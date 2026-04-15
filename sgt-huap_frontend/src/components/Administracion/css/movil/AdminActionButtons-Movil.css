@@ -1,0 +1,40 @@
+/* AdminActionButtons - Móvil */
+
+.admin-action-buttons {
+  margin-bottom: 1rem;
+}
+
+.admin-action-btn {
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  min-height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #17416C !important;
+  color: #ffffff !important;
+  border-color: #17416C !important;
+}
+
+.admin-action-btn:active {
+  transform: scale(0.98);
+  background-color: rgba(93, 133, 147, 0.9) !important;
+}
+
+.admin-action-btn:hover {
+  background-color: rgba(93, 133, 147, 0.8) !important;
+}
+
+/* En móvil, mantener 1 columna en portrait y 2 en landscape */
+.admin-action-buttons .grid {
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (orientation: landscape) and (max-width: 768px) {
+  .admin-action-buttons .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

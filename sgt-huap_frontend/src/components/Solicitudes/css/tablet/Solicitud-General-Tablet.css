@@ -1,0 +1,455 @@
+@media (min-width: 451px) and (max-width: 1024px) {
+    /* El estilo de la vista de PC es donde estan todos los colores, estos son heredados despues a la vista de tablet y movil */
+    /* De esta forma no se repetite codigo y deja los otros css libres para solo modelar y no colorear */
+
+    .solicitudes-main-header h1 {
+        color: #2c3e50;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        margin: 0;
+        font-weight: 600;
+    }
+
+    /* Menú desplegable */
+    .solicitudes-menu-container {
+        position: relative;
+        display: block;
+        width: 100%;
+        padding: 0 1rem;
+        margin-top: 56px; /* despeja el header fijo */
+    }
+
+    .menu-principal-btn {
+        width: auto; /* permite que el contenedor se ajuste al botón */
+        background-color: #17416c;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.8rem 1.2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        margin-top: 50px;
+    }
+
+    .menu-principal-btn:hover {
+        background-color: #1a4d7a;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        transform: translateY(-1px);
+    }
+
+    .menu-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        flex-shrink: 0;
+    }
+
+    .submenu-solicitudes {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        padding: 0.75rem;
+        max-width: calc(100% - 2rem);
+        margin: 0 auto;
+        position: relative;
+        z-index: 5;
+    }
+
+    /* Dropdown behavior for tablet when using the compact button */
+    .submenu-solicitudes.dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: auto;
+        width: calc(100% - 2rem);
+        border-radius: 8px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+        background: white;
+        flex-direction: column;
+    }
+
+    .submenu-btn {
+        flex: 1 1 18%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        background-color: #f8f9fa;
+        border: none;
+        padding: 0.75rem 0.75rem;
+        text-align: center;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+        border-radius: 8px;
+        min-height: 80px;
+        min-width: 110px;
+        box-sizing: border-box;
+    }
+
+    .submenu-btn:hover {
+        background-color: #e9ecef;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .turno-btn {
+        background-color: #17416C;
+        color: #ffffff;
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .turno-btn:hover {
+        background-color: #133650;
+    }
+
+    .permiso-btn {
+        background-color: #17416C;
+        color: #ffffff;
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .permiso-btn:hover {
+        background-color: #133650;
+    }
+
+    .cambio-btn {
+        background-color: #17416C;
+        color: #ffffff;
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .cambio-btn:hover {
+        background-color: #133650;
+    }
+
+    .ofrecer-btn {
+        background-color: #17416C;
+        color: #ffffff;
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .ofrecer-btn:hover {
+        background-color: #133650;
+    }
+
+    .botar-btn {
+        background-color: #17416C;
+        color: #ffffff;
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    .botar-btn:hover {
+        background-color: #133650;
+    }
+
+
+    /* Sección Mis Solicitudes */
+    .mis-solicitudes-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        margin-bottom: 1rem;
+        padding: 0 0.5rem;
+    }
+
+    .mis-solicitudes-header h2 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 1.2rem
+    }
+
+    .total-solicitudes {
+        background-color: #e2e2e2;
+        color: rgb(0, 0, 0);
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+
+    /* Estado cuando no hay solicitudes */
+    .sin-solicitudes {
+        text-align: center;
+        padding: 2rem;
+        color: #7f8c8d;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+
+    /* --- Dropdown filtros (Tipos de solicitudes) --- */
+    .filter-container {
+        display: inline-block;
+        position: relative;
+        margin: 14px 0 12px 0;
+        width: 100%;
+    }
+
+    .filter-toggle {
+        width: 100%;
+        background: #17416C;
+        color: #fff;
+        border: none;
+        padding: 0.6rem 0.9rem;
+        border-radius: 8px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        font-weight: 600;
+        transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .filter-toggle:hover { 
+        background: #133650; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .filter-toggle:active { 
+        background: #0f2a3d; 
+        transform: translateY(1px);
+    }
+
+    .filter-caret { transition: transform 0.2s ease; }
+    .filter-caret.open { transform: rotate(180deg); }
+
+    .filter-menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        right: auto;
+        width: calc(100% - 2rem);
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        z-index: 60;
+    }
+
+    .filter-item {
+        background: transparent;
+        border: none;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .filter-item:hover { background: #f1f5f9; }
+    .filter-item.active { background: #e6f0f6; font-weight: 700; }
+    .filter-item:active { background: #e6f0f6; }
+
+    .date-filters {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin: 14px 0 12px 0;
+    }
+
+    .date-filters label {
+        display: flex;
+        align-items: center;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .date-filters select {
+        margin-left: 5px;
+        padding: 0.55rem 0.9rem;
+        border: none;
+        border-radius: 8px;
+        background: #17416C;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.9rem;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.5rem center;
+        background-size: 1rem;
+        padding-right: 2.5rem;
+        transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .date-filters select:hover {
+        background: #133650;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .date-filters select:active {
+        background: #0f2a3d;
+        transform: translateY(1px);
+    }
+
+    .date-filters select:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(23, 65, 108, 0.5), 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .date-filters select option {
+        background: white;
+        color: #333;
+    }
+
+
+    /* Lista de solicitudes */
+    .solicitudes-list {
+        display: flex;
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin: 10px;
+    }
+
+    .solicitudes-list > * {
+        flex: 0 0 calc(50% - 1rem); /* 2 columnas */
+    }
+
+    /* Tarjeta de solicitud */
+    .solicitud-card {
+        background-color: #fcfcfc;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        
+        /* ALINEACIÓN Y BORDE */
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start; /* Alineamos el contenido a la izquierda */
+        border-left: 8px solid; 
+    }
+
+    /* Colores y Fondos Pastel (Se heredan o se redefinen los bordes) */
+    .solicitud-card.estado-Pendiente {
+        border-left-color: #f39c12; 
+        background-color: #fffbe6; 
+    }
+    .solicitud-card.estado-Aprobado {
+        border-left-color: #27ae60; 
+        background-color: #e6ffed; 
+    }
+    .solicitud-card.estado-Rechazado {
+        border-left-color: #e74c3c; 
+        background-color: #ffe6e6; 
+    }
+
+    .solicitud-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 12px rgba(0, 0, 0, 0.42);
+    }
+
+    .solicitud-card h4 {
+        margin: 0 0 0.8rem 0;
+        color: #2c3e50;
+        font-size: 1rem;
+        font-weight: 600;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #eee;
+    }
+
+    /* CORREGIDO: Eliminamos el background-color azul de turno-info */
+    .turno-info {
+        /* background-color: #e8f4fd; <-- ELIMINADO/COMENTADO */
+        padding: 0.8rem;
+        border-radius: 8px;
+        border-left: 0px solid #3498db;
+        /* flex: 0,7; */
+    }
+
+    /* Contenedor principal de la información */
+    .card-content-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        width: 100%;
+        margin: 0;
+    }
+    
+    /* REGLAS CLAVE DE ALINEACIÓN DE TEXTO */
+    .card-basic-info p,
+    .extra-info p,
+    .turno-info p,
+    .intercambio-info p {
+        display: flex;
+        justify-content: flex-start;
+        align-items: baseline;
+        margin: 3px 0;
+        line-height: 1.4;
+        font-size: 0.95rem; 
+    }
+
+    .card-basic-info p strong,
+    .extra-info p strong,
+    .turno-info p strong,
+    .intercambio-info p strong {
+        /* Ancho intermedio para Tablet */
+        min-width: 140px; 
+        text-align: left;
+        flex-shrink: 0;
+        padding-right: 5px;
+        font-weight: 700;
+    }
+    
+    /* ESTILOS PARA LOS BOTONES DE ACCIÓN (Tablet) */
+    .card-actions-jefatura, 
+    .card-actions-medico {
+        margin-top: 15px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+        
+        display: flex;
+        justify-content: space-between;
+        gap: 10px; /* Separación */
+        width: 100%; /* Ocupa todo el ancho de la tarjeta */
+    }
+
+    .card-actions-jefatura button, 
+    .card-actions-medico button {
+        padding: 9px 12px;
+        font-size: 0.95rem; 
+        border-radius: 6px;
+        font-weight: bold;
+        min-width: 48%; 
+        flex-grow: 1; 
+    }
+
+    /* Estilos de color de botones (Heredados del PC) */
+    .btn-aprobar { background-color: #27ae60; color: white; }
+    .btn-aprobar:hover { background-color: #219d55; }
+    .btn-rechazar { background-color: #e74c3c; color: white; }
+    .btn-rechazar:hover { background-color: #c0392b; }
+
+    .extra-info pre {
+    color: inherit !important; /* Mantener la herencia de color base */
+    /* 🌟 SOLUCIÓN AGRESIVA PARA EL COLOR AZUL DEL EMOJI 🌟 */
+    filter: grayscale(100%); 
+    /* Convierte el color de los elementos (incluidos los emojis) a escala de grises */
+    opacity: 0.8; /* Opcional: baja ligeramente la opacidad para que se integre mejor */
+}
+}

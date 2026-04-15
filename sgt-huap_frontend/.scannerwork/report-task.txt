@@ -1,0 +1,6 @@
+projectKey=Pingeso-FrontEnd
+serverUrl=http://localhost:9000
+serverVersion=25.12.0.117093
+dashboardUrl=http://localhost:9000/dashboard?id=Pingeso-FrontEnd
+ceTaskId=b4a47a2e-503c-4740-bc57-c908f4db51cb
+ceTaskUrl=http://localhost:9000/api/ce/task?id=b4a47a2e-503c-4740-bc57-c908f4db51cb

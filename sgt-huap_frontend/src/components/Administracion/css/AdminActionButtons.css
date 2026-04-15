@@ -1,0 +1,589 @@
+/* AdminActionButtons - Diseño Premium para herramientas de administración */
+
+.admin-action-buttons {
+  margin-bottom: 0;
+  position: relative;
+  z-index: 100;
+  background: transparent;
+  padding: 0;
+}
+
+/* Contenedor de herramientas */
+.admin-tools-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Label de herramientas */
+.admin-tools-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  flex-basis: 100%;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* Botón de ayuda (pequeño ?) */
+.admin-help-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #17416C 0%, #1e5a9e 100%);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  cursor: pointer;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(23, 65, 108, 0.25);
+  transition: all 0.2s ease;
+}
+
+.admin-help-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(23, 65, 108, 0.35);
+}
+
+/* Panel de ayuda desplegable */
+.admin-help-panel {
+  position: absolute;
+  left: 8px;
+  top: 48px;
+  width: 320px;
+  max-height: 380px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #e6eef8;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  z-index: 210;
+}
+
+.admin-help-panel h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+}
+
+.admin-help-item {
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.admin-help-item small {
+  display: block;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+/* Botón de despliegue para móvil */
+.admin-actions-toggle {
+  display: none;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  background-color: #17416C;
+  color: #fff;
+  border: 1px solid #17416C;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.3s ease-in-out;
+}
+
+.admin-actions-toggle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(23, 65, 108, 0.3);
+}
+
+.admin-actions-toggle .chevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  transition: transform 0.2s ease-in-out;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  display: inline-block;
+  padding: 3px;
+  margin-top: 0;
+}
+
+.admin-actions-toggle .chevron.open {
+  transform: rotate(-135deg);
+}
+
+.admin-action-btn {
+  padding: 0.625rem 1rem;
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background: linear-gradient(135deg, #17416C 0%, #1e5a9e 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(23, 65, 108, 0.25);
+  min-height: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-action-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: left 0.5s ease;
+}
+
+.admin-action-btn:hover::before {
+  left: 100%;
+}
+
+.admin-action-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-action-btn-content svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* Item wrapper for action + description */
+.admin-action-item {
+  background: #ffffff;
+  border: 1px solid #e6eef8;
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+
+/* Descripción ubicada encima del botón (dentro de la tarjeta) */
+.admin-action-desc {
+  font-size: 0.9rem;
+  color: #475569;
+  /* gris azulado */
+  line-height: 1.25;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+  margin: 0;
+}
+
+.admin-action-desc strong {
+  display: block;
+  color: #0f172a;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+/* Garantizar que el botón ocupe todo el ancho dentro de la tarjeta */
+.admin-action-item .admin-action-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.admin-action-btn:focus {
+  outline: 2px solid rgba(23, 65, 108, 0.4);
+  outline-offset: 2px;
+}
+
+.admin-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(23, 65, 108, 0.35);
+  background: linear-gradient(135deg, #1e5a9e 0%, #2563eb 100%);
+}
+
+.admin-action-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(23, 65, 108, 0.25);
+}
+
+.admin-action-btn.active {
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.admin-action-btn.active:hover {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
+}
+
+/* Grid responsivo - layout horizontal por defecto */
+.admin-action-buttons .grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* Secciones dentro de la matriz de botones */
+.admin-section {
+  background: #ffffff;
+  border: 1px solid #e6eef8;
+  padding: 12px;
+  position: relative;
+  padding-top: 1.5rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04);
+}
+
+.admin-section strong {
+  font-size: 0.975rem;
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+}
+
+.admin-section small {
+  display: block;
+  color: #64748b;
+  font-size: 0.78rem;
+  margin-bottom: 10px;
+}
+
+.admin-section-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-section .admin-action-btn {
+  min-width: 180px;
+  max-width: 320px;
+  flex: 1 1 auto;
+  background: linear-gradient(180deg, #17416C 0%, #1E3A8A 100%);
+}
+
+.admin-section .admin-action-btn .admin-action-btn-content span {
+  font-weight: 600;
+}
+
+.admin-section .admin-action-btn svg {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 3px;
+}
+
+/* === RESPONSIVE BREAKPOINTS ESPECÍFICOS === */
+
+/* Móvil (≤768px) */
+@media (max-width: 768px) {
+  .admin-action-buttons {
+    margin-bottom: 1rem;
+  }
+
+  /* Mostrar el botón de despliegue solo en móvil */
+  .admin-actions-toggle {
+    display: block;
+  }
+
+  .admin-action-btn {
+    padding: 1rem 1.25rem;
+    font-size: 1rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    min-height: 3.5rem;
+  }
+
+  .admin-action-btn:active {
+    transform: scale(0.98);
+  }
+
+  .admin-action-buttons .grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    overflow: hidden;
+    /* Transición suave de desplegar/colapsar */
+    transition: max-height 320ms ease, opacity 280ms ease;
+  }
+
+  /* Estado contraído del contenedor (oculta la grilla) */
+  .admin-action-buttons .grid.collapsed {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Estado abierto: usar un max-height alto para permitir la animación */
+  .admin-action-buttons .grid.open {
+    max-height: 1200px;
+    /* suficiente para la mayoría de listas */
+    opacity: 1;
+  }
+
+  /* Landscape móvil */
+  @media (orientation: landscape) {
+    .admin-action-buttons .grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+}
+
+/* Tablet (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .admin-action-btn {
+    padding: 0.8rem 1rem;
+    font-size: 0.875rem;
+    min-height: 3rem;
+  }
+
+  .admin-action-buttons .grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+}
+
+/* Desktop (≥1025px) */
+@media (min-width: 1025px) {
+  .admin-action-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    min-height: 2.75rem;
+  }
+
+  .admin-action-buttons .grid {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+}
+
+/* Desktop extra ancho (≥1400px) */
+@media (min-width: 1400px) {
+  .admin-action-buttons .grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* === MENÚ DESPLEGABLE RESPONSIVE === */
+
+/* Contenedor del dropdown */
+.admin-tools-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+/* Botón principal del menú (móviles) */
+.admin-tools-main-btn {
+  min-width: 200px !important;
+  justify-content: space-between !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.admin-tools-main-btn .admin-action-btn-content {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.admin-tools-main-btn span {
+  flex: 1;
+  text-align: left;
+}
+
+/* Flecha del botón principal */
+.admin-tools-chevron {
+  transition: transform 0.3s ease;
+  margin-left: 0.5rem;
+}
+
+.admin-tools-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+/* Menú desplegable */
+.admin-tools-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 0.5rem;
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Items del menú */
+.admin-tools-menu-item {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-tools-menu-item:last-child {
+  border-bottom: none;
+}
+
+.admin-tools-menu-item:hover {
+  background: rgba(23, 65, 108, 0.06);
+}
+
+.admin-tools-menu-item.active {
+  background: rgba(23, 65, 108, 0.08);
+  color: #17416C;
+  font-weight: 600;
+}
+
+.admin-tools-menu-item.active svg {
+  color: #17416C;
+}
+
+.admin-tools-menu-item-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.admin-tools-menu-item svg {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+/* Responsive para el menú */
+@media (max-width: 480px) {
+  .admin-tools-main-btn {
+    min-width: 180px !important;
+    font-size: 0.875rem !important;
+  }
+
+  .admin-tools-menu-item {
+    padding: 0.75rem 0.875rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* === ESTILOS RESPONSIVE PARA TEXTOS CORTOS === */
+
+/* Tablet: texto más compacto */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .admin-action-btn {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.75rem;
+    min-width: 120px;
+  }
+
+  .admin-action-btn-content {
+    gap: 0.375rem;
+  }
+
+  .admin-action-btn-content svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+/* Móvil pequeño: texto aún más compacto */
+@media (max-width: 480px) {
+  .admin-action-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.7rem;
+    min-width: 100px;
+  }
+
+  .admin-action-btn-content {
+    gap: 0.25rem;
+  }
+
+  .admin-action-btn-content svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
+/* Pantallas muy pequeñas: ocultar texto y mostrar solo iconos */
+@media (max-width: 360px) {
+  .admin-action-btn .admin-action-btn-content span {
+    display: none;
+  }
+
+  .admin-action-btn {
+    padding: 0.5rem;
+    min-width: 44px;
+    width: 44px;
+    justify-content: center;
+  }
+}
+
+/* Badge para notificaciones en botones */
+.admin-btn-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ef4444;
+  /* Rojo vibrante */
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  padding: 0 6px;
+  margin-left: auto;
+  /* Empujar a la derecha */
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4);
+  line-height: 1;
+}

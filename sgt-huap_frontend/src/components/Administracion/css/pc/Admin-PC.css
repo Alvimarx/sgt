@@ -1,0 +1,146 @@
+/* Admin desktop specific styles (kept minimal so behavior/visuals unchanged).
+	This file exists to allow device-specific imports from AdminPage.jsx. */
+.admin-pc-placeholder { --admin-placeholder: 1; }
+
+/* Modern Hours Widget PC Styles */
+.modern-hours-widget {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.modern-hours-widget:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.modern-hours-widget::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #7c3aed 0%, #a855f7 50%, #c084fc 100%);
+}
+
+.modern-hours-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.modern-hours-icon {
+  color: #7c3aed;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.modern-hours-title-section {
+  flex: 1;
+}
+
+.modern-hours-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.modern-hours-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0.25rem 0 0 0;
+  font-weight: 400;
+}
+
+.modern-hours-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.modern-hours-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #7c3aed;
+  line-height: 1;
+}
+
+.modern-hours-trend {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-radius: 20px;
+  border: 1px solid #86efac;
+}
+
+.modern-hours-trend-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.modern-hours-trend-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.modern-hours-trend-label {
+  font-size: 0.75rem;
+  color: #15803d;
+  font-weight: 500;
+}
+
+.modern-hours-chart {
+  margin-bottom: 1rem;
+}
+
+.modern-hours-chart-svg {
+  width: 100%;
+  height: 60px;
+}
+
+.modern-hours-stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.modern-hours-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.modern-hours-stat-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.modern-hours-stat-value {
+  font-size: 0.875rem;
+  color: #1e293b;
+  font-weight: 600;
+}

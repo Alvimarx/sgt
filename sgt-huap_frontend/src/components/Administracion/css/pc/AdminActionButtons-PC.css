@@ -1,0 +1,37 @@
+/* AdminActionButtons - PC/Desktop */
+
+.admin-action-buttons {
+  margin-bottom: 1.5rem;
+}
+
+.admin-action-btn {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  min-height: 2.75rem;
+  background-color: #17416C !important;
+  color: #ffffff !important;
+  border-color: #17416C !important;
+}
+
+.admin-action-btn:hover {
+  background-color: rgba(93, 133, 147, 0.8) !important;
+}
+
+.admin-action-btn:active {
+  background-color: rgba(93, 133, 147, 0.9) !important;
+}
+
+/* En desktop, usar siempre 3 columnas */
+.admin-action-buttons .grid {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+/* En pantallas extra anchas, permitir hasta 4 columnas si hay muchos botones */
+@media (min-width: 1400px) {
+  .admin-action-buttons .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

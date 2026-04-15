@@ -1,0 +1,39 @@
+/* Correcciones para PC de Solicitud-Ofrecer */
+/* Se asegura de sobreescribir los estilos móviles */
+
+/* El contenedor principal debe ser mas ancho en PC para acomodar el calendario */
+.root-solicitud-ofrecer .formulario-card {
+    width: 80%;
+    max-width: 1200px; /* Igual que Solicitud-Turno */
+    margin: 0 auto;
+    padding: 20px 40px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* Ajustes para el botón de selección de turno */
+.root-solicitud-ofrecer .btn-seleccionar-turno {
+    font-size: 1.1rem;
+    padding: 14px 18px;
+}
+
+/* Ajustes para el menú de turnos (lista/calendario) */
+.root-solicitud-ofrecer .menu-turnos {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* Botones de vista (Listado / Calendario) */
+.root-solicitud-ofrecer .vista-btn {
+    font-size: 1rem;
+    padding: 12px 0;
+}
+
+/* Responsive para pantallas medianas pero aún de escritorio */
+@media (max-width: 1200px) {
+    .root-solicitud-ofrecer .formulario-card {
+        width: 95%;
+        max-width: none;
+        padding: 15px 20px;
+    }
+}

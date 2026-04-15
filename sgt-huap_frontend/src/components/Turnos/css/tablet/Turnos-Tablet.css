@@ -1,0 +1,335 @@
+/* Estilos para tablet (entre 768px y 1200px) */
+@media (min-width: 768px) and (max-width: 1200px) {
+
+  .turnos-root.desktop {
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .turnos-header {
+    padding: 10px 12px;
+    margin: 0;
+  }
+
+  /* Dos columnas, un poco más compactas */
+  .turnos-layout {
+    grid-template-columns: 2fr 1fr;
+    gap: 10px;
+    padding: 0 10px 10px 10px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .mis-turnos,
+  .turnos-disponibles {
+    padding: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .mis-turnos h3 {
+    margin: 0 0 6px 0;
+    padding: 6px 10px;
+    font-size: 1.2rem;
+  }
+
+  .calendar-header {
+    padding: 6px 0;
+    margin-bottom: 6px;
+  }
+
+  /* Dropdown container */
+  .turnos-dropdown-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    transition: flex 0.3s ease;
+  }
+
+  /* Collapsed state - takes minimal space */
+  .turnos-dropdown-container.dropdown-collapsed {
+    flex: 0 0 auto;
+  }
+
+  /* Expanded state - takes all available space */
+  .turnos-dropdown-container.dropdown-expanded {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .turnos-dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 10px;
+    background-color: #fff;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    margin-bottom: 6px;
+    transition: background-color 0.2s ease;
+    flex-shrink: 0;
+  }
+
+  .turnos-dropdown-header:hover {
+    background-color: #f8f9fa;
+  }
+
+  .turnos-dropdown-header h3 {
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    background-color: transparent;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #343a40;
+  }
+
+  .dropdown-arrow {
+    font-size: 0.9rem;
+    color: #6c757d;
+    display: inline-block;
+    margin-left: 6px;
+  }
+
+  /* Lista de disponibles */
+  .turnos-disponibles-list {
+    padding: 0 4px 0 0;
+    margin: 0;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  /* Custom light scrollbar for tablet */
+  .turnos-disponibles-list::-webkit-scrollbar {
+    width: 7px;
+  }
+
+  .turnos-disponibles-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+
+  .turnos-disponibles-list::-webkit-scrollbar-thumb {
+    background: #d0d0d0;
+    border-radius: 3px;
+  }
+
+  .turnos-disponibles-list::-webkit-scrollbar-thumb:hover {
+    background: #b0b0b0;
+  }
+
+  /* Firefox scrollbar */
+  .turnos-disponibles-list {
+    scrollbar-width: thin;
+    scrollbar-color: #d0d0d0 #f1f1f1;
+  }
+
+  .turno-disponible {
+    padding: 10px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.2s ease;
+  }
+
+  .turno-disponible:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  }
+
+  .turno-disponible-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+}
+
+/* Contenedor de badges */
+.turno-info-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+/* Badge individual */
+.turno-badge {
+  display: inline-block;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 5px 11px;
+  font-size: 0.82rem;
+  color: #000000;
+  white-space: nowrap;
+}
+
+.turno-badge strong {
+  color: #000000;
+  margin-right: 4px;
+}
+
+/* Contenedor de acciones/botones */
+.turno-disponible-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Botón "Soltar turno" */
+.btn-soltar-turno {
+  background-color: #FF0000;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.btn-soltar-turno:hover {
+  background-color: #cc0000;
+  box-shadow: 0 2px 6px rgba(255, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-soltar-turno:active {
+  transform: translateY(0);
+}
+
+/* Botón "Ofrecer intercambio de turno" */
+.btn-ofrecer-intercambio {
+  background-color: #17416C;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.btn-ofrecer-intercambio:hover {
+  background-color: #0f2d4d;
+  box-shadow: 0 2px 6px rgba(23, 65, 108, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-ofrecer-intercambio:active {
+  transform: translateY(0);
+}
+
+/* Botón "Ofrecer turno" */
+.btn-ofrecer-turno {
+  background-color: #5D8593;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.btn-ofrecer-turno:hover {
+  background-color: #4a6a76;
+  box-shadow: 0 2px 6px rgba(93, 133, 147, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-ofrecer-turno:active {
+  transform: translateY(0);
+}
+
+/* Botón "Postular a turno" */
+.btn-postular-turno {
+  background-color: #28a745;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.btn-postular-turno:hover {
+  background-color: #218838;
+  box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-postular-turno:active {
+  transform: translateY(0);
+}
+
+/* Estilos para los títulos H3 en tablet */
+@media (min-width: 768px) and (max-width: 1200px) {
+  .turnos-layout h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #343a40;
+    margin: 0 0 6px 0;
+    background-color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    text-align: center;
+  }
+}
+
+.custom-warning-box {
+    /* Fondo naranja suave y borde */
+    background-color: #fcf8e3; /* Color de fondo similar al de la imagen */
+    border: 1px solid #f9e28f; /* Borde suave */
+    color: #8a6d3b; /* Color de texto más oscuro */
+    padding: 10px 15px;
+    margin: 15px 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+    max-width: 100%; /* Ajusta el ancho según tu diseño */
+}
+
+.warning-icon {
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.warning-text {
+    flex-grow: 1; /* Permite que el texto ocupe el espacio */
+}
+
+.close-warning-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #8a6d3b;
+    margin-left: 10px;
+}

@@ -1,0 +1,12 @@
+Nota: las claves de los nuevos medios son las primeras 3 letras del apellido paterno y los ultimos 3 numeros del rit sin dijito verificador.
+
+Ejemplo: 
+`viewPersonal` (`nombre`, `apel_pat`, `apel_mat`, `rut`, `dv`, `telefono`, `email`,...
+('Tania', 'Bustos', 'Jorge', '19178519', '3', '+56910000000', 'tania.bustos@hospital.prueba.cl'...
+
+la clave seria "bus519"
+
+
+select * from innhosp.viewPersonal where rut='19178519' and dv='3' and clave=sha2('bus519', 512) 
+
+Nota:Los antiguos de test siguen siendo huap2025

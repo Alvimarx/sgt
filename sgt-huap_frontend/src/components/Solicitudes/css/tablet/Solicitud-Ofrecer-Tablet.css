@@ -1,0 +1,29 @@
+.modal-overlay {
+    padding: 16px;
+}
+
+.modal-content {
+    max-width: 600px;
+    color-scheme: light; 
+}
+
+.modal-title {
+    font-size: 22px;
+}
+
+.input-field {
+    font-size: 15px;
+}
+
+.button-group {
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.btn-publicar {
+    background-color: #456689;
+    color: #fff;
+}
+.btn-publicar:hover {
+    background-color: #456689;
+}

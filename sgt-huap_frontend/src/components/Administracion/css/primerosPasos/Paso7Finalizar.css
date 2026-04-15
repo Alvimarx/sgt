@@ -1,0 +1,81 @@
+.paso7-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 450px;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.p7-card {
+    text-align: center;
+    max-width: 600px;
+    width: 100%;
+    padding: 20px;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.p7-icon-wrapper {
+    margin-bottom: 20px;
+}
+
+.p7-icon {
+    font-size: 5rem;
+    animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.p7-card h1 {
+    color: #17416c;
+    font-size: 2.2rem;
+    margin: 0 0 15px 0;
+}
+
+.p7-card p {
+    color: #64748b;
+    font-size: 1.1rem;
+    margin: 0 0 30px 0;
+}
+
+.p7-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    background: #f8fafc;
+    padding: 25px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.p7-item {
+    font-weight: 600;
+    color: #334155;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.p7-message {
+    color: #475569;
+    font-size: 0.95rem;
+    background: #eff6ff;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px dashed #bfdbfe;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fadeInUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@media (max-width: 600px) {
+    .p7-summary { grid-template-columns: 1fr; }
+}

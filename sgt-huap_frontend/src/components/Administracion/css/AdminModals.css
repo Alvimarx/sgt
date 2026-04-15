@@ -1,0 +1,343 @@
+/* Estilos específicos para modales de administración - consistencia total */
+
+/* Asegurar que todos los modales de admin usen la misma estructura visual */
+.admin-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.admin-modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 95%;
+    max-width: 1200px; /* Mucho más ancho para aprovechar pantallas grandes */
+    max-height: 90vh; /* Más altura también */
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    overflow: hidden; /* Evitar desbordamiento */
+}
+
+.admin-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(14, 20, 30, 0.04);
+    background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+    flex-shrink: 0;
+    position: relative; /* Para posicionar el botón de cerrar de forma absoluta */
+}
+
+.admin-modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #102a43;
+    font-weight: 800;
+}
+
+.modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.modal-header-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(23,65,108,0.95), rgba(30,58,138,0.95));
+    color: white;
+    box-shadow: 0 6px 18px rgba(14, 25, 40, 0.08);
+}
+
+.modal-header-text h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #0f172a;
+    letter-spacing: -0.2px;
+}
+
+.modal-header-subtitle {
+    margin: 4px 0 0 0;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.25;
+}
+
+.admin-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute; /* Posición absoluta para que no afecte el centrado */
+    right: 20px; /* Ubicar en la esquina derecha */
+    top: 50%;
+    transform: translateY(-50%); /* Centrar verticalmente */
+}
+
+.admin-modal-close:hover {
+    color: #e74c3c;
+}
+
+.admin-modal-body {
+    padding: 30px; /* Más padding para aprovechar el espacio */
+    overflow-y: auto;
+    flex: 1;
+    background: #fafafa; /* Fondo consistente */
+    min-height: 0; /* Permitir que el contenido se contraiga */
+    font-size: 16px; /* Tamaño de fuente base aumentado */
+}
+
+/* Asegurar que el contenido dentro del body tenga estilos consistentes */
+.admin-modal-body > * {
+    background: white !important;
+    border-radius: 8px !important;
+    padding: 30px !important; /* Más padding interno */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    border: none !important;
+    min-height: auto; /* Cambiar a auto para permitir contenido más pequeño */
+}
+
+/* Reset para formularios dentro del modal */
+.admin-modal-body form,
+.admin-modal-body .formulario-card,
+.admin-modal-body .formulario-overlay {
+    background: white !important;
+    border-radius: 8px !important;
+    padding: 30px !important; /* Más padding */
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    min-height: 300px !important; /* Reducido de 400px a 300px para formularios */
+}
+
+/* Reset para tablas dentro del modal */
+.admin-modal-body table,
+.admin-modal-body .table-container {
+    background: white !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+    min-height: auto !important; /* Cambiar a auto para permitir tablas más pequeñas */
+}
+
+.admin-modal-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #eee;
+    background: white;
+    flex-shrink: 0;
+}
+
+.admin-modal-done-btn {
+    width: 100%;
+    padding: 12px;
+    background: #17416C;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: background 0.2s ease;
+}
+
+.admin-modal-done-btn:hover {
+    background: #0f2d4d;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .admin-modal-content {
+        width: 95%;
+        max-width: none;
+        max-height: 90vh;
+        margin: 20px;
+    }
+    
+    .admin-modal-header,
+    .admin-modal-body,
+    .admin-modal-footer {
+        padding: 16px;
+    }
+    
+    .admin-modal-body > *,
+    .admin-modal-body form,
+    .admin-modal-body .formulario-card,
+    .admin-modal-body .formulario-overlay {
+        padding: 16px !important;
+        min-height: auto !important;
+    }
+}
+
+    /* Rotativa stepper cards */
+    .rotativa-steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+    }
+
+    .rotativa-step {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px solid #e6eef8;
+        background: #ffffff;
+        cursor: pointer;
+        transition: transform 160ms ease, box-shadow 160ms ease;
+        width: 100%;
+        text-align: left;
+    }
+
+    .rotativa-step:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 10px 30px rgba(15,23,42,0.08);
+    }
+
+    .rotativa-step-number {
+        background: #17416C;
+        color: white;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+    }
+
+    .rotativa-step-body {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .rotativa-step-body strong {
+        font-size: 15px;
+        color: #0f172a;
+    }
+
+    .rotativa-step-body span {
+        font-size: 13px;
+        color: #64748b;
+    }
+
+    .rotativa-step-chevron {
+        margin-left: auto;
+        color: #cbd5e1;
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    /* Previously, the final step had a different default color. Removed
+       to keep consistent aesthetics across all steps. Active state still
+       uses the per-button --step-color variable when set. */
+
+    /* Active state: use the per-button CSS variable --step-color */
+    .rotativa-step.active {
+        border-color: var(--step-color, #17416C);
+        box-shadow: 0 14px 40px rgba(15,23,42,0.12);
+        transform: translateY(-6px) scale(1.01);
+    }
+
+    .rotativa-step.active .rotativa-step-number {
+        background: var(--step-color, #17416C);
+        box-shadow: 0 6px 18px rgba(15,23,42,0.14);
+    }
+
+    .rotativa-step.active .rotativa-step-chevron {
+        color: var(--step-color, #17416C);
+    }
+
+/* Desktop optimizations - aprovechar pantallas grandes */
+@media (min-width: 1024px) {
+    .admin-modal-content {
+        width: 85%;
+        max-width: 1400px; /* Aún más ancho en pantallas muy grandes */
+    }
+    
+    .admin-modal-body {
+        padding: 40px; /* Más espacio en desktop */
+    }
+    
+    .admin-modal-body > *,
+    .admin-modal-body form,
+    .admin-modal-body .formulario-card,
+    .admin-modal-body .formulario-overlay {
+        padding: 40px !important;
+        min-height: auto !important; /* Cambiar a auto para permitir contenido adaptable */
+    }
+
+    /* Solo aplicar min-height a formularios en desktop */
+    .admin-modal-body form,
+    .admin-modal-body .formulario-card,
+    .admin-modal-body .formulario-overlay {
+        min-height: 400px !important;
+    }
+}
+
+/* Asegurar que cualquier componente hijo respete el diseño del modal */
+.admin-modal-body .bg-white {
+    background: white !important;
+}
+
+.admin-modal-body .rounded,
+.admin-modal-body .rounded-lg {
+    border-radius: 8px !important;
+}
+
+.admin-modal-body .shadow,
+.admin-modal-body .shadow-sm {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+
+/* Aumentar tamaño de fuente en elementos dentro del modal */
+.admin-modal-body p,
+.admin-modal-body div,
+.admin-modal-body label,
+.admin-modal-body input,
+.admin-modal-body select,
+.admin-modal-body textarea,
+.admin-modal-body button:not(.admin-modal-close) {
+    font-size: 16px !important;
+}
+
+.admin-modal-body .text-xs {
+    font-size: 14px !important;
+}
+
+.admin-modal-body .text-sm {
+    font-size: 15px !important;
+}
+
+.admin-modal-body strong,
+.admin-modal-body .font-medium,
+.admin-modal-body .font-semibold {
+    font-size: 16px !important;
+}
+
+/* Aumentar tamaño de fuente en tablas */
+.admin-modal-body table th,
+.admin-modal-body table td {
+    font-size: 15px !important;
+}

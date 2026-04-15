@@ -1,0 +1,387 @@
+/* =========================================
+   1. ESTILOS GENERALES (BASE / PC)
+   ========================================= */
+
+.creator-tipo-turno-page {
+  min-height: 100vh;
+  background-color: #f5f7fb;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  box-sizing: border-box;
+  margin-top: 60px; /* Ajuste para header fijo */
+  color-scheme: light;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  align-items: center; /* Centrar contenido en PC */
+}
+
+/* --- Encabezados --- */
+.ctt-header {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto 24px auto;
+}
+.ctt-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #17416c;
+  margin: 0;
+}
+.ctt-header p {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 16px;
+}
+
+/* --- Tarjetas Contenedoras --- */
+.ctt-priority-layout,
+.ctt-matriz-section,
+.ctt-actions-section {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto 24px auto;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 30px rgba(23, 65, 108, 0.05);
+  border: 1px solid #e2e8f0;
+  box-sizing: border-box;
+}
+
+/* --- Help Box --- */
+.ctt-help-box {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  grid-column: 1 / -1;
+}
+.ctt-help-icon {
+  background-color: #3b82f6;
+  color: white;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 14px; flex-shrink: 0;
+}
+.ctt-help-content p { margin: 0; font-size: 14px; color: #1e3a8a; }
+
+
+/* =========================================
+   2. LAYOUT SUPERIOR (Categorías y Tipos)
+   ========================================= */
+.ctt-priority-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.ctt-priority-column h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #17416c;
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+/* --- Inputs y Labels --- */
+.ctt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.ctt-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+.ctt-field input {
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #fff;
+}
+.ctt-field input:focus {
+  outline: none; border-color: #17416c; box-shadow: 0 0 0 3px rgba(23, 65, 108, 0.1);
+}
+
+/* Badge Editando */
+.ctt-editing-badge {
+  position: absolute;
+  top: -24px; right: 0;
+  background-color: #fee2e2; color: #b91c1c;
+  font-size: 10px; font-weight: 700;
+  padding: 4px 8px; border-radius: 6px;
+}
+
+/* --- Listas Arrastrables --- */
+.priority-list {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px;
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.priority-item {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 14px; color: #334155; font-weight: 500;
+  cursor: grab;
+}
+.priority-item.is-selected {
+  background-color: #eff6ff; border-color: #3b82f6; color: #1d4ed8;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+.priority-item.item-new {
+  background-color: #17416c; border-color: #0f2d4a; color: white;
+}
+.priority-badge {
+  font-size: 10px; background: #f1f5f9; padding: 2px 8px; border-radius: 99px; color: #64748b;
+}
+
+/* --- Botones de Categoría (Fila) --- */
+.ctt-category-btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.ctt-btn-add-full {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px dashed #cbd5e1;
+  background: transparent;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.ctt-btn-add-full:hover:not(:disabled) {
+  border-color: #17416c; color: #17416c; background: #f8fafc;
+}
+.ctt-btn-add-full:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}
+
+
+/* =========================================
+   3. MATRIZ (EDITOR)
+   ========================================= */
+.ctt-matriz-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 16px;
+}
+.ctt-header-info h2 { font-size: 20px; margin: 0 0 4px 0; color: #17416c; }
+.ctt-header-info p { margin: 0; color: #64748b; font-size: 14px; }
+
+.ctt-matriz-controls { display: flex; gap: 12px; align-items: center; }
+
+/* Toggle */
+.ctt-mode-toggle {
+  background: #f1f5f9; padding: 4px; border-radius: 8px; display: flex; gap: 4px;
+}
+.ctt-mode-toggle span { font-size: 11px; font-weight: 700; color: #64748b; margin: auto 8px; }
+.ctt-btn-mode {
+  border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  cursor: pointer; background: transparent; color: #64748b;
+}
+.ctt-btn-mode.active { background: #17416c; color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+.ctt-video-help-btn {
+  width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: white;
+  border: none; font-weight: bold; cursor: pointer;
+}
+
+/* Grid Scroll */
+.ctt-matriz-container { overflow-x: auto; padding-bottom: 12px; }
+.ctt-semana-grid { margin-bottom: 32px; min-width: 800px; /* PC Width */ }
+.ctt-semana-grid h3 {
+  font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 12px; text-transform: uppercase;
+}
+
+.ctt-dias-container {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;
+}
+.ctt-dia-columna {
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px;
+}
+.ctt-dia-columna h4 {
+  text-align: center; font-size: 11px; font-weight: 700; margin: 0 0 8px 0; color: #64748b;
+}
+.ctt-dia-slot {
+  min-height: 50px; border: 2px dashed #cbd5e1; border-radius: 6px; padding: 4px;
+}
+.ctt-block {
+  min-height: 40px; padding: 4px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  text-align: center; display: flex; align-items: center; justify-content: center;
+  word-break: break-word; cursor: grab;
+}
+.block-placeholder { background: white; border: 1px solid #cbd5e1; color: #64748b; }
+.block-placeholder-moved { background: #0ea5e9; color: white; border: 1px solid #0284c7; }
+.block-tipo-creado { background: #ef4444; color: white; border: 1px solid #b91c1c; }
+
+.ctt-semana-actions { display: flex; gap: 12px; margin-top: -12px; }
+
+
+/* =========================================
+   4. ACCIONES (FOOTER)
+   ========================================= */
+.ctt-actions-section {
+  display: flex; justify-content: flex-end; align-items: center; gap: 12px;
+  padding-top: 24px; margin-top: 24px; border-top: 1px solid #e2e8f0;
+}
+.ctt-actions-right { display: flex; gap: 12px; }
+
+.ctt-btn {
+  padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px;
+  border: none; cursor: pointer;
+}
+.ctt-btn.primary { background: #17416c; color: white; }
+.ctt-btn.secondary { background: white; border: 1px solid #17416c; color: #17416c; }
+.ctt-btn.cancel { background: #f1f5f9; color: #475569; }
+.ctt-btn.warning { background: #f59e0b; color: white; }
+.ctt-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Modales y Errores */
+.ctt-error-bar, .ctt-success-bar {
+  max-width: 1200px; margin: 0 auto 16px; padding: 12px; border-radius: 8px; text-align: center;
+}
+.ctt-error-bar { background: #fee2e2; color: #991b1b; }
+
+.ctt-modal-backdrop {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15,23,42,0.6); display: flex; justify-content: center; align-items: center; z-index: 9999;
+}
+.ctt-modal-content {
+  background: white; padding: 32px; border-radius: 16px; width: 90%; max-width: 450px;
+}
+.ctt-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+
+
+/* =========================================
+   5. VISTA MÓVIL OPTIMIZADA (CENTRADA)
+   ========================================= */
+@media screen and (max-width: 600px) {
+
+  /* A. Resetear Contenedores Padres */
+  .onboarding-container, .step-content-card {
+    padding: 0 !important;
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex; 
+    flex-direction: column;
+    align-items: center; /* Asegura centrado vertical */
+  }
+
+  .creator-tipo-turno-page {
+    padding: 0 !important;
+    margin-top: 0 !important;
+    width: 100% !important;
+    padding-bottom: 140px !important;
+    align-items: center; /* Centra las tarjetas horizontalmente */
+  }
+
+  /* B. Tarjetas Centradas con Márgenes */
+  .ctt-header,
+  .ctt-priority-layout, 
+  .ctt-matriz-section, 
+  .ctt-actions-section {
+    /* CLAVE DEL CENTRADO: Ancho < 100% y márgenes automáticos */
+    width: 92% !important; 
+    max-width: 450px !important; /* Que no se hagan gigantes en móviles grandes */
+    margin-left: auto !important;
+    margin-right: auto !important;
+    margin-bottom: 16px !important;
+
+    padding: 16px !important;
+    border-radius: 12px !important;
+    background: #ffffff !important; 
+    border: 1px solid #e2e8f0 !important;
+    box-sizing: border-box !important;
+  }
+  
+  .ctt-header { padding: 0 !important; background: transparent !important; border: none !important; margin-bottom: 8px !important; }
+
+  /* C. Layout de Columnas (Una encima de otra) */
+  .ctt-priority-layout {
+    grid-template-columns: 1fr !important;
+    gap: 24px !important;
+  }
+
+  .ctt-priority-column h2 {
+    font-size: 16px !important;
+    margin-bottom: 12px !important;
+    color: #0f172a;
+  }
+
+  /* D. Listas y Botones */
+  .priority-list { max-height: 200px; }
+  .ctt-category-btn-row { gap: 8px; }
+  .ctt-btn-add-full { font-size: 12px; padding: 10px 4px; }
+
+  /* E. Inputs */
+  .ctt-field label { font-size: 11px; }
+  .ctt-editing-badge {
+    position: relative; top: auto; right: auto;
+    display: inline-block; margin-bottom: 4px; align-self: flex-start;
+  }
+
+  /* F. Matriz (Simplificada y contenida en la tarjeta) */
+  .ctt-matriz-container {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: auto;
+  }
+
+  .ctt-matriz-header {
+    flex-direction: column; align-items: flex-start; gap: 12px;
+  }
+  .ctt-header-info p { display: none; }
+  .ctt-matriz-controls { width: 100%; justify-content: space-between; }
+  .ctt-mode-toggle { flex-grow: 1; justify-content: center; }
+
+  /* G. Grid Compacta */
+  .ctt-semana-grid {
+    min-width: unset !important; width: 100% !important;
+    margin-bottom: 20px; border-bottom: 4px solid #f1f5f9; padding-bottom: 12px;
+  }
+  .ctt-semana-grid h3 { margin-left: 0; }
+  .ctt-dias-container {
+    display: grid !important; grid-template-columns: repeat(7, 1fr) !important; gap: 2px !important;
+  }
+  .ctt-dia-columna { padding: 0 !important; background: transparent !important; border: none !important; }
+  .ctt-dia-columna h4 { font-size: 9px !important; margin-bottom: 4px; }
+  .ctt-dia-slot {
+    height: 55px !important; padding: 1px !important; background: #fff; border: 1px solid #e2e8f0;
+  }
+  .ctt-block { font-size: 8px !important; padding: 1px !important; line-height: 1; }
+
+  /* H. Botones Finales */
+  .ctt-actions-section { flexDirection: column-reverse; gap: 12px; }
+  .ctt-actions-right, .ctt-actions-left { width: 100%; flex-direction: column; gap: 10px; }
+  .ctt-btn { width: 100%; padding: 14px; }
+  
+  /* Ocultar elementos innecesarios */
+  .ctt-header p, .ctt-instruction-text, .ctt-help-box { display: none !important; }
+  .ctt-header h1 { font-size: 22px; text-align: center; width: 100%; }
+}

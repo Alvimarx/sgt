@@ -1,0 +1,265 @@
+@media (min-width: 1025px) {
+    .topbar-menu {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        background-color: #FF0000;
+        color: white;
+        z-index: 1000;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        container-type: inline-size;
+    }
+
+    .topbar-menu-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 70px;
+        padding: 0 16px;
+        position: relative;
+        max-width: 100%;
+        margin: 0 auto;
+    }
+
+    .topbar-menu-logo .topbar-menu-logo-text {
+        font-size: 28px;
+    }
+}
+
+@media (min-width: 1025px) {
+    .topbar-menu-logo:hover {
+        opacity: 0.9;
+    }
+
+    .topbar-menu-logo:active {
+        color: white;
+        text-decoration: none;
+    }
+
+    .topbar-menu-logo img {
+        height: 45px;
+        width: auto;
+        transition: transform 0.2s ease;
+    }
+
+    .topbar-menu-logo:hover img {
+        transform: scale(1.05);
+    }
+
+    .topbar-menu-toggle {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        display: none;
+        padding: 8px;
+        border-radius: 4px;
+        transition: background-color 0.2s ease;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .topbar-menu-links {
+        list-style: none;
+        display: flex;
+        gap: 24px;
+        margin: 0;
+        padding: 0;
+    }
+
+    .topbar-menu-links.desktop {
+        display: flex;
+    }
+
+    .topbar-menu-links.mobile {
+        display: none;
+    }
+
+    .topbar-menu-links li {
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: 500;
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .topbar-menu-link-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: white;
+        text-decoration: none;
+        padding: 12px 16px;
+        border-radius: 8px;
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        white-space: nowrap;
+        transform-origin: center bottom;
+        font-size: 18px;
+        font-weight: 500;
+        line-height: 1;
+    }
+    .topbar-menu-icon {
+        flex-shrink: 0;
+    }
+
+    .topbar-menu-icon-wrapper {
+        margin-right: 8px;
+    }
+
+    .topbar-menu-link-item:hover {
+        background-color: rgba(255, 255, 255, 0.25);
+        text-decoration: none;
+        transform: translateY(-5px) scale(1.15);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        color: white;
+    }
+
+    .topbar-menu-link-item:active {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+}
+
+/* Dropdown de cuenta */
+.topbar-menu-account { position: relative; }
+.topbar-menu-account-button { background: none; border: none; color: inherit; padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap:10px; border-radius:8px; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: center bottom; font-size: 18px; line-height: 1; }
+.topbar-menu-account-button:hover, .topbar-menu-account-button:focus-visible { background-color: rgba(255,255,255,0.25); color: white; transform: translateY(-5px) scale(1.15); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+.topbar-menu-account-button:active { background-color: rgba(255,255,255,0.18); }
+.topbar-menu-user-icon { width: 32px; height:32px; border-radius:50%; background: rgba(255,255,255,0.08); padding:4px; box-sizing: border-box; transition: all 0.3s ease; flex-shrink: 0; }
+.topbar-menu-account-button:hover .topbar-menu-user-icon { filter: brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); background: transparent; }
+.topbar-menu-account-dropdown {
+    position: absolute;
+    right: 8px;
+    top: 76px;
+    background: #ffffff;
+    color: #1b1b1b;
+    min-width: 300px;
+    border-radius: 12px;
+    box-shadow: 0 18px 48px rgba(12, 20, 30, 0.18);
+    padding: 18px 18px;
+    transform-origin: top right;
+    transform: translateY(-6px) scale(0.98);
+    opacity: 0;
+    transition: transform 180ms ease, opacity 160ms ease;
+    pointer-events: none;
+}
+.topbar-menu-account-dropdown.open {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    pointer-events: auto;
+}
+.topbar-menu-account-top-vertical { display:flex; flex-direction:column; align-items:center; gap:14px }
+.topbar-menu-account-avatar-lg.center { display:flex; align-items:center; justify-content:center }
+.topbar-menu-account-avatar-lg img { width:72px; height:72px; border-radius:14px; background: #f5f5f5; padding:8px }
+.topbar-menu-account-details-vertical { width:100%; text-align:center; display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding-top:6px }
+.topbar-menu-account-field { display:flex; flex-direction:column; align-items:center; padding:6px 0 }
+.topbar-menu-account-field:first-child { grid-column: 1 / -1 }
+.topbar-menu-field-label { font-size:0.72rem; color:#9aa0a6; text-transform:uppercase; letter-spacing:0.06em }
+.topbar-menu-field-value { font-size:1.02rem; color:#111; font-weight:700 }
+.topbar-menu-logout-btn { width:100%; padding:10px 12px; background:#d32f2f; color:white; border:none; border-radius:8px; cursor:pointer; margin-top:8px; border-top:1px solid rgba(0,0,0,0.04); padding-top:12px }
+.topbar-menu-logout-btn:hover { filter:brightness(0.96) }
+.topbar-menu-change-service-btn {
+    width: 100%;
+    padding: 10px 12px;
+    background: #1976d2; /* Azul */
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 8px;
+    border-top: 1px solid rgba(0,0,0,0.04);
+    padding-top: 12px;
+    font-weight: 500; /* Opcional: para resaltar el texto */
+    transition: filter 0.2s;
+}
+
+.topbar-menu-change-service-btn:hover {
+    filter: brightness(0.96);
+}
+
+/* Hover para el texto de la cuenta */
+.topbar-menu-account-button:hover .topbar-menu-caret, .topbar-menu-account-button:focus-visible .topbar-menu-caret { color: white; }
+.topbar-menu-caret { margin-left:6px; font-size:14px; opacity:0.92; transition: all 0.3s ease; color: rgba(255,255,255,0.95) }
+.topbar-menu-caret.open { transform: rotate(180deg) }
+
+/* Estilos para los iconos */
+.topbar-menu-icon {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    filter: brightness(0) invert(1);
+}
+
+.topbar-menu-link-item:hover .topbar-menu-icon {
+    filter: brightness(0) invert(1) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Transiciones suaves para todos los elementos interactivos */
+.topbar-menu-toggle,
+.topbar-menu-logo,
+.topbar-menu-link-item {
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Efecto press (hundimiento): sutil translate cuando está activo */
+.topbar-menu-link-item:active,
+.topbar-menu-account-button:active,
+.topbar-menu-toggle:active {
+    transform: translateY(2px) scale(1.05);
+}
+
+/* Mejora de accesibilidad para estados focus */
+.topbar-menu-toggle:focus-visible,
+.topbar-menu-logo:focus-visible,
+.topbar-menu-link-item:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 2px;
+}
+
+/* Nuevo estilo para el contenedor del iconoe */
+.topbar-menu-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Estilos para el número de notificaciones */
+.topbar-menu-notification-badge {
+  background: #ffffff;
+  color: #FF0000;
+  font-size: 0.75rem;
+  font-weight: bold;
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  padding: 2px 6px;
+  text-align: center;
+  border-radius: 50%;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Estilo para el enlace activo */
+.topbar-menu-link-item.active {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+/* Para resaltar el ícono en el ítem activo */
+.topbar-menu-link-item.active .topbar-menu-icon {
+    filter: brightness(0) invert(1) drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+}
+
+/* Evitar que el hover afecte demasiado el elemento activo */
+.topbar-menu-link-item.active:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+    color: white;
+}

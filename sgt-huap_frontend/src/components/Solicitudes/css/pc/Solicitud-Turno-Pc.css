@@ -1,0 +1,36 @@
+/* Root para PC (no afecta móvil) */
+.root-solicitud-turno-pc .formulario-card {
+  width: 80%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 40px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Botón seleccionar turno */
+.root-solicitud-turno-pc .btn-seleccionar-turno {
+  font-size: 1.1rem;
+  padding: 14px 18px;
+}
+
+/* Menú desplegable */
+.root-solicitud-turno-pc .menu-turnos {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Tabs */
+.root-solicitud-turno-pc .vista-btn {
+  font-size: 1rem;
+  padding: 12px 0;
+}
+
+/* Responsive para PC en split screen */
+@media (max-width: 1200px) {
+  .root-solicitud-turno-pc .formulario-card {
+    width: 95%;
+    max-width: none;
+    padding: 15px 20px;
+  }
+}

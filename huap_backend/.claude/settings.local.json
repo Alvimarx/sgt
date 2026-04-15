@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw spring-boot:run:*)",
+      "Bash(pg_isready:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,291 @@
+/* --- Contenedor Principal (Adaptado) --- */
+.paso4-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+
+.cpt-header { text-align: center; margin-bottom: 10px; }
+.cpt-header h2 { font-size: 1.5rem; color: #17416c; margin: 0 0 5px 0; }
+.cpt-header p { color: #64748b; margin: 0; }
+
+/* Feedback */
+.cpt-error { background-color: #fee2e2; color: #991b1b; padding: 10px; border-radius: 8px; text-align: center; }
+.cpt-success-bar { background: #dcfce7; color: #15803d; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; animation: fadeIn 0.5s;}
+
+/* Secciones */
+.cpt-config-section,
+.cpt-editor-section,
+.cpt-preview-section {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Config Grid */
+.cpt-config-section { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+.cpt-field { display: flex; flex-direction: column; gap: 5px; }
+.cpt-field label { font-size: 0.9rem; font-weight: 600; color: #334155; }
+.cpt-field input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
+
+/* Pisos Grid */
+.cpt-pisos-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px; }
+.cpt-piso-card {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer;
+  background-color: #ffffff; transition: all 0.2s; user-select: none;
+}
+.cpt-piso-card:hover { border-color: #17416c; background-color: #f8fafc; }
+.cpt-piso-card.selected { background-color: #eff6ff; border-color: #17416c; color: #17416c; font-weight: 600; }
+
+.cpt-checkbox {
+  width: 16px; height: 16px; border: 1px solid #cbd5e1; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  background-color: #fff; font-size: 10px;
+}
+.cpt-piso-card.selected .cpt-checkbox { background-color: #17416c; border-color: #17416c; color: white; }
+
+/* Editor Grid */
+.cpt-grid-header {
+  display: grid; grid-template-columns: 150px repeat(7, 1fr) 40px; gap: 5px;
+  margin-bottom: 10px; border-bottom: 2px solid #f1f5f9; padding-bottom: 5px;
+}
+.cpt-col-day, .cpt-col-name { font-weight: 600; color: #64748b; text-align: center; font-size: 0.85rem; }
+.cpt-col-name { text-align: left; }
+
+.cpt-line-row {
+  display: grid; grid-template-columns: 150px repeat(7, 1fr) 40px; gap: 5px;
+  margin-bottom: 8px; align-items: stretch;
+}
+
+.cpt-cell-name input { width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; box-sizing: border-box; }
+
+.cpt-cell-day {
+  background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 4px;
+  min-height: 50px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s; padding: 2px; position: relative;
+}
+.cpt-cell-day:hover { background-color: #e0f2fe; border-color: #7dd3fc; border-style: solid; }
+.cpt-cell-day.filled { background-color: #eff6ff; border: 1px solid #bfdbfe; border-style: solid; }
+
+.cpt-plus { color: #cbd5e1; font-size: 1.5rem; font-weight: 300; user-select: none; }
+
+/* Chip Turno */
+.cpt-turno-chip {
+  background-color: #17416c; color: white; padding: 4px; border-radius: 4px;
+  font-size: 0.7rem; width: 100%; text-align: center; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center; height: 100%;
+}
+.chip-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip-time { font-size: 0.65rem; opacity: 0.9; }
+
+/* Botones */
+.cpt-btn-icon { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2rem; }
+.cpt-btn-add-line {
+  width: 100%; padding: 10px; border: 2px dashed #cbd5e1; background: none;
+  color: #64748b; font-weight: 600; border-radius: 6px; cursor: pointer; margin-top: 10px;
+}
+.cpt-btn-add-line:hover { border-color: #17416c; color: #17416c; background-color: #f8fafc; }
+
+/* Actions Footer */
+.cpt-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+.cpt-btn { padding: 10px 20px; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; }
+.cpt-btn.save { background-color: #17416c; color: white; }
+.cpt-btn.save:disabled { opacity: 0.6; cursor: not-allowed; }
+.cpt-btn.cancel { background-color: #e2e8f0; color: #334155; }
+.cpt-btn.delete { background-color: #ef4444; color: white; }
+
+/* Modal */
+.cpt-modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.cpt-modal {
+  background: white; padding: 20px; border-radius: 12px; width: 450px; max-height: 80vh;
+  display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.cpt-modal h3 { margin-top: 0; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; font-size: 1.1rem; }
+.cpt-modal-list { overflow-y: auto; margin: 15px 0; display: flex; flex-direction: column; gap: 8px; }
+.cpt-modal-item {
+  padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer;
+}
+.cpt-modal-item:hover { background-color: #f0f9ff; border-color: #17416c; }
+.cpt-modal-item strong { display: block; color: #0f172a; font-size: 0.9rem; }
+.cpt-modal-item span { font-size: 0.8rem; color: #64748b; }
+.cpt-modal-footer { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid #eee; }
+.cpt-modal-empty { color: #999; font-style: italic; text-align: center; padding: 20px; }
+
+@media (max-width: 768px) {
+  .cpt-config-section { grid-template-columns: 1fr; }
+  .cpt-grid-header, .cpt-line-row { min-width: 800px; } /* Scroll horizontal */
+  .cpt-editor-section { overflow-x: auto; }
+}
+
+/* --- VISTA MÓVIL "ULTRA COMPACTA" (PASO 4) --- */
+@media screen and (max-width: 550px) {
+
+  /* 1. LIMPIEZA DE ESPACIOS (Igual que antes) */
+  .onboarding-container, .step-content-card {
+      padding: 0 !important;
+      width: 100% !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+  }
+
+  .paso4-container {
+      padding: 0 0 150px 0 !important;
+      gap: 8px; /* Menos espacio entre secciones */
+      width: 100%;
+  }
+
+  /* 2. CONFIGURACIÓN COMPACTA */
+  .cpt-header h2 { font-size: 1.1rem; margin: 10px 0 5px; }
+  .cpt-header p { display: none; }
+
+  .cpt-config-section {
+      padding: 8px !important;
+      gap: 8px !important;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+  }
+
+  /* Pisos pequeños */
+  .cpt-pisos-grid {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+  }
+  .cpt-piso-card { font-size: 0.75rem; padding: 4px 8px; min-height: 30px; }
+
+  /* 3. LÍNEAS (AQUÍ ESTÁ LA REDUCCIÓN DE TAMAÑO) */
+  .cpt-editor-section {
+      padding: 0 !important;
+      background: transparent !important;
+      border: none !important;
+  }
+  .cpt-grid-header { display: none !important; }
+
+  .cpt-line-row {
+      display: grid !important;
+      grid-template-columns: repeat(7, 1fr) !important;
+      grid-auto-rows: auto;
+      
+      background: #fff;
+      /* Reducimos el padding superior a 24px (antes 30px) para pegar más el título */
+      padding: 24px 4px 4px 4px !important; 
+      margin-bottom: 8px; /* Menos margen entre tarjetas */
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      position: relative;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+      gap: 1px !important; /* Espacio mínimo */
+  }
+
+  /* A) Nombre más discreto arriba */
+  .cpt-cell-name {
+      position: absolute !important;
+      top: 2px;
+      left: 4px;
+      right: 30px;
+      height: 20px;
+  }
+  .cpt-cell-name input {
+      border: none !important;
+      background: transparent;
+      font-weight: 700;
+      font-size: 0.8rem; /* Texto un poco más chico */
+      color: #334155;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+  }
+
+  /* B) Botón borrar pequeño */
+  .cpt-cell-action {
+      position: absolute !important;
+      top: 2px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      display: flex; justify-content: flex-end;
+  }
+  .cpt-btn-icon {
+      background: #fee2e2;
+      width: 20px; height: 20px;
+      border-radius: 4px;
+      font-size: 12px;
+  }
+
+  /* C) CELDAS DE DÍAS (LAS HACEMOS CHIQUITAS) */
+  .cpt-cell-day {
+      grid-row: auto !important;
+      /* AQUÍ: Reducimos altura de 50px a 36px */
+      height: 36px !important; 
+      min-width: 0 !important;
+      width: 100% !important;
+      padding: 0 !important;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      background-color: #f8fafc;
+      overflow: hidden;
+  }
+
+  /* D) CHIP DE TURNO OPTIMIZADO */
+  .cpt-turno-chip {
+      width: 100% !important;
+      height: 100% !important;
+      padding: 1px !important;
+      border-radius: 2px;
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+  }
+
+  .chip-name {
+      /* Texto legible pero compacto */
+      font-size: 7px !important; 
+      line-height: 0.95; /* Interlineado apretado para que quepan 2-3 líneas */
+      text-align: center;
+      word-break: break-all;
+      white-space: normal;
+      overflow: hidden;
+      font-weight: 600;
+      letter-spacing: -0.2px; /* Juntar letras un poquito */
+  }
+
+  .chip-time { display: none !important; }
+  /* Signo + más pequeño */
+  .cpt-plus { font-size: 14px; color: #cbd5e1; margin-top: -2px; }
+
+  /* 4. EXTRAS */
+  .cpt-preview-section {
+      display: block !important;
+      overflow-x: auto;
+      padding: 0 8px !important;
+      margin-top: 5px;
+      border: none;
+  }
+  
+  .cpt-btn-add-line {
+      margin: 5px 8px;
+      padding: 10px;
+      width: calc(100% - 16px);
+      font-size: 0.85rem;
+  }
+
+  .cpt-actions {
+      flex-direction: column;
+      padding: 10px;
+      background: #fff;
+      gap: 8px;
+  }
+  .cpt-btn { width: 100%; padding: 12px; font-size: 0.95rem; }
+  
+  .cpt-modal { width: 90% !important; max-height: 80vh; }
+}

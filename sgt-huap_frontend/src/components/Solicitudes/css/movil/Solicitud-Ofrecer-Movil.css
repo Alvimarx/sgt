@@ -1,0 +1,243 @@
+.modal-overlay {
+    padding: 12px;
+    align-items: flex-end;
+}
+
+.modal-content {
+    border-radius: 12px 12px 0 0;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease-out;
+    color-scheme: light;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    margin-bottom: 20px;
+}
+
+.modal-title {
+    font-size: 20px;
+}
+
+.button-group {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-cancel,
+.btn-submit {
+    width: 100%;
+}
+
+.btn-publicar {
+    width: 100%;
+    background-color: #ff4c4c;
+    color: #fff;
+}
+
+.root-solicitud-ofrecer .formulario-card {
+    background-color: #ffffff;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 450px;
+    margin: 0 auto;
+    transform: translateY(0);
+    animation: fadeInScale 0.3s ease-out;
+    color-scheme: light;
+}
+
+.root-solicitud-ofrecer .formulario-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.root-solicitud-ofrecer .form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.root-solicitud-ofrecer .form-section label {
+    font-weight: 600;
+    color: #495057;
+}
+
+.root-solicitud-ofrecer .form-input-display {
+    padding: 12px;
+    border: 1px dashed #ced4da;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    color: #495057;
+    line-height: 1.4;
+}
+
+.root-solicitud-ofrecer .form-input-field {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #343a40;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.root-solicitud-ofrecer .form-input-field:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.root-solicitud-ofrecer .formulario-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding-top: 20px;
+    border-top: 2px solid #e9ecef;
+    margin-top: 20px;
+}
+
+.root-solicitud-ofrecer .turno-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.root-solicitud-ofrecer .btn-seleccionar-turno {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 1rem;
+    text-align: left;
+    border: 1px solid #bbb;
+    border-radius: 10px;
+    background: #fafafa;
+    color: #000;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.root-solicitud-ofrecer .btn-seleccionar-turno:hover {
+    background: #f0f0f0;
+}
+
+.root-solicitud-ofrecer .btn-seleccionar-turno::after {
+    content: "\25BE";
+    float: right;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.root-solicitud-ofrecer .menu-turnos {
+    margin-top: 10px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    max-height: 70vh;
+    overflow: hidden;
+}
+
+.root-solicitud-ofrecer .menu-vista {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    background: #f7f7f7;
+}
+
+.root-solicitud-ofrecer .vista-btn {
+    flex: 1;
+    padding: 10px 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    transition: 0.2s ease;
+    color: #333;
+}
+
+.root-solicitud-ofrecer .vista-btn:hover {
+    background: #eaeaea;
+}
+
+.root-solicitud-ofrecer .vista-btn.activo {
+    background: #2c3e50;
+    color: #fff;
+    border-bottom: 2px solid #2c3e50;
+}
+
+.root-solicitud-ofrecer .lista-turnos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    background: #fff;
+    color: #000;
+}
+
+.root-solicitud-ofrecer .turno-item {
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background 0.2s;
+}
+
+.root-solicitud-ofrecer .turno-item:hover {
+    background: #f5f5f5;
+}
+
+.root-solicitud-ofrecer .turno-item:last-child {
+    border-bottom: none;
+}
+
+@media (max-width: 768px) {
+    .root-solicitud-ofrecer .formulario-card {
+        width: 92%;
+        max-width: 420px;
+        padding: 22px;
+    }
+
+    .root-solicitud-ofrecer .formulario-body {
+        gap: 18px;
+    }
+
+    .root-solicitud-ofrecer .menu-turnos {
+        max-height: 60vh;
+    }
+
+    .root-solicitud-ofrecer .vista-btn {
+        font-size: 0.9rem;
+    }
+
+    .root-solicitud-ofrecer .turno-item {
+        font-size: 1rem;
+    }
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+

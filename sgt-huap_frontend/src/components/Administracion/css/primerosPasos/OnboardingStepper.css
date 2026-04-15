@@ -1,0 +1,80 @@
+.stepper-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 40px;
+    width: 100%;
+    padding: 0 20px;
+}
+
+.stepper-item {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.stepper-item.last-item {
+    flex: 0;
+}
+
+.step-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    z-index: 2;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.step-circle.completed {
+    background-color: #28a745;
+    color: white;
+}
+
+.step-circle.active {
+    background-color: #17416c;
+    color: white;
+    border: 3px solid #b3d7ff;
+    transform: scale(1.1);
+}
+
+.step-label {
+    position: absolute;
+    top: 50px;
+    width: 120px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.step-label.active-label {
+    font-weight: bold;
+    color: #17416c;
+}
+
+.step-line {
+    flex: 1;
+    height: 4px;
+    margin: 0 10px;
+    background-color: #e9ecef;
+    transition: background-color 0.3s ease;
+    border-radius: 2px;
+}
+
+.step-line.line-completed {
+    background-color: #28a745;
+}

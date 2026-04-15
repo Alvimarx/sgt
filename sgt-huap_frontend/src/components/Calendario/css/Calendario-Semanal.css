@@ -1,0 +1,251 @@
+﻿.calendario-semana {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+}
+
+.semana-pasillos,
+.semana-fila {
+    display: grid;
+    grid-template-columns: minmax(60px, 0.5fr) repeat(7, minmax(0, 1fr));
+    gap: 12px;
+    align-items: stretch;
+    width: 100%;
+}
+
+.semana-fila {    border-color: var(--pasillo-border-color);
+    border: 10px;
+    background: var(--pasillo-soft-bg, transparent);
+    border-radius: 18px;
+    box-shadow: inset 0 0 0 2px var(--pasillo-border-color, transparent);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.semana-fila:hover {
+    transform: translateY(-2px);
+    box-shadow: inset 0 0 0 2px var(--pasillo-color, transparent), 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.semana-pasillos {
+    padding: 0 6px;
+    font-weight: 700;
+    color: var(--color-dark);
+    text-transform: uppercase;
+}
+
+.pasillo-header-space {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pasillo-label-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: var(--pasillo-text-color, var(--color-dark));
+    background: var(--pasillo-color, #f5f7fb);
+    border: 2px solid var(--pasillo-color, #e5e7eb);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+}
+
+.semana-dia-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f7fb;
+    border-radius: 10px;
+    padding: 12px 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    color: var(--color-dark);
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.calendario-semana .hoy {
+    border: 2px solid var(--color-accent);
+    box-shadow: 0 0 6px rgba(229, 127, 132, 0.4);
+}
+
+.dia-nombre {
+    font-weight: 700;
+    color: var(--color-dark);
+}
+
+.semana-dia {
+    background: var(--pasillo-soft-bg, #ffffff);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border: 1px solid var(--pasillo-border-color, var(--cell-border));
+    border-radius: 10px;
+    padding: 14px;
+    min-height: 140px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.turnos-semana {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.turno-semana {
+    border-radius: 8px;
+    padding: 10px;
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.2;
+    min-height: 36px; /* 12h base, consistente con mensual */
+}
+
+/* Turnos de 24h - doble altura */
+.turno-semana.turno-24h {
+    min-height: 72px !important; /* 36px x 2 */
+    text-align: center
+}
+
+.turno-tipo-semana {
+    display: center;
+    font-size: 0.95rem;
+}
+
+.turno-doctor-semana {
+    display: block;
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 1024px) {
+    .semana-pasillos,
+    .semana-fila {
+        grid-template-columns: minmax(68px, 0.65fr) repeat(7, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .pasillo-label-cell {
+        padding: 10px;
+    }
+
+    .semana-dia {
+        min-height: 120px;
+        padding: 12px;
+    }
+
+    .turno-semana {
+        font-size: 0.85rem;
+        padding: 8px;
+        min-height: 28px; /* altura coherente con calendario mensual */
+    }
+
+    .turno-semana.turno-24h {
+        min-height: 110px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .calendario-semana {
+        gap: 10px;
+        overflow-x: hidden;
+        padding-bottom: 0;
+    }
+
+    .semana-pasillos,
+    .semana-fila {
+        grid-template-columns: minmax(48px, 0.6fr) repeat(7, minmax(0, 1fr));
+        gap: 4px;
+        overflow: hidden;
+    }
+
+    .pasillo-label-cell,
+    .semana-dia-header {
+        font-size: 0.72rem;
+        padding: 8px 4px;
+    }
+
+    .pasillo-label-cell {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-orientation: mixed;
+        justify-content: center;
+        align-items: center;
+        letter-spacing: 0.05em;
+        padding: 4px 2px;
+        border-radius: 10px;
+        gap: 4px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+    }
+
+    .semana-dia {
+        min-width: 0;
+        padding: 10px 6px;
+        min-height: 110px;
+    }
+
+    .turnos-semana {
+        gap: 6px;
+    }
+
+    .turno-semana {
+        font-size: 0.72rem;
+        padding: 6px 4px;
+        min-height: 23px;
+    }
+
+    .turno-semana.turno-24h {
+        min-height: 132px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .semana-pasillos,
+    .semana-fila {
+        grid-template-columns: minmax(10px, 0.4fr) repeat(7, minmax(0, 1fr));
+        gap: 3px;
+    }
+
+    .pasillo-label-cell,
+    .semana-dia-header {
+        font-size: 0.64rem;
+        padding: 6px 3px;
+    }
+
+    .pasillo-label-cell {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-orientation: mixed;
+        justify-content: center;
+        align-items: center;
+        letter-spacing: 0.1em;
+        padding: 1px 1px;
+        border-radius: 8px;
+        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
+    }
+
+    .semana-dia {
+        padding: 8px 4px;
+        min-height: 100px;
+    }
+
+    .turnos-semana {
+        gap: 4px;
+    }
+
+    .turno-semana {
+        font-size: 0.5rem !important;
+        padding: 5px 3px;
+        min-height: 22px;
+    }
+    .turno-semana.turno-24h {
+        min-height: 160px !important;
+    }
+}

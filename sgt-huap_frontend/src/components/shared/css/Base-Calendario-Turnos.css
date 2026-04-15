@@ -1,0 +1,331 @@
+/* ============================
+   Calendario Global (PC + Móvil)
+   Se adapta según ancho de pantalla
+============================ */
+
+/* Contenedor general */
+.calendar-container {
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border-radius: 8px;
+  font-family: 'Raleway', sans-serif;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  box-sizing: border-box;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Header */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.calendar-header h3 {
+  font-weight: bold;
+  text-align: center;
+  flex-grow: 1;
+  text-transform: uppercase;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.calendar-header button {
+  border: none;
+  background: var(--color-dark);
+  color: #fff;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: background 0.2s ease;
+}
+
+.calendar-header button:hover {
+  background: #1a252f;
+}
+
+/* Días de la semana */
+/* Días de la semana */
+.calendar-weekdays {
+  /* Deprecado en favor de meter los headers dentro del grid con sticky */
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--color-light);
+  text-align: center;
+  font-weight: bold;
+  margin-bottom: 4px;
+  padding: 4px 0;
+  color: #2c3e50;
+  flex-shrink: 0;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+/* Headers de semana STICKY (dentro del grid) */
+.calendar-weekday-sticky {
+  position: -webkit-sticky;
+  /* Safari */
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-light);
+  color: #2c3e50;
+  font-weight: bold;
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  /* Para mantener alineación con bordes de celdas si es necesario */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Zona scrolleable (sólo celdas) */
+.calendar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* Custom light scrollbar for calendar */
+.calendar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.calendar-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.calendar-scroll::-webkit-scrollbar-thumb {
+  background: #d0d0d0;
+  border-radius: 4px;
+}
+
+.calendar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #b0b0b0;
+}
+
+/* Firefox scrollbar */
+.calendar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d0d0d0 #f1f1f1;
+}
+
+/* Grilla principal */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+/* Celdas */
+.calendar-cell {
+  position: relative;
+  background: var(--cell-bg);
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  padding-top: 22px;
+  box-sizing: border-box;
+  overflow: visible;
+  min-height: 70px;
+}
+
+.calendar-cell.other-month {
+  background: #fafafa;
+  color: #aaa;
+}
+
+/* Número de día: arriba a la izquierda */
+.day-number {
+  position: static;
+  font-weight: bold;
+  color: #123456;
+  font-size: 0.85rem;
+  line-height: 1;
+  font-family: 'Raleway', sans-serif;
+}
+
+/* Turnos dentro de cada día */
+.turno-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  margin-top: 6px;
+  padding: 0;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.turno-box:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+}
+
+.turno-box-header {
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+}
+
+.turno-box-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 6px;
+  box-sizing: border-box;
+}
+
+.turno-box-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.2;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: inherit;
+}
+
+.turno-box-entry:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.turno-horario {
+  font-size: 0.75rem;
+}
+
+.turno-tipo {
+  font-size: 0.68rem;
+  opacity: 0.85;
+}
+
+/* ============================
+   Móvil (<=768px)
+============================ */
+@media (max-width: 768px) {
+  .calendar-header h3 {
+    font-size: 1rem;
+  }
+
+  .calendar-weekdays {
+    font-size: 0.75rem;
+  }
+
+  .calendar-cell {
+    min-height: 60px;
+    padding: 4px;
+    padding-top: 15px;
+    /* espacio para el número */
+  }
+
+  .calendar-container .day-number {
+    font-size: 0.9rem;
+    font-family: 'Raleway', sans-serif;
+  }
+
+  .turno-box {
+    margin-top: 8px;
+  }
+
+  .turno-box-header {
+    font-size: 0.7rem;
+    padding: 5px 6px;
+  }
+
+  .turno-box-content {
+    gap: 4px;
+    padding: 6px 6px 8px;
+  }
+
+  .turno-box-entry {
+    font-size: 0.7rem;
+    padding: 6px;
+  }
+
+  .turno-horario {
+    font-size: 0.72rem;
+  }
+
+  .turno-tipo {
+    font-size: 0.62rem;
+  }
+}
+
+/* ============================
+   PC (>=769px)
+============================ */
+@media (min-width: 769px) {
+  .calendar-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .calendar-weekdays {
+    font-size: 0.95rem;
+  }
+
+  .calendar-cell {
+    min-height: 120px;
+    padding: 8px;
+    padding-top: 30px;
+    /* más aire para el número de día */
+  }
+
+  .calendar-container .day-number {
+    font-size: 1.1rem;
+    font-family: 'Raleway', sans-serif;
+  }
+
+  .turno-box {
+    margin-top: 12px;
+  }
+
+  .turno-box-header {
+    font-size: 0.82rem;
+    padding: 7px 10px;
+  }
+
+  .turno-box-content {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .turno-box-entry {
+    font-size: 0.85rem;
+    padding: 10px 12px;
+  }
+
+  .turno-horario {
+    font-size: 0.88rem;
+  }
+
+  .turno-tipo {
+    font-size: 0.78rem;
+  }
+}

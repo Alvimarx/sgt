@@ -1,0 +1,150 @@
+.plantilla-preview {
+  margin-top: 20px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Cabecera y Leyenda */
+.pp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.pp-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.pp-legend {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #64748b;
+}
+.pp-legend-item {
+  width: 24px;
+  height: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 9px;
+}
+
+/* Contenedor de Tabla con Scroll */
+.pp-scroll-container {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  /* CAMBIO: Altura aumentada a 800px para ver más semanas */
+  max-height: 800px; 
+}
+
+.pp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pp-table th, .pp-table td {
+  padding: 6px;
+  text-align: center;
+  border-bottom: 1px solid #f1f5f9;
+  border-right: 1px dashed #e2e8f0;
+  min-width: 40px;
+}
+
+/* Encabezado Fijo */
+.pp-table thead th {
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: #475569;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 2px solid #cbd5e1;
+  padding: 10px;
+}
+
+/* Columna Izquierda Fija (Semana/Línea) */
+.pp-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  border-right: 2px solid #cbd5e1;
+  text-align: left;
+  padding-left: 8px; /* Padding reducido */
+  font-weight: 600;
+  color: #1e293b;
+  /* CAMBIO: Ancho reducido */
+  min-width: 90px; 
+  max-width: 110px;
+}
+
+.pp-table thead th.pp-sticky-col {
+  z-index: 30;
+  background-color: #f8fafc;
+}
+
+/* Separador visual entre Bloques de Semanas */
+.pp-week-separator td {
+  border-bottom: 4px solid #0f172a !important; /* Línea negra sólida y gruesa */
+}
+
+/* Espaciador físico */
+.pp-week-spacer td {
+  height: 7px;
+  background-color: #000000;
+  border: none !important;
+  padding: 0;
+}
+
+/* Meta información de la fila */
+.pp-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* Gap reducido */
+  overflow: hidden;
+}
+.pp-week-badge {
+  background-color: rgba(255,255,255,0.5);
+  color: #334155;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.1);
+  flex-shrink: 0;
+}
+.pp-line-name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Bloque de Turno Pintado */
+.pp-turno-block {
+  color: white;
+  border-radius: 4px;
+  padding: 4px 2px;
+  font-weight: bold;
+  font-size: 10px;
+  text-transform: uppercase;
+  cursor: help;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

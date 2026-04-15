@@ -1,0 +1,222 @@
+version: "3.8"
+services:
+  # ==========================================
+  # APACHE LOAD BALANCER
+  # ==========================================
+  apache-lb:
+    image: httpd:2.4-alpine
+    container_name: huap-apache-lb
+    restart: always
+    ports:
+      - "5173:80" # Puerto 5173 externo -> 80 interno (puerto 80 bloqueado por router)
+      - "443:443" # HTTPS (opcional, para producción)
+    volumes:
+      - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - ./apache/conf.d:/usr/local/apache2/conf/conf.d:ro
+    depends_on:
+      - backend-1
+      - backend-2
+      - backend-3
+      - frontend-1
+      - frontend-2
+      - frontend-3
+    networks:
+      - huap-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/apache-health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # BACKENDS (Spring Boot) - 3 instancias
+  # Se conectarán a la BD instalada en la máquina host.
+  # ==========================================
+  backend-1:
+    build:
+      context: ./huap_backend
+      dockerfile: Dockerfile
+    image: huap-backend-1:latest
+    container_name: huap-backend-1
+    restart: always
+    expose:
+      - "8080"
+    environment:
+      - DB_HOST=10.55.0.1
+      - DB_PORT=3306
+      - DB_USERNAME=root
+      - DB_PASSWORD=secret
+      - DDL_AUTO=update
+      - JWT_SECRET=***JWT_SECRET_PURGADO***
+      - SERVER_ID=backend-1
+    networks:
+      - huap-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v1/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend-2:
+    build:
+      context: ./huap_backend
+      dockerfile: Dockerfile
+    image: huap-backend-2:latest
+    container_name: huap-backend-2
+    restart: always
+    expose:
+      - "8080"
+    environment:
+      - DB_HOST=10.55.0.1
+      - DB_PORT=3306
+      - DB_USERNAME=root
+      - DB_PASSWORD=secret
+      - DDL_AUTO=update
+      - JWT_SECRET=***JWT_SECRET_PURGADO***
+      - SERVER_ID=backend-2
+    networks:
+      - huap-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v1/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend-3:
+    build:
+      context: ./huap_backend
+      dockerfile: Dockerfile
+    image: huap-backend-3:latest
+    container_name: huap-backend-3
+    restart: always
+    expose:
+      - "8080"
+    environment:
+      - DB_HOST=172.17.0.1
+      - DB_PORT=3306
+      - DB_USERNAME=root
+      - DB_PASSWORD=secret
+      - DDL_AUTO=update
+      - JWT_SECRET=***JWT_SECRET_PURGADO***
+      - SERVER_ID=backend-3
+    networks:
+      - huap-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v1/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # FRONTENDS (React/Vite + Nginx) - 3 instancias
+  # ... (El resto de los servicios frontend quedan igual)
+  # ==========================================
+  frontend-1:
+    build:
+      context: ./sgt-huap_frontend
+      dockerfile: Dockerfile
+      args:
+        # La API pasa por el load balancer - usar variable de entorno o ruta relativa
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api/v1}
+    image: huap-frontend-1:latest
+    container_name: huap-frontend-1
+    restart: always
+    expose:
+      - "80"
+    networks:
+      - huap-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend-2:
+    build:
+      context: ./sgt-huap_frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api/v1}
+    image: huap-frontend-2:latest
+    container_name: huap-frontend-2
+    restart: always
+    expose:
+      - "80"
+    networks:
+      - huap-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend-3:
+    build:
+      context: ./sgt-huap_frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api/v1}
+    image: huap-frontend-3:latest
+    container_name: huap-frontend-3
+    restart: always
+    expose:
+      - "80"
+    networks:
+      - huap-network
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ==========================================
+# REDES
+# ==========================================
+networks:
+  huap-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.55.0.0/16

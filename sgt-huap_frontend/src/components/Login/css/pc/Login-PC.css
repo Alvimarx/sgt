@@ -1,0 +1,80 @@
+/* Desktop (PC): side-by-side layout with visual panel on left */
+@media (min-width: 760px) {
+  .login-page {
+    align-items: flex-start;
+    padding-top: 6vh;
+  }
+
+  /* Switch to flex for predictable equal-height columns */
+  .login-card {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    margin-top: 1.5rem;
+    min-height: 70vh;
+  }
+
+  .login-visual {
+    display: flex;
+    flex: 0 0 40%;
+    max-width: 420px;
+    border-top-left-radius: 14px;
+    border-bottom-left-radius: 14px;
+    align-self: stretch;
+    min-height: 70vh;
+  }
+
+  .visual-logo {
+    width: min(200px, 32vw);
+  }
+
+  .login-panel {
+    flex: 1;
+    padding: 2.25rem 2.5rem;
+    border-top-right-radius: 14px;
+    border-bottom-right-radius: 14px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .login-title {
+    font-size: 1.35rem;
+  }
+}
+
+/* Large desktop: bigger dimensions */
+@media (min-width: 1200px) {
+  .login-card {
+    max-width: 1100px;
+    min-height: 75vh;
+  }
+
+  .login-visual {
+    padding: 3rem;
+    min-height: 75vh;
+  }
+
+  .login-panel {
+    padding: 3rem;
+  }
+
+  .login-title {
+    font-size: 1.5rem;
+  }
+
+  .login-input {
+    padding: 1.05rem 1rem;
+    font-size: 1.05rem;
+  }
+
+  .login-btn {
+    padding: 1rem;
+    font-size: 1.05rem;
+  }
+
+  .visual-logo {
+    width: min(220px, 34vw);
+  }
+}
