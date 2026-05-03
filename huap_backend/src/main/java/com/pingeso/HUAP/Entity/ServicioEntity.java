@@ -1,68 +1,42 @@
 package com.pingeso.HUAP.Entity;
 
 import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "servicio")
+@Table(name = "Servicio")
 public class ServicioEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_servicio", unique = true, nullable = false)
-    private Integer idServicio;
+    private Long idServicio;
 
-    @Column(name = "nombre", nullable = false, length = 150)
+    @Column(name = "nombre", nullable = false)
     private String nombre;
 
-    @Column(name = "id_responsable")
-    private Integer idResponsable;
+    @OneToMany(mappedBy = "servicio")
+    private List<TurnoEntity> turnos = new ArrayList<>();
 
-    @Column(name = "id_subrogante")
-    private Integer idSubrogante;
+    @OneToMany(mappedBy = "servicio")
+    private List<PlantillaEntity> plantillas = new ArrayList<>();
 
-    @Column(name = "estado", nullable = false)
-    private Boolean estado;
+    @OneToMany(mappedBy = "servicio")
+    private List<ServiciosFuncionarioEntity> serviciosFuncionario = new ArrayList<>();
 
-// Relaciones JPA (solo lectura para estos fk)
-    @ManyToOne
-    @JoinColumn(
-            name = "id_responsable",
-            referencedColumnName = "id_personal",
-            insertable = false,
-            updatable = false,
-            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT)
-    )
-    private PersonalEntity responsable;
-
-    @ManyToOne
-    @JoinColumn(
-            name = "id_subrogante",
-            referencedColumnName = "id_personal",
-            insertable = false,
-            updatable = false,
-            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT)
-    )
-    private PersonalEntity subrogante;
-
-    public ServicioEntity() {}
-
-    public ServicioEntity(Integer idServicio, String nombre, Integer idResponsable, Integer idSubrogante, Boolean estado) {
-        this.idServicio = idServicio;
-        this.nombre = nombre;
-        this.idResponsable = idResponsable;
-        this.idSubrogante = idSubrogante;
-        this.estado = estado;
+    public ServicioEntity() {
     }
 
     public ServicioEntity(String nombre) {
         this.nombre = nombre;
-        this.estado = true;
     }
 
-    public Integer getIdServicio() {
+    public Long getIdServicio() {
         return idServicio;
     }
 
-    public void setIdServicio(Integer idServicio) {
+    public void setIdServicio(Long idServicio) {
         this.idServicio = idServicio;
     }
 
@@ -74,35 +48,27 @@ public class ServicioEntity {
         this.nombre = nombre;
     }
 
-    public Integer getIdResponsable() {
-        return idResponsable;
+    public List<TurnoEntity> getTurnos() {
+        return turnos;
     }
 
-    public void setIdResponsable(Integer idResponsable) {
-        this.idResponsable = idResponsable;
+    public void setTurnos(List<TurnoEntity> turnos) {
+        this.turnos = turnos;
     }
 
-    public Integer getIdSubrogante() {
-        return idSubrogante;
+    public List<PlantillaEntity> getPlantillas() {
+        return plantillas;
     }
 
-    public void setIdSubrogante(Integer idSubrogante) {
-        this.idSubrogante = idSubrogante;
+    public void setPlantillas(List<PlantillaEntity> plantillas) {
+        this.plantillas = plantillas;
     }
 
-    public Boolean getEstado() {
-        return estado;
+    public List<ServiciosFuncionarioEntity> getServiciosFuncionario() {
+        return serviciosFuncionario;
     }
 
-    public void setEstado(Boolean estado) {
-        this.estado = estado;
-    }
-
-    public PersonalEntity getResponsable() {
-        return responsable;
-    }
-
-    public PersonalEntity getSubrogante() {
-        return subrogante;
+    public void setServiciosFuncionario(List<ServiciosFuncionarioEntity> serviciosFuncionario) {
+        this.serviciosFuncionario = serviciosFuncionario;
     }
 }
