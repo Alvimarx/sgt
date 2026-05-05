@@ -1,46 +1,55 @@
 package com.pingeso.HUAP.Entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
+@Builder
+@Data
 @Table(name = "Funcionario")
+@AllArgsConstructor
+
 public class FuncionarioEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_funcionario", unique = true, nullable = false)
+    @Column(name = "ID_FUNCIONARIO", unique = true, nullable = false)
     private Long idFuncionario;
 
-    @Column(name = "nombre", nullable = false)
+    @Column(name = "Nombre", nullable = false)
     private String nombre;
 
-    @Column(name = "apel_pat", nullable = false)
+    @Column(name = "Apel_pat", nullable = false)
     private String apelPat;
 
-    @Column(name = "apel_mat")
+    @Column(name = "Apel_mat")
     private String apelMat;
 
-    @Column(name = "rut", nullable = false, unique = true)
+    @Column(name = "Rut", nullable = false, unique = true)
     private String rut;
 
-    @Column(name = "clave", nullable = false)
+    @Column(name = "Clave", nullable = false)
     private String clave;
 
-    @Column(name = "profesion")
+    @Column(name = "Profesion")
     private String profesion;
 
     // --- Relaciones ---
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_rol_sistema", nullable = false)
+    @JoinColumn(name = "ID_ROL_SISTEMA", nullable = false)
     private RolSistemaEntity rolSistema;
 
-    @OneToMany(mappedBy = "funcionario")
+    @OneToMany(mappedBy = "Funcionario")
     private List<TurnoEntity> turnos = new ArrayList<>();
 
-    @OneToMany(mappedBy = "funcionario")
+    @OneToMany(mappedBy = "Funcionario")
     private List<ServiciosFuncionarioEntity> serviciosFuncionario = new ArrayList<>();
 
     // --- Constructores ---

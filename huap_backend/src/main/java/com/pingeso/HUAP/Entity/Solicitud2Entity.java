@@ -38,10 +38,16 @@ public class Solicitud2Entity {
     @JoinColumn(name = "ID_FUNCIONARIO_RECEPTOR")
     private FuncionarioEntity funcionarioReceptor; // El que recibe la solicitud
 
+    //Para mantener la consistencia dentro de las solicitudes
+    public enum EstadoSolicitud {
+        PENDIENTE,
+        APROBADA,
+        RECHAZADA
+    }
 
-
+    @Enumerated(EnumType.STRING)
     @Column(name = "Estado")
-    private String estado;
+    private EstadoSolicitud estado;
 
     @Column(name = "Fecha_creacion")
     private LocalDateTime fechaCreacion;

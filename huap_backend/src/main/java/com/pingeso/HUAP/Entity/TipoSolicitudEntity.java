@@ -22,7 +22,7 @@ public class TipoSolicitudEntity {
     @Column(name = "ID_TIPO_SOLICITUD", unique = true, nullable = false)
     private Long idTipoSolicitud;
 
-    @Column(name = "Estado")
-    private TinyIntAsSmallIntJdbcType estado;
+    @Column(name = "Tipo")
+    private TinyIntAsSmallIntJdbcType tipo;
 
 }
