@@ -22,6 +22,12 @@ public class TipoSolicitudEntity {
     @Column(name = "ID_TIPO_SOLICITUD", unique = true, nullable = false)
     private Long idTipoSolicitud;
 
+    /*
+    1:Permiso
+    2:Botar
+    3:Cobertura(Cuando un loco quiere ponerse mas pega)
+    4:Intercambio
+     */
     @Column(name = "Tipo")
     private TinyIntAsSmallIntJdbcType tipo;
 

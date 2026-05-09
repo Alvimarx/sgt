@@ -34,9 +34,17 @@ public class Solicitud2Entity {
     @JoinColumn(name = "ID_TURNO")
     private TurnoEntity turno;
 
+    //Util para intercambios de Turno (Ofrecer particular a todos necesito saber que gano y que se va)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ID_TURNO_RECEPTOR")
+    private TurnoEntity turnoReceptor;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_FUNCIONARIO_RECEPTOR")
     private FuncionarioEntity funcionarioReceptor; // El que recibe la solicitud
+
+    @Column(name = "Aceptado_Receptor")
+    private Boolean aceptadoReceptor;
 
     //Para mantener la consistencia dentro de las solicitudes
     public enum EstadoSolicitud {

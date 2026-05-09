@@ -1,10 +1,15 @@
 package com.pingeso.HUAP.Controller;
 
 
+import com.pingeso.HUAP.DTO.CrearSolicitudDTO;
 import com.pingeso.HUAP.Entity.Solicitud2Entity;
+import com.pingeso.HUAP.Repository.BitacoraRepository;
+import com.pingeso.HUAP.Repository.FuncionarioRepository;
+import com.pingeso.HUAP.Repository.TipoSolicitudRepository;
 import com.pingeso.HUAP.Service.Solicitud2Service;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,7 +22,13 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class Solicitud2Controller {
 
+    private final FuncionarioRepository funcionarioRepository;
+    private final TipoSolicitudRepository tipoSolicitudRepository;
     private final Solicitud2Service solicitud2Service;
+    private final BitacoraRepository bitacoraRepository;
+
+
+
 
     //Mas tarde hay que cambiar state por algo mas representativo
     @PatchMapping("/state/{id}/estado")
@@ -36,7 +47,6 @@ public class Solicitud2Controller {
         );
     }
 
-    @PostMapping()
 
      /*
     Getters
