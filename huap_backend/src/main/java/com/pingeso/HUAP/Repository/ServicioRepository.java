@@ -7,6 +7,9 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface ServicioRepository extends JpaRepository<ServicioEntity, Integer> {
+public interface ServicioRepository extends JpaRepository<ServicioEntity, Long> {
+
     Optional<ServicioEntity> findByNombre(String nombre);
+
+    boolean existsByNombre(String nombre);
 }

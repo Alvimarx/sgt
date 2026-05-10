@@ -36,7 +36,7 @@ public class TurnoEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_funcionario")
-    private FuncionarioEntity funcionario; 
+    private FuncionarioEntity Funcionario; 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_servicio") 
@@ -65,7 +65,7 @@ public class TurnoEntity {
         this.diaFinalTurno = diaFinalTurno;
         this.horaInicio = horaInicio;
         this.horaFin = horaFin;
-        this.funcionario = funcionario;
+        this.Funcionario = funcionario;
         this.servicio = servicio;
         this.piso = piso;
         this.plantilla = plantilla;
@@ -91,8 +91,8 @@ public class TurnoEntity {
     public void setHoraFin(LocalTime horaFin) { this.horaFin = horaFin; }
 
     // Getters y Setters de los Objetos
-    public FuncionarioEntity getFuncionario() { return funcionario; }
-    public void setFuncionario(FuncionarioEntity funcionario) { this.funcionario = funcionario; }
+    public FuncionarioEntity getFuncionario() { return Funcionario; }
+    public void setFuncionario(FuncionarioEntity funcionario) { this.Funcionario = funcionario; }
 
     public ServicioEntity getServicio() { return servicio; }
     public void setServicio(ServicioEntity servicio) { this.servicio = servicio; }

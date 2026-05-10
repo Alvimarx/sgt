@@ -1,111 +1,126 @@
 package com.pingeso.HUAP.Controller;
 
-import com.pingeso.HUAP.Service.ServicioService;
 import com.pingeso.HUAP.Entity.ServicioEntity;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.pingeso.HUAP.Service.ServicioService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/servicios")
+@RequestMapping("/servicios")
 @CrossOrigin("*")
 public class ServicioController {
 
-    @Autowired
-    private ServicioService servicioService;
+    private final ServicioService servicioService;
 
-    // Obtener todos los servicios
-    @GetMapping("")
-    public ResponseEntity<?> listServicios() {
-        return ResponseEntity.ok().body(servicioService.getAllServiciosSummary());
+    public ServicioController(ServicioService servicioService) {
+        this.servicioService = servicioService;
     }
 
-    // Obtener un servicio por ID
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getServicioById(@PathVariable Integer id) {
-        Map<String, Object> servicio = servicioService.getServicioSummary(id);
-        if (servicio == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok().body(servicio);
+    @GetMapping
+    public ResponseEntity<List<ServicioResponseDTO>> obtenerTodos() {
+        List<ServicioResponseDTO> servicios = servicioService.obtenerTodos()
+                .stream()
+                .map(this::convertirAResponseDTO)
+                .toList();
+
+        return ResponseEntity.ok(servicios);
     }
 
-    // Buscar servicio por nombre
-    @GetMapping("/nombre/{nombre}")
-    public ResponseEntity<?> getServicioByNombre(@PathVariable String nombre) {
-        ServicioEntity servicio = servicioService.getServicioByNombre(nombre);
-        if (servicio == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok().body(servicio);
+    @GetMapping("/{idServicio}")
+    public ResponseEntity<ServicioResponseDTO> obtenerPorId(@PathVariable Long idServicio) {
+        ServicioEntity servicio = servicioService.obtenerPorId(idServicio)
+                .orElseThrow(() -> new IllegalArgumentException("No existe un servicio con el ID indicado."));
+
+        return ResponseEntity.ok(convertirAResponseDTO(servicio));
     }
 
-    // Crear nuevo servicio
-    @PostMapping("")
-    public ResponseEntity<?> createServicio(@RequestBody Map<String, Object> payload) {
-        try {
-            ServicioEntity nuevoServicio = servicioService.createServicio(payload);
-            Map<String, Object> summary = servicioService.getServicioSummary(nuevoServicio.getIdServicio());
-            return ResponseEntity.status(HttpStatus.CREATED).body(summary);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new java.util.HashMap<String, Object>() {{
-                put("error", e.getMessage());
-            }});
+    @PostMapping
+    public ResponseEntity<ServicioResponseDTO> crearServicio(@RequestBody ServicioRequestDTO request) {
+        ServicioEntity servicio = new ServicioEntity();
+        servicio.setNombre(request.getNombre());
+
+        ServicioEntity servicioCreado = servicioService.crearServicio(servicio);
+
+        return ResponseEntity.ok(convertirAResponseDTO(servicioCreado));
+    }
+
+    @PutMapping("/{idServicio}")
+    public ResponseEntity<ServicioResponseDTO> actualizarServicio(
+            @PathVariable Long idServicio,
+            @RequestBody ServicioRequestDTO request
+    ) {
+        ServicioEntity servicioActualizado = new ServicioEntity();
+        servicioActualizado.setNombre(request.getNombre());
+
+        ServicioEntity servicio = servicioService.actualizarServicio(idServicio, servicioActualizado);
+
+        return ResponseEntity.ok(convertirAResponseDTO(servicio));
+    }
+
+    @DeleteMapping("/{idServicio}")
+    public ResponseEntity<Void> eliminarServicio(@PathVariable Long idServicio) {
+        servicioService.eliminarServicio(idServicio);
+        return ResponseEntity.noContent().build();
+    }
+
+    private ServicioResponseDTO convertirAResponseDTO(ServicioEntity servicio) {
+        return new ServicioResponseDTO(
+                servicio.getIdServicio(),
+                servicio.getNombre()
+        );
+    }
+
+    // DTO para recibir datos desde el frontend
+    public static class ServicioRequestDTO {
+
+        private String nombre;
+
+        public ServicioRequestDTO() {
+        }
+
+        public ServicioRequestDTO(String nombre) {
+            this.nombre = nombre;
+        }
+
+        public String getNombre() {
+            return nombre;
+        }
+
+        public void setNombre(String nombre) {
+            this.nombre = nombre;
         }
     }
 
-    // Actualizar servicio existente
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateServicio(@PathVariable Integer id, @RequestBody Map<String, Object> payload) {
-        try {
-            Map<String, Object> updated = servicioService.updateServicio(id, payload);
-            if (updated == null) return ResponseEntity.notFound().build();
-            return ResponseEntity.ok().body(updated);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new java.util.HashMap<String, Object>() {{
-                put("error", e.getMessage());
-            }});
+    // DTO para responder al frontend
+    public static class ServicioResponseDTO {
+
+        private Long idServicio;
+        private String nombre;
+
+        public ServicioResponseDTO() {
         }
-    }
 
-    // Eliminar servicio
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteServicio(@PathVariable Integer id) {
-        boolean deleted = servicioService.deleteServicio(id);
-        if (!deleted) {
-            return ResponseEntity.notFound().build();
+        public ServicioResponseDTO(Long idServicio, String nombre) {
+            this.idServicio = idServicio;
+            this.nombre = nombre;
         }
-        return ResponseEntity.ok().body(new java.util.HashMap<String, Object>() {{
-            put("message", "Servicio eliminado exitosamente");
-        }});
-    }
 
-    // Obtener usuarios por servicio
-    @GetMapping("/{id}/usuarios")
-    public ResponseEntity<?> getUsuariosByServicio(@PathVariable Integer id) {
-        List<Map<String, Object>> usuarios = servicioService.getUsuariosByServicio(id);
-        return ResponseEntity.ok().body(usuarios);
-    }
+        public Long getIdServicio() {
+            return idServicio;
+        }
 
-    // Obtener servicios activos
-    @GetMapping("/activos")
-    public ResponseEntity<?> getServiciosActivos() {
-        List<ServicioEntity> servicios = servicioService.getServiciosActivos();
-        return ResponseEntity.ok().body(servicios);
-    }
-    // Limpiar datos del servicio (borrado en cascada masivo, preservando servicio y usuarios)
-    @DeleteMapping("/{id}/limpiar")
-    public ResponseEntity<?> limpiarServicio(@PathVariable Integer id) {
-        try {
-            servicioService.limpiarServicio(id);
-            return ResponseEntity.ok().body(new java.util.HashMap<String, Object>() {{
-                put("message", "Servicio limpiado exitosamente (datos eliminados)");
-            }});
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new java.util.HashMap<String, Object>() {{
-                put("error", "Error al limpiar el servicio: " + e.getMessage());
-            }});
+        public void setIdServicio(Long idServicio) {
+            this.idServicio = idServicio;
+        }
+
+        public String getNombre() {
+            return nombre;
+        }
+
+        public void setNombre(String nombre) {
+            this.nombre = nombre;
         }
     }
 }

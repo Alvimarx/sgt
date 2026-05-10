@@ -12,9 +12,17 @@ import java.util.List;
 @Entity
 @Builder
 @Data
-@Table(name = "Funcionario")
+@NoArgsConstructor
 @AllArgsConstructor
-
+@Table(
+        name = "Funcionario",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_funcionario_rut_dv",
+                        columnNames = {"Rut", "DV"}
+                )
+        }
+)
 public class FuncionarioEntity {
 
     @Id
@@ -31,8 +39,11 @@ public class FuncionarioEntity {
     @Column(name = "Apel_mat")
     private String apelMat;
 
-    @Column(name = "Rut", nullable = false, unique = true)
+    @Column(name = "Rut", nullable = false)
     private String rut;
+
+    @Column(name = "DV", nullable = false, length = 1)
+    private String dv;
 
     @Column(name = "Clave", nullable = false)
     private String clave;
@@ -46,22 +57,22 @@ public class FuncionarioEntity {
     @JoinColumn(name = "ID_ROL_SISTEMA", nullable = false)
     private RolSistemaEntity rolSistema;
 
+    @Builder.Default
     @OneToMany(mappedBy = "Funcionario")
     private List<TurnoEntity> turnos = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "Funcionario")
     private List<ServiciosFuncionarioEntity> serviciosFuncionario = new ArrayList<>();
 
-    // --- Constructores ---
-
-    public FuncionarioEntity() {
-    }
+    // --- Constructor útil sin ID ---
 
     public FuncionarioEntity(
             String nombre,
             String apelPat,
             String apelMat,
             String rut,
+            String dv,
             String clave,
             String profesion,
             RolSistemaEntity rolSistema
@@ -70,90 +81,9 @@ public class FuncionarioEntity {
         this.apelPat = apelPat;
         this.apelMat = apelMat;
         this.rut = rut;
+        this.dv = dv;
         this.clave = clave;
         this.profesion = profesion;
         this.rolSistema = rolSistema;
-    }
-
-    // --- Getters y Setters ---
-
-    public Long getIdFuncionario() {
-        return idFuncionario;
-    }
-
-    public void setIdFuncionario(Long idFuncionario) {
-        this.idFuncionario = idFuncionario;
-    }
-
-    public String getNombre() {
-        return nombre;
-    }
-
-    public void setNombre(String nombre) {
-        this.nombre = nombre;
-    }
-
-    public String getApelPat() {
-        return apelPat;
-    }
-
-    public void setApelPat(String apelPat) {
-        this.apelPat = apelPat;
-    }
-
-    public String getApelMat() {
-        return apelMat;
-    }
-
-    public void setApelMat(String apelMat) {
-        this.apelMat = apelMat;
-    }
-
-    public String getRut() {
-        return rut;
-    }
-
-    public void setRut(String rut) {
-        this.rut = rut;
-    }
-
-    public String getClave() {
-        return clave;
-    }
-
-    public void setClave(String clave) {
-        this.clave = clave;
-    }
-
-    public String getProfesion() {
-        return profesion;
-    }
-
-    public void setProfesion(String profesion) {
-        this.profesion = profesion;
-    }
-
-    public RolSistemaEntity getRolSistema() {
-        return rolSistema;
-    }
-
-    public void setRolSistema(RolSistemaEntity rolSistema) {
-        this.rolSistema = rolSistema;
-    }
-
-    public List<TurnoEntity> getTurnos() {
-        return turnos;
-    }
-
-    public void setTurnos(List<TurnoEntity> turnos) {
-        this.turnos = turnos;
-    }
-
-    public List<ServiciosFuncionarioEntity> getServiciosFuncionario() {
-        return serviciosFuncionario;
-    }
-
-    public void setServiciosFuncionario(List<ServiciosFuncionarioEntity> serviciosFuncionario) {
-        this.serviciosFuncionario = serviciosFuncionario;
     }
 }

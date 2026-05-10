@@ -21,8 +21,6 @@ public class PisoEntity {
     @Column(name = "color_hexa", length = 7)
     private String colorHexa;
 
-    // (NUEVO) Relación con la Plantilla Asignada
-    // Muchos pisos pueden tener la misma plantilla
     @ManyToOne
     @JoinColumn(name = "id_plantilla_piso")
     private PlantillaPisoEntity plantillaPiso;
