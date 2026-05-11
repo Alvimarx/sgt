@@ -40,6 +40,11 @@ public class SolicitudService {
         this.eventLogService = eventLogService;
     }
 
+    private static final String ESTADO_PENDIENTE_JEFATURA = "Pendiente de jefatura";
+    private static final String ESTADO_ESPERA_RECEPTOR    = "Espera de receptor";
+    private static final String ESTADO_APROBADO           = "Aprobado";
+    private static final String ESTADO_RECHAZADO          = "Rechazado";
+
     // Definir los tipos de solicitud que son PERMISOS
     private static final List<String> TIPOS_PERMISO_POR_RANGO = List.of(
             "Permiso",
@@ -288,7 +293,7 @@ public class SolicitudService {
         solicitud.setTipo(dto.getTipo());
         solicitud.setMotivo(dto.getMotivo());
         solicitud.setFechaCreacion(LocalDateTime.now());
-        solicitud.setEstado("Pendiente");
+        solicitud.setEstado(ESTADO_PENDIENTE_JEFATURA);
         solicitud.setAceptadoMedico(null);
         SolicitudEntity saved = solicitudRepository.save(solicitud);
         // Registrar en bitácora: creación de solicitud de cobertura
@@ -298,7 +303,7 @@ public class SolicitudService {
                 saved,
                 turnoSolicitado,
                 null,
-                "Pendiente",
+                ESTADO_PENDIENTE_JEFATURA,
                 dto.getMotivo(),
                 null,
                 null);
@@ -317,7 +322,7 @@ public class SolicitudService {
         solicitud.setFechaInicioPermiso(dto.getFechaInicioPermiso());
         solicitud.setFechaTerminoPermiso(dto.getFechaTerminoPermiso());
         solicitud.setFechaCreacion(LocalDateTime.now());
-        solicitud.setEstado("Pendiente");
+        solicitud.setEstado(ESTADO_PENDIENTE_JEFATURA);
 
         // === NUEVA LÓGICA: Vincular turnos por ID ===
         if (dto.getTurnosAfectadosIds() != null && !dto.getTurnosAfectadosIds().isEmpty()) {
@@ -337,7 +342,7 @@ public class SolicitudService {
                 saved,
                 null,
                 null,
-                "Pendiente",
+                ESTADO_PENDIENTE_JEFATURA,
                 dto.getDescripcion(),
                 dto.getFechaInicioPermiso() != null ? dto.getFechaInicioPermiso().toLocalDate() : null,
                 dto.getFechaTerminoPermiso() != null ? dto.getFechaTerminoPermiso().toLocalDate() : null);
@@ -360,7 +365,7 @@ public class SolicitudService {
         solicitud.setTipo(dto.getTipo());
         solicitud.setMotivo(dto.getMotivo());
         solicitud.setFechaCreacion(LocalDateTime.now());
-        solicitud.setEstado("Pendiente");
+        solicitud.setEstado(ESTADO_ESPERA_RECEPTOR);
         solicitud.setAceptadoMedico(null);
         SolicitudEntity saved = solicitudRepository.save(solicitud);
         registrarEvento("SOLICITUD_CREADA",
@@ -369,7 +374,7 @@ public class SolicitudService {
             saved,
             turnoDeseado,
             null,
-            "Pendiente",
+            ESTADO_ESPERA_RECEPTOR,
             dto.getMotivo(),
             null,
             null);
@@ -393,7 +398,7 @@ public class SolicitudService {
             solicitud.setTipo(dto.getTipo());
             solicitud.setMotivo(dto.getCondiciones());
             solicitud.setFechaCreacion(LocalDateTime.now());
-            solicitud.setEstado("Pendiente");
+            solicitud.setEstado(ESTADO_ESPERA_RECEPTOR);
 
             SolicitudEntity saved = solicitudRepository.save(solicitud);
             registrarEvento("SOLICITUD_CREADA",
@@ -402,7 +407,7 @@ public class SolicitudService {
                     saved,
                     null,
                     null,
-                    "Pendiente",
+                    ESTADO_ESPERA_RECEPTOR,
                     dto.getCondiciones(),
                     null,
                     null);
@@ -431,7 +436,7 @@ public class SolicitudService {
             solicitud.setTipo(dto.getTipo());
             solicitud.setMotivo(dto.getCondiciones());
             solicitud.setFechaCreacion(LocalDateTime.now());
-            solicitud.setEstado("Pendiente");
+            solicitud.setEstado(ESTADO_ESPERA_RECEPTOR);
 
             SolicitudEntity saved = solicitudRepository.save(solicitud);
 
@@ -446,7 +451,7 @@ public class SolicitudService {
                     saved,
                     null,
                     null,
-                    "Pendiente",
+                    ESTADO_ESPERA_RECEPTOR,
                     dto.getCondiciones(),
                     null,
                     null
@@ -510,7 +515,7 @@ public class SolicitudService {
 
                 List<SolicitudEntity> conflictos = solicitudRepository.findAllByTurno_IdAndEstadoAndIdNot(
                         turnoId,
-                        "Pendiente",
+                        ESTADO_PENDIENTE_JEFATURA,
                         solicitudId
                 );
 
@@ -816,8 +821,8 @@ public class SolicitudService {
             throw new RuntimeException("Solo se puede responder a solicitudes de Cambio de turno.");
         }
 
-        // 3. Validación de estado (solo si está pendiente)
-        if (!"Pendiente".equals(solicitud.getEstado())) {
+        // 3. Validación de estado (solo si está esperando al receptor)
+        if (!ESTADO_ESPERA_RECEPTOR.equals(solicitud.getEstado())) {
             throw new RuntimeException("La solicitud ya fue procesada.");
         }
 
@@ -826,7 +831,7 @@ public class SolicitudService {
 
         if (aceptado) {
             solicitud.setAceptadoMedico(true);
-            // La solicitud se mantiene en "Pendiente" hasta que Jefatura apruebe la finalización del intercambio.
+            solicitud.setEstado(ESTADO_PENDIENTE_JEFATURA);
             SolicitudEntity saved = solicitudRepository.save(solicitud);
             registrarEvento("INTERCAMBIO_ACEPTADO",
                     "Médico receptor aceptó el intercambio",
@@ -834,15 +839,14 @@ public class SolicitudService {
                     saved,
                     saved.getTurno(),
                     estadoAnterior,
-                    saved.getEstado(),
+                    ESTADO_PENDIENTE_JEFATURA,
                     saved.getMotivo(),
                     null,
                     null);
             return saved;
         } else {
             solicitud.setAceptadoMedico(null);
-            // Si el médico rechaza, la solicitud se rechaza automáticamente (no requiere aprobación de Jefatura).
-            solicitud.setEstado("Rechazado");
+            solicitud.setEstado(ESTADO_RECHAZADO);
             SolicitudEntity saved = solicitudRepository.save(solicitud);
             registrarEvento("INTERCAMBIO_RECHAZADO",
                     "Médico receptor rechazó el intercambio",
@@ -850,7 +854,7 @@ public class SolicitudService {
                     saved,
                     saved.getTurno(),
                     estadoAnterior,
-                    saved.getEstado(),
+                    ESTADO_RECHAZADO,
                     saved.getMotivo(),
                     null,
                     null);
@@ -876,6 +880,7 @@ public class SolicitudService {
 
         if (acepta) {
             solicitud.setAceptadoMedico(true);
+            solicitud.setEstado(ESTADO_PENDIENTE_JEFATURA);
             SolicitudEntity saved = solicitudRepository.save(solicitud);
             registrarEvento("INTERCAMBIO_ACEPTADO",
                     "Médico receptor aceptó el intercambio",
@@ -883,14 +888,14 @@ public class SolicitudService {
                     saved,
                     saved.getTurno(),
                     estadoAnterior,
-                    saved.getEstado(),
+                    ESTADO_PENDIENTE_JEFATURA,
                     saved.getMotivo(),
                     null,
                     null);
             return saved;
         } else {
             solicitud.setAceptadoMedico(null);
-            solicitud.setEstado("Rechazado");
+            solicitud.setEstado(ESTADO_RECHAZADO);
             SolicitudEntity saved = solicitudRepository.save(solicitud);
             registrarEvento("INTERCAMBIO_RECHAZADO",
                     "Médico receptor rechazó el intercambio",
@@ -898,7 +903,7 @@ public class SolicitudService {
                     saved,
                     saved.getTurno(),
                     estadoAnterior,
-                    saved.getEstado(),
+                    ESTADO_RECHAZADO,
                     saved.getMotivo(),
                     null,
                     null);
@@ -918,8 +923,8 @@ public class SolicitudService {
             throw new RuntimeException("Este método solo procesa solicitudes de tipo 'Oferta de turno'.");
         }
 
-        // 3. Validación de estado (solo si está pendiente)
-        if (!"Pendiente".equalsIgnoreCase(solicitud.getEstado())) {
+        // 3. Validación de estado (solo si está esperando al receptor)
+        if (!ESTADO_ESPERA_RECEPTOR.equalsIgnoreCase(solicitud.getEstado())) {
             throw new RuntimeException("La solicitud ya fue procesada (Estado actual: " + solicitud.getEstado() + ").");
         }
 
@@ -927,8 +932,8 @@ public class SolicitudService {
         PersonalEntity actor = obtenerUsuarioDesdeContexto();
 
         if (aceptado) {
-            // El médico acepta la oferta.
             solicitud.setAceptadoMedico(true);
+            solicitud.setEstado(ESTADO_PENDIENTE_JEFATURA);
             SolicitudEntity saved = solicitudRepository.save(solicitud);
             registrarEvento("OFERTA_ACEPTADA",
                     "Médico aceptó la oferta de turno",
@@ -936,18 +941,15 @@ public class SolicitudService {
                     saved,
                     saved.getTurno(),
                     estadoAnterior,
-                    saved.getEstado(),
+                    ESTADO_PENDIENTE_JEFATURA,
                     saved.getMotivo(),
                     null,
                     null);
             return saved;
 
         } else {
-            // El médico rechaza la oferta.
             solicitud.setAceptadoMedico(false);
-
-            // Si el receptor rechaza, la solicitud se cierra automáticamente como Rechazada.
-            solicitud.setEstado("Rechazado");
+            solicitud.setEstado(ESTADO_RECHAZADO);
             SolicitudEntity saved = solicitudRepository.save(solicitud);
             registrarEvento("OFERTA_RECHAZADA",
                     "Médico rechazó la oferta de turno",
@@ -955,7 +957,7 @@ public class SolicitudService {
                     saved,
                     saved.getTurno(),
                     estadoAnterior,
-                    saved.getEstado(),
+                    ESTADO_RECHAZADO,
                     saved.getMotivo(),
                     null,
                     null);
@@ -998,7 +1000,7 @@ public class SolicitudService {
 
         // Datos de auditoría y estado
         solicitud.setFechaCreacion(LocalDateTime.now());
-        solicitud.setEstado("Pendiente");
+        solicitud.setEstado(ESTADO_PENDIENTE_JEFATURA);
 
         // Guardar
         SolicitudEntity saved = solicitudRepository.save(solicitud);
@@ -1010,7 +1012,7 @@ public class SolicitudService {
                 saved,
                 null,
                 null,
-                "Pendiente",
+                ESTADO_PENDIENTE_JEFATURA,
                 dto.getMotivo(),
                 solicitud.getFechaInicioPermiso() != null ? solicitud.getFechaInicioPermiso().toLocalDate() : null,
                 solicitud.getFechaTerminoPermiso() != null ? solicitud.getFechaTerminoPermiso().toLocalDate() : null);
