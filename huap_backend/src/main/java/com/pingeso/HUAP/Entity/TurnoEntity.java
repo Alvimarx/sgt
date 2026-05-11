@@ -1,15 +1,20 @@
 package com.pingeso.HUAP.Entity;
 
 import jakarta.persistence.*;
+import lombok.*;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-// Creamos indices, para optimizar las consultas por servicio y fechas, que son las más comunes en el calendario
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "Turnos", indexes = {
     @Index(name = "idx_servicio_fechas", columnList = "id_servicio, dia_inicio_turno, dia_final_turno")
 })
-
 public class TurnoEntity {
 
     @Id
@@ -36,7 +41,7 @@ public class TurnoEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_funcionario")
-    private FuncionarioEntity Funcionario; 
+    private FuncionarioEntity funcionario; 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_servicio") 
@@ -49,58 +54,5 @@ public class TurnoEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_plantilla")
     private PlantillaEntity plantilla;
-
-
-
-    // --- Constructores ---
-
-    public TurnoEntity() {
-    }
-
-    public TurnoEntity(String nombre, LocalDate diaInicioTurno, LocalDate diaFinalTurno, 
-                       LocalTime horaInicio, LocalTime horaFin, 
-                       FuncionarioEntity funcionario, ServicioEntity servicio, PisoEntity piso, PlantillaEntity plantilla) {
-        this.nombre = nombre;
-        this.diaInicioTurno = diaInicioTurno;
-        this.diaFinalTurno = diaFinalTurno;
-        this.horaInicio = horaInicio;
-        this.horaFin = horaFin;
-        this.Funcionario = funcionario;
-        this.servicio = servicio;
-        this.piso = piso;
-        this.plantilla = plantilla;
-    }
-
-    // --- Getters y Setters ---
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getNombre() { return nombre; }
-    public void setNombre(String nombre) { this.nombre = nombre; }
-
-    public LocalDate getDiaInicioTurno() { return diaInicioTurno; }
-    public void setDiaInicioTurno(LocalDate diaInicioTurno) { this.diaInicioTurno = diaInicioTurno; }
-
-    public LocalDate getDiaFinalTurno() { return diaFinalTurno; }
-    public void setDiaFinalTurno(LocalDate diaFinalTurno) { this.diaFinalTurno = diaFinalTurno; }
-
-    public LocalTime getHoraInicio() { return horaInicio; }
-    public void setHoraInicio(LocalTime horaInicio) { this.horaInicio = horaInicio; }
-
-    public LocalTime getHoraFin() { return horaFin; }
-    public void setHoraFin(LocalTime horaFin) { this.horaFin = horaFin; }
-
-    // Getters y Setters de los Objetos
-    public FuncionarioEntity getFuncionario() { return Funcionario; }
-    public void setFuncionario(FuncionarioEntity funcionario) { this.Funcionario = funcionario; }
-
-    public ServicioEntity getServicio() { return servicio; }
-    public void setServicio(ServicioEntity servicio) { this.servicio = servicio; }
-
-    public PisoEntity getPiso() { return piso; }
-    public void setPiso(PisoEntity piso) { this.piso = piso; }
-
-    public PlantillaEntity getPlantilla() { return plantilla; }
-    public void setPlantilla(PlantillaEntity plantilla) { this.plantilla = plantilla; }
 
 }

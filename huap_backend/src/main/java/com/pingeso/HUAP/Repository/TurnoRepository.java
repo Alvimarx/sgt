@@ -1,5 +1,4 @@
 package com.pingeso.HUAP.Repository;
-
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -8,32 +7,37 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
-    Optional<TurnoEntity> findById(Long id);
+    // ====================================================================
+    // BÚSQUEDAS BÁSICAS POR ENTIDAD 
+    // ====================================================================
 
     List<TurnoEntity> findByNombre(String nombre);
-
-    List<TurnoEntity> findByFuncionario_Id(Long idServicioFuncionario);
-
+    List<TurnoEntity> findByFuncionario_Id(Long idFuncionario);
     List<TurnoEntity> findByServicio_Id(Long idServicio);
-
     List<TurnoEntity> findByPiso_Id(Long idPiso);
-
     List<TurnoEntity> findByPlantilla_Id(Long idPlantilla);
 
-    // Métodos para encontrar turnos sin asignar (funcionario null)
+    // ====================================================================
+    // BÚSQUEDA DE TURNOS VACANTES (SIN ASIGNAR)
+    // ====================================================================
+
     List<TurnoEntity> findByFuncionarioIsNull();
-        // Método para encontrar turnos sin asignar de un servicio específico
+    List<TurnoEntity> findByDiaInicioTurnoAndFuncionarioIsNull(LocalDate dia);
+    List<TurnoEntity> findByServicio_IdAndDiaInicioTurnoAndFuncionarioIsNull(Long servicioId, LocalDate dia);
+    List<TurnoEntity> findByServicio_IdAndDiaInicioTurno(Long servicioId, LocalDate dia);
+
     @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario IS NULL AND t.servicio.id = :servicioId")
     List<TurnoEntity> findUnassignedTurnosByServicio(@Param("servicioId") Long servicioId);
 
-    // - - - VISTAS CALENDARIO - - -
+    // ====================================================================
+    // VISTAS DE CALENDARIO Y RANGOS DE FECHAS
+    // ====================================================================
 
-    // Obtener turnos por rango de fechas y servicio (para cobertura del calendario)
+    // Cobertura general de un Servicio en un rango de fechas
     @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.id = :servicioId " +
            "AND t.diaFinalTurno >= :fechaInicio AND t.diaInicioTurno <= :fechaFin")
     List<TurnoEntity> findByServicioIdAndDateRange(
@@ -41,28 +45,27 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin);
 
-    // Obtener los turnos de un funcionario específico por rango de fechas y servicio 
-    @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.id = :servicioId " +
-           "AND t.funcionario.id = :funcionarioId " +
+    // Turnos de un Funcionario específico por mes/rango
+    @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario.idFuncionario = :funcionarioId " +
            "AND t.diaFinalTurno >= :fechaInicio AND t.diaInicioTurno <= :fechaFin")
-    List<TurnoEntity> findByServicioIdAndFuncionarioIdAndDateRange(
-            @Param("servicioId") Long servicioId,
+    List<TurnoEntity> findByFuncionarioIdAndDateRange(
             @Param("funcionarioId") Long funcionarioId,
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin);
 
+    // ====================================================================
+    // RESOLUCIÓN DE CONFLICTOS Y VALIDACIONES
+    // ====================================================================
 
-    // - - - RESOLUCION DE CONFLICTOS - - -
-
-    // Método para detectar conflictos de turnos en un rango de fechas para un funcionario específico, independiente del servicio
-    @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario.id = :funcionarioId " +
+    // Conflicto de Funcionario (Evita que el médico esté en 2 lugares a la vez)
+    @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario.idFuncionario = :funcionarioId " +
            "AND t.diaFinalTurno >= :fechaInicio AND t.diaInicioTurno <= :fechaFin")
     List<TurnoEntity> findConflictosByFuncionario(
             @Param("funcionarioId") Long funcionarioId,
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin);
 
-    // Método para detectar conflictos de turnos en un rango de fechas para un piso específico, independiente del servicio
+    // Búsqueda en un Piso específico (Usado para el motor de horas unionadas)
     @Query("SELECT t FROM TurnoEntity t WHERE t.piso.id = :pisoId " +
            "AND t.diaFinalTurno >= :fechaInicio AND t.diaInicioTurno <= :fechaFin")
     List<TurnoEntity> findByPisoIdAndDateRange(
@@ -70,8 +73,8 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin);
 
-    // Verificar conflictos de turnos en un rango de fechas para una plantilla específica
-    @Query("SELECT t FROM TurnoEntity t WHERE t.plantilla.id = :plantillaId " +
+    // Conflictos en Asignación Masiva por Plantilla
+    @Query("SELECT t FROM TurnoEntity t WHERE t.plantilla.idPlantilla = :plantillaId " +
            "AND t.servicio.id = :servicioId " +
            "AND t.diaFinalTurno >= :fechaInicio AND t.diaInicioTurno <= :fechaFin")
     List<TurnoEntity> findConflictsByPlantilla(
@@ -79,7 +82,4 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("servicioId") Long servicioId,
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin);
-
-    
-
 }
