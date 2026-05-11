@@ -20,5 +20,14 @@ public interface FuncionarioRepository extends JpaRepository<FuncionarioEntity, 
     @Query ("SELECT f FROM FuncionarioEntity f WHERE f.rut = :rut")
     FuncionarioEntity findByRut(@Param ("rut") String rut); 
 
+    /**
+     * Obtiene todos los funcionarios de un servicio específico.
+     * 
+     */
+    @Query ("SELECT f FROM FuncionarioEntity f " +
+            "JOIN f.serviciosFuncionario sf " +
+            "WHERE sf.servicio.idServicio = :idServicio")
+    List<FuncionarioEntity> findAllByServicioId(@Param ("idServicio") Long idServicio);
+
     
 }
