@@ -52,44 +52,9 @@ public class Solicitud2Service {
         return solicitud2Repository.findByturno_IdTurno(idTurno);
     }
 
-    /*
-    Getters para solicitudes en base a las FK y PK
+     /*
+        Modificadores y utilidades
      */
-
-    @Transactional
-    public Solicitud2Entity crearSolicitud(Long idFuncionario, Long idFuncionarioReceptor, Long idTipoSolicitud,
-                                           Long idTurno, Long idTurnoReceptor,LocalDateTime inicio, LocalDateTime fin, String motivo) {
-        // FKs
-        FuncionarioEntity funcionario = funcionarioRepository.findById(idFuncionario)
-                .orElseThrow(() -> new RuntimeException("Funcionario emisor no existe"));
-
-        FuncionarioEntity funcionarioReceptor = funcionarioRepository.findById(idFuncionarioReceptor)
-                .orElseThrow(() -> new RuntimeException("Funcionario receptor no existe"));
-
-        TipoSolicitudEntity tipoSolicitud = tipoSolicitudRepository.findById(idTipoSolicitud)
-                .orElseThrow(() -> new RuntimeException("Tipo de solicitud no existe"));
-
-        TurnoEntity turno = turnoRepository.findById(idTurno)
-                .orElseThrow(() -> new RuntimeException("Turno no existe"));
-
-        TurnoEntity turnoReceptor = turnoRepository.findById(idTurnoReceptor)
-                .orElseThrow(() -> new RuntimeException("Turno Receptor no existe"));
-
-        // Creacion de la solicitud
-        Solicitud2Entity solicitud = Solicitud2Entity.builder()
-                .funcionario(funcionario)
-                .funcionarioReceptor(funcionarioReceptor)
-                .tipoSolicitud(tipoSolicitud)
-                .turno(turno)
-                .turnoReceptor(turnoReceptor)
-                .estado(Solicitud2Entity.EstadoSolicitud.PENDIENTE)
-                .fechaCreacion(LocalDateTime.now())
-                .fechaInicioPermiso(inicio)
-                .fechaTerminoPermiso(fin)
-                .motivo(motivo) //Dentro del front por un dropdown Probablemente
-                .build();
-        return solicitud2Repository.save(solicitud);
-    }
 
     @Transactional
     public Solicitud2Entity crearSolicitud(CrearSolicitudDTO dto) {
@@ -155,9 +120,6 @@ public class Solicitud2Service {
         return solicitud2Repository.save(solicitud);
     }
 
-    /*
-    Modificadores y utilidades
-     */
 
     @Transactional
     public Solicitud2Entity cambiarEstado(Long idSolicitud, Solicitud2Entity.EstadoSolicitud nuevoEstado, Long idUsuarioAsignador) {
@@ -234,16 +196,6 @@ public class Solicitud2Service {
         } catch (Exception e) {
             System.err.println("Error guardando en bitácora: " + e.getMessage());
         }
-    }
-
-    @Transactional
-    public Solicitud2Entity cambiarEstado(Long idSolicitud, Solicitud2Entity.EstadoSolicitud nuevoEstado) {
-        Solicitud2Entity solicitud = solicitud2Repository.findById(idSolicitud)
-                .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
-
-        solicitud.setEstado(nuevoEstado);
-
-        return solicitud2Repository.save(solicitud);
     }
 
     @Transactional

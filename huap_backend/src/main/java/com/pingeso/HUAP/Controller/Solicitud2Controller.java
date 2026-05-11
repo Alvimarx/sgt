@@ -29,24 +29,29 @@ public class Solicitud2Controller {
 
 
 
-
-    //Mas tarde hay que cambiar state por algo mas representativo
-    @PatchMapping("/state/{id}/estado")
-    public ResponseEntity<Solicitud2Entity> cambiarEstado(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        Solicitud2Entity.EstadoSolicitud estado =
-                Solicitud2Entity.EstadoSolicitud.valueOf(body.get("estado"));
-        return ResponseEntity.ok(
-                solicitud2Service.cambiarEstado(id, estado)
-        );
+    @PostMapping("/crearsolicitud")
+    public ResponseEntity<Solicitud2Entity> crear(@RequestBody CrearSolicitudDTO dto) {
+        return ResponseEntity.ok(solicitud2Service.crearSolicitud(dto));
     }
 
-    @PatchMapping("/{id}/motivo")
+    @PutMapping("/responderintercambio/{id}")
+    public ResponseEntity<Solicitud2Entity> responderIntercambio(@PathVariable Long id, @RequestParam Long idReceptor,
+            @RequestParam boolean respuesta) {
+        return ResponseEntity.ok(solicitud2Service.responderOfertaIntercambio(id, idReceptor, respuesta));
+    }
+
+    @PutMapping("/estado/{id}")
+    public ResponseEntity<Solicitud2Entity> cambiarEstado(@PathVariable Long id, @RequestParam Solicitud2Entity.EstadoSolicitud nuevoEstado,
+            @RequestParam Long idUsuarioAsignador) {
+        return ResponseEntity.ok(solicitud2Service.cambiarEstado(id, nuevoEstado, idUsuarioAsignador));
+    }
+
+    @PatchMapping("/motivo/{id}/")
     public ResponseEntity<Solicitud2Entity> modificarMotivo(@PathVariable Long id, @RequestParam String motivo) {
         return ResponseEntity.ok(
                 solicitud2Service.modificarMotivo(id, motivo)
         );
     }
-
 
      /*
     Getters
@@ -57,7 +62,7 @@ public class Solicitud2Controller {
         return  ResponseEntity.ok(solicitud2Service.findAllSolicitudes());
     }
 
-    @GetMapping("/allsolicitud/funcionario/{id}")
+    @GetMapping("/funcionario/{id}")
     public ResponseEntity<List<Solicitud2Entity>> getAllSolicitudFuncionario(@PathVariable Long id) {
         return ResponseEntity.ok(solicitud2Service.findByFuncionario(id));
     }
