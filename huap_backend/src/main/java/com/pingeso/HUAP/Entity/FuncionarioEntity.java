@@ -48,6 +48,9 @@ public class FuncionarioEntity {
     @Column(name = "Clave", nullable = false)
     private String clave;
 
+    @Column(name = "Estado", nullable = false)
+    private int estado;
+
     @Column(name = "Profesion")
     private String profesion;
 
@@ -74,6 +77,7 @@ public class FuncionarioEntity {
             String rut,
             String dv,
             String clave,
+            int estado,
             String profesion,
             RolSistemaEntity rolSistema
     ) {
@@ -83,6 +87,7 @@ public class FuncionarioEntity {
         this.rut = rut;
         this.dv = dv;
         this.clave = clave;
+        this.estado = estado;
         this.profesion = profesion;
         this.rolSistema = rolSistema;
     }
