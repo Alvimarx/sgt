@@ -41,8 +41,6 @@ class SolicitudServiceTest {
     @Mock
     private PersonalRepository personalRepository;
     @Mock
-    private PisoRepository pisoRepository;
-    @Mock
     private EventLogService eventLogService;
 
     @InjectMocks
@@ -58,9 +56,13 @@ class SolicitudServiceTest {
         medico1.setIdPersonal(1L);
         medico1.setNombre("Dr. House");
 
+        PisoEntity pisoDefault = new PisoEntity();
+        pisoDefault.setId(10L);
+        pisoDefault.setNombre("Piso 10");
+
         turno1 = new TurnoEntity();
         turno1.setId(100L);
-        turno1.setIdPiso("10");
+        turno1.setPiso(pisoDefault);
         turno1.setDiaInicioTurno(LocalDate.now());
         turno1.setHoraInicio(LocalTime.of(8, 0));
         turno1.setHoraFin(LocalTime.of(20, 0));
@@ -122,27 +124,35 @@ class SolicitudServiceTest {
     // --- TESTS DE MAPEO (DTOs) ---
 
     @Test
-    @DisplayName("Debe mapear turno a DetailDTO y resolver nombre de piso por ID y Nombre")
+    @DisplayName("Debe mapear turno a DetailDTO con las relaciones de la nueva estructura")
     void mapTurnoToDetailDTOTest() throws Exception {
-        PisoEntity piso = new PisoEntity();
-        piso.setId(10L);
-        piso.setNombre("Piso 10");
+        ServicioEntity servicio = new ServicioEntity();
+        servicio.setId(1L);
+        servicio.setNombre("Medicina");
 
-        when(pisoRepository.findById(10L)).thenReturn(Optional.of(piso));
-        when(pisoRepository.findByNombre("URGENCIAS")).thenReturn(Optional.of(piso));
+        FuncionarioEntity funcionario = new FuncionarioEntity();
+        funcionario.setIdFuncionario(5L);
+        funcionario.setNombre("Juan");
+        funcionario.setApelPat("Perez");
+
+        turno1.setNombre("Turno Mañana");
+        turno1.setServicio(servicio);
+        turno1.setFuncionario(funcionario);
+        turno1.setDiaFinalTurno(LocalDate.now().plusDays(1));
 
         Method method = SolicitudService.class.getDeclaredMethod("mapTurnoToDetailDTO", TurnoEntity.class);
         method.setAccessible(true);
 
-        // Caso 1: ID Numérico
-        turno1.setIdPiso("10");
-        TurnoDetailDTO dto1 = (TurnoDetailDTO) method.invoke(solicitudService, turno1);
-        assertEquals("Piso 10", dto1.getIdPiso());
+        TurnoDetailDTO dto = (TurnoDetailDTO) method.invoke(solicitudService, turno1);
 
-        // Caso 2: Catch NumberFormatException -> Búsqueda por nombre
-        turno1.setIdPiso("URGENCIAS");
-        TurnoDetailDTO dto2 = (TurnoDetailDTO) method.invoke(solicitudService, turno1);
-        assertEquals("Piso 10", dto2.getIdPiso());
+        assertEquals(100L, dto.getId());
+        assertEquals("Turno Mañana", dto.getNombre());
+        assertEquals(10L, dto.getIdPiso());
+        assertEquals("Piso 10", dto.getNombrePiso());
+        assertEquals(1L, dto.getIdServicio());
+        assertEquals("Medicina", dto.getNombreServicio());
+        assertEquals(5L, dto.getIdFuncionario());
+        assertEquals("Juan Perez", dto.getNombreFuncionario());
 
         // Caso Nulo
         assertNull(method.invoke(solicitudService, (Object) null));
@@ -1163,41 +1173,33 @@ class SolicitudServiceTest {
     }
 
     @Test
-    @DisplayName("Debe cubrir el mapeo del médico receptor y el catch de error en resolución de piso")
+    @DisplayName("Debe cubrir el mapeo del médico receptor y del piso desde la relación directa")
     void mapToResponseDTOFullCoverageTest() throws Exception {
-        // 1. Setup Médico Receptor
         PersonalEntity receptor = new PersonalEntity();
         receptor.setIdPersonal(2L);
         receptor.setNombre("Dr. Receptor");
 
-        // 2. Setup Turno con idPiso que causará una excepción genérica
+        PisoEntity piso = new PisoEntity();
+        piso.setId(10L);
+        piso.setNombre("Piso 10");
+
         TurnoEntity turno = new TurnoEntity();
         turno.setId(100L);
-        turno.setIdPiso("10"); // Valor numérico para que pase el parseLong
+        turno.setPiso(piso);
 
-        // Configuramos la entidad con un médico receptor (Cubre la línea faltante)
         solicitud1.setMedicoReceptor(receptor);
         solicitud1.setTipo("Cobertura");
         solicitud1.setTurno(turno);
 
-        // 3. Forzar Catch de Exception genérica en PisoRepository (Cubre la línea faltante)
-        // Usamos anyLong() porque el código primero hace Long.parseLong("10")
-        when(pisoRepository.findById(anyLong())).thenThrow(new RuntimeException("Error fatal de DB"));
-
-        // Invocamos el método principal de mapeo mediante Reflection
         Method mapMethod = SolicitudService.class.getDeclaredMethod("mapToResponseDTO", SolicitudEntity.class);
         mapMethod.setAccessible(true);
 
-        // Act
         SolicitudResponseDTO result = (SolicitudResponseDTO) mapMethod.invoke(solicitudService, solicitud1);
 
-        // Assert
         assertNotNull(result.getMedicoReceptor());
         assertEquals(2L, result.getMedicoReceptor().getId());
-        // El nombre del piso debería ser el ID original "10" porque el catch rescató la ejecución
-        assertEquals("10", result.getTurno().getIdPiso());
-
-        verify(pisoRepository).findById(10L);
+        assertEquals(10L, result.getTurno().getIdPiso());
+        assertEquals("Piso 10", result.getTurno().getNombrePiso());
     }
 
     @Test

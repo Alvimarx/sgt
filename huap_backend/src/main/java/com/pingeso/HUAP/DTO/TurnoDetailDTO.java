@@ -1,71 +1,32 @@
 package com.pingeso.HUAP.DTO;
 
-import java.time.LocalDateTime;
+import lombok.*;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class TurnoDetailDTO {
     private Long id;
-    private String idPiso;
-    private String diaSemana;
-    private String tipoTurno;
-    private LocalDateTime diaInicioTurno;
-    private String horaInicio;
-    private String horaFin;
+    private String nombre;
+    private LocalDate diaInicioTurno;
+    private LocalDate diaFinalTurno;
+    private LocalTime horaInicio;
+    private LocalTime horaFin;
 
-    //getters
-    public Long getId() {
-        return id;
-    }
+    private Long idFuncionario;
+    private String nombreFuncionario;
 
-    public String getIdPiso() {
-        return idPiso;
-    }
+    private Long idServicio;
+    private String nombreServicio;
 
-    public String getDiaSemana() {
-        return diaSemana;
-    }
+    private Long idPiso;
+    private String nombrePiso;
 
-    public String getTipoTurno() {
-        return tipoTurno;
-    }
-
-    public LocalDateTime getDiaInicioTurno() {
-        return diaInicioTurno;
-    }
-
-    public String getHoraInicio() {
-        return horaInicio;
-    }
-
-    public String getHoraFin() {
-        return horaFin;
-    }
-
-    //setters
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public void setIdPiso(String idPiso) {
-        this.idPiso = idPiso;
-    }
-
-    public void setDiaSemana(String diaSemana) {
-        this.diaSemana = diaSemana;
-    }
-
-    public void setTipoTurno(String tipoTurno) {
-        this.tipoTurno = tipoTurno;
-    }
-
-    public void setDiaInicioTurno(LocalDateTime diaInicioTurno) {
-        this.diaInicioTurno = diaInicioTurno;
-    }
-
-    public void setHoraInicio(String horaInicio) {
-        this.horaInicio = horaInicio;
-    }
-
-    public void setHoraFin(String horaFin) {
-        this.horaFin = horaFin;
-    }
+    private Long idPlantilla;
+    private String nombrePlantilla;
 }

@@ -7,7 +7,6 @@ import com.pingeso.HUAP.Entity.PersonalEntity;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Repository.PersonalRepository;
-import com.pingeso.HUAP.Repository.PisoRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,15 +27,13 @@ public class SolicitudService {
     private final SolicitudRepository solicitudRepository;
     private final TurnoRepository turnoRepository;
     private final PersonalRepository personalRepository;
-    private final PisoRepository pisoRepository;
     private final EventLogService eventLogService;
 
     @Autowired
-    public SolicitudService(SolicitudRepository solicitudRepository, TurnoRepository turnoRepository, PersonalRepository personalRepository, PisoRepository pisoRepository, EventLogService eventLogService) {
+    public SolicitudService(SolicitudRepository solicitudRepository, TurnoRepository turnoRepository, PersonalRepository personalRepository, EventLogService eventLogService) {
         this.solicitudRepository = solicitudRepository;
         this.turnoRepository = turnoRepository;
         this.personalRepository = personalRepository;
-        this.pisoRepository = pisoRepository;
         this.eventLogService = eventLogService;
     }
 
@@ -182,47 +179,32 @@ public class SolicitudService {
 
     //metodo auxiliar para convertir de turno entity a turnodetaildto
     private TurnoDetailDTO mapTurnoToDetailDTO(TurnoEntity turnoEntity) {
-        TurnoDetailDTO dto = new TurnoDetailDTO();
         if (turnoEntity == null) return null;
 
-        dto.setId(turnoEntity.getId());
-        // Resolver idPiso a nombre de piso cuando sea posible para no exponer solo un identificador
-        String idPisoRaw = turnoEntity.getIdPiso();
-        String pisoNombre = idPisoRaw;
-        if (idPisoRaw != null) {
-            try {
-                // intentar parsear como id numérico
-                Long pisoId = Long.parseLong(idPisoRaw.trim());
-                java.util.Optional<com.pingeso.HUAP.Entity.PisoEntity> opt = pisoRepository.findById(pisoId);
-                if (opt.isPresent()) {
-                    pisoNombre = opt.get().getNombre();
-                }
-            } catch (NumberFormatException nfe) {
-                // si no es numérico, intentar buscar por nombre (alguna integracion antigua puede guardar nombre)
-                try {
-                    java.util.Optional<com.pingeso.HUAP.Entity.PisoEntity> opt2 = pisoRepository.findByNombre(idPisoRaw);
-                    if (opt2.isPresent()) pisoNombre = opt2.get().getNombre();
-                } catch (Exception ignore) {
-                    // ignore
-                }
-            } catch (Exception ex) {
-                // no interrumpir por error en resolución de piso
-                System.err.println("No se pudo resolver nombre de piso desde idPiso: " + ex.getMessage());
-            }
-        }
-        dto.setIdPiso(pisoNombre);
-        dto.setDiaSemana(turnoEntity.getDiaSemana());
-        dto.setTipoTurno(turnoEntity.getTipoTurno());
+        TurnoDetailDTO dto = TurnoDetailDTO.builder()
+                .id(turnoEntity.getId())
+                .nombre(turnoEntity.getNombre())
+                .diaInicioTurno(turnoEntity.getDiaInicioTurno())
+                .diaFinalTurno(turnoEntity.getDiaFinalTurno())
+                .horaInicio(turnoEntity.getHoraInicio())
+                .horaFin(turnoEntity.getHoraFin())
+                .build();
 
-        if (turnoEntity.getDiaInicioTurno() != null) {
-            dto.setDiaInicioTurno(turnoEntity.getDiaInicioTurno().atStartOfDay());
+        if (turnoEntity.getFuncionario() != null) {
+            dto.setIdFuncionario(turnoEntity.getFuncionario().getIdFuncionario());
+            dto.setNombreFuncionario(turnoEntity.getFuncionario().getNombre() + " " + turnoEntity.getFuncionario().getApelPat());
         }
-
-        if (turnoEntity.getHoraInicio() != null) {
-            dto.setHoraInicio(turnoEntity.getHoraInicio().toString());
+        if (turnoEntity.getServicio() != null) {
+            dto.setIdServicio(turnoEntity.getServicio().getId());
+            dto.setNombreServicio(turnoEntity.getServicio().getNombre());
         }
-        if (turnoEntity.getHoraFin() != null) {
-            dto.setHoraFin(turnoEntity.getHoraFin().toString());
+        if (turnoEntity.getPiso() != null) {
+            dto.setIdPiso(turnoEntity.getPiso().getId());
+            dto.setNombrePiso(turnoEntity.getPiso().getNombre());
+        }
+        if (turnoEntity.getPlantilla() != null) {
+            dto.setIdPlantilla(turnoEntity.getPlantilla().getIdPlantilla());
+            dto.setNombrePlantilla(turnoEntity.getPlantilla().getNombre());
         }
 
         return dto;
