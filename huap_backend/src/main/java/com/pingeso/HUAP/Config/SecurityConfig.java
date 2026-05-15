@@ -55,6 +55,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/health").permitAll()
                         .requestMatchers("/api/v1/info").permitAll()
 
+                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionario/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionario/login/select-service").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/v1/usuarios/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/usuarios/**").hasAnyRole("JEFATURA", "SUBROGANTE")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/**").hasAnyRole("JEFATURA", "SUBROGANTE")

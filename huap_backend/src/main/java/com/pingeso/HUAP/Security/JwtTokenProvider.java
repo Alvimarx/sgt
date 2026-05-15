@@ -36,14 +36,14 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
         return Jwts.builder()
-                .setSubject(Long.toString(id))
+                .subject(Long.toString(id))
                 .claim("rut", rut)
                 .claim("rol", rol)
                 .claim("servicioId", servicioId)
                 .claim("tipo", "FINAL") // <--- El marcador de seguridad
-                .setIssuedAt(new Date())
-                .setExpiration(expiryDate)
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .issuedAt(new Date())
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
                 .compact();
     }
 
