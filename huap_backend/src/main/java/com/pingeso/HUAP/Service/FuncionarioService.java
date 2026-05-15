@@ -12,7 +12,7 @@ import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.RolServicioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.ServiciosFuncionarioEntity;
-import com.pingeso.HUAP.Entity.SolicitudEntity;
+import com.pingeso.HUAP.Entity.Solicitud2Entity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.RolServicioRepository;
@@ -110,7 +110,7 @@ public class FuncionarioService {
             map.put("nombreCompleto", funcionario.getNombre() + " " + funcionario.getApelPat());
 
 
-            map.put("idServicio", sf.getServicio() != null ? sf.getServicio().getId() : null);
+            map.put("idServicio", sf.getServicio() != null ? sf.getServicio().getIdServicio() : null);
             map.put("rolServicio", sf.getRolServicio() != null ? sf.getRolServicio().getIdRolServicio() : null);
 
             return map;
@@ -153,7 +153,7 @@ public class FuncionarioService {
         if (f.getServiciosFuncionario() != null) {
             List<RolServicioDTO> serviciosList = f.getServiciosFuncionario().stream()
                 .map(sf -> new RolServicioDTO(
-                    (sf.getServicio() != null) ? sf.getServicio().getId() : null,
+                    (sf.getServicio() != null) ? sf.getServicio().getIdServicio() : null,
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getIdRolServicio() : null,
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getNombreRol() : null
                 )).collect(Collectors.toList());
@@ -263,7 +263,7 @@ public class FuncionarioService {
 
             // Buscamos si ya existe la relación en la colección actual
             ServiciosFuncionarioEntity relacion = u.getServiciosFuncionario().stream()
-                .filter(sf -> sf.getServicio() != null && sf.getServicio().getId().equals(sId))
+                .filter(sf -> sf.getServicio() != null && sf.getServicio().getIdServicio().equals(sId))
                 .findFirst()
                 .orElse(null);
 
@@ -307,7 +307,7 @@ public class FuncionarioService {
      * FALLARÁ porque FuncionarioEntity ya no tiene el atributo 'servicioId' directo.
      
     @Deprecated
-    public List<SolicitudEntity> getAllSolicitudesByServicioId(Long servicioId) {
+    public List<Solicitud2Entity> getAllSolicitudesByServicioId(Long servicioId) {
         if (servicioId == null)
             return java.util.Collections.emptyList();
         try {

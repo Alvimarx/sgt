@@ -62,7 +62,6 @@ public class FuncionarioEntity {
 
     @Builder.Default
     @OneToMany(mappedBy = "funcionario")
-    @OneToMany(mappedBy = "funcionario")
     private List<TurnoEntity> turnos = new ArrayList<>();
 
     @Builder.Default

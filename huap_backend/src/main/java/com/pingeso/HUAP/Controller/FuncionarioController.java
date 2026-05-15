@@ -53,7 +53,7 @@ public class FuncionarioController {
         List<ServicioDisponibleDTO> opciones = usuario.getServiciosFuncionario().stream()
                 .filter(sf -> sf.getServicio() != null)
                 .map(sf -> new ServicioDisponibleDTO(
-                        sf.getServicio().getId(),
+                        sf.getServicio().getIdServicio(),
                         sf.getServicio().getNombre(),
                         sf.getRolServicio() != null ? sf.getRolServicio().getNombreRol() : "MEDICO"
                 ))
@@ -85,7 +85,7 @@ public class FuncionarioController {
         Long idServicioElegido = request.getServicioId();
         
         ServiciosFuncionarioEntity relacion = usuario.getServiciosFuncionario().stream()
-                .filter(sf -> sf.getServicio().getId().equals(idServicioElegido))
+                .filter(sf -> sf.getServicio().getIdServicio().equals(idServicioElegido))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Acceso denegado al servicio indicado"));
 
@@ -98,14 +98,14 @@ public class FuncionarioController {
                 usuario.getIdFuncionario(),
                 usuario.getRut(),
                 rolFinal,
-                relacion.getServicio().getId()
+                relacion.getServicio().getIdServicio()
         );
 
         // 5. Devolver la respuesta (usando constructor normal)
         return ResponseEntity.ok(new LoginResponse(
                 finalToken,
                 usuario.getIdFuncionario(),
-                relacion.getServicio().getId(),
+                relacion.getServicio().getIdServicio(),
                 rolFinal,
                 usuario.getNombre(),
                 usuario.getApelPat(),
