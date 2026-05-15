@@ -15,6 +15,8 @@ import ServiciosView from './ServiciosView';
 import LoginView from './LoginView';
 import SelectServiceView from './SelectServiceView';
 import CalendarView from './calendarView';
+import AsignacionView from './AsignacionView';
+import JerarquiaView from './JerarquiaView';
 
 const Prop4 = ({ tweaks = {} }) => {
   const [currentView, setCurrentView] = useState('login');
@@ -83,11 +85,15 @@ const Prop4 = ({ tweaks = {} }) => {
           onBack={() => setCurrentView('perfil')} 
           onGoRotativa={() => setCurrentView('rotativa_wizard')} 
           onGoServicios={() => setCurrentView('servicios')}
+          onGoAsignacion={() => setCurrentView('asignacion')}
+          onGoFuncionarios={() => setCurrentView('jerarquia')}
         />
       )}
       
       {currentView === 'rotativa_wizard' && <RotativaWizard onExit={() => setCurrentView('admin')} />}
       {currentView === 'servicios' && <ServiciosView onBack={() => setCurrentView('admin')} />}
+      {currentView === 'asignacion' && <AsignacionView onBack={() => setCurrentView('admin')} />}
+      {currentView === 'jerarquia' && <JerarquiaView onBack={() => setCurrentView('admin')} />}
 
       {/* TAB BAR: Solo se muestra en las vistas principales */}
       {['agenda', 'perfil', 'calendar_view'].includes(currentView) && (

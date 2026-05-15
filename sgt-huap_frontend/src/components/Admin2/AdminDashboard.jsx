@@ -26,7 +26,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
 };
 
 // AÑADIDO: onGoServicios a los props
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios }) => {
+const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -49,7 +49,20 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios }) => {
           tone="primary" 
           onClick={onGoServicios}
         />
-        
+        <AdminCard 
+          icon="users" 
+          title="Asignación de Funcionarios" 
+          desc="Asigna funcionarios a servicios y rotativas." 
+          tone="accent" 
+          onClick={onGoAsignacion}
+        />
+        <AdminCard 
+          icon="user" 
+          title="Jerarquía de Funcionarios" 
+          desc="Designa nuevas jefaturas al sistema." 
+          tone="accent" 
+          onClick={onGoFuncionarios}
+        />
         <AdminCard 
           icon="calendar" 
           title="Crear Rotativa" 
@@ -57,7 +70,16 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios }) => {
           tone="accent" 
           onClick={onGoRotativa} 
         />
+        <AdminCard 
+          icon="alert" 
+          title="Evaluar Solicitudes" 
+          desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos." 
+          tone="accent" 
+          onClick={onGoSolitudes} 
+        />
       </div>
+
+      
     </div>
   );
 };
