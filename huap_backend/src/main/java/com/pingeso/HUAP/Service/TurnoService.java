@@ -593,7 +593,7 @@ public class TurnoService {
     }
 
     /**
-     * Calcula las horas reales de cobertura para TODO un Servicio.
+     * Calcula las horas reales de cobertura para
      * getCoberturaByServicio.
      */
     public Map<String, Object> getCoberturaRealByServicio(Long servicioId, LocalDate inicio, LocalDate fin) {

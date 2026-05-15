@@ -51,7 +51,7 @@ public class FuncionarioEntity {
     @Column(name = "Profesion")
     private String profesion;
 
-    // --- Relaciones --- MANTENERLOSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+    // --- Relaciones --- MANTENERLOS
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_ROL_SISTEMA", nullable = false)
@@ -72,9 +72,6 @@ public class FuncionarioEntity {
     @Builder.Default
     @OneToMany(mappedBy = "funcionarioReceptor")
     private List<Solicitud2Entity> solicitudesRecibidas = new ArrayList<>();
-
-
-
 
     // --- Constructor útil sin ID ---
 
