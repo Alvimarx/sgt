@@ -65,7 +65,7 @@ public class FuncionarioEntity {
     private List<TurnoEntity> turnos = new ArrayList<>();
 
     @Builder.Default
-    @OneToMany(mappedBy = "Funcionario", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "funcionario", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ServiciosFuncionarioEntity> serviciosFuncionario = new ArrayList<>();
 
     @Builder.Default
