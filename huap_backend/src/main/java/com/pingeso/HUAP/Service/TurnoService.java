@@ -1,11 +1,10 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.TurnoEntity;
-import com.pingeso.HUAP.Entity.PisoEntity;
+import com.pingeso.HUAP.Repository.Solicitud2Repository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Repository.PisoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
-import com.pingeso.HUAP.Repository.SolicitudRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -16,7 +15,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.time.DayOfWeek;
-import java.time.temporal.ChronoUnit;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -38,7 +36,7 @@ public class TurnoService {
     private com.pingeso.HUAP.Service.HolidayService holidayService;
 
     @Autowired
-    private SolicitudRepository solicitudRepository;
+    private Solicitud2Repository solicitud2Repository;
 
     // ====================================================================
     // BLOQUE 1: REGLAS DE NEGOCIO DE TIEMPOS Y FERIADOS
@@ -89,7 +87,6 @@ public class TurnoService {
 
         return saveTurno(turnoExistente);
     }
-
 
     /*
      * Ajusta la hora de inicio para turnos en fines de semana y feriados.
@@ -177,13 +174,13 @@ public class TurnoService {
         if (turno.getPlantilla() != null && turno.getServicio() != null) {
             List<TurnoEntity> conflictosPlantilla = turnoRepository.findConflictsByPlantilla(
                     turno.getPlantilla().getIdPlantilla(),
-                    turno.getServicio().getId(), 
+                    turno.getServicio().getIdServicio(), 
                     turno.getDiaInicioTurno(), 
                     turno.getDiaFinalTurno());
             
             // Excluimos el turno actual (útil para cuando saveTurno se usa desde updateTurno)
             boolean hayConflicto = conflictosPlantilla.stream()
-                    .anyMatch(t -> turno.getId() == null || !t.getId().equals(turno.getId()));
+                    .anyMatch(t -> turno.getIdTurno() == null || !t.getIdTurno().equals(turno.getIdTurno()));
             
             if (hayConflicto) {
                 throw new Exception("Conflicto: El puesto (Plantilla) ya tiene un turno generado en estas fechas para este servicio.");
@@ -198,7 +195,7 @@ public class TurnoService {
                     turno.getDiaFinalTurno());
             
             boolean hayConflicto = conflictosFuncionario.stream()
-                    .anyMatch(t -> turno.getId() == null || !t.getId().equals(turno.getId()));
+                    .anyMatch(t -> turno.getIdTurno() == null || !t.getIdTurno().equals(turno.getIdTurno()));
             
             if (hayConflicto) {
                 throw new Exception("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas.");
@@ -221,30 +218,31 @@ public class TurnoService {
         return turnoRepository.save(turno);
     }
 
-
+    //Necesita revision
+    /**
     @Transactional
     public void deleteTurno(Long id) throws Exception {
         turnoRepository.findById(id)
                 .orElseThrow(() -> new Exception("No se encontró el turno a eliminar con ID: " + id));
 
         // 1. Limpiar join table: remover el turno de turnosAfectados en cada solicitud
-        List<com.pingeso.HUAP.Entity.SolicitudEntity> conTurnoAfectado =
-                solicitudRepository.findByTurnosAfectados_Id(id);
-        for (com.pingeso.HUAP.Entity.SolicitudEntity s : conTurnoAfectado) {
+        List<com.pingeso.HUAP.Entity.Solicitud2Entity> conTurnoAfectado =
+                solicitud2Repository.findByTurnosAfectados_Id(id);
+        for (com.pingeso.HUAP.Entity.Solicitud2Entity s : conTurnoAfectado) {
             s.getTurnosAfectados().removeIf(t -> t.getId().equals(id));
         }
-        solicitudRepository.saveAll(conTurnoAfectado);
+        solicitud2Repository.saveAll(conTurnoAfectado);
 
         // 2. Eliminar solicitudes cuyo turno objetivo es este turno
-        solicitudRepository.deleteAll(solicitudRepository.findAllByTurno_Id(id));
+        solicitud2Repository.deleteAll(solicitud2Repository.findAllByTurno_Id(id));
 
         // 3. Eliminar solicitudes de intercambio donde este turno era el ofrecido
-        solicitudRepository.deleteAll(solicitudRepository.findAllByTurnoDeSolicitanteId(id));
+        solicitud2Repository.deleteAll(solicitud2Repository.findAllByTurnoDeSolicitanteId(id));
 
         // 4. Eliminar el turno
         turnoRepository.deleteById(id);
     }
-
+    **/
 
     // ====================================================================
     // BLOQUE 3: TRANSFORMACIÓN DE DATOS 
@@ -257,7 +255,7 @@ public class TurnoService {
         Map<String, Object> m = new HashMap<>();
         
         // --- 1. Identificadores y Datos Básicos ---
-        m.put("id", t.getId());
+        m.put("id", t.getIdTurno());
         m.put("nombre", t.getNombre());
 
         // --- 2. Fechas y Horas ---
@@ -268,7 +266,7 @@ public class TurnoService {
 
         // --- 3. Ubicación (Piso) ---
         if (t.getPiso() != null) {
-            m.put("idPiso", t.getPiso().getId());
+            m.put("idPiso", t.getPiso().getIdPiso());
             m.put("nombrePiso", t.getPiso().getNombre());
         } else {
             m.put("idPiso", null);
@@ -304,7 +302,7 @@ public class TurnoService {
      * Obtiene todos los turnos de un piso específico.
      */
     public List<Map<String, Object>> getTurnosByPiso(Long pisoId) {
-        return turnoRepository.findByPiso_Id(pisoId).stream()
+        return turnoRepository.findByPiso_IdPiso(pisoId).stream()
                 .map(this::convertirTurnoAMap)
                 .collect(Collectors.toList());
     }
@@ -313,7 +311,7 @@ public class TurnoService {
      * Obtiene todos los turnos asignados a un médico específico (Historial completo).
      */
     public List<Map<String, Object>> getTurnosByMedico(Long funcionarioId) {
-        return turnoRepository.findByFuncionario_Id(funcionarioId).stream()
+        return turnoRepository.findByFuncionario_IdFuncionario(funcionarioId).stream()
                 .map(this::convertirTurnoAMap)
                 .collect(Collectors.toList());
     }
@@ -351,7 +349,7 @@ public class TurnoService {
         
         // La base de datos hace los 3 filtros a la vez: 
         // 1. Servicio, 2. Día de inicio exacto (evita duplicados), 3. Funcionario es NULL
-        List<TurnoEntity> turnos = turnoRepository.findByServicio_IdAndDiaInicioTurnoAndFuncionarioIsNull(servicioId, fecha);
+        List<TurnoEntity> turnos = turnoRepository.findByServicio_IdServicioAndDiaInicioTurnoAndFuncionarioIsNull(servicioId, fecha);
 
         // Convertimos al formato que espera tu frontend
         return turnos.stream()
@@ -365,7 +363,7 @@ public class TurnoService {
      * getTurnosByServicioWithPisoNombre
      */
     public List<Map<String, Object>> getTurnosByServicioConDetalles(Long servicioId) {
-        List<TurnoEntity> turnos = turnoRepository.findByServicio_Id(servicioId);
+        List<TurnoEntity> turnos = turnoRepository.findByServicio_IdServicio(servicioId);
         return turnos.stream()
                      .map(this::convertirTurnoAMap)
                      .collect(Collectors.toList());
@@ -391,10 +389,13 @@ public class TurnoService {
     // BLOQUE 4: ASIGNACIONES MASIVAS Y PLANIFICACIÓN
     // ====================================================================
 
+
     /**
      * Elimina todos los turnos dentro de un rango de fechas para un piso específico.
      * Reutiliza la lógica segura de deleteTurno() para no romper llaves foráneas.
      */
+    //Necesita revision
+    /**
     @Transactional
     public void deleteTurnosByRange(LocalDate fechaInicio, LocalDate fechaFin, Long pisoId) {
         List<TurnoEntity> turnosAEliminar = turnoRepository.findByPisoIdAndDateRange(pisoId, fechaInicio, fechaFin);
@@ -407,6 +408,7 @@ public class TurnoService {
             }
         }
     }
+    **/
 
     /**
      * Obtiene los turnos "vacantes" (sin asignar) para un piso y rango de fechas.
@@ -451,7 +453,7 @@ public class TurnoService {
                 
                 // 4. Validar que este funcionario no choque con OTRO turno que ya tenga asignado
                 List<TurnoEntity> conflictosFunc = turnoRepository.findConflictosByFuncionario(
-                        funcionario.getId(), turno.getDiaInicioTurno(), turno.getDiaFinalTurno());
+                        funcionario.getIdFuncionario(), turno.getDiaInicioTurno(), turno.getDiaFinalTurno());
                 
                 if (conflictosFunc.isEmpty()) {
                     turno.setFuncionario(funcionario);
@@ -459,7 +461,7 @@ public class TurnoService {
                     turnosAsignados++;
                 } else {
                     logger.warn("Se omitió asignación masiva para el turno {} porque el funcionario {} tiene tope de horario.", 
-                                turno.getId(), funcionario.getNombre());
+                                turno.getIdTurno(), funcionario.getNombre());
                 }
             }
         }
@@ -591,7 +593,7 @@ public class TurnoService {
     }
 
     /**
-     * Calcula las horas reales de cobertura para TODO un Servicio.
+     * Calcula las horas reales de cobertura para
      * getCoberturaByServicio.
      */
     public Map<String, Object> getCoberturaRealByServicio(Long servicioId, LocalDate inicio, LocalDate fin) {

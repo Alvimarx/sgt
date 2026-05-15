@@ -32,7 +32,8 @@ public class AlterarTurnoService {
         this.eventLogService = eventLogService;
         this.notificacionService = notificacionService;
     }
-
+    //Necesita revision
+    /**
     @Transactional
     public Map<String, Object> alterarTurno(AlterarTurnoRequest request) {
         // Validar turno existe
@@ -203,7 +204,9 @@ public class AlterarTurnoService {
 
         return resultado;
     }
-
+    **/
+    //Necesita revision
+    /**
     private void registrarEnBitacora(PersonalEntity admin, TurnoEntity turno,
             PersonalEntity medicoAnterior, PersonalEntity nuevoMedico,
             String tipoEvento, String descripcion, String motivo) {
@@ -231,4 +234,5 @@ public class AlterarTurnoService {
 
         eventLogService.save(evento);
     }
+     **/
 }

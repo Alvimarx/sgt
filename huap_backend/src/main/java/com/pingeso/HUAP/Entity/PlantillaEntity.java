@@ -44,7 +44,7 @@ public class PlantillaEntity {
         turnos.add(turno);
         turno.setPlantilla(this);
     }
-
+    
     public void removeTurno(PlantillaTurnoEntity turno) {
         turnos.remove(turno);
         turno.setPlantilla(null);

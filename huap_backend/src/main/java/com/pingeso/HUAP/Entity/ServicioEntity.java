@@ -16,7 +16,7 @@ public class ServicioEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_servicio", unique = true, nullable = false)
-    private Long id;
+    private Long idServicio;
 
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
@@ -24,4 +24,9 @@ public class ServicioEntity {
     // Relación con Piso: 1 Servicio tiene muchos Pisos.
     @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PisoEntity> pisos;
+
+    // Relación con Piso: 1 Servicio tiene muchas plantillas.
+    @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PlantillaEntity> plantilla;
+
 }

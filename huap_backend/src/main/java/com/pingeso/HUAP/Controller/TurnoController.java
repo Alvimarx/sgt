@@ -78,7 +78,8 @@ public class TurnoController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-
+    //Necesita revision
+    /**
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteTurno(@PathVariable Long id) {
         try {
@@ -88,6 +89,7 @@ public class TurnoController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         }
     }
+    **/
 
     // ====================================================================
     // CONSULTAS POR SERVICIO
@@ -260,7 +262,8 @@ public class TurnoController {
     // ====================================================================
     // ALTERAR TURNO (DESASIGNAR / REASIGNAR / ASIGNAR / CAMBIAR_HORAS)
     // ====================================================================
-
+    //Necesita revision
+    /**
     @PostMapping("/alterar")
     public ResponseEntity<?> alterarTurno(@RequestBody AlterarTurnoRequest request) {
         try {
@@ -270,7 +273,10 @@ public class TurnoController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    **/
 
+    //Necesita revision
+    /**
     @PostMapping("/delete-range")
     public ResponseEntity<?> deleteRange(@RequestBody Map<String, Object> payload) {
         try {
@@ -283,6 +289,7 @@ public class TurnoController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    **/
 
     private TurnoEntity buildTurnoFromPayload(Map<String, Object> payload) {
         TurnoEntity turno = new TurnoEntity();

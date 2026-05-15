@@ -49,7 +49,7 @@ public class ServicioController {
         try {
             ServicioEntity nuevoServicio = servicioService.createServicio(payload);
             // Actualizado a getId()
-            Map<String, Object> summary = servicioService.getServicioSummary(nuevoServicio.getId());
+            Map<String, Object> summary = servicioService.getServicioSummary(nuevoServicio.getIdServicio());
             return ResponseEntity.status(HttpStatus.CREATED).body(summary);
         } catch (Exception e) {
             // Uso de Map.of() para evitar memory leaks de las dobles llaves {{ }}

@@ -27,7 +27,7 @@ public class ServicioService {
     private Map<String, Object> convertirServicioAMap(ServicioEntity s) {
         if (s == null) return null;
         Map<String, Object> m = new HashMap<>();
-        m.put("id", s.getId()); 
+        m.put("id", s.getIdServicio()); 
         m.put("nombre", s.getNombre());
         return m;
     }
@@ -69,7 +69,7 @@ public class ServicioService {
         servicio.setNombre((String) payload.get("nombre"));
         
         ServicioEntity nuevoServicio = servicioRepository.save(servicio);
-        logger.info("Servicio creado exitosamente con ID: {}", nuevoServicio.getId());
+        logger.info("Servicio creado exitosamente con ID: {}", nuevoServicio.getIdServicio());
         
         return nuevoServicio;
     }
@@ -90,7 +90,7 @@ public class ServicioService {
         }
         
         servicioRepository.save(servicio);
-        return getServicioSummary(servicio.getId());
+        return getServicioSummary(servicio.getIdServicio());
     }
 
     public boolean deleteServicio(Long id) {
