@@ -22,13 +22,69 @@ public class JwtTokenProvider {
     @Value("${app.jwt.expiration:86400000}") // 24 horas por defecto
     private long jwtExpirationMs;
 
+    private final int PRE_AUTH_EXPIRATION = 5 * 60 * 1000;
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
-     * Genera un token JWT para un usuario
+     * Genera el token final con todo el contexto de trabajo. V2
      */
+    public String generateToken(Long id, String rut, String rol, Long servicioId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
+
+        return Jwts.builder()
+                .setSubject(Long.toString(id))
+                .claim("rut", rut)
+                .claim("rol", rol)
+                .claim("servicioId", servicioId)
+                .claim("tipo", "FINAL") // <--- El marcador de seguridad
+                .setIssuedAt(new Date())
+                .setExpiration(expiryDate)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .compact();
+    }
+
+   /**
+     * Genera un token temporal solo para seleccionar servicio. V2
+     */
+    public String generatePreAuthToken(Long idFuncionario) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + PRE_AUTH_EXPIRATION);
+
+        return Jwts.builder()
+                .subject(Long.toString(idFuncionario))
+                .claim("tipo", "PRE_AUTH") // <--- El marcador de seguridad
+                .issuedAt(new Date())
+                .expiration(expiryDate)
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    /**
+     * Extrae el ID del token de pre-auth validando su tipo. V2
+     */
+    public Long getUserIdFromPreAuthToken(String token) {
+        Claims claims = Jwts.parser()           
+            .verifyWith(getSigningKey())    
+            .build()
+            .parseSignedClaims(token)        
+            .getPayload();                   
+
+        String tipo = (String) claims.get("tipo");
+        
+        if (!"PRE_AUTH".equals(tipo)) {
+            throw new RuntimeException("El token proporcionado no es de pre-autorización");
+        }
+
+        return Long.parseLong(claims.getSubject());
+    }
+
+    /**
+     * Genera un token JWT para un usuario
+     * legacy
     public String generateToken(Long userId, String rut, String rol, Long servicioId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
@@ -43,6 +99,8 @@ public class JwtTokenProvider {
                 .signWith(getSigningKey())
                 .compact();
     }
+    */
+
 
     /**
      * Obtiene el userId del token JWT

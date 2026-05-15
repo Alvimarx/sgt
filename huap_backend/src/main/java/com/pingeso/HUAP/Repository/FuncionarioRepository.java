@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface FuncionarioRepository extends JpaRepository<FuncionarioEntity, Long> {
 
     // Repository para encontrar el usuario por id
-    Optional<FuncionarioEntity> findById(Long id);
+    FuncionarioEntity findByIdFuncionario(Long idFuncionario);
 
     // Repository para encontrar al usuario por el rut
     @Query ("SELECT f FROM FuncionarioEntity f WHERE f.rut = :rut")
@@ -29,5 +29,12 @@ public interface FuncionarioRepository extends JpaRepository<FuncionarioEntity, 
             "WHERE sf.servicio.idServicio = :idServicio")
     List<FuncionarioEntity> findAllByServicioId(@Param ("idServicio") Long idServicio);
 
+    //Query para contar usuarios activos
+    // V2: Count users by estado for a given servicio id (soporta múltiples servicios)
+    @Query("SELECT COUNT(DISTINCT f) FROM FuncionarioEntity f " +
+           "LEFT JOIN f.serviciosFuncionario sf " +
+           "WHERE f.estado = :estado " +
+           "AND (:servicioId IS NULL OR sf.servicio.idServicio = :servicioId)")
+    Long countByEstadoAndServicioId(@Param("estado") Integer estado, @Param("servicioId") Long servicioId);
     
 }

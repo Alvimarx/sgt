@@ -61,11 +61,11 @@ public class FuncionarioEntity {
     private RolSistemaEntity rolSistema;
 
     @Builder.Default
-    @OneToMany(mappedBy = "Funcionario")
+    @OneToMany(mappedBy = "funcionario")
     private List<TurnoEntity> turnos = new ArrayList<>();
 
     @Builder.Default
-    @OneToMany(mappedBy = "Funcionario")
+    @OneToMany(mappedBy = "Funcionario", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ServiciosFuncionarioEntity> serviciosFuncionario = new ArrayList<>();
 
     // --- Constructor útil sin ID ---
