@@ -9,13 +9,21 @@ export const SGTRoleChip = ({ role }) => {
   return <SGTBadge tone={tones[role] || 'neutral'} size="xs">{role}</SGTBadge>;
 };
 
-const ProfileView = ({ onGoAdmin }) => {
+const ProfileView = ({ onGoAdmin, onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const me = SGT_DATA.PEOPLE.me;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
       <TopHeader title="Mi Perfil" dense />
+
+      {/* Nuevo Header con botón Volver */}
+      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+        </button>
+        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Mi Perfil</div>
+      </div>
       
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <SGTAvatar person={me} size={80} style={{ fontSize: 32 }} />

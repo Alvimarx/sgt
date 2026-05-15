@@ -10,6 +10,7 @@ export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth =
     stroke: color, strokeWidth, strokeLinecap: 'round', strokeLinejoin: 'round',
   };
   switch (name) {
+    case 'home':          return <svg {...common}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
     case 'chevron-left':  return <svg {...common}><path d="M15 18l-6-6 6-6"/></svg>;
     case 'chevron-right': return <svg {...common}><path d="M9 18l6-6-6-6"/></svg>;
     case 'chevron-down':  return <svg {...common}><path d="M6 9l6 6 6-6"/></svg>;
@@ -151,11 +152,12 @@ export const AlertBanner = ({ pendientes, collapsed, onToggle }) => {
 };
 
 export const TabBar = ({ active, onChange }) => {
+  // AQUI EL CAMBIO CLAVE: Agregamos el id 'home' para que vuelva a Prop4 y dejamos 'calendar' para tu nueva vista
   const tabs = [
-    { id: 'calendar', label: 'Calendario', icon: 'calendar' },
+    { id: 'home',     label: 'Inicio',     icon: 'home' },     
+    { id: 'calendar', label: 'Calendario', icon: 'calendar' }, 
     { id: 'requests', label: 'Solicitudes', icon: 'swap' },
-    { id: 'hours',    label: 'Mis horas', icon: 'clock' },
-    { id: 'me',       label: 'Perfil',    icon: 'user' },
+    { id: 'me',       label: 'Perfil',     icon: 'user' },
   ];
   return (
     <div style={{ display: 'flex', borderTop: `1px solid ${P().line}`, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(8px)', padding: '6px 6px 10px' }}>

@@ -12,15 +12,27 @@ import ProfileView, { SGTRoleChip } from './Perfil';
 import AdminDashboard from './AdminDashboard';
 import RotativaWizard from './Rotativa';
 import ServiciosView from './ServiciosView';
+import LoginView from './LoginView';
+import SelectServiceView from './SelectServiceView';
+import CalendarView from './calendarView';
 
 const Prop4 = ({ tweaks = {} }) => {
-  const [currentView, setCurrentView] = useState('agenda'); 
-  const [activeTab, setActiveTab] = useState('calendar');
+  const [currentView, setCurrentView] = useState('login');
+  const [activeTab, setActiveTab] = useState('home'); // Empezamos en home por defecto
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    if (tabId === 'calendar') setCurrentView('agenda');
-    if (tabId === 'me') setCurrentView('perfil');
+    
+    // CORRECCIÓN DE RUTAS:
+    if (tabId === 'home') {
+      setCurrentView('agenda'); // El botón Inicio te lleva a la Agenda (tu Home)
+    }
+    if (tabId === 'calendar') {
+      setCurrentView('calendar_view'); // El botón Calendario lleva a tu nueva vista
+    }
+    if (tabId === 'me') {
+      setCurrentView('perfil');
+    }
   };
 
   return (
@@ -31,23 +43,54 @@ const Prop4 = ({ tweaks = {} }) => {
         @keyframes sgtSlideLeft { from { transform:translateX(100%); } to { transform:translateX(0); } }
       `}</style>
 
+      {/* FLUJO INICIAL */}
+      {currentView === 'login' && (
+        <LoginView onLoginSuccess={() => setCurrentView('select_service')} />
+      )}
+
+      {currentView === 'select_service' && (
+        <SelectServiceView onServiceSelected={(servicioId) => {
+          setCurrentView('agenda');
+          setActiveTab('home');
+        }} />
+      )}
+
+      {/* VISTA AGENDA (HOME ACTUAL) */}
       {currentView === 'agenda' && <AgendaView tweaks={tweaks} />}
-      {currentView === 'perfil' && <ProfileView onGoAdmin={() => setCurrentView('admin')} />}
+
+      {/* VISTA CALENDARIO (CALENDARVIEW.JSX) */}
+      {currentView === 'calendar_view' && (
+        <CalendarView onBack={() => {
+          setCurrentView('agenda');
+          setActiveTab('home');
+        }} />
+      )}
+
+      {/* VISTA PERFIL */}
+      {currentView === 'perfil' && (
+        <ProfileView 
+          onGoAdmin={() => setCurrentView('admin')} 
+          onBack={() => {
+            setCurrentView('agenda');
+            setActiveTab('home');
+          }}
+        />
+      )}
       
+      {/* VISTAS DE ADMINISTRACIÓN */}
       {currentView === 'admin' && (
         <AdminDashboard 
           onBack={() => setCurrentView('perfil')} 
           onGoRotativa={() => setCurrentView('rotativa_wizard')} 
-          onGoServicios={() => setCurrentView('servicios')} // <--- 2. AÑADE ESTE PROP
+          onGoServicios={() => setCurrentView('servicios')}
         />
       )}
       
       {currentView === 'rotativa_wizard' && <RotativaWizard onExit={() => setCurrentView('admin')} />}
-      
-      {/* 3. AÑADE LA VISTA DE SERVICIOS */}
       {currentView === 'servicios' && <ServiciosView onBack={() => setCurrentView('admin')} />}
 
-      {['agenda', 'perfil'].includes(currentView) && (
+      {/* TAB BAR: Solo se muestra en las vistas principales */}
+      {['agenda', 'perfil', 'calendar_view'].includes(currentView) && (
         <TabBar active={activeTab} onChange={handleTabChange} />
       )}
     </PhoneShell>
