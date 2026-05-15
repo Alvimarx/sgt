@@ -12,5 +12,5 @@ public interface PisoRepository extends JpaRepository<PisoEntity, Long> {
     
     Optional<PisoEntity> findByNombre(String nombre);
     
-    List<PisoEntity> findByServicio_Id(Long idServicio);
+    List<PisoEntity> findByServicio_IdServicio(Long idServicio);
 }

@@ -40,8 +40,8 @@ public class TurnoEntity {
     // --- Relaciones ---
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_funcionario")
-    private FuncionarioEntity funcionario; 
+    @JoinColumn(name = "ID_FUNCIONARIO")
+    private FuncionarioEntity funcionario;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_servicio") 

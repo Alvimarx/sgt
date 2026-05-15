@@ -51,19 +51,30 @@ public class FuncionarioEntity {
     @Column(name = "Profesion")
     private String profesion;
 
-    // --- Relaciones ---
+    // --- Relaciones --- MANTENERLOSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_ROL_SISTEMA", nullable = false)
     private RolSistemaEntity rolSistema;
 
     @Builder.Default
-    @OneToMany(mappedBy = "Funcionario")
+    @OneToMany(mappedBy = "funcionario")
     private List<TurnoEntity> turnos = new ArrayList<>();
 
     @Builder.Default
-    @OneToMany(mappedBy = "Funcionario")
+    @OneToMany(mappedBy = "funcionario")
     private List<ServiciosFuncionarioEntity> serviciosFuncionario = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "funcionario")
+    private List<Solicitud2Entity> solicitudesEmitidas = new ArrayList<>();
+    
+    @Builder.Default
+    @OneToMany(mappedBy = "funcionarioReceptor")
+    private List<Solicitud2Entity> solicitudesRecibidas = new ArrayList<>();
+
+
+
 
     // --- Constructor útil sin ID ---
 

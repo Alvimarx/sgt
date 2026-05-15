@@ -39,17 +39,17 @@ public class Solicitud2Service {
 
     //Todas Las solicitudes para un Receptor
     public List<Solicitud2Entity> findByFuncionarioReceptor(Long idFuncionario) {
-        return solicitud2Repository.findByfuncionarioReceptor_IdReceptor(idFuncionario);
+        return solicitud2Repository.findByFuncionarioReceptor_IdFuncionario(idFuncionario);
     }
 
     //Todas las solicitudes de un cierto tipo
     public List<Solicitud2Entity> findByTipoSolicitud(Long idTipoSolicitud) {
-        return solicitud2Repository.findBytipoSolicitud_IdTipoSolicitud(idTipoSolicitud);
+        return solicitud2Repository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud);
     }
 
     //Todas las solicitudes de cierto turno
     public List<Solicitud2Entity> findByTurno(Long idTurno) {
-        return solicitud2Repository.findByturno_IdTurno(idTurno);
+        return solicitud2Repository.findByTurno_Id(idTurno);
     }
 
      /*
@@ -171,7 +171,7 @@ public class Solicitud2Service {
     }
 
     private void rechazarSolicitudesCompetitivas(Long idTurno, Long idSolicitudAprobada, FuncionarioEntity asignador) {
-        List<Solicitud2Entity> conflictos = solicitud2Repository.findByturno_IdTurno(idTurno).stream()
+        List<Solicitud2Entity> conflictos = solicitud2Repository.findByTurno_Id(idTurno).stream()
                 .filter(s -> s.getEstado() == Solicitud2Entity.EstadoSolicitud.PENDIENTE && !s.getIdSolicitud().equals(idSolicitudAprobada))
                 .toList();
 

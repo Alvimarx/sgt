@@ -14,8 +14,8 @@ public class ServiciosFuncionarioEntity {
     // --- Relaciones ---
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_funcionario", nullable = false)
-    private FuncionarioEntity Funcionario;
+    @JoinColumn(name = "ID_FUNCIONARIO", nullable = false)
+    private FuncionarioEntity funcionario;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_servicio", nullable = false)
@@ -35,7 +35,7 @@ public class ServiciosFuncionarioEntity {
             ServicioEntity servicio,
             RolServicioEntity rolServicio
     ) {
-        this.Funcionario = funcionario;
+        this.funcionario = funcionario;
         this.servicio = servicio;
         this.rolServicio = rolServicio;
     }
@@ -51,11 +51,11 @@ public class ServiciosFuncionarioEntity {
     }
 
     public FuncionarioEntity getFuncionario() {
-        return Funcionario;
+        return funcionario;
     }
 
     public void setFuncionario(FuncionarioEntity funcionario) {
-        this.Funcionario = funcionario;
+        this.funcionario = funcionario;
     }
 
     public ServicioEntity getServicio() {

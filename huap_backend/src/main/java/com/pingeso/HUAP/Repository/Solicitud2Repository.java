@@ -13,9 +13,10 @@ public interface Solicitud2Repository extends JpaRepository<Solicitud2Entity, Lo
 
     List<Solicitud2Entity> findByFuncionario_IdFuncionario(Long idFuncionario);
 
-    List<Solicitud2Entity> findByfuncionarioReceptor_IdReceptor(Long idReceptor);
+    List<Solicitud2Entity> findByFuncionarioReceptor_IdFuncionario(Long idFuncionario);
 
-    List<Solicitud2Entity> findBytipoSolicitud_IdTipoSolicitud(Long idTipoSolicitud);
+    List<Solicitud2Entity> findByTipoSolicitud_IdTipoSolicitud(Long idTipoSolicitud);
 
-    List<Solicitud2Entity> findByturno_IdTurno(Long idTurno);
+    List<Solicitud2Entity> findByTurno_Id(Long id);
+
 }
