@@ -20,7 +20,7 @@ public class TurnoEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_turno", unique = true, nullable = false)
-    private Long id;
+    private Long idTurno;
 
     @Column(name = "nombre")
     private String nombre;
@@ -44,7 +44,7 @@ public class TurnoEntity {
     private FuncionarioEntity funcionario;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_servicio") 
+    @JoinColumn(name = "id_servicio")
     private ServicioEntity servicio;
 
     @ManyToOne(fetch = FetchType.LAZY)

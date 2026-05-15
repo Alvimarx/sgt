@@ -17,6 +17,6 @@ public interface Solicitud2Repository extends JpaRepository<Solicitud2Entity, Lo
 
     List<Solicitud2Entity> findByTipoSolicitud_IdTipoSolicitud(Long idTipoSolicitud);
 
-    List<Solicitud2Entity> findByTurno_Id(Long id);
+    List<Solicitud2Entity> findByTurno_IdTurno(Long idTurno);
 
 }

@@ -180,7 +180,7 @@ public class TurnoService {
             
             // Excluimos el turno actual (útil para cuando saveTurno se usa desde updateTurno)
             boolean hayConflicto = conflictosPlantilla.stream()
-                    .anyMatch(t -> turno.getId() == null || !t.getId().equals(turno.getId()));
+                    .anyMatch(t -> turno.getIdTurno() == null || !t.getIdTurno().equals(turno.getIdTurno()));
             
             if (hayConflicto) {
                 throw new Exception("Conflicto: El puesto (Plantilla) ya tiene un turno generado en estas fechas para este servicio.");
@@ -195,7 +195,7 @@ public class TurnoService {
                     turno.getDiaFinalTurno());
             
             boolean hayConflicto = conflictosFuncionario.stream()
-                    .anyMatch(t -> turno.getId() == null || !t.getId().equals(turno.getId()));
+                    .anyMatch(t -> turno.getIdTurno() == null || !t.getIdTurno().equals(turno.getIdTurno()));
             
             if (hayConflicto) {
                 throw new Exception("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas.");
@@ -255,7 +255,7 @@ public class TurnoService {
         Map<String, Object> m = new HashMap<>();
         
         // --- 1. Identificadores y Datos Básicos ---
-        m.put("id", t.getId());
+        m.put("id", t.getIdTurno());
         m.put("nombre", t.getNombre());
 
         // --- 2. Fechas y Horas ---
@@ -461,7 +461,7 @@ public class TurnoService {
                     turnosAsignados++;
                 } else {
                     logger.warn("Se omitió asignación masiva para el turno {} porque el funcionario {} tiene tope de horario.", 
-                                turno.getId(), funcionario.getNombre());
+                                turno.getIdTurno(), funcionario.getNombre());
                 }
             }
         }
