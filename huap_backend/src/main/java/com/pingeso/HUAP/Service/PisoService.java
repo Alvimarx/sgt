@@ -1,0 +1,101 @@
+package com.pingeso.HUAP.Service;
+
+import com.pingeso.HUAP.Entity.PisoEntity;
+import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Repository.PisoRepository;
+import com.pingeso.HUAP.Repository.ServicioRepository;
+import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@Transactional
+public class PisoService {
+
+    private final PisoRepository pisoRepository;
+    private final ServicioRepository servicioRepository;
+
+    public PisoService(
+            PisoRepository pisoRepository,
+            ServicioRepository servicioRepository
+    ) {
+        this.pisoRepository = pisoRepository;
+        this.servicioRepository = servicioRepository;
+    }
+
+    // Crear piso
+    public PisoEntity crearPiso(
+            Long idServicio,
+            String nombre
+    ) {
+
+        ServicioEntity servicio = servicioRepository.findById(idServicio)
+                .orElseThrow(() ->
+                        new RuntimeException("Servicio no encontrado")
+                );
+
+        if (nombre == null || nombre.trim().isEmpty()) {
+            throw new RuntimeException("El nombre del piso no puede estar vacío");
+        }
+
+        PisoEntity piso = new PisoEntity();
+        piso.setNombre(nombre);
+        piso.setServicio(servicio);
+
+        return pisoRepository.save(piso);
+    }
+
+    // Obtener piso por id
+    public PisoEntity obtenerPiso(Long idPiso) {
+
+        return pisoRepository.findById(idPiso)
+                .orElseThrow(() ->
+                        new RuntimeException("Piso no encontrado")
+                );
+    }
+
+    // Obtener todos los pisos
+    public List<PisoEntity> obtenerTodosPisos() {
+        return pisoRepository.findAll();
+    }
+
+    // Obtener pisos por servicio
+    public List<PisoEntity> obtenerPisosPorServicio(Long idServicio) {
+        return pisoRepository.findByServicio_IdServicio(idServicio);
+    }
+
+    // Actualizar piso
+    public PisoEntity actualizarPiso(
+            Long idPiso,
+            String nombre
+    ) {
+
+        PisoEntity piso = obtenerPiso(idPiso);
+
+        if (nombre == null || nombre.trim().isEmpty()) {
+            throw new RuntimeException("El nombre del piso no puede estar vacío");
+        }
+
+        piso.setNombre(nombre);
+
+        return pisoRepository.save(piso);
+    }
+
+    // Eliminar piso
+    public void eliminarPiso(Long idPiso) {
+
+        PisoEntity piso = obtenerPiso(idPiso);
+
+        pisoRepository.delete(piso);
+    }
+
+    // Obtener piso por nombre
+    public PisoEntity obtenerPisosPorNombre(String nombre) {
+
+        return pisoRepository.findByNombre(nombre)
+                .orElseThrow(() ->
+                        new RuntimeException("Piso no encontrado")
+                );
+    }
+}

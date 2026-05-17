@@ -8,7 +8,6 @@ import com.pingeso.HUAP.Service.Notificacion2Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -19,8 +18,7 @@ public class Notificacion2Controller {
 
     private final Notificacion2Service notificacion2Service;
 
-
-    @GetMapping("/sinleer/{idFuncionario}/")
+    @GetMapping("/sinleer/{idFuncionario}")
     public ResponseEntity<Long> contarSinLeer(@PathVariable Long idFuncionario) {
         return ResponseEntity.ok(notificacion2Service.contarNoLeidasPorUsuario(idFuncionario));
     }

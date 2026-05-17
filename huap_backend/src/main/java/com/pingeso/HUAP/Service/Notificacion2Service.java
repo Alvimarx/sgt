@@ -69,13 +69,8 @@ public class Notificacion2Service {
     }
 
     public long contarNoLeidasPorUsuario(Long idFuncionario) {
-        return obtenerNotificacionesFuncionario(idFuncionario).stream()
-                .filter(dto -> dto.getEstado().equals("NO_LEIDO"))
-                .count();
+    return notificacion2Repository.countNoLeidasByFuncionario(idFuncionario);
     }
-    /*
-        Getters
-     */
 
     public Notificacion2Entity findNotificacion2ById(Long id) {
         return notificacion2Repository.findById(id).orElseThrow(() -> new RuntimeException("Notificacion no encontrada"));

@@ -27,8 +27,6 @@ public class Solicitud2Controller {
     private final Solicitud2Service solicitud2Service;
     private final BitacoraRepository bitacoraRepository;
 
-
-
     @PostMapping("/crearsolicitud")
     public ResponseEntity<Solicitud2Entity> crear(@RequestBody CrearSolicitudDTO dto) {
         return ResponseEntity.ok(solicitud2Service.crearSolicitud(dto));

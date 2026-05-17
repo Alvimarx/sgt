@@ -11,12 +11,19 @@ import java.util.Optional;
 
 @Repository
 public interface Notificacion2Repository extends JpaRepository<Notificacion2Entity, Long> {
-    Optional<Notificacion2Entity> findBySolicitud_IdSolicitud(Long idSolicitud);
 
+    Optional<Notificacion2Entity> findBySolicitud_IdSolicitud(Long idSolicitud);
     @Query("SELECT n FROM Notificacion2Entity n JOIN n.solicitud s " +
             "WHERE (s.funcionario.idFuncionario = :idFuncionario " +
             "OR s.funcionarioReceptor.idFuncionario = :idFuncionario) " +
             "AND n.estado != 'ELIMINADO' " +
             "ORDER BY n.fechaEnvio DESC")
+            
     List<Notificacion2Entity> findByFuncionarioId(@Param("idFuncionario") Long idFuncionario);
+    
+    @Query("SELECT COUNT(n) FROM Notificacion2Entity n JOIN n.solicitud s " +
+       "WHERE (s.funcionario.idFuncionario = :idFuncionario OR s.funcionarioReceptor.idFuncionario = :idFuncionario) " +
+       "AND n.estado = 'NO_LEIDO'")
+    long countNoLeidasByFuncionario(@Param("idFuncionario") Long idFuncionario);
+
 }
