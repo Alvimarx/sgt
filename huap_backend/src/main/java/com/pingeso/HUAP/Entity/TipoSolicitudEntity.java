@@ -5,9 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.type.descriptor.jdbc.TinyIntAsSmallIntJdbcType;
-
-
 @Builder
 @Data
 @Table(name = "Tipo_Solicitud")
@@ -22,13 +19,8 @@ public class TipoSolicitudEntity {
     @Column(name = "ID_TIPO_SOLICITUD", unique = true, nullable = false)
     private Long idTipoSolicitud;
 
-    /*
-    1:Permiso
-    2:Botar
-    3:Cobertura(Cuando un loco quiere ponerse mas pega)
-    4:Intercambio
-     */
+    // 1=Permiso  2=Botar turno  3=Cobertura  4=Intercambio
     @Column(name = "Tipo")
-    private TinyIntAsSmallIntJdbcType tipo;
+    private Integer tipo;
 
 }

@@ -196,15 +196,16 @@ public class FuncionarioService {
         
         Map<String,Object> out = new HashMap<>();
         try {
-            Long activos = funcionarioRepository.countByEstadoAndServicioId(1, servicioId);
+            long activos = funcionarioRepository.countByEstadoAndServicioId(1, servicioId);
 
             List<FuncionarioEntity> allUsers = funcionarioRepository.findAllByServicioId(servicioId);
             long total = allUsers.size();
-            long inactivos = total - (activos == null ? 0L : activos);
+            long inactivos = total - activos;
 
+            out.put("activos", activos);
             out.put("inactivos", inactivos);
             out.put("total", total);
-            double pct = total == 0 ? 0.0 : (100.0 * (activos == null ? 0.0 : activos.doubleValue()) / (double) total);
+            double pct = total == 0 ? 0.0 : (100.0 * activos / (double) total);
             out.put("porcentajeActivos", Math.round(pct));
         } catch (Exception e) {
             logger.error("Error al obtener disponibilidad por servicioId={}: {}", servicioId, e.getMessage(), e);

@@ -5,7 +5,6 @@ import com.pingeso.HUAP.Entity.*;
 import com.pingeso.HUAP.Repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.type.descriptor.jdbc.TinyIntAsSmallIntJdbcType;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -127,7 +126,7 @@ public class Solicitud2Service {
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
         FuncionarioEntity asignador = funcionarioRepository.findById(idUsuarioAsignador).orElse(null);
-        TinyIntAsSmallIntJdbcType tipoSolicitud = solicitud.getTipoSolicitud().getTipo();
+        Integer tipoSolicitud = solicitud.getTipoSolicitud().getTipo();
 
         if (nuevoEstado == Solicitud2Entity.EstadoSolicitud.APROBADA) {
 

@@ -1,7 +1,6 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Repository.TipoSolicitudRepository;
-import org.hibernate.type.descriptor.jdbc.TinyIntAsSmallIntJdbcType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
