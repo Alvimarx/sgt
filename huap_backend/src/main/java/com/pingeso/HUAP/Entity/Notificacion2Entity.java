@@ -31,7 +31,8 @@ public class Notificacion2Entity {
     @Column(name = "Mensaje")
     private String mensaje;
 
+    // Nullable con el fin de poder notificar a un funcionario sin necesidad de una solicitud asociada
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ID_SOLICITUD")
+    @JoinColumn(name = "ID_SOLICITUD", nullable = true)
     private Solicitud2Entity solicitud;
 }

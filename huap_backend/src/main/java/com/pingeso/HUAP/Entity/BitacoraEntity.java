@@ -6,8 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.type.descriptor.jdbc.TinyIntAsSmallIntJdbcType;
-
 import java.time.LocalDateTime;
 
 @Builder
@@ -54,7 +52,7 @@ public class BitacoraEntity {
     private LocalDateTime fechaModificacion;
 
     @Column(name = "Activo")
-    private TinyIntAsSmallIntJdbcType activo;
+    private Boolean activo;
 
 
 }

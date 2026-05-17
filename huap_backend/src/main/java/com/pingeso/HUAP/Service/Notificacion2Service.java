@@ -90,16 +90,24 @@ public class Notificacion2Service {
                 ));
     }
 
+    @Transactional
+    public Notificacion2Entity crearNotificacionSistema(com.pingeso.HUAP.Entity.FuncionarioEntity receptor, String mensaje) {
+        Notificacion2Entity notificacion = Notificacion2Entity.builder()
+                .estado("NO_LEIDO")
+                .fechaEnvio(LocalDateTime.now())
+                .mensaje(mensaje)
+                .solicitud(null)
+                .build();
+        return notificacion2Repository.save(notificacion);
+    }
+
     private NotificacionRespuestaDTO mapToDTO(Notificacion2Entity entity) {
         return NotificacionRespuestaDTO.builder()
-                .idNotificacion(entity.getIdNotificacion()) // Asegúrate de que el getter coincida con tu entity
+                .idNotificacion(entity.getIdNotificacion())
                 .mensaje(entity.getMensaje())
                 .estado(entity.getEstado())
                 .fechaEnvio(entity.getFechaEnvio())
-                .idSolicitud(entity.getSolicitud().getIdSolicitud())
+                .idSolicitud(entity.getSolicitud() != null ? entity.getSolicitud().getIdSolicitud() : null)
                 .build();
     }
-
-
-
 }

@@ -3,12 +3,9 @@ package com.pingeso.HUAP.Controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import com.pingeso.HUAP.DTO.FuncionarioSummaryDTO;
 import com.pingeso.HUAP.DTO.LoginRequest;
 import com.pingeso.HUAP.DTO.LoginResponse;
 import com.pingeso.HUAP.DTO.LoginResponseV2;
@@ -21,6 +18,7 @@ import com.pingeso.HUAP.Service.FuncionarioService;
 
 import java.util.List;
 import java.util.Map;
+
 
 @RestController
 @RequestMapping("api/v2/funcionario")
@@ -69,6 +67,35 @@ public class FuncionarioController {
         String preAuthToken = jwtTokenProvider.generatePreAuthToken(usuario.getIdFuncionario());
 
         return ResponseEntity.ok(new LoginResponseV2(preAuthToken, true, opciones));
+    }
+
+    // --- Gestión de funcionarios ---
+
+    @GetMapping("/summary")
+    public ResponseEntity<List<FuncionarioSummaryDTO>> getAllSummary(
+            @RequestParam(required = false) Long servicioId) {
+        return ResponseEntity.ok(funcionarioService.getAllUserSummaryByServicio(servicioId));
+    }
+
+    @GetMapping("/{id}/summary")
+    public ResponseEntity<FuncionarioSummaryDTO> getSummary(@PathVariable Long id) {
+        FuncionarioSummaryDTO dto = funcionarioService.getUserSummary(id);
+        if (dto == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/disponibilidad/{servicioId}")
+    public ResponseEntity<Map<String, Object>> getDisponibilidad(@PathVariable Long servicioId) {
+        return ResponseEntity.ok(funcionarioService.getAvailabilityByServicio(servicioId));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<FuncionarioSummaryDTO> update(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload) {
+        FuncionarioSummaryDTO updated = funcionarioService.updateUser(id, payload);
+        if (updated == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(updated);
     }
 
     @PostMapping("/login/select-service")

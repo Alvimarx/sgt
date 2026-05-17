@@ -6,7 +6,6 @@ import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.PisoRepository;
 import com.pingeso.HUAP.Repository.PlantillaRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
-import com.pingeso.HUAP.Service.AlterarTurnoService;
 import com.pingeso.HUAP.Service.TurnoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -38,8 +37,6 @@ public class TurnoController {
     @Autowired
     private PlantillaRepository plantillaRepository;
 
-    @Autowired
-    private AlterarTurnoService alterarTurnoService;
 
     // ====================================================================
     // CRUD BASE
