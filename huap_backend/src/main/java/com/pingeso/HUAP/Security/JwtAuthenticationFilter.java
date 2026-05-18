@@ -37,7 +37,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = getJwtFromRequest(request);
 
+
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                // No se puede utilizar el token pre-auth para acceder a recursos protegidos por el token final
+                if ("PRE_AUTH".equals(tokenProvider.getTipoFromToken(jwt))) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 Long userId = tokenProvider.getUserIdFromToken(jwt);
                 String rol = tokenProvider.getRolFromToken(jwt);
 

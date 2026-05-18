@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class RolServicioDTO {
     private Long idServicio;
+    private String nombreServicio;
     private Long idRolServicio;
     private String rolServicioNombre;
 }

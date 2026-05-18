@@ -103,6 +103,19 @@ public class JwtTokenProvider {
 
 
     /**
+     * Obtiene el tipo del token JWT (PRE_AUTH o FINAL)
+     */
+    public String getTipoFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("tipo", String.class);
+    }
+
+    /**
      * Obtiene el userId del token JWT
      */
     public Long getUserIdFromToken(String token) {

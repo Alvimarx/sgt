@@ -154,6 +154,7 @@ public class FuncionarioService {
             List<RolServicioDTO> serviciosList = f.getServiciosFuncionario().stream()
                 .map(sf -> new RolServicioDTO(
                     (sf.getServicio() != null) ? sf.getServicio().getIdServicio() : null,
+                    (sf.getServicio() != null) ? sf.getServicio().getNombre() : null,
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getIdRolServicio() : null,
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getNombreRol() : null
                 )).collect(Collectors.toList());
