@@ -9,7 +9,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/plantillas/bloques")
+@RequestMapping("/api/v2/plantillas/bloques")
 @CrossOrigin("*")
 public class PlantillaTurnoController {
 

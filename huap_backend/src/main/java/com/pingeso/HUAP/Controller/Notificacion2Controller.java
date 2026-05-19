@@ -11,55 +11,51 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v2/notificacion")
+@RequestMapping("/api/v2/notificaciones")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class Notificacion2Controller {
 
     private final Notificacion2Service notificacion2Service;
 
-    @GetMapping("/sinleer/{idFuncionario}")
+    @GetMapping("/sin-leer/{idFuncionario}")
     public ResponseEntity<Long> contarSinLeer(@PathVariable Long idFuncionario) {
         return ResponseEntity.ok(notificacion2Service.contarNoLeidasPorUsuario(idFuncionario));
     }
 
-    @PutMapping("/leer/{id}")
+    @PutMapping("/{id}/leer")
     public ResponseEntity<Void> marcarLeida(@PathVariable Long id) {
         boolean actualizado = notificacion2Service.marcarLeido(id);
         return actualizado ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
     }
 
-    @DeleteMapping("/eliminar/{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
         boolean eliminado = notificacion2Service.marcarComoEliminado(id);
         return eliminado ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
     }
 
-    @PostMapping("/crear")
+    @PostMapping
     public ResponseEntity<Notificacion2Entity> crear(@RequestBody CrearNotificacionDTO dto) {
         return ResponseEntity.ok(notificacion2Service.crearNotificacion(dto));
     }
-
-     /*
-    Getters
-     */
 
     @GetMapping("/usuario/{idFuncionario}")
     public ResponseEntity<List<NotificacionRespuestaDTO>> getBandeja(@PathVariable Long idFuncionario) {
         return ResponseEntity.ok(notificacion2Service.obtenerNotificacionesFuncionario(idFuncionario));
     }
 
-    @GetMapping("/notificacion/{id}")
+    @GetMapping("/{id}")
     public ResponseEntity<Notificacion2Entity> getNotificacion2(@PathVariable long id) {
         return ResponseEntity.ok(notificacion2Service.findNotificacion2ById(id));
     }
 
-    @GetMapping("/allnotificacion/{id}")
-    public ResponseEntity<List<Notificacion2Entity>> getAllNotificacion2(@PathVariable long id) {
+    @GetMapping
+    public ResponseEntity<List<Notificacion2Entity>> getAllNotificacion2() {
         return ResponseEntity.ok(notificacion2Service.findAllNotificacion());
     }
 
-    @GetMapping("/notificacion/solicitud/{id}")
+    @GetMapping("/solicitud/{id}")
     public ResponseEntity<Notificacion2Entity> getNotificacion2Solicitud(@PathVariable long id) {
         return ResponseEntity.ok(notificacion2Service.findByIdSolicitud(id));
     }

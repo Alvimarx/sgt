@@ -1,9 +1,9 @@
 // Prop4.jsx
 import React, { useState, useMemo } from 'react';
 import { SGT_DATA } from './data';
-import './style.css'; 
+import './style.css';
 
-import { 
+import {
   PhoneShell, TopHeader, IconBtn, SGTBadge, SGTAvatar, Sheet, SGTIcon, TabBar, AlertBanner
 } from './UIPrimitives';
 
@@ -17,24 +17,40 @@ import SelectServiceView from './SelectServiceView';
 import CalendarView from './calendarView';
 import AsignacionView from './AsignacionView';
 import JerarquiaView from './JerarquiaView';
+import { useAuth } from '../../context/AuthContext';
 
 const Prop4 = ({ tweaks = {} }) => {
+  const auth = useAuth();
   const [currentView, setCurrentView] = useState('login');
-  const [activeTab, setActiveTab] = useState('home'); // Empezamos en home por defecto
+  const [activeTab, setActiveTab] = useState('home');
+
+  // Estado puente entre Paso 1 (LoginView) y Paso 2 (SelectServiceView)
+  const [preAuthToken, setPreAuthToken] = useState(null);
+  const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    
-    // CORRECCIÓN DE RUTAS:
-    if (tabId === 'home') {
-      setCurrentView('agenda'); // El botón Inicio te lleva a la Agenda (tu Home)
+    if (tabId === 'home')     setCurrentView('agenda');
+    if (tabId === 'calendar') setCurrentView('calendar_view');
+    if (tabId === 'me')       setCurrentView('perfil');
+  };
+
+  // Paso 1 completado: guarda el preAuthToken y la lista de servicios
+  const handleLoginSuccess = ({ preAuthToken, servicios }) => {
+    setPreAuthToken(preAuthToken);
+    setServiciosDisponibles(servicios);
+    setCurrentView('select_service');
+  };
+
+  // Paso 2 completado: actualiza el contexto global y navega a la app
+  const handleServiceSelected = (userData) => {
+    if (auth?.updateUser) {
+      auth.updateUser(userData);
     }
-    if (tabId === 'calendar') {
-      setCurrentView('calendar_view'); // El botón Calendario lleva a tu nueva vista
-    }
-    if (tabId === 'me') {
-      setCurrentView('perfil');
-    }
+    setPreAuthToken(null);
+    setServiciosDisponibles([]);
+    setCurrentView('agenda');
+    setActiveTab('home');
   };
 
   return (
@@ -47,18 +63,19 @@ const Prop4 = ({ tweaks = {} }) => {
 
       {/* FLUJO INICIAL */}
       {currentView === 'login' && (
-        <LoginView onLoginSuccess={() => setCurrentView('select_service')} />
+        <LoginView onLoginSuccess={handleLoginSuccess} />
       )}
 
       {currentView === 'select_service' && (
-        <SelectServiceView onServiceSelected={(servicioId) => {
-          setCurrentView('agenda');
-          setActiveTab('home');
-        }} />
+        <SelectServiceView
+          preAuthToken={preAuthToken}
+          servicios={serviciosDisponibles}
+          onServiceSelected={handleServiceSelected}
+        />
       )}
 
       {/* VISTA AGENDA (HOME ACTUAL) */}
-      {currentView === 'agenda' && <AgendaView tweaks={tweaks} />}
+      {currentView === 'agenda' && <AgendaView tweaks={tweaks} userName={auth.user?.nombre || 'Usuario'} />}
 
       {/* VISTA CALENDARIO (CALENDARVIEW.JSX) */}
       {currentView === 'calendar_view' && (
@@ -106,7 +123,7 @@ const Prop4 = ({ tweaks = {} }) => {
 // ------------------------------------------------------------------
 // AGENDA Y COMPONENTES RELACIONADOS (Se mantienen aquí)
 // ------------------------------------------------------------------
-const AgendaView = ({ tweaks }) => {
+const AgendaView = ({ tweaks, userName }) => {
   const [filter, setFilter] = useState('todos');
   const [detailShift, setDetailShift] = useState(null);
   const [bannerCollapsed, setBannerCollapsed] = useState(false);
@@ -131,7 +148,7 @@ const AgendaView = ({ tweaks }) => {
 
   return (
     <>
-      <TopHeader title="Agenda" subtitle="Hola Jorge · Semana 16–22 nov" rightSlot={<div style={{ display:'flex', gap:6 }}><IconBtn icon="bell" badge={D.PENDIENTES?.length || 0}/></div>} dense />
+      <TopHeader title="Agenda" subtitle={`Hola ${userName}`} rightSlot={<div style={{ display:'flex', gap:6 }}><IconBtn icon="bell" badge={D.PENDIENTES?.length || 0}/></div>} dense />
       <AlertBanner pendientes={D.PENDIENTES} collapsed={bannerCollapsed} onToggle={() => setBannerCollapsed(!bannerCollapsed)} />
       
       <div style={{ display:'flex', gap:6, padding:'10px 14px 6px', overflowX:'auto' }}>

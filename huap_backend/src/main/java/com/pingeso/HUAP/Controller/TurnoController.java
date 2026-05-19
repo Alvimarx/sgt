@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/turnos")
+@RequestMapping("/api/v2/turnos")
 @CrossOrigin(origins = "*")
 public class TurnoController {
 

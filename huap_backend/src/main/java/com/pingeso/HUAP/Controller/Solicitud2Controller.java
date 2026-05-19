@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("api/v2/solicitudes")
+@RequestMapping("/api/v2/solicitudes")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class Solicitud2Controller {
@@ -27,37 +27,33 @@ public class Solicitud2Controller {
     private final Solicitud2Service solicitud2Service;
     private final BitacoraRepository bitacoraRepository;
 
-    @PostMapping("/crearsolicitud")
+    @PostMapping
     public ResponseEntity<Solicitud2Entity> crear(@RequestBody CrearSolicitudDTO dto) {
         return ResponseEntity.ok(solicitud2Service.crearSolicitud(dto));
     }
 
-    @PutMapping("/responderintercambio/{id}")
+    @PutMapping("/{id}/intercambio")
     public ResponseEntity<Solicitud2Entity> responderIntercambio(@PathVariable Long id, @RequestParam Long idReceptor,
             @RequestParam boolean respuesta) {
         return ResponseEntity.ok(solicitud2Service.responderOfertaIntercambio(id, idReceptor, respuesta));
     }
 
-    @PutMapping("/estado/{id}")
+    @PutMapping("/{id}/estado")
     public ResponseEntity<Solicitud2Entity> cambiarEstado(@PathVariable Long id, @RequestParam Solicitud2Entity.EstadoSolicitud nuevoEstado,
             @RequestParam Long idUsuarioAsignador) {
         return ResponseEntity.ok(solicitud2Service.cambiarEstado(id, nuevoEstado, idUsuarioAsignador));
     }
 
-    @PatchMapping("/motivo/{id}/")
+    @PatchMapping("/{id}/motivo")
     public ResponseEntity<Solicitud2Entity> modificarMotivo(@PathVariable Long id, @RequestParam String motivo) {
         return ResponseEntity.ok(
                 solicitud2Service.modificarMotivo(id, motivo)
         );
     }
 
-     /*
-    Getters
-     */
-
-    @GetMapping("/allsolicitud")
+    @GetMapping
     public ResponseEntity<List<Solicitud2Entity>> getAllSolicitud() {
-        return  ResponseEntity.ok(solicitud2Service.findAllSolicitudes());
+        return ResponseEntity.ok(solicitud2Service.findAllSolicitudes());
     }
 
     @GetMapping("/funcionario/{id}")
@@ -65,18 +61,18 @@ public class Solicitud2Controller {
         return ResponseEntity.ok(solicitud2Service.findByFuncionario(id));
     }
 
-    @GetMapping("/allsolicitud/receptor/{id}")
+    @GetMapping("/receptor/{id}")
     public ResponseEntity<List<Solicitud2Entity>> getAllSolicitudReceptor(@PathVariable Long id) {
         return ResponseEntity.ok(solicitud2Service.findByFuncionarioReceptor(id));
     }
 
-    @GetMapping("/allsolicitud/tipo/{id}")
+    @GetMapping("/tipo/{id}")
     public ResponseEntity<List<Solicitud2Entity>> getAllSolicitudByTipo(@PathVariable Long id) {
         return ResponseEntity.ok(solicitud2Service.findByTipoSolicitud(id));
     }
 
-    @GetMapping("/allsolicitud/turno/{id}")
+    @GetMapping("/turno/{id}")
     public ResponseEntity<List<Solicitud2Entity>> getAllSolicitudTurno(@PathVariable Long id) {
-        return  ResponseEntity.ok(solicitud2Service.findByTurno(id));
+        return ResponseEntity.ok(solicitud2Service.findByTurno(id));
     }
 }

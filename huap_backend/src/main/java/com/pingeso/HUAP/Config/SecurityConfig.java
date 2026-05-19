@@ -12,7 +12,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
-// 1. CAMBIO DE IMPORT: Quita BCrypt e importa MessageDigestPasswordEncoder
 import org.springframework.security.crypto.password.MessageDigestPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -50,30 +49,15 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/usuarios/login").permitAll()
-                        .requestMatchers("/api/v1/usuarios/register").permitAll()
-                        .requestMatchers("/api/v1/health").permitAll()
-                        .requestMatchers("/api/v1/info").permitAll()
+                        .requestMatchers("/api/v2/health").permitAll()
+                        .requestMatchers("/api/v2/info").permitAll()
 
-                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionario/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionario/login/select-service").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login/select-service").permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/v1/usuarios/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/usuarios/**").hasAnyRole("JEFATURA", "SUBROGANTE")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/usuarios/**").hasAnyRole("JEFATURA", "SUBROGANTE")
-                        .requestMatchers(HttpMethod.DELETE, "/api/v1/usuarios/**").hasAnyRole("JEFATURA", "SUBROGANTE")
-
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes/{solicitudId}/estado")
+                        .requestMatchers(HttpMethod.PUT, "/api/v2/solicitudes/*/estado")
                         .hasAnyRole("JEFATURA", "SUBROGANTE", "MEDICO")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/solicitudes/**").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/botar-turno/{medicoSolicitanteId}")
-                        .authenticated()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/solicitudes/**").authenticated()
-
-                        .requestMatchers("/api/v1/turnos/**").authenticated()
-                        .requestMatchers("/api/v1/plantillas-piso/**").authenticated()
-
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/solicitudes/intercambio/respuesta/*")
+                        .requestMatchers(HttpMethod.PUT, "/api/v2/solicitudes/*/intercambio")
                         .hasAnyRole("JEFATURA", "SUBROGANTE", "MEDICO")
 
                         .anyRequest().authenticated());

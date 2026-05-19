@@ -23,7 +23,7 @@ import java.util.Map;
 
 
 @RestController
-@RequestMapping("api/v2/funcionario")
+@RequestMapping("/api/v2/funcionarios")
 @CrossOrigin
 public class FuncionarioController {
     

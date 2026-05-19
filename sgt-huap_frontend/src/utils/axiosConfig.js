@@ -8,7 +8,7 @@ import { getToken, clearAuth, isTokenValid } from './tokenManager';
 
 // Configuración base de Axios
 const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v2',
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json',
@@ -71,12 +71,11 @@ axiosInstance.interceptors.response.use(
         if (error.response) {
             const { status, data } = error.response;
             
-            // 401: Token inválido o expirado
-            if (status === 401) {
+            // 401: Token inválido o expirado — ignorar en endpoints de login (credenciales wrongas, no sesión expirada)
+            const isLoginEndpoint = error.config?.url?.includes('/login');
+            if (status === 401 && !isLoginEndpoint) {
                 console.warn('[Axios] Token inválido o expirado. Limpiando autenticación...');
                 clearAuth();
-                
-                // Redirigir al login si no estamos ya ahí
                 if (!window.location.pathname.includes('/login')) {
                     window.location.href = '/login';
                 }

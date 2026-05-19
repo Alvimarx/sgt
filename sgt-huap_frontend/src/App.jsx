@@ -8,7 +8,7 @@ import Prop4 from "./components/Admin2/Prop4.jsx";
 import Menu from "./components/Menu/jsx/Menu.jsx";
 import Calendario from "./components/Calendario/jsx/Calendario.jsx";
 import SolicitudesGeneral from "./components/Solicitudes/jsx/Solicitud-General.jsx";
-import Login from "./components/Login/jsx/Login.jsx";
+//import Login from "./components/Login/jsx/Login.jsx";
 import AdminPage from "./components/Administracion/jsx/AdminPage.jsx";
 import AdminOnboardingGuard from './components/Administracion/jsx/AdminOnboardingGuard.jsx';
 import OnboardingLayout from './components/Administracion/jsx/primerosPasos/OnboardingLayout.jsx';
@@ -44,7 +44,7 @@ function App() {
                     <Route path="/agenda-demo" element={<Prop4 />} />
 
                     {/* Ruta de Login */}
-                    <Route path="/login" element={<Login />} />
+                    <Route path="/login" element={<Prop4 />} />
 
                     {/* Rutas antiguas de la app */}
                     <Route path="/calendario" element={<><Menu /><Calendario /></>} />

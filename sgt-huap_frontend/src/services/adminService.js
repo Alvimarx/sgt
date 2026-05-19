@@ -1,132 +1,85 @@
 // adminService.js
 // Servicio centralizado para todas las peticiones de administración
-// Todas las peticiones dependen de servicioId para filtrar por servicio
 
 import axiosInstance from '../utils/axiosConfig';
-import { getServicioId as getServicioIdFromToken, getUserId as getUserIdFromToken, getToken } from '../utils/tokenManager';
+import { getServicioId as getServicioIdFromToken, getUserId as getUserIdFromToken } from '../utils/tokenManager';
 
-// Base completa tomada desde la variable de entorno (ej. http://localhost:8080/api/v1)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const getServicioId = () => getServicioIdFromToken() || localStorage.getItem('servicioId');
+const getUserId    = () => getUserIdFromToken()    || localStorage.getItem('userId');
 
-// Para llamadas con axiosInstance (ya configurado con baseURL=VITE_API_BASE_URL) usamos rutas relativas
-// Para llamadas que usan fetch() conservamos la URL completa usando API_BASE_URL
-
-/**
- * Helper: fetch() con Authorization header si existe token
- * Esto permite mantener llamadas legacy que usan fetch sin reescribirlas todas a axios.
- */
-const fetchWithAuth = async (url, options = {}) => {
-    const token = getToken();
-    const headers = options.headers ? { ...options.headers } : {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const resp = await fetch(url, { ...options, headers });
-    return resp;
-};
-
-/**
- * Obtiene el servicioId del token JWT o localStorage (fallback)
- */
-const getServicioId = () => {
-    return getServicioIdFromToken() || localStorage.getItem('servicioId');
-};
-
-/**
- * Obtiene el userId del token JWT o localStorage (fallback)
- */
-const getUserId = () => {
-    return getUserIdFromToken() || localStorage.getItem('userId');
-};
-
-/**
- * USUARIOS
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// FUNCIONARIOS  →  /api/v2/funcionarios
+// ─────────────────────────────────────────────────────────────────────────────
 export const usuariosService = {
-    // Obtener todos los usuarios del servicio
+
+    // GET /funcionarios/summary?servicioId=
     getAll: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
-        const url = `/usuarios${sId ? `?servicioId=${sId}` : ''}`;
+        const url = `/funcionarios/summary${sId ? `?servicioId=${sId}` : ''}`;
         const response = await axiosInstance.get(url);
         return response.data;
     },
 
-    // Obtener un usuario por ID
+    // GET /funcionarios/{id}/summary
     getById: async (id) => {
-        const response = await axiosInstance.get(`/usuarios/${id}`);
+        const response = await axiosInstance.get(`/funcionarios/${id}/summary`);
         return response.data;
     },
 
-    // Crear nuevo usuario
-    create: async (userData) => {
-        // Creación de usuarios deshabilitada en frontend. Lanzar error claro.
-        throw new Error('Creación de usuarios deshabilitada');
-    },
-
-    // Actualizar usuario
+    // PUT /funcionarios/{id}
     update: async (id, userData) => {
-        // Normalizar el payload para el backend
         const payload = {
-            nombre: userData.primerNombre || userData.nombre,
-            apellidoPaterno: userData.primerApellido || userData.apellidoPaterno,
-            apellidoMaterno: userData.segundoApellido || userData.apellidoMaterno,
-            rut: userData.rut,
-            email: userData.email,
-            telefono: userData.telefono,
-            estado: userData.estado,
-            horasAsignadas: userData.horasAsignadas,
-            tipoTurno: userData.tipoTurno || userData.tipoDeTurnoFijoOReemplazo,
-            diaDeTurno: userData.diaDeTurno || userData.turnoFijo?.day,
-            rol: mapRolToBackend(userData.rol)
+            nombre:           userData.primerNombre    || userData.nombre,
+            apellidoPaterno:  userData.primerApellido  || userData.apellidoPaterno,
+            apellidoMaterno:  userData.segundoApellido || userData.apellidoMaterno,
+            rut:              userData.rut,
+            email:            userData.email,
+            telefono:         userData.telefono,
+            estado:           userData.estado,
+            horasAsignadas:   userData.horasAsignadas,
+            tipoTurno:        userData.tipoTurno || userData.tipoDeTurnoFijoOReemplazo,
+            diaDeTurno:       userData.diaDeTurno || userData.turnoFijo?.day,
+            rol:              mapRolToBackend(userData.rol)
         };
-
-        const response = await axiosInstance.put(`/usuarios/${id}`, payload);
+        const response = await axiosInstance.put(`/funcionarios/${id}`, payload);
         return response.data;
     },
 
-    // Eliminar usuario (marcar como inactivo)
+    // Marcar como inactivo vía PUT /funcionarios/{id}
     delete: async (id) => {
-        // En lugar de eliminar, marcamos como inactivo
         return usuariosService.update(id, { estado: 'inactivo' });
     },
 
-    // Obtener disponibilidad por servicio (activos/inactivos)
+    // GET /funcionarios/disponibilidad/{servicioId}
     getDisponibilidad: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
         if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/usuarios/servicio/${sId}/disponibilidad`);
-        return response.data;
-    },
-
-    // Obtener estadísticas de horas por servicio
-    getHorasStats: async (servicioId = null, page = 0, size = 10) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/usuarios/servicio/${sId}/stats/horas?page=${page}&size=${size}`);
+        const response = await axiosInstance.get(`/funcionarios/disponibilidad/${sId}`);
         return response.data;
     }
+    // getHorasStats eliminado — sin equivalente en el backend v2
 };
 
-/**
- * Mapea el rol del frontend al formato del backend
- */
 function mapRolToBackend(rol) {
     if (!rol) return 'MEDICO';
-    const rolStr = String(rol).toLowerCase();
-    if (rolStr.includes('jefatura subrogante') || rolStr.includes('subrogante')) return 'SUBROGANTE';
-    if (rolStr.includes('jefatura')) return 'JEFATURA';
+    const r = String(rol).toLowerCase();
+    if (r.includes('subrogante')) return 'SUBROGANTE';
+    if (r.includes('jefatura'))   return 'JEFATURA';
     return 'MEDICO';
 }
 
-/**
- * TURNOS
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// TURNOS  →  /api/v2/turnos  |  /api/v2/gestion-turnos
+// ─────────────────────────────────────────────────────────────────────────────
 export const turnosService = {
-    // Crear turno
+
+    // POST /turnos
     create: async (turnoData) => {
-        const response = await axiosInstance.post(`/turnos`, turnoData);
+        const response = await axiosInstance.post('/turnos', turnoData);
         return response.data;
     },
 
-    // Obtener todos los turnos del servicio
+    // GET /turnos/servicio/{id}
     getByServicio: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
         if (!sId) throw new Error('servicioId es requerido');
@@ -134,7 +87,15 @@ export const turnosService = {
         return response.data;
     },
 
-    // Obtener turnos del servicio para un día específico
+    // GET /turnos/servicio/{id}/calendario/{year}/{month}
+    getCalendario: async (servicioId = null, year, month) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/calendario/${year}/${month}`);
+        return response.data;
+    },
+
+    // GET /turnos/servicio/{id}/dia/{fecha}
     getByServicioAndDia: async (servicioId = null, fecha) => {
         const sId = servicioId || getServicioId();
         if (!sId) throw new Error('servicioId es requerido');
@@ -143,264 +104,245 @@ export const turnosService = {
         return response.data;
     },
 
-    // Obtener estadísticas de turnos por servicio
-    getStats: async (servicioId = null) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/turnos/servicio/${sId}/stats`);
-        return response.data;
-    },
-
-    // Obtener cobertura de turnos para el calendario
-    getCobertura: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-
-        let url = `/turnos/servicio/${sId}/cobertura`;
-        const params = [];
-        if (fechaInicio) params.push(`fechaInicio=${fechaInicio}`);
-        if (fechaFin) params.push(`fechaFin=${fechaFin}`);
-        if (params.length > 0) url += `?${params.join('&')}`;
-
-        const response = await axiosInstance.get(url);
-        return response.data;
-    },
-
-    // Obtener porcentaje de cobertura por piso para el mes anterior
-    getCoveragePerPisoPreviousMonth: async (servicioId = null) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/turnos/servicio/${sId}/stats/piso/mes-anterior`);
-        return response.data;
-    },
-
-    // Alias para compatibilidad con código que usa el nombre antiguo
-    getCoveragePerPisoLastMonth: async (servicioId = null) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/turnos/servicio/${sId}/stats/piso/mes-anterior`);
-        return response.data;
-    },
-
-    // Obtener porcentaje de cobertura por piso para el mes actual
-    getCoveragePerPisoCurrentMonth: async (servicioId = null) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/turnos/servicio/${sId}/stats/piso/mes-actual`);
-        return response.data;
-    },
-
-    // Obtener porcentaje de cobertura por piso para un mes específico
-    getCoveragePerPisoByMonth: async (servicioId = null, year, month) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        if (!year || !month) throw new Error('year y month son requeridos');
-        const response = await axiosInstance.get(`/turnos/servicio/${sId}/stats/piso/mes?year=${year}&month=${month}`);
-        return response.data;
-    },
-
-    // Obtener turnos por médico
-    getByMedico: async (medicoId, year = null, month = null) => {
-        if (!medicoId) throw new Error('medicoId es requerido');
-        let url = `/turnos/medico/${medicoId}`;
-        const params = [];
-        if (year) params.push(`year=${year}`);
-        if (month) params.push(`month=${month}`);
-        if (params.length > 0) url += `?${params.join('&')}`;
-        const response = await axiosInstance.get(url);
-        return response.data;
-    },
-
-    // Obtener turnos futuros de un médico
-    getFuturos: async (medicoId) => {
-        if (!medicoId) throw new Error('medicoId es requerido');
-        const response = await axiosInstance.get(`/turnos/medico/${medicoId}/futuros`);
-        return response.data;
-    },
-
-    // Alterar un turno (desasignar, reasignar, cambiar horas)
-    alterar: async (alterarRequest) => {
-        const response = await axiosInstance.post(`/turnos/alterar`, alterarRequest);
-        return response.data;
-    },
-
-    // Obtener turnos sin asignar para un día específico
+    // GET /turnos/servicio/{id}/dia/{fecha}/sin-asignar
     getSinAsignarByDia: async (servicioId = null, fecha) => {
         const sId = servicioId || getServicioId();
         if (!sId) throw new Error('servicioId es requerido');
         if (!fecha) throw new Error('fecha es requerida');
         const response = await axiosInstance.get(`/turnos/servicio/${sId}/dia/${fecha}/sin-asignar`);
         return response.data;
+    },
+
+    // GET /turnos/servicio/{id}/sin-asignar
+    getSinAsignar: async (servicioId = null) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/sin-asignar`);
+        return response.data;
+    },
+
+    // GET /turnos/servicio/{id}/stats?fechaInicio=&fechaFin=
+    getStats: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const params = [];
+        if (fechaInicio) params.push(`fechaInicio=${fechaInicio}`);
+        if (fechaFin)    params.push(`fechaFin=${fechaFin}`);
+        const qs = params.length ? `?${params.join('&')}` : '';
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/stats${qs}`);
+        return response.data;
+    },
+
+    // GET /turnos/servicio/{id}/cobertura?fechaInicio=&fechaFin=
+    getCobertura: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const params = [];
+        if (fechaInicio) params.push(`fechaInicio=${fechaInicio}`);
+        if (fechaFin)    params.push(`fechaFin=${fechaFin}`);
+        const qs = params.length ? `?${params.join('&')}` : '';
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/cobertura${qs}`);
+        return response.data;
+    },
+
+    // GET /turnos/funcionario/{id}?year=&month=
+    getByMedico: async (funcionarioId, year = null, month = null) => {
+        if (!funcionarioId) throw new Error('funcionarioId es requerido');
+        const params = [];
+        if (year)  params.push(`year=${year}`);
+        if (month) params.push(`month=${month}`);
+        const qs = params.length ? `?${params.join('&')}` : '';
+        const response = await axiosInstance.get(`/turnos/funcionario/${funcionarioId}${qs}`);
+        return response.data;
+    },
+
+    // GET /turnos/funcionario/{id}/futuros
+    getFuturos: async (funcionarioId) => {
+        if (!funcionarioId) throw new Error('funcionarioId es requerido');
+        const response = await axiosInstance.get(`/turnos/funcionario/${funcionarioId}/futuros`);
+        return response.data;
+    },
+
+    // GET /turnos/piso/{pisoId}
+    getByPiso: async (pisoId) => {
+        if (!pisoId) throw new Error('pisoId es requerido');
+        const response = await axiosInstance.get(`/turnos/piso/${pisoId}`);
+        return response.data;
+    },
+
+    // GET /turnos/asignacion?pisoId=&fechaInicio=&fechaFin=
+    getParaAsignacion: async (pisoId, fechaInicio, fechaFin) => {
+        const response = await axiosInstance.get(
+            `/turnos/asignacion?pisoId=${pisoId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
+        );
+        return response.data;
+    },
+
+    // PUT /turnos/asignacion-masiva
+    asignacionMasiva: async (payload) => {
+        const response = await axiosInstance.put('/turnos/asignacion-masiva', payload);
+        return response.data;
+    },
+
+    // POST /turnos/check-conflicts
+    checkConflicts: async (payload) => {
+        const response = await axiosInstance.post('/turnos/check-conflicts', payload);
+        return response.data;
+    },
+
+    // POST /gestion-turnos/alterar  (movido de /turnos/alterar en v2)
+    alterar: async (alterarRequest) => {
+        const response = await axiosInstance.post('/gestion-turnos/alterar', alterarRequest);
+        return response.data;
     }
+
+    // getCoveragePerPiso* eliminados — sin equivalente en el backend v2
 };
 
-/**
- * SOLICITUDES
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// SOLICITUDES  →  /api/v2/solicitudes
+// ─────────────────────────────────────────────────────────────────────────────
 export const solicitudesService = {
-    // Obtener todas las solicitudes del servicio
-    getByServicio: async (servicioId = null) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/usuarios/servicio/${sId}/solicitudes`);
-        return response.data;
-    },
 
-    // Obtener todas las solicitudes globales
+    // GET /solicitudes
     getAll: async () => {
-        const response = await axiosInstance.get(`/solicitudes/todas`);
+        const response = await axiosInstance.get('/solicitudes');
         return response.data;
     },
 
-    // Obtener solicitudes por médico
-    getByMedico: async (medicoId) => {
-        const response = await axiosInstance.get(`/solicitudes/usuario/${medicoId}`);
+    // GET /solicitudes/funcionario/{id}  (solicitante)
+    getByFuncionario: async (funcionarioId) => {
+        const response = await axiosInstance.get(`/solicitudes/funcionario/${funcionarioId}`);
         return response.data;
     },
 
-    // Obtener solicitudes filtradas por estado
-    getByEstado: async (filtro, medicoId = null) => {
-        let url;
-        if (medicoId) {
-            url = `/solicitudes/usuario/${filtro}/${medicoId}`;
-        } else {
-            url = `/solicitudes/todas/${filtro}`;
-        }
-        const response = await axiosInstance.get(url);
+    // Alias para compatibilidad con código que llama getByMedico
+    getByMedico: async (funcionarioId) => solicitudesService.getByFuncionario(funcionarioId),
+
+    // GET /solicitudes/receptor/{id}
+    getByReceptor: async (receptorId) => {
+        const response = await axiosInstance.get(`/solicitudes/receptor/${receptorId}`);
         return response.data;
     },
 
-    // Crear solicitud de cobertura
-    createCobertura: async (medicoId, solicitudData) => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/solicitudes/cobertura/${medicoId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(solicitudData)
-        });
-        if (!response.ok) throw new Error('Error al crear solicitud de cobertura');
-        return response.json();
+    // GET /solicitudes/tipo/{id}
+    getByTipo: async (tipoId) => {
+        const response = await axiosInstance.get(`/solicitudes/tipo/${tipoId}`);
+        return response.data;
     },
 
-    // Crear solicitud de permiso
-    createPermiso: async (medicoId, solicitudData) => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/solicitudes/permiso/${medicoId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(solicitudData)
-        });
-        if (!response.ok) throw new Error('Error al crear solicitud de permiso');
-        return response.json();
+    // GET /solicitudes/turno/{id}
+    getByTurno: async (turnoId) => {
+        const response = await axiosInstance.get(`/solicitudes/turno/${turnoId}`);
+        return response.data;
     },
 
-    // Crear solicitud de intercambio
-    createIntercambio: async (medicoId, solicitudData) => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/solicitudes/intercambio/${medicoId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(solicitudData)
-        });
-        if (!response.ok) throw new Error('Error al crear solicitud de intercambio');
-        return response.json();
+    // POST /solicitudes  — payload: CrearSolicitudDTO
+    // { idFuncionario, idFuncionarioReceptor?, idTipoSolicitud, idTurno?,
+    //   idTurnoIntercambio?, fechaInicioPermiso?, fechaTerminoPermiso?, motivo }
+    crear: async (dto) => {
+        const response = await axiosInstance.post('/solicitudes', dto);
+        return response.data;
     },
 
-    // Crear solicitud de oferta
-    createOferta: async (medicoId, solicitudData) => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/solicitudes/oferta/${medicoId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(solicitudData)
-        });
-        if (!response.ok) throw new Error('Error al crear solicitud de oferta');
-        return response.json();
+    // Atajos semánticos que construyen el DTO según el tipo de solicitud
+    createCobertura: async (funcionarioId, { idTipoSolicitud, idTurno, motivo }) => {
+        return solicitudesService.crear({ idFuncionario: funcionarioId, idTipoSolicitud, idTurno, motivo });
     },
 
-    // Actualizar estado de solicitud (aprobar/rechazar)
-    updateEstado: async (solicitudId, nuevoEstado) => {
-        const response = await axiosInstance.put(`/solicitudes/${solicitudId}/estado`, { estado: nuevoEstado });
-        const data = response.data;
-        // Emitir evento global para que componentes interesados (ej. CalendarView) recarguen datos en tiempo real
+    createPermiso: async (funcionarioId, { idTipoSolicitud, fechaInicioPermiso, fechaTerminoPermiso, motivo }) => {
+        return solicitudesService.crear({ idFuncionario: funcionarioId, idTipoSolicitud, fechaInicioPermiso, fechaTerminoPermiso, motivo });
+    },
+
+    createIntercambio: async (funcionarioId, { idTipoSolicitud, idTurno, idTurnoIntercambio, idFuncionarioReceptor, motivo }) => {
+        return solicitudesService.crear({ idFuncionario: funcionarioId, idFuncionarioReceptor, idTipoSolicitud, idTurno, idTurnoIntercambio, motivo });
+    },
+
+    createOferta: async (funcionarioId, { idTipoSolicitud, idTurno, motivo }) => {
+        return solicitudesService.crear({ idFuncionario: funcionarioId, idTipoSolicitud, idTurno, motivo });
+    },
+
+    // PUT /solicitudes/{id}/estado?nuevoEstado=&idUsuarioAsignador=
+    // IMPORTANTE: el backend usa @RequestParam, no @RequestBody
+    updateEstado: async (solicitudId, nuevoEstado, idUsuarioAsignador) => {
+        const userId = idUsuarioAsignador || getUserId();
+        const response = await axiosInstance.put(
+            `/solicitudes/${solicitudId}/estado?nuevoEstado=${nuevoEstado}&idUsuarioAsignador=${userId}`
+        );
         try {
-            if (typeof window !== 'undefined' && window.dispatchEvent) {
-                window.dispatchEvent(new CustomEvent('solicitud:updated', { detail: { id: solicitudId, estado: nuevoEstado, response: data } }));
-            }
-        } catch (e) {
-            console.warn('adminService: no se pudo emitir evento solicitud:updated', e)
-        }
-        return data;
+            window.dispatchEvent(new CustomEvent('solicitud:updated', {
+                detail: { id: solicitudId, estado: nuevoEstado, response: response.data }
+            }));
+        } catch (_) {}
+        return response.data;
     },
 
-    // Eliminar solicitud
-    delete: async (solicitudId) => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/solicitudes/${solicitudId}`, {
-            method: 'DELETE'
-        });
-        if (!response.ok) throw new Error('Error al eliminar solicitud');
-        return response.text();
+    // PUT /solicitudes/{id}/intercambio?idReceptor=&respuesta=
+    responderIntercambio: async (solicitudId, idReceptor, respuesta) => {
+        const response = await axiosInstance.put(
+            `/solicitudes/${solicitudId}/intercambio?idReceptor=${idReceptor}&respuesta=${respuesta}`
+        );
+        return response.data;
     },
 
-    // Obtener conteos de solicitudes por fecha (para calendario)
-    getFechas: async (servicioId = null) => {
-        const sId = servicioId || getServicioId();
-        if (!sId) throw new Error('servicioId es requerido');
-        const response = await fetchWithAuth(`${API_BASE_URL}/usuarios/servicio/${sId}/solicitudes/fechas`);
-        if (!response.ok) throw new Error('Error al obtener fechas de solicitudes');
-        return response.json();
+    // PATCH /solicitudes/{id}/motivo?motivo=
+    modificarMotivo: async (solicitudId, motivo) => {
+        const response = await axiosInstance.patch(
+            `/solicitudes/${solicitudId}/motivo?motivo=${encodeURIComponent(motivo)}`
+        );
+        return response.data;
     }
+
+    // delete y getByServicio eliminados — sin equivalente en el backend v2
+    // getFechas eliminado — sin equivalente en el backend v2
+    // getByEstado eliminado — filtrar en frontend sobre getAll() o getByFuncionario()
 };
 
-/**
- * NOTIFICACIONES
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTIFICACIONES  →  /api/v2/notificaciones
+// ─────────────────────────────────────────────────────────────────────────────
 export const notificacionesService = {
-    // Obtener todas las notificaciones
+
+    // GET /notificaciones/
     getAll: async () => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/notificacion`);
-        if (!response.ok) throw new Error('Error al obtener notificaciones');
-        return response.json();
+        const response = await axiosInstance.get('/notificaciones/');
+        return response.data;
     },
 
-    // Obtener notificaciones por usuario
+    // GET /notificaciones/usuario/{id}
     getByUsuario: async (usuarioId = null) => {
         const uId = usuarioId || getUserId();
         if (!uId) throw new Error('usuarioId es requerido');
-        const response = await fetchWithAuth(`${API_BASE_URL}/notificacion/usuario/${uId}`);
-        if (!response.ok) throw new Error('Error al obtener notificaciones del usuario');
-        return response.json();
+        const response = await axiosInstance.get(`/notificaciones/usuario/${uId}`);
+        return response.data;
     },
 
-    // Obtener notificaciones no leídas
+    // GET /notificaciones/sin-leer/{id}   (era no-leidas)
     getNoLeidas: async (usuarioId = null) => {
         const uId = usuarioId || getUserId();
         if (!uId) throw new Error('usuarioId es requerido');
-        const response = await fetchWithAuth(`${API_BASE_URL}/notificacion/no-leidas/${uId}`);
-        if (!response.ok) throw new Error('Error al obtener notificaciones no leídas');
-        return response.json();
+        const response = await axiosInstance.get(`/notificaciones/sin-leer/${uId}`);
+        return response.data;
     },
 
-    // Marcar notificación como leída
+    // PUT /notificaciones/{id}/leer
     marcarLeida: async (notificacionId) => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/notificacion/leido/${notificacionId}`, {
-            method: 'PUT'
-        });
-        if (!response.ok) throw new Error('Error al marcar notificación como leída');
-        return response;
+        const response = await axiosInstance.put(`/notificaciones/${notificacionId}/leer`);
+        return response.data;
     },
 
-    // Eliminar notificación
+    // DELETE /notificaciones/{id}   (era PUT /notificacion/eliminado)
     eliminar: async (notificacionId) => {
-        const response = await fetchWithAuth(`${API_BASE_URL}/notificacion/eliminado/${notificacionId}`, {
-            method: 'PUT'
-        });
-        if (!response.ok) throw new Error('Error al eliminar notificación');
-        return response;
+        const response = await axiosInstance.delete(`/notificaciones/${notificacionId}`);
+        return response.data;
     }
 };
 
-/**
- * PISOS
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// PISOS  →  /api/v2/pisos
+// ─────────────────────────────────────────────────────────────────────────────
 export const pisosService = {
-    // Obtener todos los pisos
+
     getAll: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
         const url = `/pisos${sId ? `?servicioId=${sId}` : ''}`;
@@ -408,13 +350,11 @@ export const pisosService = {
         return response.data;
     },
 
-    // Obtener piso por ID
     getById: async (id) => {
         const response = await axiosInstance.get(`/pisos/${id}`);
         return response.data;
     },
 
-    // Obtener pisos por servicio
     getByServicio: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
         if (!sId) throw new Error('servicioId es requerido');
@@ -422,182 +362,157 @@ export const pisosService = {
         return response.data;
     },
 
-    // Crear piso
     create: async (pisoData) => {
         const response = await axiosInstance.post('/pisos', pisoData);
         return response.data;
     },
 
-    // Actualizar piso
     update: async (id, pisoData) => {
         const response = await axiosInstance.put(`/pisos/${id}`, pisoData);
         return response.data;
     },
 
-    // Eliminar piso
     delete: async (id) => {
         const response = await axiosInstance.delete(`/pisos/${id}`);
         return response.data;
     }
 };
 
-/**
- * EVENTOS / BITÁCORA
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// BITÁCORA  →  /api/v2/bitacoras  (era /evento)
+// ─────────────────────────────────────────────────────────────────────────────
 export const eventosService = {
-    // Obtener todos los eventos
+
+    // GET /bitacoras/
     getAll: async () => {
-        const response = await axiosInstance.get('/evento');
+        const response = await axiosInstance.get('/bitacoras/');
         return response.data;
     },
 
-    // Filtrar por tipo de evento
+    // GET /bitacoras/tipo/{tipo}
     getByTipo: async (tipo) => {
-        const response = await axiosInstance.get(`/evento/tipo/${encodeURIComponent(tipo)}`);
+        const response = await axiosInstance.get(`/bitacoras/tipo/${encodeURIComponent(tipo)}`);
         return response.data;
     },
 
-    // Filtrar por usuario (idPersonal)
+    // GET /bitacoras/funcionario/{id}  (era /evento/usuario)
     getByUsuario: async (usuarioId) => {
-        const response = await axiosInstance.get(`/evento/usuario/${usuarioId}`);
+        const response = await axiosInstance.get(`/bitacoras/funcionario/${usuarioId}`);
         return response.data;
     },
 
-    // Filtrar por turno
+    // GET /bitacoras/turno/{id}
     getByTurno: async (turnoId) => {
-        const response = await axiosInstance.get(`/evento/turno/${turnoId}`);
+        const response = await axiosInstance.get(`/bitacoras/turno/${turnoId}`);
         return response.data;
     },
 
-    // Filtrar por solicitud
+    // GET /bitacoras/solicitud/{id}
     getBySolicitud: async (solicitudId) => {
-        const response = await axiosInstance.get(`/evento/solicitud/${solicitudId}`);
+        const response = await axiosInstance.get(`/bitacoras/solicitud/${solicitudId}`);
         return response.data;
     }
 };
 
-/**
- * FUNCIÓN HELPER: Normalizar solicitud del backend a formato UI
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// SERVICIOS  →  /api/v2/servicios
+// ─────────────────────────────────────────────────────────────────────────────
+export const serviciosService = {
+
+    getAll: async () => {
+        const response = await axiosInstance.get('/servicios/');
+        return response.data;
+    },
+
+    getById: async (id) => {
+        const response = await axiosInstance.get(`/servicios/${id}`);
+        return response.data;
+    },
+
+    create: async (data) => {
+        const response = await axiosInstance.post('/servicios/', data);
+        return response.data;
+    },
+
+    update: async (id, data) => {
+        const response = await axiosInstance.put(`/servicios/${id}`, data);
+        return response.data;
+    },
+
+    delete: async (id) => {
+        const response = await axiosInstance.delete(`/servicios/${id}`);
+        return response.data;
+    }
+    // limpiar eliminado — sin equivalente en el backend v2
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NORMALIZACIÓN  (sin cambios — adapta respuesta del backend al formato UI)
+// ─────────────────────────────────────────────────────────────────────────────
 export const normalizeSolicitud = (s) => {
     if (!s) return null;
 
     const solicitante = s.medicoSolicitante ? {
         id_medico: s.medicoSolicitante.id || s.medicoSolicitante.idPersonal,
-        nombre: ((s.medicoSolicitante.nombre || s.medicoSolicitante.primerNombre || '') + ' ' +
-            (s.medicoSolicitante.apellidoPaterno || s.medicoSolicitante.primerApellido || '')).trim(),
+        nombre: ((s.medicoSolicitante.nombre || '') + ' ' + (s.medicoSolicitante.apellidoPaterno || '')).trim(),
         email: s.medicoSolicitante.email
     } : null;
 
     const receptor = s.medicoReceptor ? {
         id_medico: s.medicoReceptor.id || s.medicoReceptor.idPersonal,
-        nombre: ((s.medicoReceptor.nombre || s.medicoReceptor.primerNombre || '') + ' ' +
-            (s.medicoReceptor.apellidoPaterno || s.medicoReceptor.primerApellido || '')).trim(),
+        nombre: ((s.medicoReceptor.nombre || '') + ' ' + (s.medicoReceptor.apellidoPaterno || '')).trim(),
         email: s.medicoReceptor.email
     } : null;
 
-    const turno = s.turno || null;
-
-    // Determinar la fecha objetivo (fecha del turno o fecha de inicio del permiso)
-    // Para solicitudes de intercambio/oferta podemos recibir objetos separados: turnoPropio / turnoDeseado
-    const turnoPropio = s.turnoPropio || s.turno_propio || s.turno_origen || s.turnoOrigen || null;
-    const turnoDeseado = s.turnoDeseado || s.turno_deseado || s.turno_destino || s.turnoDestino || null;
-
-    // Preferir la fecha del turno propio (día que se ofrece) para mostrar la solicitud en el calendario
-    const fechaFromPropio = turnoPropio ? (turnoPropio.diaInicioTurno || turnoPropio.diaInicio || turnoPropio.fecha || null) : null;
-    const fechaFromTurno = turno ? (turno.diaInicioTurno || turno.diaInicio || turno.fecha || null) : null;
-    const fechaObjetivo = s.fechaInicioPermiso || fechaFromPropio || fechaFromTurno || null;
-
-    // Helper para mapear un objeto turno del backend al formato UI esperado
     const mapTurno = (t) => {
         if (!t) return null;
         return {
-            id_turno: t.id || t.idTurno || t.id_turno || null,
-            seccion: t.idPiso || t.piso || t.seccion || t.id_piso || null,
-            fecha: t.diaInicioTurno || t.diaInicio || t.fecha || null,
-            hora_inicio: t.horaInicio || t.hora_inicio || t.hora || null,
-            hora_fin: t.horaFin || t.hora_fin || null,
-            tipoTurno: t.tipoTurno || t.tipo_turno || t.turno || null
+            id_turno:    t.id || t.idTurno || null,
+            seccion:     t.idPiso || t.piso || t.seccion || null,
+            fecha:       t.diaInicioTurno || t.diaInicio || t.fecha || null,
+            hora_inicio: t.horaInicio || t.hora_inicio || null,
+            hora_fin:    t.horaFin || t.hora_fin || null,
+            tipoTurno:   t.tipoTurno || t.tipo_turno || null
         };
     };
 
-    // Preferir mapeo específico para intercambios/ofertas
-    const turno_origen = mapTurno(turnoPropio || turno);
-    const turno_destino = mapTurno(turnoDeseado || (turnoPropio ? turno : null));
+    const turnoPropio   = s.turnoPropio   || s.turno_propio   || s.turnoOrigen  || null;
+    const turnoDeseado  = s.turnoDeseado  || s.turno_deseado  || s.turnoDestino || null;
+    const fechaObjetivo = s.fechaInicioPermiso
+        || (turnoPropio  ? (turnoPropio.diaInicioTurno  || turnoPropio.diaInicio  || turnoPropio.fecha  || null) : null)
+        || (s.turno      ? (s.turno.diaInicioTurno      || s.turno.diaInicio      || s.turno.fecha      || null) : null);
 
     return {
-        id: s.id,
-        tipo: s.tipo || 'Solicitud',
+        id:                  s.id,
+        tipo:                s.tipo || 'Solicitud',
         solicitante,
         receptor,
-        estado: s.estado || 'Pendiente',
-        fecha_solicitud: s.fechaCreacion ? new Date(s.fechaCreacion).getTime() : null,
-        fecha: fechaObjetivo,
-        fecha_objetivo: fechaObjetivo,
-        date: fechaObjetivo,
-        turno_origen,
-        turno_destino,
-        motivo: s.motivo || '',
-        tipoAutorizacion: s.tipoAutorizacion || null,
-        fechaInicioPermiso: s.fechaInicioPermiso || null,
+        estado:              s.estado || 'Pendiente',
+        fecha_solicitud:     s.fechaCreacion ? new Date(s.fechaCreacion).getTime() : null,
+        fecha:               fechaObjetivo,
+        fecha_objetivo:      fechaObjetivo,
+        date:                fechaObjetivo,
+        turno_origen:        mapTurno(turnoPropio || s.turno),
+        turno_destino:       mapTurno(turnoDeseado),
+        motivo:              s.motivo || '',
+        tipoAutorizacion:    s.tipoAutorizacion || null,
+        fechaInicioPermiso:  s.fechaInicioPermiso || null,
         fechaTerminoPermiso: s.fechaTerminoPermiso || null
     };
 };
 
-/**
- * FERIADOS
- * Servicio para gestionar feriados usando la API de Boostr
- */
-export const holidaysService = {
-    // Verificar si una fecha específica es feriado
-    checkHoliday: async (year, month, day) => {
-        const response = await axiosInstance.get(`/holidays/check/${year}/${month}/${day}`);
-        return response.data;
-    },
-
-    // Obtener todos los feriados cacheados
-    getAll: async () => {
-        const response = await axiosInstance.get('/holidays/all');
-        return response.data;
-    },
-
-    // Obtener feriados por año
-    getByYear: async (year) => {
-        const response = await axiosInstance.get(`/holidays/year/${year}`);
-        return response.data;
-    },
-
-    // Forzar recarga de feriados desde la API
-    refresh: async () => {
-        const response = await axiosInstance.post('/holidays/refresh');
-        return response.data;
-    },
-
-    // Obtener estadísticas de feriados
-    getStats: async () => {
-        const response = await axiosInstance.get('/holidays/stats');
-        return response.data;
-    }
-};
-
-/**
- * SERVICIOS
- */
-export const serviciosService = {
-    // Limpiar (resetear) un servicio: borra todos los datos asociados excepto usuarios
-    limpiar: async (id) => {
-        const response = await axiosInstance.delete(`/servicios/${id}/limpiar`);
-        return response.data;
-    }
-};
-
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPORT DEFAULT
+// ─────────────────────────────────────────────────────────────────────────────
 export default {
-    usuarios: usuariosService,
-    servicios: serviciosService,
-    turnos: turnosService,
-    solicitudes: solicitudesService,
+    usuarios:       usuariosService,
+    funcionarios:   usuariosService,   // alias explícito con el nombre nuevo
+    turnos:         turnosService,
+    solicitudes:    solicitudesService,
     notificaciones: notificacionesService,
-    pisos: pisosService,
-    holidays: holidaysService,
+    pisos:          pisosService,
+    eventos:        eventosService,    // mantiene nombre externo para no romper imports
+    bitacoras:      eventosService,    // alias explícito con el nombre nuevo
+    servicios:      serviciosService,
     normalizeSolicitud
 };

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/bitacora")
+@RequestMapping("/api/v2/bitacoras")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class BitacoraController {

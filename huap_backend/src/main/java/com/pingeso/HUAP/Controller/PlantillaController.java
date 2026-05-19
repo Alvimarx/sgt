@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/plantillas")
+@RequestMapping("/api/v2/plantillas")
 @CrossOrigin("*")
 public class PlantillaController {
 

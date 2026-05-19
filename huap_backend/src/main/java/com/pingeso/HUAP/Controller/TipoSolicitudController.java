@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/tiposolicitud")
+@RequestMapping("/api/v2/tipos-solicitud")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class TipoSolicitudController {

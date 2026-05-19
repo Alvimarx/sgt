@@ -16,7 +16,7 @@ import java.util.Map;
  * Usado por Docker health checks y el load balancer nginx.
  */
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v2")
 public class HealthController {
 
     @Value("${SERVER_ID:backend-unknown}")
