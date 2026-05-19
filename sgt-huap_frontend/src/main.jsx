@@ -8,9 +8,9 @@ import { NotificationProvider } from './context/NotificationContext'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AuthProvider>
-      <NotificationProvider>
+      
         <App />
-      </NotificationProvider>
+      
     </AuthProvider>
   </StrictMode>,
 )

@@ -18,6 +18,7 @@ import CalendarView from './calendarView';
 import AsignacionView from './AsignacionView';
 import JerarquiaView from './JerarquiaView';
 import { useAuth } from '../../context/AuthContext';
+import { switchService } from '../../services/authService';
 
 const Prop4 = ({ tweaks = {} }) => {
   const auth = useAuth();
@@ -44,13 +45,35 @@ const Prop4 = ({ tweaks = {} }) => {
 
   // Paso 2 completado: actualiza el contexto global y navega a la app
   const handleServiceSelected = (userData) => {
+    // 💡 GUARDAMOS EL NOMBRE EN LOCALSTORAGE PARA EL PERFIL
+    if (serviciosDisponibles.length > 0 && userData.servicioId) {
+      const servicioReal = serviciosDisponibles.find(
+        s => Number(s.servicioId || s.idServicio) === Number(userData.servicioId)
+      );
+      if (servicioReal) {
+        localStorage.setItem('sgt_servicio_activo_nombre', servicioReal.nombre || servicioReal.nombreServicio);
+      }
+    }
+
     if (auth?.updateUser) {
       auth.updateUser(userData);
     }
-    setPreAuthToken(null);
-    setServiciosDisponibles([]);
+    
+    // Limpiamos el token temporal, pero mantenemos los servicios por si quiere cambiar luego
+    setPreAuthToken(null); 
     setCurrentView('agenda');
     setActiveTab('home');
+  };
+
+  // 💡 FUNCIÓN PARA VOLVER A SELECCIONAR SERVICIO DINÁMICAMENTE
+  const handleBackToServiceSelection = () => {
+    // Usamos los servicios del AuthContext o los que ya teníamos en estado
+    const servicios = auth.user?.servicios || serviciosDisponibles;
+    if (servicios && servicios.length > 0) {
+      setServiciosDisponibles(servicios);
+      setPreAuthToken(null); // null indica que estamos haciendo Switch, no un Login nuevo
+      setCurrentView('select_service');
+    }
   };
 
   return (
@@ -75,7 +98,13 @@ const Prop4 = ({ tweaks = {} }) => {
       )}
 
       {/* VISTA AGENDA (HOME ACTUAL) */}
-      {currentView === 'agenda' && <AgendaView tweaks={tweaks} userName={auth.user?.nombre || 'Usuario'} />}
+      {currentView === 'agenda' && (
+        <AgendaView 
+          tweaks={tweaks} 
+          userName={auth.user?.nombre || 'Usuario'} 
+          onSwitchService={handleBackToServiceSelection} // 💡 Pasamos la prop correctamente
+        />
+      )}
 
       {/* VISTA CALENDARIO (CALENDARVIEW.JSX) */}
       {currentView === 'calendar_view' && (
@@ -93,6 +122,7 @@ const Prop4 = ({ tweaks = {} }) => {
             setCurrentView('agenda');
             setActiveTab('home');
           }}
+          onChangeService={handleBackToServiceSelection} // 💡 Para cambiar desde el perfil también
         />
       )}
       
@@ -121,9 +151,11 @@ const Prop4 = ({ tweaks = {} }) => {
 };
 
 // ------------------------------------------------------------------
-// AGENDA Y COMPONENTES RELACIONADOS (Se mantienen aquí)
+// AGENDA Y COMPONENTES RELACIONADOS
 // ------------------------------------------------------------------
-const AgendaView = ({ tweaks, userName }) => {
+
+// 💡 AÑADIMOS onSwitchService EN LOS PARÁMETROS DEL COMPONENTE
+const AgendaView = ({ tweaks, userName, onSwitchService }) => {
   const [filter, setFilter] = useState('todos');
   const [detailShift, setDetailShift] = useState(null);
   const [bannerCollapsed, setBannerCollapsed] = useState(false);
@@ -148,7 +180,27 @@ const AgendaView = ({ tweaks, userName }) => {
 
   return (
     <>
-      <TopHeader title="Agenda" subtitle={`Hola ${userName}`} rightSlot={<div style={{ display:'flex', gap:6 }}><IconBtn icon="bell" badge={D.PENDIENTES?.length || 0}/></div>} dense />
+      <TopHeader 
+        title="Agenda" 
+        subtitle={`Hola ${userName}`}leftSlot={<button onClick={onSwitchService} 
+        style={{ 
+          background: 'transparent', 
+          border: 'none', 
+          padding: '4px 8px 4px 0', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center' 
+            }}
+          ><SGTIcon name="chevron-left" size={24} color={SGT_DATA.PALETTE.ink} />
+          </button>
+        } 
+        rightSlot={
+          <div style={{ display:'flex', gap:6 }}>
+            <IconBtn icon="bell" badge={D.PENDIENTES?.length || 0}/>
+          </div>
+        } 
+        dense 
+      />
       <AlertBanner pendientes={D.PENDIENTES} collapsed={bannerCollapsed} onToggle={() => setBannerCollapsed(!bannerCollapsed)} />
       
       <div style={{ display:'flex', gap:6, padding:'10px 14px 6px', overflowX:'auto' }}>
@@ -281,6 +333,7 @@ const TeamComposition = ({ team, density = 'cozy' }) => {
     </div>
   );
 };
+
 const RoleGroup = ({ title, role, people, ideal }) => {
   const gap = ideal - people.length;
   return (
@@ -299,12 +352,14 @@ const RoleGroup = ({ title, role, people, ideal }) => {
     </div>
   );
 };
+
 const ShiftActions = ({ shift }) => {
   const actions = [];
   if (shift.miTurno && !shift.solicitudPendiente) { actions.push({ id: 'cambio', label: 'Solicitar cambio', icon: 'swap', tone: 'primary' }); }
   actions.push({ id: 'historial', label: 'Ver historial', icon: 'history', tone: 'ghost' });
   return <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{actions.map(a => <ActionBtn key={a.id} {...a}/>)}</div>;
 };
+
 const ActionBtn = ({ label, icon, tone = 'primary' }) => {
   const tones = { primary: { bg: P2().primary, ink: '#fff', bd: P2().primary }, ghost: { bg: '#fff', ink: P2().ink, bd: P2().line } };
   const t = tones[tone] || tones.primary;
@@ -314,6 +369,7 @@ const ActionBtn = ({ label, icon, tone = 'primary' }) => {
     </button>
   );
 };
+
 const ShiftDetail = ({ shift }) => {
   const team = SGT_DATA.TEAMS[shift.equipo];
   return (

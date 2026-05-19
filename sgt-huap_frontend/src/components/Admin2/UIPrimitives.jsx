@@ -115,8 +115,9 @@ export const Sheet = ({ open, onClose, children, title, maxHeight = '85%' }) => 
   );
 };
 
-export const TopHeader = ({ title, subtitle, rightSlot, dense }) => (
+export const TopHeader = ({ title, subtitle, rightSlot, dense, leftSlot }) => (
   <div style={{ padding: dense ? '14px 16px 10px' : '16px 18px 12px', background: '#fff', borderBottom: `1px solid ${P().line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+    {leftSlot}
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 19, fontWeight: 800, color: P().ink, lineHeight: 1.15, letterSpacing: -0.2 }}>{title}</div>
       {subtitle && <div style={{ fontSize: 12, color: P().ink3, marginTop: 2, fontWeight: 600 }}>{subtitle}</div>}

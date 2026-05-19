@@ -51,6 +51,11 @@ export const selectService = async (preAuthToken, servicioId) => {
 
         saveToken(token);
 
+        // 💡 Convertimos a String para evitar fallos de tipo (===) y usamos el fallback si no existe la lista
+        const servicioEncontrado = perfil.servicios?.find(
+            s => Number(s.idServicio) === Number(servicioActivo)
+        );
+
         const userData = {
             userId: perfil.idFuncionario,
             servicioId: servicioActivo,
@@ -61,8 +66,11 @@ export const selectService = async (preAuthToken, servicioId) => {
             nombreCompleto: `${perfil.nombre || ''} ${perfil.apellidoPaterno || ''} ${perfil.apellidoMaterno || ''}`.trim(),
             rut: perfil.rut,
             rutCompleto: perfil.rutCompleto,
-            servicios: perfil.servicios || []
+            servicios: perfil.servicios || [],
+            servicioNombre: servicioEncontrado ? servicioEncontrado.nombreServicio : 'Servicio Asignado'
         };
+
+        console.log("🚨 DATA DESDE AUTH SERVICE:", userData);
 
         saveUserData(userData);
 
@@ -88,6 +96,10 @@ export const switchService = async (servicioId) => {
 
         saveToken(token);
 
+        const servicioEncontrado = perfil.servicios?.find(
+            s => Number(s.idServicio) === Number(servicioActivo)
+        );
+
         const userData = {
             userId: perfil.idFuncionario,
             servicioId: servicioActivo,
@@ -98,7 +110,8 @@ export const switchService = async (servicioId) => {
             nombreCompleto: `${perfil.nombre || ''} ${perfil.apellidoPaterno || ''} ${perfil.apellidoMaterno || ''}`.trim(),
             rut: perfil.rut,
             rutCompleto: perfil.rutCompleto,
-            servicios: perfil.servicios || []
+            servicios: perfil.servicios || [],
+            servicioNombre: servicioEncontrado ? servicioEncontrado.nombreServicio : 'Servicio Asignado'
         };
 
         saveUserData(userData);

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { SGT_DATA } from './data';
 import { SGTIcon, TopHeader } from './UIPrimitives';
 import { selectService } from '../../services/authService';
+import { switchService } from '../../services/authService';
 
 // Props:
 //   servicios     — Array<{ servicioId, nombre, rol }> que viene del Paso 1 (login)
@@ -18,8 +19,16 @@ const SelectServiceView = ({ servicios = [], preAuthToken, onServiceSelected }) 
     setError('');
     setLoadingId(srv.servicioId);
 
-    const result = await selectService(preAuthToken, srv.servicioId);
-    setLoadingId(null);
+    let result;
+    
+    // 💡 LÓGICA DINÁMICA:
+    if (preAuthToken) {
+      // Si hay token temporal, es el flujo de Login inicial
+      result = await selectService(preAuthToken, srv.servicioId);
+    } else {
+      // Si NO hay preAuthToken, es que el usuario ya estaba dentro y pidió "volver"
+      result = await switchService(srv.servicioId);
+    }
 
     if (!result.success) {
       setError(result.error || 'No se pudo seleccionar el servicio');
@@ -27,6 +36,8 @@ const SelectServiceView = ({ servicios = [], preAuthToken, onServiceSelected }) 
     }
 
     // Paso 2 exitoso: sube userData (con JWT final ya guardado) al padre
+    localStorage.setItem('sgt_servicio_activo_nombre', srv.nombre);
+    console.log("Servicio seleccionado:", result.userData);
     onServiceSelected(result.userData);
   };
 

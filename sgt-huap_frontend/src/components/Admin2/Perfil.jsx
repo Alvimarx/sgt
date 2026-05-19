@@ -2,6 +2,7 @@
 import React from 'react';
 import { SGT_DATA } from './data';
 import { TopHeader, SGTAvatar, SGTIcon, SGTBadge } from './UIPrimitives';
+import { useAuth } from '../../context/AuthContext';
 
 // Exportamos el chip de roles por si lo necesitas en otras vistas
 export const SGTRoleChip = ({ role }) => {
@@ -9,9 +10,16 @@ export const SGTRoleChip = ({ role }) => {
   return <SGTBadge tone={tones[role] || 'neutral'} size="xs">{role}</SGTBadge>;
 };
 
+
+
 const ProfileView = ({ onGoAdmin, onBack }) => {
   const PA = SGT_DATA.PALETTE;
-  const me = SGT_DATA.PEOPLE.me;
+  const { user } = useAuth();
+  
+  // Usamos el usuario de la sesión, con fallback a data local por seguridad
+  const me = user || SGT_DATA.PEOPLE.me;
+
+  const nombreServicioActivo = localStorage.getItem('sgt_servicio_activo_nombre') || 'Servicio Asignado';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
@@ -29,7 +37,7 @@ const ProfileView = ({ onGoAdmin, onBack }) => {
         <SGTAvatar person={me} size={80} style={{ fontSize: 32 }} />
         <div style={{ textAlign: 'center' }}>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: PA.ink }}>{me.nombre}</h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Servicio de Urgencias HUAP</p>
+          <p style={{ margin: '4px 0 0 0', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>{nombreServicioActivo}</p>
           <div style={{ marginTop: 8 }}><SGTRoleChip role={me.rol} /></div>
         </div>
       </div>
