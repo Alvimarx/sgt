@@ -6,54 +6,50 @@ import com.pingeso.HUAP.Repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-
 public class Solicitud2Service {
 
     private final Solicitud2Repository solicitud2Repository;
     private final FuncionarioRepository funcionarioRepository;
     private final TipoSolicitudRepository tipoSolicitudRepository;
     private final TurnoRepository turnoRepository;
-    private final BitacoraRepository bitacoraRepository;
+    private final BitacoraService bitacoraService;
 
-    //Los estados de una solicitud
-
-
+    @Transactional
     public List<Solicitud2Entity> findAllSolicitudes() {
         return solicitud2Repository.findAll();
     }
 
-    /*
-    Getters para solicitudes en base a las FK y PK
-     */
-    //Todas las solicitudes de 1 funcionario
+    @Transactional
     public List<Solicitud2Entity> findByFuncionario(Long idFuncionario) {
         return solicitud2Repository.findByFuncionario_IdFuncionario(idFuncionario);
     }
 
-    //Todas Las solicitudes para un Receptor
+    @Transactional
     public List<Solicitud2Entity> findByFuncionarioReceptor(Long idFuncionario) {
         return solicitud2Repository.findByFuncionarioReceptor_IdFuncionario(idFuncionario);
     }
 
-    //Todas las solicitudes de un cierto tipo
+    @Transactional
     public List<Solicitud2Entity> findByTipoSolicitud(Long idTipoSolicitud) {
         return solicitud2Repository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud);
     }
 
-    //Todas las solicitudes de cierto turno
+    @Transactional
     public List<Solicitud2Entity> findByTurno(Long idTurno) {
         return solicitud2Repository.findByTurno_IdTurno(idTurno);
     }
 
-     /*
-        Modificadores y utilidades
-     */
+    /*
+       Modificadores y utilidades
+    */
 
     @Transactional
     public Solicitud2Entity crearSolicitud(CrearSolicitudDTO dto) {
@@ -63,7 +59,6 @@ public class Solicitud2Service {
         TipoSolicitudEntity tipoSolicitud = tipoSolicitudRepository.findById(dto.getIdTipoSolicitud())
                 .orElseThrow(() -> new RuntimeException("Tipo de solicitud no existe"));
 
-        // Buscamos opcionales
         FuncionarioEntity receptor = dto.getIdFuncionarioReceptor() != null ?
                 funcionarioRepository.findById(dto.getIdFuncionarioReceptor()).orElse(null) : null;
 
@@ -78,19 +73,19 @@ public class Solicitud2Service {
                 .funcionarioReceptor(receptor)
                 .tipoSolicitud(tipoSolicitud)
                 .turno(turno)
-                .turnoReceptor(turnoIntercambio) // El turno que se entrega
+                .turnoReceptor(turnoIntercambio)
                 .estado(Solicitud2Entity.EstadoSolicitud.PENDIENTE)
                 .fechaCreacion(LocalDateTime.now())
                 .fechaInicioPermiso(dto.getFechaInicioPermiso())
                 .fechaTerminoPermiso(dto.getFechaTerminoPermiso())
                 .motivo(dto.getMotivo())
-                .aceptadoReceptor(null) // Todavía no es aceptado por otro
+                .aceptadoReceptor(null)
                 .build();
 
         Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
 
-        // Registrar en Bitácora
-        registrarEvento("SOLICITUD_CREADA", guardada, funcionario);
+        agendarBitacora("SOLICITUD_CREADA", guardada.getIdSolicitud(),
+                funcionario.getIdFuncionario());
 
         return guardada;
     }
@@ -108,17 +103,18 @@ public class Solicitud2Service {
 
         if (acepta) {
             solicitud.setAceptadoReceptor(true);
-            registrarEvento("OFERTA_ACEPTADA_POR_RECEPTOR", solicitud, receptor);
-            // Queda en estado PENDIENTE esperando a la Jefatura
         } else {
             solicitud.setAceptadoReceptor(false);
             solicitud.setEstado(Solicitud2Entity.EstadoSolicitud.RECHAZADA);
-            registrarEvento("OFERTA_RECHAZADA_POR_RECEPTOR", solicitud, receptor);
         }
 
-        return solicitud2Repository.save(solicitud);
-    }
+        Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
 
+        String evento = acepta ? "OFERTA_ACEPTADA_POR_RECEPTOR" : "OFERTA_RECHAZADA_POR_RECEPTOR";
+        agendarBitacora(evento, guardada.getIdSolicitud(), receptor.getIdFuncionario());
+
+        return guardada;
+    }
 
     @Transactional
     public Solicitud2Entity cambiarEstado(Long idSolicitud, Solicitud2Entity.EstadoSolicitud nuevoEstado, Long idUsuarioAsignador) {
@@ -129,72 +125,51 @@ public class Solicitud2Service {
         Integer tipoSolicitud = solicitud.getTipoSolicitud().getTipo();
 
         if (nuevoEstado == Solicitud2Entity.EstadoSolicitud.APROBADA) {
-
-            // 3.1 Rechazar solicitudes competidoras para el mismo turno
             if (solicitud.getTurno() != null) {
                 rechazarSolicitudesCompetitivas(solicitud.getTurno().getIdTurno(), idSolicitud, asignador);
             }
 
-            // 3.2 Lógica Colateral según el Tipo de Solicitud
             if (tipoSolicitud.equals(1) || tipoSolicitud.equals(2)) {
-                // Liberar el turno
                 TurnoEntity turno = solicitud.getTurno();
                 if (turno != null) {
-                    turno.setFuncionario(null); // Lo dejamos disponible
+                    turno.setFuncionario(null);
                     turnoRepository.save(turno);
                 }
-            }
-            else if (tipoSolicitud.equals(3)) {
-                // Asignar el turno al solicitante
+            } else if (tipoSolicitud.equals(3)) {
                 TurnoEntity turno = solicitud.getTurno();
                 turno.setFuncionario(solicitud.getFuncionario());
                 turnoRepository.save(turno);
-            }
-            else if (tipoSolicitud.equals(4)) {
-                // Intercambiar turnos entre solicitante y receptor
+            } else if (tipoSolicitud.equals(4)) {
                 TurnoEntity turnoDeseado = solicitud.getTurno();
                 TurnoEntity turnoPropio = solicitud.getTurnoReceptor();
-
                 turnoDeseado.setFuncionario(solicitud.getFuncionario());
                 turnoPropio.setFuncionario(solicitud.getFuncionarioReceptor());
-
                 turnoRepository.save(turnoDeseado);
                 turnoRepository.save(turnoPropio);
             }
         }
 
         solicitud.setEstado(nuevoEstado);
-        registrarEvento("CAMBIO_ESTADO_" + nuevoEstado.name(), solicitud, asignador);
+        Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
 
-        return solicitud2Repository.save(solicitud);
+        Long idAsignador = asignador != null ? asignador.getIdFuncionario() : null;
+        agendarBitacora("CAMBIO_ESTADO_" + nuevoEstado.name(), guardada.getIdSolicitud(), idAsignador);
+
+        return guardada;
     }
 
     private void rechazarSolicitudesCompetitivas(Long idTurno, Long idSolicitudAprobada, FuncionarioEntity asignador) {
-        List<Solicitud2Entity> conflictos = solicitud2Repository.findByTurno_IdTurno(idTurno).stream()
-                .filter(s -> s.getEstado() == Solicitud2Entity.EstadoSolicitud.PENDIENTE && !s.getIdSolicitud().equals(idSolicitudAprobada))
-                .toList();
+        Long idAsignador = asignador != null ? asignador.getIdFuncionario() : null;
 
-        for (Solicitud2Entity conflicto : conflictos) {
-            conflicto.setEstado(Solicitud2Entity.EstadoSolicitud.RECHAZADA);
-            conflicto.setMotivo("Rechazo automático: Otra solicitud para este turno fue aprobada.");
-            solicitud2Repository.save(conflicto);
-            registrarEvento("RECHAZO_AUTOMATICO", conflicto, asignador);
-        }
-    }
-
-    //Hay que validar finalmente que vamos registra dentro de las bitacoras
-    private void registrarEvento(String tipoEvento, Solicitud2Entity solicitud, FuncionarioEntity actor) {
-        try {
-            BitacoraEntity log = BitacoraEntity.builder()
-                    .tipoEvento(tipoEvento)
-                    .solicitud(solicitud)
-                    .funcionario(actor)
-                    .fechaInicioAfectada(LocalDateTime.now())
-                    .build();
-            bitacoraRepository.save(log);
-        } catch (Exception e) {
-            System.err.println("Error guardando en bitácora: " + e.getMessage());
-        }
+        solicitud2Repository.findByTurno_IdTurno(idTurno).stream()
+                .filter(s -> s.getEstado() == Solicitud2Entity.EstadoSolicitud.PENDIENTE
+                        && !s.getIdSolicitud().equals(idSolicitudAprobada))
+                .forEach(conflicto -> {
+                    conflicto.setEstado(Solicitud2Entity.EstadoSolicitud.RECHAZADA);
+                    conflicto.setMotivo("Rechazo automático: Otra solicitud para este turno fue aprobada.");
+                    Solicitud2Entity guardado = solicitud2Repository.save(conflicto);
+                    agendarBitacora("RECHAZO_AUTOMATICO", guardado.getIdSolicitud(), idAsignador);
+                });
     }
 
     @Transactional
@@ -208,5 +183,18 @@ public class Solicitud2Service {
         return solicitud2Repository.save(solicitud);
     }
 
+    // Registra el evento en bitácora DESPUÉS de que la TX principal commitee,
+    // evitando lock conflicts por FKs a filas aún no commiteadas.
+    private void agendarBitacora(String evento, Long idSolicitud, Long idFuncionario) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            bitacoraService.registrarEvento(evento, idSolicitud, idFuncionario);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                bitacoraService.registrarEvento(evento, idSolicitud, idFuncionario);
+            }
+        });
+    }
 }
-

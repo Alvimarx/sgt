@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,7 @@ public class RolSistemaEntity {
 
     // --- Relaciones ---
 
+    @JsonIgnore
     @OneToMany(mappedBy = "rolSistema")
     private List<FuncionarioEntity> funcionarios = new ArrayList<>();
 

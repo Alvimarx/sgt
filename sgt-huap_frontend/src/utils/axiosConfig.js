@@ -23,6 +23,8 @@ axiosInstance.interceptors.request.use(
     (config) => {
         const token = getToken();
 
+        console.log(`[Token] ${config.method?.toUpperCase()} ${config.url} → ${token ? token.slice(0, 30) + '...' : 'NULL'}`);
+
         // Si existe token pero ya expiró, limpiar sesión y redirigir antes de hacer la petición
         if (token && !isTokenValid()) {
             console.warn('[Axios] Token expirado. Limpiando sesión antes de la petición.');
@@ -36,7 +38,7 @@ axiosInstance.interceptors.request.use(
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
         }
-        
+
         // Log para debugging (activar con VITE_DEBUG=true)
         if (import.meta.env.VITE_DEBUG === 'true') {
             console.log(`[Axios] ${config.method?.toUpperCase()} ${config.url}`, {
@@ -44,7 +46,7 @@ axiosInstance.interceptors.request.use(
                 data: config.data
             });
         }
-        
+
         return config;
     },
     (error) => {
@@ -67,10 +69,10 @@ axiosInstance.interceptors.response.use(
     },
     (error) => {
         console.error('[Axios] Response error:', error);
-        
+
         if (error.response) {
             const { status, data } = error.response;
-            
+
             // 401: Token inválido o expirado — ignorar en endpoints de login (credenciales wrongas, no sesión expirada)
             const isLoginEndpoint = error.config?.url?.includes('/login');
             if (status === 401 && !isLoginEndpoint) {
@@ -80,13 +82,13 @@ axiosInstance.interceptors.response.use(
                     window.location.href = '/login';
                 }
             }
-            
+
             // 403: Sin permisos
             if (status === 403) {
                 console.error('[Axios] Acceso denegado. Sin permisos suficientes.');
                 // Podrías mostrar un mensaje o redirigir a una página de error
             }
-            
+
             // Agregar el mensaje de error al objeto error para fácil acceso
             error.message = data?.error || data?.message || error.message;
         } else if (error.request) {
@@ -94,7 +96,7 @@ axiosInstance.interceptors.response.use(
             console.error('[Axios] No se recibió respuesta del servidor');
             error.message = 'No se pudo conectar con el servidor';
         }
-        
+
         return Promise.reject(error);
     }
 );

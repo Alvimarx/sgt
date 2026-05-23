@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -45,6 +46,7 @@ public class FuncionarioEntity {
     @Column(name = "DV", nullable = false, length = 1)
     private String dv;
 
+    @JsonIgnore
     @Column(name = "Clave", nullable = false)
     private String clave;
 
@@ -60,18 +62,22 @@ public class FuncionarioEntity {
     @JoinColumn(name = "ID_ROL_SISTEMA", nullable = false)
     private RolSistemaEntity rolSistema;
 
+    @JsonIgnore
     @Builder.Default
     @OneToMany(mappedBy = "funcionario")
     private List<TurnoEntity> turnos = new ArrayList<>();
 
+    @JsonIgnore
     @Builder.Default
     @OneToMany(mappedBy = "funcionario", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ServiciosFuncionarioEntity> serviciosFuncionario = new ArrayList<>();
 
+    @JsonIgnore
     @Builder.Default
     @OneToMany(mappedBy = "funcionario")
     private List<Solicitud2Entity> solicitudesEmitidas = new ArrayList<>();
-    
+
+    @JsonIgnore
     @Builder.Default
     @OneToMany(mappedBy = "funcionarioReceptor")
     private List<Solicitud2Entity> solicitudesRecibidas = new ArrayList<>();

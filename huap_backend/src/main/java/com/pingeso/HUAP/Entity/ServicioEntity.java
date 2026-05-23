@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
@@ -22,10 +23,11 @@ public class ServicioEntity {
     private String nombre;
 
     // Relación con Piso: 1 Servicio tiene muchos Pisos.
+    @JsonIgnore
     @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PisoEntity> pisos;
 
-    // Relación con Piso: 1 Servicio tiene muchas plantillas.
+    @JsonIgnore
     @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PlantillaEntity> plantilla;
 

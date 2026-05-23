@@ -29,7 +29,7 @@ public class BitacoraEntity {
     @JoinColumn(name = "ID_TURNO")
     private TurnoEntity turno;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_SOLICITUD")
     private Solicitud2Entity solicitud;
 

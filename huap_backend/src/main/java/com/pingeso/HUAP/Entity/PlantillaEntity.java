@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ public class PlantillaEntity {
     @Column(name = "semanas", nullable = false)
     private Byte semanas;
 
+    @JsonIgnore
     @OneToMany(
             mappedBy = "plantilla",
             cascade = CascadeType.ALL,
