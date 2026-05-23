@@ -26,7 +26,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
 };
 
 // AÑADIDO: onGoServicios a los props
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes }) => {
+const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -53,20 +53,27 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
           icon="users" 
           title="Asignación de Funcionarios" 
           desc="Asigna funcionarios a servicios y rotativas." 
-          tone="accent" 
+          tone="primary" 
           onClick={onGoAsignacion}
+        />
+        <AdminCard 
+          icon="users" 
+          title="Asignacion de turnos" 
+          desc="Asigna o quita funcionarios de turnos" 
+          tone="accent" 
+          onClick={onGoSolitudes} 
         />
         <AdminCard 
           icon="user" 
           title="Jerarquía de Funcionarios" 
           desc="Designa nuevas jefaturas al sistema." 
-          tone="accent" 
+          tone="primary" 
           onClick={onGoFuncionarios}
         />
         <AdminCard 
           icon="calendar" 
-          title="Crear Rotativa" 
-          desc="Diseña un nuevo patrón de turnos rotativos en 6 pasos." 
+          title="Crear Turno" 
+          desc="Diseña un nuevo turno." 
           tone="accent" 
           onClick={onGoRotativa} 
         />
@@ -77,6 +84,14 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
           tone="accent" 
           onClick={onGoSolitudes} 
         />
+        <AdminCard 
+          icon="home" 
+          title="Gestionar Pisos" 
+          desc="Crea, edita y elimina pisos del sistema." 
+          tone="primary" 
+          onClick={onGoPisos} 
+        />
+        
       </div>
 
       

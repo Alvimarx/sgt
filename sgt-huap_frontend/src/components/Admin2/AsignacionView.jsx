@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { SGT_DATA } from './data';
 import { SGTIcon } from './UIPrimitives';
 import { getServicios } from '../../services/servicioService';
-import { getFuncionarios, asignarServicio } from '../../services/funcionarioService';
+import { getFuncionariosSummary, asignarServicio } from '../../services/funcionarioService';
 
 const AsignacionView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
@@ -28,13 +28,15 @@ const AsignacionView = ({ onBack }) => {
     const cargarDatos = async () => {
       setLoadingDatos(true);
       
-      console.log("Iniciando petición a getServicios...");
+      console.log("Iniciando petición a getServicios y getFuncionariosSummary...");
       
-      // Llamamos SOLO a los servicios
-      const resServ = await getServicios();
+      // Ejecutamos ambas peticiones en paralelo
+      const [resServ, resFunc] = await Promise.all([
+        getServicios(),
+        getFuncionariosSummary() // Lo llamamos sin parámetros para traer a TODOS los usuarios al buscador
+      ]);
       
-      console.log("Respuesta cruda del backend:", resServ);
-      
+      // Manejo de la respuesta de Servicios
       if (resServ.success) {
         let dataServicios = [];
         if (Array.isArray(resServ.data)) {
@@ -44,15 +46,19 @@ const AsignacionView = ({ onBack }) => {
         } else if (typeof resServ.data === 'object' && resServ.data !== null) {
           dataServicios = Object.values(resServ.data);
         }
-        
-        console.log("Servicios procesados y guardados en el estado:", dataServicios);
         setServicios(dataServicios);
       } else {
         console.error("Falló la petición de servicios:", resServ.error);
       }
+
+      // Manejo de la respuesta de Funcionarios
+      if (resFunc.success) {
+        // Asumiendo que resFunc.data es directamente el List<FuncionarioSummaryDTO>
+        setFuncionarios(Array.isArray(resFunc.data) ? resFunc.data : []);
+      } else {
+        console.error("Falló la petición de funcionarios:", resFunc.error);
+      }
       
-      // Dejamos la lista de funcionarios vacía por ahora para que no rompa la vista
-      setFuncionarios([]); 
       setLoadingDatos(false);
     };
 

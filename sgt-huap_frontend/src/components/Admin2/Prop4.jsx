@@ -17,6 +17,7 @@ import SelectServiceView from './SelectServiceView';
 import CalendarView from './calendarView';
 import AsignacionView from './AsignacionView';
 import JerarquiaView from './JerarquiaView';
+import PisosView from './PisosView';
 import { useAuth } from '../../context/AuthContext';
 import { switchService } from '../../services/authService';
 
@@ -36,16 +37,15 @@ const Prop4 = ({ tweaks = {} }) => {
     if (tabId === 'me')       setCurrentView('perfil');
   };
 
-  // Paso 1 completado: guarda el preAuthToken y la lista de servicios
+  // Paso 1 completado
   const handleLoginSuccess = ({ preAuthToken, servicios }) => {
     setPreAuthToken(preAuthToken);
     setServiciosDisponibles(servicios);
     setCurrentView('select_service');
   };
 
-  // Paso 2 completado: actualiza el contexto global y navega a la app
+  // Paso 2 completado
   const handleServiceSelected = (userData) => {
-    // 💡 GUARDAMOS EL NOMBRE EN LOCALSTORAGE PARA EL PERFIL
     if (serviciosDisponibles.length > 0 && userData.servicioId) {
       const servicioReal = serviciosDisponibles.find(
         s => Number(s.servicioId || s.idServicio) === Number(userData.servicioId)
@@ -59,19 +59,18 @@ const Prop4 = ({ tweaks = {} }) => {
       auth.updateUser(userData);
     }
     
-    // Limpiamos el token temporal, pero mantenemos los servicios por si quiere cambiar luego
     setPreAuthToken(null); 
     setCurrentView('agenda');
     setActiveTab('home');
   };
 
-  // 💡 FUNCIÓN PARA VOLVER A SELECCIONAR SERVICIO DINÁMICAMENTE
+  // Volver a seleccionar servicio
   const handleBackToServiceSelection = () => {
-    // Usamos los servicios del AuthContext o los que ya teníamos en estado
-    const servicios = auth.user?.servicios || serviciosDisponibles;
+    // PROTECCIÓN CONTRA NULOS AQUÍ
+    const servicios = auth?.user?.servicios || serviciosDisponibles;
     if (servicios && servicios.length > 0) {
       setServiciosDisponibles(servicios);
-      setPreAuthToken(null); // null indica que estamos haciendo Switch, no un Login nuevo
+      setPreAuthToken(null); 
       setCurrentView('select_service');
     }
   };
@@ -84,10 +83,8 @@ const Prop4 = ({ tweaks = {} }) => {
         @keyframes sgtSlideLeft { from { transform:translateX(100%); } to { transform:translateX(0); } }
       `}</style>
 
-      {/* FLUJO INICIAL */}
-      {currentView === 'login' && (
-        <LoginView onLoginSuccess={handleLoginSuccess} />
-      )}
+      {/* FLUJOS */}
+      {currentView === 'login' && <LoginView onLoginSuccess={handleLoginSuccess} />}
 
       {currentView === 'select_service' && (
         <SelectServiceView
@@ -97,16 +94,15 @@ const Prop4 = ({ tweaks = {} }) => {
         />
       )}
 
-      {/* VISTA AGENDA (HOME ACTUAL) */}
       {currentView === 'agenda' && (
         <AgendaView 
           tweaks={tweaks} 
-          userName={auth.user?.nombre || 'Usuario'} 
-          onSwitchService={handleBackToServiceSelection} // 💡 Pasamos la prop correctamente
+          // PROTECCIÓN CONTRA NULOS AQUÍ
+          userName={auth?.user?.nombre || 'Usuario'} 
+          onSwitchService={handleBackToServiceSelection} 
         />
       )}
 
-      {/* VISTA CALENDARIO (CALENDARVIEW.JSX) */}
       {currentView === 'calendar_view' && (
         <CalendarView onBack={() => {
           setCurrentView('agenda');
@@ -114,7 +110,6 @@ const Prop4 = ({ tweaks = {} }) => {
         }} />
       )}
 
-      {/* VISTA PERFIL */}
       {currentView === 'perfil' && (
         <ProfileView 
           onGoAdmin={() => setCurrentView('admin')} 
@@ -122,11 +117,10 @@ const Prop4 = ({ tweaks = {} }) => {
             setCurrentView('agenda');
             setActiveTab('home');
           }}
-          onChangeService={handleBackToServiceSelection} // 💡 Para cambiar desde el perfil también
+          onChangeService={handleBackToServiceSelection} 
         />
       )}
       
-      {/* VISTAS DE ADMINISTRACIÓN */}
       {currentView === 'admin' && (
         <AdminDashboard 
           onBack={() => setCurrentView('perfil')} 
@@ -134,15 +128,30 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoServicios={() => setCurrentView('servicios')}
           onGoAsignacion={() => setCurrentView('asignacion')}
           onGoFuncionarios={() => setCurrentView('jerarquia')}
+          onGoPisos={() => setCurrentView('pisos')}
+          onGoSolitudes={() => setCurrentView('solicitudes')}
         />
       )}
       
+      {/* RUTAS SECUNDARIAS DEL ADMIN */}
       {currentView === 'rotativa_wizard' && <RotativaWizard onExit={() => setCurrentView('admin')} />}
       {currentView === 'servicios' && <ServiciosView onBack={() => setCurrentView('admin')} />}
       {currentView === 'asignacion' && <AsignacionView onBack={() => setCurrentView('admin')} />}
       {currentView === 'jerarquia' && <JerarquiaView onBack={() => setCurrentView('admin')} />}
+      {currentView === 'pisos' && <PisosView onBack={() => setCurrentView('admin')} />}
+      
+      {/* Fallback temporal si no tienes la vista de Solicitudes creada aún */}
+      {currentView === 'solicitudes' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: SGT_DATA.PALETTE.surface2 }}>
+          <div style={{ padding: 20, textAlign: 'center', marginTop: 50 }}>
+            <SGTIcon name="alert" size={40} color={SGT_DATA.PALETTE.ink3} />
+            <h3 style={{ color: SGT_DATA.PALETTE.ink }}>Vista en construcción</h3>
+            <button onClick={() => setCurrentView('admin')} style={{ padding: '10px 20px', marginTop: 20, borderRadius: 10, border: 'none', background: SGT_DATA.PALETTE.primary, color: '#fff' }}>Volver</button>
+          </div>
+        </div>
+      )}
 
-      {/* TAB BAR: Solo se muestra en las vistas principales */}
+      {/* TAB BAR */}
       {['agenda', 'perfil', 'calendar_view'].includes(currentView) && (
         <TabBar active={activeTab} onChange={handleTabChange} />
       )}
@@ -154,7 +163,6 @@ const Prop4 = ({ tweaks = {} }) => {
 // AGENDA Y COMPONENTES RELACIONADOS
 // ------------------------------------------------------------------
 
-// 💡 AÑADIMOS onSwitchService EN LOS PARÁMETROS DEL COMPONENTE
 const AgendaView = ({ tweaks, userName, onSwitchService }) => {
   const [filter, setFilter] = useState('todos');
   const [detailShift, setDetailShift] = useState(null);
@@ -180,18 +188,22 @@ const AgendaView = ({ tweaks, userName, onSwitchService }) => {
 
   return (
     <>
+      {/* SINTAXIS REPARADA EN TopHeader */}
       <TopHeader 
         title="Agenda" 
-        subtitle={`Hola ${userName}`}leftSlot={<button onClick={onSwitchService} 
-        style={{ 
-          background: 'transparent', 
-          border: 'none', 
-          padding: '4px 8px 4px 0', 
+        subtitle={`Hola ${userName}`} 
+        leftSlot={
+          <button onClick={onSwitchService} 
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              padding: '4px 8px 4px 0', 
               cursor: 'pointer', 
               display: 'flex', 
               alignItems: 'center' 
             }}
-          ><SGTIcon name="chevron-left" size={24} color={SGT_DATA.PALETTE.ink} />
+          >
+            <SGTIcon name="chevron-left" size={24} color={SGT_DATA.PALETTE.ink} />
           </button>
         } 
         rightSlot={
@@ -309,7 +321,7 @@ const Prop4DayRow = ({ day, defaultExpanded, onOpen, density }) => {
 
 const P2 = () => SGT_DATA.PALETTE;
 const TeamComposition = ({ team, density = 'cozy' }) => {
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, ReactSetExpanded] = React.useState(false);
   const totalSinJefe = (team.urgenciologos?.length || 0) + (team.medicos?.length || 0);
   return (
     <div>
@@ -320,7 +332,7 @@ const TeamComposition = ({ team, density = 'cozy' }) => {
           <div style={{ marginTop: 2 }}><SGTRoleChip role="JEFATURA" /></div>
         </div>
       </div>
-      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', marginTop: 8, background: 'transparent', border: `1px dashed ${P2().line}`, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: P2().ink2, fontSize: 12.5, fontWeight: 700 }}>
+      <button onClick={() => ReactSetExpanded(!expanded)} style={{ width: '100%', marginTop: 8, background: 'transparent', border: `1px dashed ${P2().line}`, borderRadius: 10, padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: P2().ink2, fontSize: 12.5, fontWeight: 700 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><SGTIcon name="users" size={14} color={P2().ink2}/> Equipo · {totalSinJefe} de 8</span>
         <SGTIcon name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={P2().ink2}/>
       </button>
@@ -335,7 +347,6 @@ const TeamComposition = ({ team, density = 'cozy' }) => {
 };
 
 const RoleGroup = ({ title, role, people, ideal }) => {
-  const gap = ideal - people.length;
   return (
     <div style={{ border: `1px solid ${P2().line}`, borderRadius: 10, background: '#fff' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderBottom: `1px solid ${P2().line2}` }}>
