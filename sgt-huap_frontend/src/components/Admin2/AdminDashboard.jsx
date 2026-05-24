@@ -25,7 +25,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos, onGoStats, onGoBitacora, onGoAuditoria }) => {
+const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -71,10 +71,17 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
         />
         <AdminCard 
           icon="calendar" 
-          title="Crear Turno" 
-          desc="Diseña un nuevo turno." 
+          title="Crear tipo de Turno" 
+          desc="Diseña un nuevo tipo de turno." 
           tone="accent" 
-          onClick={onGoRotativa} 
+          onClick={onGoTiposTurno} 
+        />
+        <AdminCard 
+          icon="calendar" 
+          title="Crear Rotativa de Turnos" 
+          desc="Crea una nueva rotativa de turnos." 
+          tone="accent" 
+          onClick={onGoPlantillas} 
         />
         <AdminCard 
           icon="alert" 

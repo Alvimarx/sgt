@@ -26,11 +26,16 @@ public class PlantillaController {
     @PostMapping
     public ResponseEntity<PlantillaDTO> crearPlantilla(@RequestBody PlantillaDTO dto) {
         PlantillaEntity entidad = plantillaService.crearPlantilla(
-                dto.getIdServicio(), 
-                dto.getNombre(), 
-                dto.getSemanas(),
-                dto.getSecuenciaDias()
+                dto.getIdServicio(),
+                dto.getNombre(),
+                dto.getSemanas()
         );
+        if (dto.getSecuenciaDias() != null && !dto.getSecuenciaDias().isEmpty()) {
+            List<Long> idsDias = dto.getSecuenciaDias().stream()
+                    .map(d -> d.getTurno() != null ? d.getTurno().getIdPlantillaTurno() : null)
+                    .toList();
+            entidad = plantillaService.establecerSecuencia(entidad.getIdPlantilla(), idsDias);
+        }
         return ResponseEntity.ok(convertToDTO(entidad));
     }
 
