@@ -12,7 +12,7 @@ export const SGTRoleChip = ({ role }) => {
 
 
 
-const ProfileView = ({ onGoAdmin, onBack }) => {
+const ProfileView = ({ onGoAdmin, onBack, onGoPersonalDash }) => {
   const PA = SGT_DATA.PALETTE;
   const { user } = useAuth();
   
@@ -42,11 +42,27 @@ const ProfileView = ({ onGoAdmin, onBack }) => {
         </div>
       </div>
 
-      <div style={{ padding: '0 16px', marginTop: 10 }}>
+      <div style={{ padding: '0 16px', marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: PA.ink3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
           Herramientas Especiales
         </div>
-        
+
+        <button onClick={onGoPersonalDash} style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+          background: '#fff', border: `1px solid ${PA.primary}`, borderRadius: 14,
+          padding: '16px', cursor: 'pointer', textAlign: 'left',
+          boxShadow: '0 4px 12px rgba(23,65,108,0.08)'
+        }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center', color: PA.primary }}>
+            <SGTIcon name="sliders" size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: PA.ink }}>Mi Dashboard</div>
+            <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>Tus horas, turnos y estadísticas</div>
+          </div>
+          <SGTIcon name="chevron-right" size={16} color={PA.primary} strokeWidth={2.5}/>
+        </button>
+
         <button onClick={onGoAdmin} style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
           background: '#fff', border: `1px solid ${PA.warn}`, borderRadius: 14,

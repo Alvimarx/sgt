@@ -385,7 +385,13 @@ export const eventosService = {
 
     // GET /bitacoras/
     getAll: async () => {
-        const response = await axiosInstance.get('/bitacoras/');
+        const response = await axiosInstance.get('/bitacoras');
+        return response.data;
+    },
+
+    // GET /bitacoras/dto  (sin circular serialization)
+    getAllDTO: async () => {
+        const response = await axiosInstance.get('/bitacoras/dto');
         return response.data;
     },
 

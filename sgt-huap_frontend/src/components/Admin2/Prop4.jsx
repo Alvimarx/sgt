@@ -18,9 +18,13 @@ import {
 // Importamos las nuevas vistas separadas
 import { useAuth } from "../../context/AuthContext";
 import AdminDashboard from "./AdminDashboard";
+import AdminStats from "./AdminStats";
 import AsignacionView from "./AsignacionView";
+import AuditoriaView from "./AuditoriaView";
+import BitacoraView from "./BitacoraView";
 import JerarquiaView from "./JerarquiaView";
 import LoginView from "./LoginView";
+import PersonalDashboard from "./PersonalDashboard";
 import ProfileView, { SGTRoleChip } from "./Perfil";
 import PisosView from "./PisosView";
 import RotativaWizard from "./Rotativa";
@@ -134,12 +138,17 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "perfil" && (
         <ProfileView
           onGoAdmin={() => setCurrentView("admin")}
+          onGoPersonalDash={() => setCurrentView("personal_dashboard")}
           onBack={() => {
             setCurrentView("agenda");
             setActiveTab("home");
           }}
           onChangeService={handleBackToServiceSelection}
         />
+      )}
+
+      {currentView === "personal_dashboard" && (
+        <PersonalDashboard onBack={() => setCurrentView("perfil")} />
       )}
 
       {currentView === "admin" && (
@@ -154,6 +163,9 @@ const Prop4 = ({ tweaks = {} }) => {
             setSolicitudesReturn("admin");
             setCurrentView("solicitudes");
           }}
+          onGoStats={() => setCurrentView("admin_stats")}
+          onGoBitacora={() => setCurrentView("bitacora")}
+          onGoAuditoria={() => setCurrentView("auditoria")}
         />
       )}
 
@@ -175,6 +187,15 @@ const Prop4 = ({ tweaks = {} }) => {
       )}
       {currentView === "solicitudes" && (
         <SolicitudesView onBack={() => setCurrentView(solicitudesReturn)} />
+      )}
+      {currentView === "admin_stats" && (
+        <AdminStats onBack={() => setCurrentView("admin")} />
+      )}
+      {currentView === "bitacora" && (
+        <BitacoraView onBack={() => setCurrentView("admin")} />
+      )}
+      {currentView === "auditoria" && (
+        <AuditoriaView onBack={() => setCurrentView("admin")} />
       )}
 
       {/* TAB BAR: Solo se muestra en las vistas principales */}

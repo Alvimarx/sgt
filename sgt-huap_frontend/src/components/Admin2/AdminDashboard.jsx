@@ -25,12 +25,11 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-// AÑADIDO: onGoServicios a los props
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos }) => {
+const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos, onGoStats, onGoBitacora, onGoAuditoria }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
       <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
           <SGTIcon name="chevron-left" size={24} color={PA.ink} />
@@ -38,7 +37,7 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
         <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Administración</div>
       </div>
 
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', flex: 1 }}>
         <p style={{ margin: '0 0 10px', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Selecciona un módulo para configurar la plataforma.</p>
 
         {/* AÑADIDO: onClick={onGoServicios} */}
@@ -84,14 +83,34 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
           tone="accent" 
           onClick={onGoSolitudes} 
         />
-        <AdminCard 
-          icon="home" 
-          title="Gestionar Pisos" 
-          desc="Crea, edita y elimina pisos del sistema." 
-          tone="primary" 
-          onClick={onGoPisos} 
+        <AdminCard
+          icon="home"
+          title="Gestionar Pisos"
+          desc="Crea, edita y elimina pisos del sistema."
+          tone="primary"
+          onClick={onGoPisos}
         />
-        
+        <AdminCard
+          icon="sliders"
+          title="Estadísticas del Servicio"
+          desc="Cobertura, turnos vacantes y horas cubiertas."
+          tone="primary"
+          onClick={onGoStats}
+        />
+        <AdminCard
+          icon="history"
+          title="Bitácora de Cambios"
+          desc="Registro cronológico de todos los eventos del sistema."
+          tone="accent"
+          onClick={onGoBitacora}
+        />
+        <AdminCard
+          icon="check-circle"
+          title="Auditoría de Asistencia"
+          desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
+          tone="accent"
+          onClick={onGoAuditoria}
+        />
       </div>
 
       

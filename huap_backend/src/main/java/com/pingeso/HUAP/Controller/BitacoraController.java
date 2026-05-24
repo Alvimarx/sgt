@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Controller;
 
+import com.pingeso.HUAP.DTO.BitacoraResponseDTO;
 import com.pingeso.HUAP.Entity.BitacoraEntity;
 import com.pingeso.HUAP.Service.BitacoraService;
 import lombok.RequiredArgsConstructor;
@@ -51,5 +52,19 @@ public class BitacoraController {
     @PostMapping
     public ResponseEntity<BitacoraEntity> create(@RequestBody BitacoraEntity evento) {
         return ResponseEntity.ok(bitacoraService.save(evento));
+    }
+
+    // ── Endpoints DTO (no modifican los existentes) ─────────────────────────
+
+    @GetMapping("/dto")
+    public ResponseEntity<List<BitacoraResponseDTO>> getAllDTO() {
+        return ResponseEntity.ok(bitacoraService.findAllDTO());
+    }
+
+    @GetMapping("/dto/{id}")
+    public ResponseEntity<BitacoraResponseDTO> getByIdDTO(@PathVariable Long id) {
+        return bitacoraService.findByIdDTO(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }
