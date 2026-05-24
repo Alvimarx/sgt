@@ -1,6 +1,11 @@
 package com.pingeso.HUAP.Controller;
 
+import com.pingeso.HUAP.DTO.PlantillaDTO;
+import com.pingeso.HUAP.DTO.PlantillaDiaDTO;
+import com.pingeso.HUAP.DTO.PlantillaTurnoDTO;
+import com.pingeso.HUAP.Entity.PlantillaDiaEntity;
 import com.pingeso.HUAP.Entity.PlantillaEntity;
+import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Service.PlantillaService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,116 +19,111 @@ public class PlantillaController {
 
     private final PlantillaService plantillaService;
 
-    public PlantillaController(
-            PlantillaService plantillaService
-    ) {
+    public PlantillaController(PlantillaService plantillaService) {
         this.plantillaService = plantillaService;
     }
 
-    // Crear plantilla
     @PostMapping
-    public ResponseEntity<PlantillaEntity> crearPlantilla(
-            @RequestParam Long idServicio,
-            @RequestParam String nombre,
-            @RequestParam Byte semanas
-    ) {
-
-        PlantillaEntity plantilla =
-                plantillaService.crearPlantilla(
-                        idServicio,
-                        nombre,
-                        semanas
-                );
-
-        return ResponseEntity.ok(plantilla);
+    public ResponseEntity<PlantillaDTO> crearPlantilla(@RequestBody PlantillaDTO dto) {
+        PlantillaEntity entidad = plantillaService.crearPlantilla(
+                dto.getIdServicio(), 
+                dto.getNombre(), 
+                dto.getSemanas(),
+                dto.getSecuenciaDias()
+        );
+        return ResponseEntity.ok(convertToDTO(entidad));
     }
 
-    // Obtener plantilla por id
     @GetMapping("/{id}")
-    public ResponseEntity<PlantillaEntity> obtenerPlantilla(
-            @PathVariable Long id
-    ) {
-
-        return ResponseEntity.ok(
-                plantillaService.obtenerPlantilla(id)
-        );
+    public ResponseEntity<PlantillaDTO> obtenerPlantilla(@PathVariable Long id) {
+        return ResponseEntity.ok(convertToDTO(plantillaService.obtenerPlantilla(id)));
     }
 
-    // Obtener todas
     @GetMapping
-    public ResponseEntity<List<PlantillaEntity>>
-    obtenerPlantillas() {
-
-        return ResponseEntity.ok(
-                plantillaService.obtenerPlantillas()
-        );
+    public ResponseEntity<List<PlantillaDTO>> obtenerPlantillas() {
+        List<PlantillaDTO> respuesta = plantillaService.obtenerPlantillas().stream()
+                .map(this::convertToDTO)
+                .toList();
+        return ResponseEntity.ok(respuesta);
     }
 
-    // Obtener por servicio
     @GetMapping("/servicio/{idServicio}")
-    public ResponseEntity<List<PlantillaEntity>>
-    obtenerPorServicio(
-            @PathVariable Long idServicio
-    ) {
-
-        return ResponseEntity.ok(
-                plantillaService.obtenerPlantillasPorServicio(
-                        idServicio
-                )
-        );
+    public ResponseEntity<List<PlantillaDTO>> obtenerPorServicio(@PathVariable Long idServicio) {
+        List<PlantillaDTO> respuesta = plantillaService.obtenerPlantillasPorServicio(idServicio).stream()
+                .map(this::convertToDTO)
+                .toList();
+        return ResponseEntity.ok(respuesta);
     }
 
-    // Actualizar plantilla
-    @PutMapping("/{id}")
-    public ResponseEntity<PlantillaEntity>
-    actualizarPlantilla(
-            @PathVariable Long id,
-            @RequestParam String nombre,
-            @RequestParam Byte semanas
-    ) {
-
-        return ResponseEntity.ok(
-                plantillaService.actualizarPlantilla(
-                        id,
-                        nombre,
-                        semanas
-                )
-        );
-    }
-
-    // Eliminar plantilla
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarPlantilla(
-            @PathVariable Long id
-    ) {
-
-        plantillaService.eliminarPlantilla(id);
-
-        return ResponseEntity.noContent().build();
-    }
-
-    // Duplicar plantilla
     @PostMapping("/{id}/duplicar")
-    public ResponseEntity<PlantillaEntity>
-    duplicarPlantilla(
-            @PathVariable Long id
-    ) {
-
-        return ResponseEntity.ok(
-                plantillaService.duplicarPlantilla(id)
-        );
+    public ResponseEntity<PlantillaDTO> duplicarPlantilla(@PathVariable Long id) {
+        return ResponseEntity.ok(convertToDTO(plantillaService.duplicarPlantilla(id)));
     }
 
-    // Validar plantilla
     @GetMapping("/{id}/validar")
-    public ResponseEntity<String> validarPlantilla(
-            @PathVariable Long id
-    ) {
-
+    public ResponseEntity<String> validarPlantilla(@PathVariable Long id) {
         plantillaService.validarPlantilla(id);
+        return ResponseEntity.ok("Plantilla válida");
+    }
 
-        return ResponseEntity.ok(
-                "Plantilla válida"
-        );
+    @PutMapping("/{id}/secuencia")
+    public ResponseEntity<PlantillaDTO> establecerSecuencia(
+            @PathVariable Long id,
+            @RequestBody List<Long> idsDias
+    ) {
+        PlantillaEntity entidad = plantillaService.establecerSecuencia(id, idsDias);
+        return ResponseEntity.ok(convertToDTO(entidad));
+    }
+
+    @GetMapping("/{id}/secuencia")
+    public ResponseEntity<List<PlantillaDiaDTO>> obtenerSecuencia(@PathVariable Long id) {
+        List<PlantillaDiaEntity> entidades = plantillaService.obtenerSecuencia(id);
+        List<PlantillaDiaDTO> respuesta = entidades.stream()
+                .map(this::convertDiaToDTO)
+                .toList();
+        return ResponseEntity.ok(respuesta);
+    }
+
+    // =========================================================================
+    // MÉTODOS DE MAPEO AUXILIARES (Entity -> DTO)
+    // =========================================================================
+    
+    private PlantillaDTO convertToDTO(PlantillaEntity entidad) {
+        if (entidad == null) return null;
+        PlantillaDTO dto = new PlantillaDTO();
+        dto.setIdPlantilla(entidad.getIdPlantilla());
+        dto.setNombre(entidad.getNombre());
+        dto.setSemanas(entidad.getSemanas());
+        
+        if (entidad.getServicio() != null) {
+            dto.setIdServicio(entidad.getServicio().getIdServicio());
+            dto.setNombreServicio(entidad.getServicio().getNombre());
+        }
+        
+        if (entidad.getSecuenciaDias() != null) {
+            dto.setSecuenciaDias(entidad.getSecuenciaDias().stream().map(this::convertDiaToDTO).toList());
+        }
+        return dto;
+    }
+
+    private PlantillaDiaDTO convertDiaToDTO(PlantillaDiaEntity entidad) {
+        if (entidad == null) return null;
+        PlantillaDiaDTO dto = new PlantillaDiaDTO();
+        dto.setDiaIndex(entidad.getDiaIndex());
+        
+        if (entidad.getPlantillaTurno() != null) {
+            PlantillaTurnoEntity turno = entidad.getPlantillaTurno();
+            PlantillaTurnoDTO turnoDTO = new PlantillaTurnoDTO(
+                turno.getIdPlantillaTurno(),
+                turno.getNombre(),
+                turno.getHoraInicio(),
+                turno.getHoraTermino(),
+                turno.getServicio() != null ? turno.getServicio().getIdServicio() : null
+            );
+            dto.setTurno(turnoDTO);
+        } else {
+            dto.setTurno(null); // Día Libre
+        }
+        return dto;
     }
 }

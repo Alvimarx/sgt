@@ -1,9 +1,10 @@
 package com.pingeso.HUAP.Service;
 
-import com.pingeso.HUAP.Entity.PlantillaEntity;
 import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
-import com.pingeso.HUAP.Repository.PlantillaRepository;
+import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Repository.PlantillaDiaRepository;
 import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
+import com.pingeso.HUAP.Repository.ServicioRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -15,166 +16,105 @@ import java.util.List;
 public class PlantillaTurnoService {
 
     private final PlantillaTurnoRepository plantillaTurnoRepository;
-    private final PlantillaRepository plantillaRepository;
+    private final PlantillaDiaRepository plantillaDiaRepository;
+    private final ServicioRepository servicioRepository;
 
     public PlantillaTurnoService(
             PlantillaTurnoRepository plantillaTurnoRepository,
-            PlantillaRepository plantillaRepository
+            PlantillaDiaRepository plantillaDiaRepository,
+            ServicioRepository servicioRepository
     ) {
         this.plantillaTurnoRepository = plantillaTurnoRepository;
-        this.plantillaRepository = plantillaRepository;
+        this.plantillaDiaRepository = plantillaDiaRepository;
+        this.servicioRepository = servicioRepository;
     }
 
-    // Agregar bloque horario a plantilla
-    public PlantillaTurnoEntity agregarBloqueHorarioPlantilla(
-            Long idPlantilla,
+    // =========================================================
+    // CRUD DEL CATÁLOGO DE TIPOS DE TURNO
+    // =========================================================
+
+    public PlantillaTurnoEntity crearTipoDeTurno(
+            String nombre,
             LocalTime horaInicio,
             LocalTime horaTermino,
-            String nombre
+            Long idServicio
     ) {
-
-        PlantillaEntity plantilla = plantillaRepository.findById(idPlantilla)
-                .orElseThrow(() ->
-                        new RuntimeException("Plantilla no encontrada")
-                );
-
         validarHorario(horaInicio, horaTermino);
 
-        if (plantillaTurnoRepository
-                .existsByPlantilla_IdPlantillaAndNombre(
-                        idPlantilla,
-                        nombre
-                )) {
+        ServicioEntity servicio = servicioRepository.findById(idServicio)
+                .orElseThrow(() -> new RuntimeException("Servicio no encontrado"));
 
-            throw new RuntimeException(
-                    "Ya existe un bloque con ese nombre en la plantilla"
-            );
+        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombre(idServicio, nombre)) {
+            throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
         }
 
-        if (existeSolapamientoHorarioPlantilla(
-                idPlantilla,
-                horaInicio,
-                horaTermino
-        )) {
-
-            throw new RuntimeException(
-                    "Existe solapamiento de horarios"
-            );
-        }
-
-        PlantillaTurnoEntity bloqueHorario =
-                new PlantillaTurnoEntity(
-                        plantilla,
-                        horaInicio,
-                        horaTermino,
-                        nombre
-                );
-
-        return plantillaTurnoRepository.save(bloqueHorario);
+        return plantillaTurnoRepository.save(new PlantillaTurnoEntity(nombre, servicio, horaInicio, horaTermino));
     }
 
-    // Obtener bloque horario por id
-    public PlantillaTurnoEntity obtenerBloqueHorarioPlantilla(
-            Long idPlantillaTurno
-    ) {
-
+    public PlantillaTurnoEntity obtenerTipoDeTurno(Long idPlantillaTurno) {
         return plantillaTurnoRepository.findById(idPlantillaTurno)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Bloque horario no encontrado"
-                        )
-                );
+                .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado"));
     }
 
-    // Obtener bloques horarios de plantilla
-    public List<PlantillaTurnoEntity>
-    obtenerBloquesHorarioPorPlantilla(Long idPlantilla) {
-
-        return plantillaTurnoRepository
-                .findByPlantilla_IdPlantilla(idPlantilla);
+    public List<PlantillaTurnoEntity> obtenerCatalogo() {
+        return plantillaTurnoRepository.findAll();
     }
 
-    // Actualizar bloque horario
-    public PlantillaTurnoEntity actualizarBloqueHorarioPlantilla(
+    /**
+     * Devuelve todos los tipos de turno que pertenecen a un servicio específico.
+     */
+    public List<PlantillaTurnoEntity> obtenerTiposDeTurnoPorServicio(Long idServicio) {
+        return plantillaTurnoRepository.findByServicio_IdServicio(idServicio);
+    }
+
+    public PlantillaTurnoEntity actualizarTipoDeTurno(
             Long idPlantillaTurno,
+            String nombre,
             LocalTime horaInicio,
-            LocalTime horaTermino,
-            String nombre
+            LocalTime horaTermino
     ) {
-
-        PlantillaTurnoEntity bloqueHorario =
-                obtenerBloqueHorarioPlantilla(idPlantillaTurno);
-
         validarHorario(horaInicio, horaTermino);
+        PlantillaTurnoEntity tipo = obtenerTipoDeTurno(idPlantillaTurno);
 
-        List<PlantillaTurnoEntity> solapamientos =
-                plantillaTurnoRepository
-                        .findByPlantilla_IdPlantillaAndHoraInicioLessThanAndHoraTerminoGreaterThan(
-                                bloqueHorario.getPlantilla().getIdPlantilla(),
-                                horaTermino,
-                                horaInicio
-                        );
+        Long idServicio = tipo.getServicio().getIdServicio();
+        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombreAndIdPlantillaTurnoNot(idServicio, nombre, idPlantillaTurno)) {
+            throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
+        }
 
-        boolean existeOtroSolapado = solapamientos.stream()
-                .anyMatch(t ->
-                        !t.getIdPlantillaTurno()
-                                .equals(idPlantillaTurno)
-                );
+        tipo.setNombre(nombre);
+        tipo.setHoraInicio(horaInicio);
+        tipo.setHoraTermino(horaTermino);
 
-        if (existeOtroSolapado) {
+        return plantillaTurnoRepository.save(tipo);
+    }
 
+    
+
+    /**
+     * Elimina un tipo de turno del catálogo.
+     * Falla si el tipo está referenciado en la secuencia de alguna rotativa.
+     */
+    public void eliminarTipoDeTurno(Long idPlantillaTurno) {
+        obtenerTipoDeTurno(idPlantillaTurno);
+
+        long usos = plantillaDiaRepository.countByPlantillaTurno_IdPlantillaTurno(idPlantillaTurno);
+        if (usos > 0) {
             throw new RuntimeException(
-                    "Existe solapamiento de horarios"
+                    "No se puede eliminar: el tipo de turno está asignado a "
+                    + usos + " día(s) en rotativas existentes."
             );
         }
 
-        bloqueHorario.setHoraInicio(horaInicio);
-        bloqueHorario.setHoraTermino(horaTermino);
-        bloqueHorario.setNombre(nombre);
-
-        return plantillaTurnoRepository.save(bloqueHorario);
+        plantillaTurnoRepository.deleteById(idPlantillaTurno);
     }
 
-    // Eliminar bloque horario
-    public void eliminarBloqueHorarioPlantilla(
-            Long idPlantillaTurno
-    ) {
+    // =========================================================
+    // VALIDACIONES PRIVADAS
+    // =========================================================
 
-        PlantillaTurnoEntity bloqueHorario =
-                obtenerBloqueHorarioPlantilla(idPlantillaTurno);
-
-        plantillaTurnoRepository.delete(bloqueHorario);
-    }
-
-    // Validar horarios
-    private void validarHorario(
-            LocalTime horaInicio,
-            LocalTime horaTermino
-    ) {
-
+    private void validarHorario(LocalTime horaInicio, LocalTime horaTermino) {
         if (horaInicio.equals(horaTermino)) {
-
-            throw new RuntimeException(
-                    "La hora de inicio y término no pueden ser iguales"
-            );
+            throw new RuntimeException("La hora de inicio y término no pueden ser iguales");
         }
-    }
-
-    // Validar solapamientos
-    public boolean existeSolapamientoHorarioPlantilla(
-            Long idPlantilla,
-            LocalTime horaInicio,
-            LocalTime horaTermino
-    ) {
-
-        List<PlantillaTurnoEntity> solapamientos =
-                plantillaTurnoRepository
-                        .findByPlantilla_IdPlantillaAndHoraInicioLessThanAndHoraTerminoGreaterThan(
-                                idPlantilla,
-                                horaTermino,
-                                horaInicio
-                        );
-
-        return !solapamientos.isEmpty();
     }
 }

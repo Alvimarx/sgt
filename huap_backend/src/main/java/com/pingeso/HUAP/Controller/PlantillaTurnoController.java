@@ -1,126 +1,103 @@
 package com.pingeso.HUAP.Controller;
 
+import com.pingeso.HUAP.DTO.PlantillaTurnoDTO;
 import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Service.PlantillaTurnoService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v2/plantillas/bloques")
+@RequestMapping("/api/v2/tipos-turno")
 @CrossOrigin("*")
 public class PlantillaTurnoController {
 
     private final PlantillaTurnoService plantillaTurnoService;
 
-    public PlantillaTurnoController(
-            PlantillaTurnoService plantillaTurnoService
-    ) {
+    public PlantillaTurnoController(PlantillaTurnoService plantillaTurnoService) {
         this.plantillaTurnoService = plantillaTurnoService;
     }
 
-    // Agregar bloque horario a plantilla
     @PostMapping
-    public ResponseEntity<PlantillaTurnoEntity>
-    agregarBloqueHorarioPlantilla(
-            @RequestParam Long idPlantilla,
-            @RequestParam LocalTime horaInicio,
-            @RequestParam LocalTime horaTermino,
-            @RequestParam String nombre
-    ) {
-
-        PlantillaTurnoEntity bloqueHorario =
-                plantillaTurnoService
-                        .agregarBloqueHorarioPlantilla(
-                                idPlantilla,
-                                horaInicio,
-                                horaTermino,
-                                nombre
-                        );
-
-        return ResponseEntity.ok(bloqueHorario);
+    public ResponseEntity<PlantillaTurnoDTO> crearTipoDeTurno(@RequestBody PlantillaTurnoDTO dto) {
+        PlantillaTurnoEntity entidad = plantillaTurnoService.crearTipoDeTurno(
+                dto.getNombre(),
+                dto.getHoraInicio(),
+                dto.getHoraTermino(),
+                dto.getIdServicio()
+        );
+        return ResponseEntity.ok(convertToDTO(entidad));
     }
 
-    // Obtener bloque horario
+
+    @GetMapping("/servicio/{servicioId}")
+    public ResponseEntity<List<PlantillaTurnoDTO>> obtenerTiposDeTurnoPorServicio(@PathVariable Long servicioId) {
+        List<PlantillaTurnoEntity> entidades = plantillaTurnoService.obtenerTiposDeTurnoPorServicio(servicioId);
+        List<PlantillaTurnoDTO> respuesta = entidades.stream()
+                .map(this::convertToDTO)
+                .toList();
+        return ResponseEntity.ok(respuesta);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<PlantillaTurnoDTO>> obtenerCatalogo() {
+        List<PlantillaTurnoEntity> entidades = plantillaTurnoService.obtenerCatalogo();
+        List<PlantillaTurnoDTO> respuesta = entidades.stream()
+                .map(this::convertToDTO)
+                .toList();
+        return ResponseEntity.ok(respuesta);
+    }
+
     @GetMapping("/{id}")
-    public ResponseEntity<PlantillaTurnoEntity>
-    obtenerBloqueHorarioPlantilla(
-            @PathVariable Long id
-    ) {
-
-        return ResponseEntity.ok(
-                plantillaTurnoService
-                        .obtenerBloqueHorarioPlantilla(id)
-        );
+    public ResponseEntity<PlantillaTurnoDTO> obtenerTipoDeTurno(@PathVariable Long id) {
+        PlantillaTurnoEntity entidad = plantillaTurnoService.obtenerTipoDeTurno(id);
+        return ResponseEntity.ok(convertToDTO(entidad));
     }
 
-    // Obtener bloques horarios de plantilla
-    @GetMapping("/plantilla/{idPlantilla}")
-    public ResponseEntity<List<PlantillaTurnoEntity>>
-    obtenerBloquesHorarioPorPlantilla(
-            @PathVariable Long idPlantilla
-    ) {
-
-        return ResponseEntity.ok(
-                plantillaTurnoService
-                        .obtenerBloquesHorarioPorPlantilla(
-                                idPlantilla
-                        )
-        );
-    }
-
-    // Actualizar bloque horario
     @PutMapping("/{id}")
-    public ResponseEntity<PlantillaTurnoEntity>
-    actualizarBloqueHorarioPlantilla(
+    public ResponseEntity<PlantillaTurnoDTO> actualizarTipoDeTurno(
             @PathVariable Long id,
-            @RequestParam LocalTime horaInicio,
-            @RequestParam LocalTime horaTermino,
-            @RequestParam String nombre
+            @RequestBody PlantillaTurnoDTO dto
     ) {
-
-        return ResponseEntity.ok(
-                plantillaTurnoService
-                        .actualizarBloqueHorarioPlantilla(
-                                id,
-                                horaInicio,
-                                horaTermino,
-                                nombre
-                        )
+        PlantillaTurnoEntity entidad = plantillaTurnoService.actualizarTipoDeTurno(
+                id,
+                dto.getNombre(),
+                dto.getHoraInicio(),
+                dto.getHoraTermino()
         );
+        return ResponseEntity.ok(convertToDTO(entidad));
     }
 
-    // Eliminar bloque horario
+    /**
+     * 6. Elimina un tipo de turno del catálogo.
+     */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void>
-    eliminarBloqueHorarioPlantilla(
-            @PathVariable Long id
-    ) {
-
-        plantillaTurnoService
-                .eliminarBloqueHorarioPlantilla(id);
-
+    public ResponseEntity<Void> eliminarTipoDeTurno(@PathVariable Long id) {
+        plantillaTurnoService.eliminarTipoDeTurno(id);
         return ResponseEntity.noContent().build();
     }
 
-    // Validar solapamiento
-    @GetMapping("/validar-solapamiento")
-    public ResponseEntity<Boolean>
-    validarSolapamientoHorarioPlantilla(
-            @RequestParam Long idPlantilla,
-            @RequestParam LocalTime horaInicio,
-            @RequestParam LocalTime horaTermino
-    ) {
+    // =========================================================================
+    // MÉTODO AUXILIAR DE MAPEO (Entity -> DTO)
+    // =========================================================================
+    /**
+     * Convierte la entidad de la Base de Datos a un JSON plano (DTO).
+     * Esto elimina los objetos Proxy de Hibernate evitando el "hibernateLazyInitializer".
+     */
+    private PlantillaTurnoDTO convertToDTO(PlantillaTurnoEntity entidad) {
+        if (entidad == null) return null;
 
-        return ResponseEntity.ok(
-                plantillaTurnoService
-                        .existeSolapamientoHorarioPlantilla(
-                                idPlantilla,
-                                horaInicio,
-                                horaTermino
-                        )
-        );
+        PlantillaTurnoDTO dto = new PlantillaTurnoDTO();
+        dto.setIdPlantillaTurno(entidad.getIdPlantillaTurno());
+        dto.setNombre(entidad.getNombre());
+        dto.setHoraInicio(entidad.getHoraInicio());
+        dto.setHoraTermino(entidad.getHoraTermino());
+    
+        if (entidad.getServicio() != null) {
+            dto.setIdServicio(entidad.getServicio().getIdServicio());
+        }
+
+        return dto;
     }
 }

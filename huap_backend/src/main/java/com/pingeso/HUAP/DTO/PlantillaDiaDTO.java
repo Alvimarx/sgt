@@ -1,0 +1,13 @@
+package com.pingeso.HUAP.DTO;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PlantillaDiaDTO {
+    private int diaIndex;
+    private PlantillaTurnoDTO turno; // Será null si es un día libre
+}

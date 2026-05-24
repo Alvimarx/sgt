@@ -1,9 +1,12 @@
 package com.pingeso.HUAP.Service;
 
+import com.pingeso.HUAP.Entity.PlantillaDiaEntity;
 import com.pingeso.HUAP.Entity.PlantillaEntity;
 import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Repository.PlantillaDiaRepository;
 import com.pingeso.HUAP.Repository.PlantillaRepository;
+import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -16,104 +19,152 @@ public class PlantillaService {
 
     private final PlantillaRepository plantillaRepository;
     private final ServicioRepository servicioRepository;
+    private final PlantillaTurnoRepository plantillaTurnoRepository;
+    private final PlantillaDiaRepository plantillaDiaRepository;
 
     public PlantillaService(
             PlantillaRepository plantillaRepository,
-            ServicioRepository servicioRepository
+            ServicioRepository servicioRepository,
+            PlantillaTurnoRepository plantillaTurnoRepository,
+            PlantillaDiaRepository plantillaDiaRepository
     ) {
         this.plantillaRepository = plantillaRepository;
         this.servicioRepository = servicioRepository;
+        this.plantillaTurnoRepository = plantillaTurnoRepository;
+        this.plantillaDiaRepository = plantillaDiaRepository;
     }
 
-    // Crear plantilla
-    public PlantillaEntity crearPlantilla(
-            Long idServicio,
-            String nombre,
-            Byte semanas
-    ) {
+    // =========================================================
+    // CRUD DE PLANTILLA
+    // =========================================================
 
-        ServicioEntity servicio = servicioRepository.findById(idServicio)
-                .orElseThrow(() ->
-                        new RuntimeException("Servicio no encontrado")
-                );
+    public PlantillaEntity crearPlantilla(Long idServicio, String nombre, Byte semanas, List<com.pingeso.HUAP.DTO.PlantillaDiaDTO> secuenciaDiasDTO) {
+    // 1. Validar el Servicio
+    ServicioEntity servicio = servicioRepository.findById(idServicio)
+            .orElseThrow(() -> new RuntimeException("Servicio no encontrado con ID: " + idServicio));
 
-        if (plantillaRepository.existsByServicio_IdServicioAndNombre(
-                idServicio,
-                nombre
-        )) {
-            throw new RuntimeException(
-                    "Ya existe una plantilla con ese nombre en el servicio"
-            );
-        }
-
-        if (semanas <= 0) {
-            throw new RuntimeException(
-                    "La cantidad de semanas debe ser mayor a 0"
-            );
-        }
-
-        PlantillaEntity plantilla = new PlantillaEntity(
-                servicio,
-                nombre,
-                semanas
-        );
-
-        return plantillaRepository.save(plantilla);
+    if (plantillaRepository.existsByServicio_IdServicioAndNombre(idServicio, nombre)) {
+        throw new RuntimeException("Ya existe una plantilla con el nombre '" + nombre + "' en este servicio");
     }
 
-    // Obtener plantilla por id
+    // 2. Instanciar la Madre
+    PlantillaEntity plantilla = new PlantillaEntity(servicio, nombre, semanas);
+
+    // 3. Si vienen días en la petición, procesarlos e indexarlos de inmediato
+    if (secuenciaDiasDTO != null && !secuenciaDiasDTO.isEmpty()) {
+        for (com.pingeso.HUAP.DTO.PlantillaDiaDTO diaDTO : secuenciaDiasDTO) {
+            PlantillaTurnoEntity turno = null;
+            
+            if (diaDTO.getTurno() != null && diaDTO.getTurno().getIdPlantillaTurno() != null) {
+                Long idTurno = diaDTO.getTurno().getIdPlantillaTurno();
+                turno = plantillaTurnoRepository.findById(idTurno)
+                        .orElseThrow(() -> new RuntimeException("Turno no encontrado: ID " + idTurno));
+                
+                // Validación de seguridad entre servicios
+                if (!turno.getServicio().getIdServicio().equals(idServicio)) {
+                    throw new RuntimeException("Seguridad: El turno '" + turno.getNombre() + "' no pertenece a este servicio.");
+                }
+            }
+            
+            // Construir el hijo asociándole la plantilla madre
+            PlantillaDiaEntity nuevoDia = new PlantillaDiaEntity(plantilla, diaDTO.getDiaIndex(), turno);
+            plantilla.getSecuenciaDias().add(nuevoDia);
+        }
+    }
+
+    // 4. Guardar cascada completa (Madre + Hijos)
+    PlantillaEntity guardada = plantillaRepository.save(plantilla);
+
+    // 5. Validar la regla matemática final (Semanas * 7) si se enviaron días
+    if (secuenciaDiasDTO != null && !secuenciaDiasDTO.isEmpty()) {
+        validarPlantilla(guardada.getIdPlantilla());
+    }
+
+    return guardada;
+}
+
     public PlantillaEntity obtenerPlantilla(Long idPlantilla) {
-
         return plantillaRepository.findById(idPlantilla)
-                .orElseThrow(() ->
-                        new RuntimeException("Plantilla no encontrada")
-                );
+                .orElseThrow(() -> new RuntimeException("Plantilla no encontrada"));
     }
 
-    // Obtener todas las plantillas
     public List<PlantillaEntity> obtenerPlantillas() {
         return plantillaRepository.findAll();
     }
 
-    // Obtener plantillas por servicio
-    public List<PlantillaEntity> obtenerPlantillasPorServicio(
-            Long idServicio
-    ) {
+    public List<PlantillaEntity> obtenerPlantillasPorServicio(Long idServicio) {
         return plantillaRepository.findByServicio_IdServicio(idServicio);
     }
 
-    // Actualizar plantilla
-    public PlantillaEntity actualizarPlantilla(
-            Long idPlantilla,
-            String nombre,
-            Byte semanas
-    ) {
-
+    public PlantillaEntity actualizarPlantilla(Long idPlantilla, String nombre, Byte semanas) {
         PlantillaEntity plantilla = obtenerPlantilla(idPlantilla);
 
         if (semanas <= 0) {
-            throw new RuntimeException(
-                    "La cantidad de semanas debe ser mayor a 0"
-            );
+            throw new RuntimeException("La cantidad de semanas debe ser mayor a 0");
         }
 
         plantilla.setNombre(nombre);
         plantilla.setSemanas(semanas);
+        return plantillaRepository.save(plantilla);
+    }
+
+    public void eliminarPlantilla(Long idPlantilla) {
+        plantillaRepository.delete(obtenerPlantilla(idPlantilla));
+    }
+
+    // =========================================================
+    // GESTIÓN DE LA SECUENCIA (PATRÓN DE DÍAS)
+    // =========================================================
+
+    /**
+     * Un valor null en la lista indica un día libre (no generará TurnoEntity).
+     */
+    public PlantillaEntity establecerSecuencia(Long idPlantilla, List<Long> idsDias) {
+        PlantillaEntity plantilla = obtenerPlantilla(idPlantilla);
+
+        // 1. Limpiar la secuencia actual
+        plantilla.getSecuenciaDias().clear();
+        plantillaRepository.flush();
+
+        // 2. Insertar la nueva secuencia con validación de seguridad
+        for (Long idTipo : idsDias) {
+            PlantillaTurnoEntity tipo = null;
+            if (idTipo != null) {
+                tipo = plantillaTurnoRepository.findById(idTipo)
+                        .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado: ID " + idTipo));
+
+                if (!tipo.getServicio().getIdServicio().equals(plantilla.getServicio().getIdServicio())) {
+                    throw new RuntimeException("Seguridad: El turno '" + tipo.getNombre() + 
+                            "' no pertenece al servicio (" + plantilla.getServicio().getNombre() + ") de esta plantilla.");
+                }
+            }
+            // Añadir el día de forma segura usando la instancia actual de la lista para calcular el index
+            plantilla.getSecuenciaDias().add(
+                    new PlantillaDiaEntity(plantilla, plantilla.getSecuenciaDias().size(), tipo)
+            );
+        }
 
         return plantillaRepository.save(plantilla);
     }
 
-    // Eliminar plantilla
-    public void eliminarPlantilla(Long idPlantilla) {
-
-        PlantillaEntity plantilla = obtenerPlantilla(idPlantilla);
-
-        plantillaRepository.delete(plantilla);
+    /**
+     * Devuelve la secuencia de días de una plantilla ordenada por diaIndex.
+     * Las entradas con plantillaTurno == null representan días libres.
+     */
+    public List<PlantillaDiaEntity> obtenerSecuencia(Long idPlantilla) {
+        obtenerPlantilla(idPlantilla);
+        return plantillaDiaRepository.findByPlantilla_IdPlantillaOrderByDiaIndexAsc(idPlantilla);
     }
 
-    // Duplicar plantilla
-    public PlantillaEntity duplicarPlantilla(Long idPlantilla) {
+    // =========================================================
+    // OPERACIONES COMPUESTAS
+    // =========================================================
 
+    /**
+     * Crea una copia de la plantilla preservando su secuencia de días completa.
+     * Los días libres (null) se preservan en la copia.
+     */
+    public PlantillaEntity duplicarPlantilla(Long idPlantilla) {
         PlantillaEntity original = obtenerPlantilla(idPlantilla);
 
         PlantillaEntity copia = new PlantillaEntity(
@@ -121,37 +172,40 @@ public class PlantillaService {
                 original.getNombre() + " - copia",
                 original.getSemanas()
         );
+        // Persiste primero para obtener el ID antes de crear los PlantillaDia hijos.
+        plantillaRepository.save(copia);
 
-        for (PlantillaTurnoEntity turno : original.getTurnos()) {
-
-            PlantillaTurnoEntity nuevoTurno =
-                    new PlantillaTurnoEntity();
-
-            nuevoTurno.setNombre(turno.getNombre());
-            nuevoTurno.setHoraInicio(turno.getHoraInicio());
-            nuevoTurno.setHoraTermino(turno.getHoraTermino());
-
-            copia.addTurno(nuevoTurno);
+        for (PlantillaDiaEntity dia : original.getSecuenciaDias()) {
+            copia.getSecuenciaDias().add(
+                    new PlantillaDiaEntity(copia, copia.getSecuenciaDias().size(), dia.getPlantillaTurno())
+            );
         }
 
         return plantillaRepository.save(copia);
     }
 
-    // Validar plantilla
+    /**
+     * Valida que la plantilla tenga una secuencia coherente con las semanas declaradas y sea apta para generar turnos. Lanza excepciones con mensajes claros si encuentra problemas.
+     */
     public void validarPlantilla(Long idPlantilla) {
-
         PlantillaEntity plantilla = obtenerPlantilla(idPlantilla);
 
         if (plantilla.getSemanas() <= 0) {
-            throw new RuntimeException(
-                    "La plantilla debe tener al menos una semana"
-            );
+            throw new RuntimeException("La plantilla debe tener al menos una semana");
         }
 
-        if (plantilla.getTurnos().isEmpty()) {
+        if (plantilla.getSecuenciaDias().isEmpty()) {
+            throw new RuntimeException("La plantilla no tiene días configurados en su patrón");
+        }
+
+        int esperado = plantilla.getSemanas() * 7;
+        int actual = plantilla.getSecuenciaDias().size();
+        if (actual != esperado) {
             throw new RuntimeException(
-                    "La plantilla debe tener al menos un turno"
+                    "El patrón tiene " + actual + " días pero se esperan " + esperado
+                    + " (" + plantilla.getSemanas() + " semana/s × 7 días)"
             );
         }
     }
+
 }

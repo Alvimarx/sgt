@@ -3,29 +3,16 @@ package com.pingeso.HUAP.Repository;
 import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-
-import java.time.LocalTime;
 import java.util.List;
 
 @Repository
-public interface PlantillaTurnoRepository
-        extends JpaRepository<PlantillaTurnoEntity, Long> {
+public interface PlantillaTurnoRepository extends JpaRepository<PlantillaTurnoEntity, Long> {
 
-    // Obtener todos los turnos de una plantilla
-    List<PlantillaTurnoEntity>
-    findByPlantilla_IdPlantilla(Long idPlantilla);
+    boolean existsByServicio_IdServicioAndNombre(Long idServicio, String nombre);
 
-    // Validar nombres repetidos dentro de una plantilla
-    boolean existsByPlantilla_IdPlantillaAndNombre(
-            Long idPlantilla,
-            String nombre
-    );
+    boolean existsByServicio_IdServicioAndNombreAndIdPlantillaTurnoNot(Long idServicio, String nombre, Long idPlantillaTurno);
 
-    // Buscar posibles solapamientos
-    List<PlantillaTurnoEntity>
-    findByPlantilla_IdPlantillaAndHoraInicioLessThanAndHoraTerminoGreaterThan(
-            Long idPlantilla,
-            LocalTime horaTermino,
-            LocalTime horaInicio
-    );
+    // Busca todos los tipos de turno asociados a un ID de servicio específico
+    List<PlantillaTurnoEntity> findByServicio_IdServicio(Long idServicio);
+
 }

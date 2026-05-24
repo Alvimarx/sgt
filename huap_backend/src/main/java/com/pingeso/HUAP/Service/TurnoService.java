@@ -275,13 +275,22 @@ public class TurnoService {
 
         // --- 4. Médico Asignado ---
         if (t.getFuncionario() != null) {
-            m.put("idMedico", t.getFuncionario().getIdFuncionario());
-            m.put("nombreMedico", t.getFuncionario().getNombre() + " " + t.getFuncionario().getApelPat());
-            m.put("rutMedico", t.getFuncionario().getRut());
+            m.put("idFuncionario", t.getFuncionario().getIdFuncionario());
+            m.put("nombreFuncionario", t.getFuncionario().getNombre() + " " + t.getFuncionario().getApelPat());
+            m.put("rutFuncionario", t.getFuncionario().getRut());
         } else {
-            m.put("idMedico", null);
-            m.put("nombreMedico", "Sin Asignar");
-            m.put("rutMedico", null);
+            m.put("idFuncionario", null);
+            m.put("nombreFuncionario", "Sin Asignar");
+            m.put("rutFuncionario", null);
+        }
+
+        // Plantilla
+        if (t.getPlantilla() != null) {
+            m.put("idPlantilla", t.getPlantilla().getIdPlantilla());
+            m.put("nombrePlantilla", t.getPlantilla().getNombre());
+        } else {
+            m.put("idPlantilla", null);
+            m.put("nombrePlantilla", "Sin Plantilla");
         }
 
         return m;

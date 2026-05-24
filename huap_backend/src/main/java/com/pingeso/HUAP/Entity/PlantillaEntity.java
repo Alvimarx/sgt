@@ -29,26 +29,13 @@ public class PlantillaEntity {
     private Byte semanas;
 
     @JsonIgnore
-    @OneToMany(
-            mappedBy = "plantilla",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
-    private List<PlantillaTurnoEntity> turnos = new ArrayList<>();
+    @OneToMany(mappedBy = "plantilla", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("diaIndex ASC")
+    private List<PlantillaDiaEntity> secuenciaDias = new ArrayList<>();
 
     public PlantillaEntity(ServicioEntity servicio, String nombre, Byte semanas) {
         this.servicio = servicio;
         this.nombre = nombre;
         this.semanas = semanas;
-    }
-
-    public void addTurno(PlantillaTurnoEntity turno) {
-        turnos.add(turno);
-        turno.setPlantilla(this);
-    }
-    
-    public void removeTurno(PlantillaTurnoEntity turno) {
-        turnos.remove(turno);
-        turno.setPlantilla(null);
     }
 }

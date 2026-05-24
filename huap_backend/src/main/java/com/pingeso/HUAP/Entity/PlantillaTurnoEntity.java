@@ -5,7 +5,10 @@ import lombok.*;
 import java.time.LocalTime;
 
 @Entity
-@Table(name = "plantilla_turno")
+@Table(
+    name = "plantilla_turno",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"id_servicio", "nombre"}) // Evita que haya dos tipos de turno con el mismo nombre dentro del mismo servicio
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -16,9 +19,8 @@ public class PlantillaTurnoEntity {
     @Column(name = "id_plantilla_turno")
     private Long idPlantillaTurno;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_plantilla", nullable = false)
-    private PlantillaEntity plantilla;
+    @Column(name = "nombre", nullable = false, length = 100)
+    private String nombre;
 
     @Column(name = "hora_inicio", nullable = false)
     private LocalTime horaInicio;
@@ -26,18 +28,14 @@ public class PlantillaTurnoEntity {
     @Column(name = "hora_termino", nullable = false)
     private LocalTime horaTermino;
 
-    @Column(name = "nombre", nullable = false, length = 255)
-    private String nombre;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_servicio", nullable = false)
+    private ServicioEntity servicio;
 
-    public PlantillaTurnoEntity(
-            PlantillaEntity plantilla,
-            LocalTime horaInicio,
-            LocalTime horaTermino,
-            String nombre
-    ) {
-        this.plantilla = plantilla;
+    public PlantillaTurnoEntity(String nombre, ServicioEntity servicio, LocalTime horaInicio, LocalTime horaTermino) {
+        this.nombre = nombre;
+        this.servicio = servicio;
         this.horaInicio = horaInicio;
         this.horaTermino = horaTermino;
-        this.nombre = nombre;
     }
 }
