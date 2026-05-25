@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Controller;
 
+import com.pingeso.HUAP.DTO.PisoRequestDTO;
 import com.pingeso.HUAP.Entity.PisoEntity;
 import com.pingeso.HUAP.Service.PisoService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,15 +19,14 @@ public class PisoController {
 
     // Crear piso
     @PostMapping
-    public ResponseEntity<PisoEntity> crearPiso(
-            @RequestParam Long idServicio,
-            @RequestParam String nombre
-    ) {
-
-        PisoEntity piso = pisoService.crearPiso(idServicio, nombre);
+        public ResponseEntity<PisoEntity> crearPiso(@RequestBody PisoRequestDTO request) {
+        PisoEntity piso = pisoService.crearPiso(
+                request.getIdServicio(),
+                request.getNombre()
+        );
 
         return ResponseEntity.ok(piso);
-    }
+        }
 
     // Obtener piso por id
     @GetMapping("/{id}")

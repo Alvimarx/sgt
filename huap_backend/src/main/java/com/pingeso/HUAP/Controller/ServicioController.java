@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Map;
 
@@ -77,5 +79,24 @@ public class ServicioController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok().body(Map.of("message", "Servicio eliminado exitosamente"));
+    }
+
+    @GetMapping("/buscar")
+    public ResponseEntity<?> buscarServicios(
+            @RequestParam(required = false) String nombre,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(servicioService.buscarServicios(nombre, pageable));
+    }
+
+    @GetMapping("/paginado")
+    public ResponseEntity<?> listarServiciosPaginados(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(servicioService.getServiciosPaginados(pageable));
     }
 }

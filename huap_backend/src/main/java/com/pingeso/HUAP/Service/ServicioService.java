@@ -6,7 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -114,6 +115,20 @@ public class ServicioService {
         }
     }
 
+
+    public Page<Map<String, Object>> getServiciosPaginados(Pageable pageable) {
+        return servicioRepository.findAll(pageable)
+                .map(this::convertirServicioAMap);
+    }
+
+    public Page<Map<String, Object>> buscarServicios(String nombre, Pageable pageable) {
+        if (nombre == null || nombre.trim().isEmpty()) {
+            return getServiciosPaginados(pageable);
+        }
+
+        return servicioRepository.findByNombreContainingIgnoreCase(nombre.trim(), pageable)
+                .map(this::convertirServicioAMap);
+    }
     // FALTA AGREGAR MÉTODO DE ELIMINACIÓN CON CASCADA MANUAL SI ES NECESARIO PARA LIMPIAR EL SERVICIO
 
     
