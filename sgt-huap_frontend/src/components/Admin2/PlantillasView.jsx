@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { plantillasService, tiposTurnoService, formatHora } from '../../services/plantillasService';
+import { SGTIcon } from './UIPrimitives';
 
 // ─── Paleta ─────────────────────────────────────────────────────────────────
 const PA = {
@@ -483,7 +484,7 @@ function PlantillaCard({ plantilla, onEdit, onDuplicate, onDelete }) {
 }
 
 // ─── Vista principal ─────────────────────────────────────────────────────────
-export default function PlantillasView() {
+export default function PlantillasView({ onBack }) {
     const { user } = useAuth();
 
     const [plantillas,  setPlantillas]  = useState([]);
@@ -545,53 +546,47 @@ export default function PlantillasView() {
     // Modo editor abierto
     if (editing !== null) {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <button
-                    onClick={() => setEditing(null)}
-                    style={{
-                        alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '6px 14px', borderRadius: 8, border: `1px solid ${PA.line}`,
-                        background: 'none', color: PA.ink2, fontSize: 13, cursor: 'pointer',
-                    }}
-                >
-                    <X size={13} /> Volver a la lista
-                </button>
-
-                {tipos.length === 0 && (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13,
-                    }}>
-                        <AlertCircle size={14} />
-                        No hay tipos de turno definidos para este servicio. Créalos primero en «Tipos de Turno».
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
+                <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button onClick={() => setEditing(null)} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                        <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                    </button>
+                    <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>
+                        {editing === 'new' ? 'Nueva rotativa' : `Editando: ${editing.nombre}`}
                     </div>
-                )}
-
-                <PlantillaEditor
-                    plantilla={editing === 'new' ? null : editing}
-                    tipos={tipos}
-                    servicioId={user?.servicioId}
-                    onSaved={handleSaved}
-                    onCancel={() => setEditing(null)}
-                />
+                </div>
+                <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {tipos.length === 0 && (
+                        <div style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13,
+                        }}>
+                            <AlertCircle size={14} />
+                            No hay tipos de turno definidos para este servicio. Créalos primero en «Tipos de Turno».
+                        </div>
+                    )}
+                    <PlantillaEditor
+                        plantilla={editing === 'new' ? null : editing}
+                        tipos={tipos}
+                        servicioId={user?.servicioId}
+                        onSaved={handleSaved}
+                        onCancel={() => setEditing(null)}
+                    />
+                </div>
             </div>
         );
     }
 
     // Vista de lista
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
 
-            {/* Encabezado */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                    <h2 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: PA.ink }}>
-                        Rotativas (Plantillas)
-                    </h2>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: PA.ink3 }}>
-                        Patrones cíclicos de turnos para este servicio
-                    </p>
-                </div>
+            {/* Header con botón volver */}
+            <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                    <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                </button>
+                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink, flex: 1 }}>Rotativas</div>
                 <button
                     onClick={() => setEditing('new')}
                     style={{
@@ -605,60 +600,65 @@ export default function PlantillasView() {
                 </button>
             </div>
 
-            {/* Error global */}
-            {error && (
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13,
-                }}>
-                    <AlertCircle size={15} />
-                    {error}
-                    <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: PA.warn }}>
-                        <X size={14} />
-                    </button>
-                </div>
-            )}
+            {/* Contenido scrollable */}
+            <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Lista de plantillas */}
-            {loading ? (
-                <div style={{ padding: 48, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
-                    Cargando…
-                </div>
-            ) : plantillas.length === 0 ? (
-                <div style={{
-                    background: PA.surface, border: `1px solid ${PA.line}`, borderRadius: 14,
-                    padding: 56, textAlign: 'center',
-                }}>
-                    <CalendarDays size={40} style={{ color: PA.ink3, marginBottom: 14 }} />
-                    <p style={{ margin: '0 0 16px', color: PA.ink3, fontSize: 14 }}>
-                        No hay rotativas definidas para este servicio.
-                    </p>
-                    <button
-                        onClick={() => setEditing('new')}
-                        style={{
-                            padding: '9px 20px', borderRadius: 10,
-                            background: PA.primary, color: '#fff', border: 'none',
-                            fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                        }}
-                    >
-                        Crear la primera rotativa
-                    </button>
-                </div>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-                    {plantillas.map(p => (
-                        <PlantillaCard
-                            key={p.idPlantilla}
-                            plantilla={p}
-                            onEdit={setEditing}
-                            onDuplicate={handleDuplicate}
-                            onDelete={setConfirmDel}
-                        />
-                    ))}
-                </div>
-            )}
+                {/* Error global */}
+                {error && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13,
+                    }}>
+                        <AlertCircle size={15} />
+                        {error}
+                        <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: PA.warn }}>
+                            <X size={14} />
+                        </button>
+                    </div>
+                )}
 
-            {/* Diálogo de confirmación de eliminación */}
+                {/* Lista de plantillas */}
+                {loading ? (
+                    <div style={{ padding: 48, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
+                        Cargando…
+                    </div>
+                ) : plantillas.length === 0 ? (
+                    <div style={{
+                        background: PA.surface, border: `1px solid ${PA.line}`, borderRadius: 14,
+                        padding: 56, textAlign: 'center',
+                    }}>
+                        <CalendarDays size={40} style={{ color: PA.ink3, marginBottom: 14 }} />
+                        <p style={{ margin: '0 0 16px', color: PA.ink3, fontSize: 14 }}>
+                            No hay rotativas definidas para este servicio.
+                        </p>
+                        <button
+                            onClick={() => setEditing('new')}
+                            style={{
+                                padding: '9px 20px', borderRadius: 10,
+                                background: PA.primary, color: '#fff', border: 'none',
+                                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                            }}
+                        >
+                            Crear la primera rotativa
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                        {plantillas.map(p => (
+                            <PlantillaCard
+                                key={p.idPlantilla}
+                                plantilla={p}
+                                onEdit={setEditing}
+                                onDuplicate={handleDuplicate}
+                                onDelete={setConfirmDel}
+                            />
+                        ))}
+                    </div>
+                )}
+
+            </div>
+
+            {/* Diálogo de confirmación de eliminación (overlay fijo, fuera del scroll) */}
             {confirmDel && (
                 <div style={{
                     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',

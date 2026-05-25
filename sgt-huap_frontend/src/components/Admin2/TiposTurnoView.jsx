@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Clock, Plus, Pencil, Trash2, X, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { tiposTurnoService, formatHora } from '../../services/plantillasService';
+import { SGTIcon } from './UIPrimitives';
 
 // ─── Paleta de colores reutilizable ────────────────────────────────────────
 const PA = {
@@ -214,7 +215,7 @@ function ConfirmDelete({ turno, onConfirm, onCancel, deleting }) {
 }
 
 // ─── Vista principal ─────────────────────────────────────────────────────────
-export default function TiposTurnoView() {
+export default function TiposTurnoView({ onBack }) {
     const { user } = useAuth();
 
     const [tipos,       setTipos]       = useState([]);
@@ -279,18 +280,14 @@ export default function TiposTurnoView() {
     const closeForm  = () => { setEditing(null); setShowForm(false); };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
 
-            {/* Encabezado */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                <div>
-                    <h2 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: PA.ink }}>
-                        Tipos de Turno
-                    </h2>
-                    <p style={{ margin: '4px 0 0', fontSize: 13, color: PA.ink3 }}>
-                        Catálogo de turnos disponibles para este servicio
-                    </p>
-                </div>
+            {/* Header con botón volver */}
+            <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                    <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                </button>
+                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink, flex: 1 }}>Tipos de Turno</div>
                 <button
                     onClick={openCreate}
                     style={{
@@ -304,84 +301,89 @@ export default function TiposTurnoView() {
                 </button>
             </div>
 
-            {/* Error global */}
-            {error && (
-                <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13
-                }}>
-                    <AlertCircle size={15} />
-                    {error}
-                    <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: PA.warn }}>
-                        <X size={14} />
-                    </button>
-                </div>
-            )}
+            {/* Contenido scrollable */}
+            <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Formulario de creación/edición */}
-            {showForm && (
-                <TurnoForm
-                    inicial={editing}
-                    onSave={handleSave}
-                    onCancel={closeForm}
-                    saving={saving}
-                />
-            )}
-
-            {/* Tabla de tipos */}
-            <div style={{ background: PA.surface, borderRadius: 14, border: `1px solid ${PA.line}`, overflow: 'hidden' }}>
-                {loading ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
-                        Cargando…
-                    </div>
-                ) : tipos.length === 0 ? (
-                    <div style={{ padding: 48, textAlign: 'center' }}>
-                        <Clock size={36} style={{ color: PA.ink3, marginBottom: 12 }} />
-                        <p style={{ margin: 0, color: PA.ink3, fontSize: 14 }}>
-                            No hay tipos de turno definidos para este servicio.
-                        </p>
-                        <button
-                            onClick={openCreate}
-                            style={{
-                                marginTop: 14, padding: '8px 18px', borderRadius: 8,
-                                background: PA.primary, color: '#fff', border: 'none',
-                                fontSize: 13, cursor: 'pointer'
-                            }}
-                        >
-                            Crear el primero
+                {/* Error global */}
+                {error && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13
+                    }}>
+                        <AlertCircle size={15} />
+                        {error}
+                        <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: PA.warn }}>
+                            <X size={14} />
                         </button>
                     </div>
-                ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr style={{ background: PA.surface2, borderBottom: `1px solid ${PA.line}` }}>
-                                {['Turno', 'Hora inicio', 'Hora término', 'Acciones'].map(h => (
-                                    <th key={h} style={{
-                                        padding: '10px 16px', textAlign: 'left',
-                                        fontSize: 11, fontWeight: 700, color: PA.ink3,
-                                        textTransform: 'uppercase', letterSpacing: '0.05em'
-                                    }}>
-                                        {h}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {tipos.map((t, i) => (
-                                <TurnoRow
-                                    key={t.idPlantillaTurno}
-                                    turno={t}
-                                    index={i}
-                                    onEdit={openEdit}
-                                    onDelete={setConfirmDel}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
                 )}
+
+                {/* Formulario de creación/edición */}
+                {showForm && (
+                    <TurnoForm
+                        inicial={editing}
+                        onSave={handleSave}
+                        onCancel={closeForm}
+                        saving={saving}
+                    />
+                )}
+
+                {/* Tabla de tipos */}
+                <div style={{ background: PA.surface, borderRadius: 14, border: `1px solid ${PA.line}`, overflow: 'hidden' }}>
+                    {loading ? (
+                        <div style={{ padding: 40, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
+                            Cargando…
+                        </div>
+                    ) : tipos.length === 0 ? (
+                        <div style={{ padding: 48, textAlign: 'center' }}>
+                            <Clock size={36} style={{ color: PA.ink3, marginBottom: 12 }} />
+                            <p style={{ margin: 0, color: PA.ink3, fontSize: 14 }}>
+                                No hay tipos de turno definidos para este servicio.
+                            </p>
+                            <button
+                                onClick={openCreate}
+                                style={{
+                                    marginTop: 14, padding: '8px 18px', borderRadius: 8,
+                                    background: PA.primary, color: '#fff', border: 'none',
+                                    fontSize: 13, cursor: 'pointer'
+                                }}
+                            >
+                                Crear el primero
+                            </button>
+                        </div>
+                    ) : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ background: PA.surface2, borderBottom: `1px solid ${PA.line}` }}>
+                                    {['Turno', 'Hora inicio', 'Hora término', 'Acciones'].map(h => (
+                                        <th key={h} style={{
+                                            padding: '10px 16px', textAlign: 'left',
+                                            fontSize: 11, fontWeight: 700, color: PA.ink3,
+                                            textTransform: 'uppercase', letterSpacing: '0.05em'
+                                        }}>
+                                            {h}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {tipos.map((t, i) => (
+                                    <TurnoRow
+                                        key={t.idPlantillaTurno}
+                                        turno={t}
+                                        index={i}
+                                        onEdit={openEdit}
+                                        onDelete={setConfirmDel}
+                                    />
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
             </div>
 
-            {/* Diálogo de confirmación */}
+            {/* Diálogo de confirmación (overlay fijo, fuera del scroll) */}
             {confirmDel && (
                 <ConfirmDelete
                     turno={confirmDel}

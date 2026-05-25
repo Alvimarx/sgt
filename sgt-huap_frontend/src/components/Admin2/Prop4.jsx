@@ -122,7 +122,6 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "agenda" && (
         <AgendaView
           tweaks={tweaks}
-          // PROTECCIÓN CONTRA NULOS AQUÍ
           userName={auth?.user?.nombre || "Usuario"}
           onSwitchService={handleBackToServiceSelection}
         />
@@ -202,19 +201,11 @@ const Prop4 = ({ tweaks = {} }) => {
         <AuditoriaView onBack={() => setCurrentView("admin")} />
       )}
       {currentView === "tipos_turno" && (
-        <AdminViewWrapper title="Tipos de Turno" onBack={() => setCurrentView("admin")}
->
-          <TiposTurnoView />
-        </AdminViewWrapper>
+        <TiposTurnoView onBack={() => setCurrentView("admin")} />
       )}
       {currentView === "plantillas" && (
-        <AdminViewWrapper
-          title="Rotativas"
-          onBack={() => setCurrentView("admin")}
-        >
-          <PlantillasView />
-        </AdminViewWrapper>
-      )}
+        <PlantillasView onBack={() => setCurrentView("admin")}/>)
+      }
 
       {/* TAB BAR: Solo se muestra en las vistas principales */}
       {["agenda", "perfil", "calendar_view", "solicitudes"].includes(
@@ -944,35 +935,6 @@ const ShiftDetail = ({ shift }) => {
           Acciones
         </div>
         <ShiftActions shift={shift} />
-      </div>
-    </div>
-  );
-};
-
-// Wrapper genérico para vistas administrativas
-const AdminViewWrapper = ({ title, onBack, children }) => {
-  const PA = SGT_DATA.PALETTE;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        padding: "12px 16px", borderBottom: `1px solid ${PA.line}`,
-        background: PA.surface, flexShrink: 0,
-      }}>
-        <button
-          onClick={onBack}
-          style={{
-            display: "flex", alignItems: "center",
-            background: "none", border: "none", cursor: "pointer",
-            padding: 4, color: PA.ink2,
-          }}
-        >
-          <SGTIcon name="chevron-left" size={22} color={PA.ink2} />
-        </button>
-        <span style={{ fontWeight: 700, fontSize: 16, color: PA.ink }}>{title}</span>
-      </div>
-      <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-        {children}
       </div>
     </div>
   );

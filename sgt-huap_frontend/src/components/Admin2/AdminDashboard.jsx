@@ -25,7 +25,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas }) => {
+const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -57,7 +57,7 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
         />
         <AdminCard 
           icon="users" 
-          title="Asignacion de turnos" 
+          title="Asignación de turnos" 
           desc="Asigna o quita funcionarios de turnos" 
           tone="accent" 
           onClick={onGoSolitudes} 
@@ -78,11 +78,19 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
         />
         <AdminCard 
           icon="calendar" 
-          title="Crear Rotativa de Turnos" 
-          desc="Crea una nueva rotativa de turnos." 
+          title="Crear Rotativa" 
+          desc="Diseña una nueva rotativa." 
           tone="accent" 
           onClick={onGoPlantillas} 
         />
+        <AdminCard 
+          icon="calendar" 
+          title="Crear Planificación Mensual" 
+          desc="Diseña una nueva planificación mensual." 
+          tone="accent" 
+          onClick={onGoPlanificacion} 
+        />
+
         <AdminCard 
           icon="alert" 
           title="Evaluar Solicitudes" 

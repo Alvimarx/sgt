@@ -38,50 +38,44 @@ public class PlantillaService {
     // CRUD DE PLANTILLA
     // =========================================================
 
-    public PlantillaEntity crearPlantilla(Long idServicio, String nombre, Byte semanas, List<com.pingeso.HUAP.DTO.PlantillaDiaDTO> secuenciaDiasDTO) {
-    // 1. Validar el Servicio
-    ServicioEntity servicio = servicioRepository.findById(idServicio)
-            .orElseThrow(() -> new RuntimeException("Servicio no encontrado con ID: " + idServicio));
+    public PlantillaEntity crearPlantilla(Long idServicio, String nombre, Byte semanas, List<Long> idsDias) {
+        ServicioEntity servicio = servicioRepository.findById(idServicio)
+                .orElseThrow(() -> new RuntimeException("Servicio no encontrado con ID: " + idServicio));
 
-    if (plantillaRepository.existsByServicio_IdServicioAndNombre(idServicio, nombre)) {
-        throw new RuntimeException("Ya existe una plantilla con el nombre '" + nombre + "' en este servicio");
-    }
-
-    // 2. Instanciar la Madre
-    PlantillaEntity plantilla = new PlantillaEntity(servicio, nombre, semanas);
-
-    // 3. Si vienen días en la petición, procesarlos e indexarlos de inmediato
-    if (secuenciaDiasDTO != null && !secuenciaDiasDTO.isEmpty()) {
-        for (com.pingeso.HUAP.DTO.PlantillaDiaDTO diaDTO : secuenciaDiasDTO) {
-            PlantillaTurnoEntity turno = null;
-            
-            if (diaDTO.getTurno() != null && diaDTO.getTurno().getIdPlantillaTurno() != null) {
-                Long idTurno = diaDTO.getTurno().getIdPlantillaTurno();
-                turno = plantillaTurnoRepository.findById(idTurno)
-                        .orElseThrow(() -> new RuntimeException("Turno no encontrado: ID " + idTurno));
-                
-                // Validación de seguridad entre servicios
-                if (!turno.getServicio().getIdServicio().equals(idServicio)) {
-                    throw new RuntimeException("Seguridad: El turno '" + turno.getNombre() + "' no pertenece a este servicio.");
-                }
-            }
-            
-            // Construir el hijo asociándole la plantilla madre
-            PlantillaDiaEntity nuevoDia = new PlantillaDiaEntity(plantilla, diaDTO.getDiaIndex(), turno);
-            plantilla.getSecuenciaDias().add(nuevoDia);
+        if (plantillaRepository.existsByServicio_IdServicioAndNombre(idServicio, nombre)) {
+            throw new RuntimeException("Ya existe una plantilla con el nombre '" + nombre + "' en este servicio");
         }
+
+        if (semanas <= 0) {
+            throw new RuntimeException("La cantidad de semanas debe ser mayor a 0");
+        }
+
+        PlantillaEntity plantilla = new PlantillaEntity(servicio, nombre, semanas);
+
+        if (idsDias != null && !idsDias.isEmpty()) {
+            for (Long idTurno : idsDias) {
+                PlantillaTurnoEntity turno = null;
+                if (idTurno != null) {
+                    turno = plantillaTurnoRepository.findById(idTurno)
+                            .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado: ID " + idTurno));
+                    if (!turno.getServicio().getIdServicio().equals(idServicio)) {
+                        throw new RuntimeException("El turno '" + turno.getNombre() + "' no pertenece a este servicio.");
+                    }
+                }
+                plantilla.getSecuenciaDias().add(
+                        new PlantillaDiaEntity(plantilla, plantilla.getSecuenciaDias().size(), turno)
+                );
+            }
+        }
+
+        PlantillaEntity guardada = plantillaRepository.save(plantilla);
+
+        if (idsDias != null && !idsDias.isEmpty()) {
+            validarPlantilla(guardada.getIdPlantilla());
+        }
+
+        return guardada;
     }
-
-    // 4. Guardar cascada completa (Madre + Hijos)
-    PlantillaEntity guardada = plantillaRepository.save(plantilla);
-
-    // 5. Validar la regla matemática final (Semanas * 7) si se enviaron días
-    if (secuenciaDiasDTO != null && !secuenciaDiasDTO.isEmpty()) {
-        validarPlantilla(guardada.getIdPlantilla());
-    }
-
-    return guardada;
-}
 
     public PlantillaEntity obtenerPlantilla(Long idPlantilla) {
         return plantillaRepository.findById(idPlantilla)
