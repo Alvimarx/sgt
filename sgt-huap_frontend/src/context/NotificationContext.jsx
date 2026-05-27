@@ -1,6 +1,11 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
-import axiosInstance from "../utils/axiosConfig";
 import { useAuth } from "./AuthContext";
+import {
+  eliminarNotificacion,
+  getNotificacionesSinLeer,
+  getNotificacionesUsuario,
+  marcarNotificacionLeida,
+} from "../services/notificationService";
 
 /**
  * NOTIFICATION CONTEXT
@@ -18,86 +23,63 @@ export function NotificationProvider({ children }) {
 
   const { user } = useAuth();
   const userId = user?.userId || localStorage.getItem("userId");
-  const API_BASE = "/notificacion";
-
-  // 🔹 Obtener número de notificaciones no leídas
-  // SOLO usa datos del backend - NO datos mock
+  // Obtener número de notificaciones no leídas
   const fetchUnreadCount = async () => {
     if (!userId) return;
 
-    try {
-      const response = await axiosInstance.get(`${API_BASE}/no-leidas/${userId}`);
-      setUnreadCount(response.data);
-    } catch (error) {
-      console.error("Error al obtener notificaciones no leídas", error?.message || error);
-      // En caso de error, mantener contador en 0 - NO usar datos mock
-      setUnreadCount(0);
-    }
+    const result = await getNotificacionesSinLeer(userId);
+    setUnreadCount(result.success ? result.data : 0);
   };
 
-  // 🔹 Obtener lista de notificaciones
-  // SOLO usa datos del backend - NO datos mock
+  // Obtener lista de notificaciones
   const fetchNotifications = async () => {
     if (!userId) return;
 
-    try {
-      const response = await axiosInstance.get(`${API_BASE}/usuario/${userId}`);
-      const data = response.data || [];
-
-      // Validar que los datos vengan del backend
-      if (!Array.isArray(data)) {
-        console.error("Los datos del backend no son un array válido");
-        setNotifications([]);
-        return;
-      }
-
-      const mapped = data
-        .filter((n) => !n.eliminado)
-        .map((n) => ({
-          id: n.id,
-          nombre: "",
-
-          texto: n.mensaje,
-          fecha: new Date(n.fechaEnvio).toLocaleString("es-CL", {
-            dateStyle: "short",
-            timeStyle: "short",
-          }),
-          tipo: n.estado.toLowerCase(),
-          isRead: n.leido,
-        }));
-
-      setNotifications(mapped);
-    } catch (error) {
-      console.error("Error al obtener notificaciones", error?.message || error);
-      // En caso de error, mantener array vacío - NO usar datos mock
+    const result = await getNotificacionesUsuario(userId);
+    if (!result.success) {
       setNotifications([]);
+      return;
     }
+
+    const mapped = (result.data || [])
+      .filter((n) => !n.eliminado)
+      .map((n) => ({
+        id: n.id,
+        titulo: n.titulo || n.asunto || "Notificación",
+        texto: n.texto || n.mensaje || "",
+        fecha: n.fechaLabel || n.fechaEnvio || n.fecha || null,
+        tipo: (n.estado || "neutral").toLowerCase(),
+        isRead: n.isRead === true || n.leido === true || String(n.estado).toUpperCase() === "LEIDO",
+        raw: n,
+      }));
+
+    setNotifications(mapped);
   };
 
-  // 🔹 Marcar como leído
+  // Marcar como leído
   const markAsRead = async (id) => {
-    try {
-      await axiosInstance.put(`${API_BASE}/leido/${id}`);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-      // Actualizar contador
-      fetchUnreadCount();
-    } catch (error) {
-      console.error("Error marcando notificación como leída", error?.message || error);
+    const result = await marcarNotificacionLeida(id);
+    if (!result.success) {
+      console.error("Error marcando notificación como leída", result.error);
+      return;
     }
+
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+    fetchUnreadCount();
   };
 
-  // 🔹 Eliminar notificación
+  //Eliminar notificación
   const deleteNotification = async (id) => {
-    try {
-      await axiosInstance.put(`${API_BASE}/eliminado/${id}`);
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-      // Actualizar contador
-      fetchUnreadCount();
-    } catch (error) {
-      console.error("Error eliminando notificación", error?.message || error);
+    const result = await eliminarNotificacion(id);
+    if (!result.success) {
+      console.error("Error eliminando notificación", result.error);
+      return;
     }
+
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    fetchUnreadCount();
   };
 
   // 🔹 Refrescar manualmente desde otros componentes

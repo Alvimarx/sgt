@@ -9,7 +9,7 @@ import { switchService } from '../../services/authService';
 //   servicios     — Array<{ servicioId, nombre, rol }> que viene del Paso 1 (login)
 //   preAuthToken  — string, el token temporal de 5 min del Paso 1
 //   onServiceSelected(userData) — Prop4 lo recibe y actualiza el AuthContext
-const SelectServiceView = ({ servicios = [], preAuthToken, onServiceSelected }) => {
+const SelectServiceView = ({ servicios = [], preAuthToken, onServiceSelected, onLogout }) => {
   const PA = SGT_DATA.PALETTE;
   const [loadingId, setLoadingId] = useState(null);
   const [error, setError] = useState('');
@@ -44,11 +44,27 @@ const SelectServiceView = ({ servicios = [], preAuthToken, onServiceSelected }) 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
 
-      <div style={{ padding: '24px 20px 10px' }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: PA.ink }}>Selecciona un servicio</h2>
-        <p style={{ margin: '6px 0 0', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>
-          Elige el área de trabajo a la que deseas ingresar hoy.
-        </p>
+      <div style={{ padding: '20px 20px 10px', display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between' }}>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: PA.ink }}>Selecciona un servicio</h2>
+          <p style={{ margin: '6px 0 0', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>
+            Elige el área de trabajo a la que deseas ingresar hoy.
+          </p>
+        </div>
+
+        <button
+          onClick={onLogout}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            height: 36, padding: '0 10px', borderRadius: 10,
+            border: `1px solid ${PA.line}`, background: '#fff',
+            color: PA.ink2, fontSize: 12, fontWeight: 800,
+            cursor: 'pointer', flexShrink: 0
+          }}
+        >
+          <SGTIcon name="close" size={15} color={PA.ink2} />
+          Salir
+        </button>
       </div>
 
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>

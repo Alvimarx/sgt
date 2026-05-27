@@ -18,6 +18,7 @@ export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth =
     case 'close':         return <svg {...common}><path d="M18 6L6 18M6 6l12 12"/></svg>;
     case 'filter':        return <svg {...common}><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>;
     case 'bell':          return <svg {...common}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
+    case 'tray':          return <svg {...common}><path d="M3 7h5l2 3h4l2-3h5"/><path d="M4 7l1.5 10h13L20 7"/><path d="M9 17h6"/></svg>;
     case 'user':          return <svg {...common}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
     case 'users':         return <svg {...common}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
     case 'clock':         return <svg {...common}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>;
