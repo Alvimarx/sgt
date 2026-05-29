@@ -1,149 +1,377 @@
-// CalendarView.jsx
-import React, { useState, useMemo } from 'react';
+// calendarView.jsx
+import React, { useEffect, useMemo, useState } from 'react';
 import { SGT_DATA } from './data';
-import { SGTIcon, IconBtn, Sheet, SGTBadge, SGTAvatar } from './UIPrimitives';
+import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from './UIPrimitives';
+import { useAuth } from '../../context/AuthContext';
+import { getTurnosCalendario } from '../../services/turnosService';
+import ShiftDetail, { getTeamColor } from './ShiftDetail';
 
-const CalendarView = ({ onOpenDetail, onBack }) => { // <-- 1. AÑADIDO onBack AQUÍ
-  const D = SGT_DATA;
-  const PA = D.PALETTE;
-  const [selectedDay, setSelectedDay] = useState(null);
+// ---------------------------------------------------------------------------
+// HELPERS DE PRESENTACIÓN
+// ---------------------------------------------------------------------------
 
-  const LEADING_EMPTY = 6;
-  const DAYS_IN_MONTH = 30;
-  const DAY_LABELS    = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-  const keyFor        = d => `2026-11-${String(d).padStart(2, '0')}`;
+const MONTH_NAMES = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
-  const cells = useMemo(() => {
-    const arr = Array(LEADING_EMPTY).fill(null);
-    for (let d = 1; d <= DAYS_IN_MONTH; d++) arr.push(d);
-    while (arr.length % 7 !== 0) arr.push(null);
-    return arr;
-  }, []);
+const TEAM_COLORS = [
+    { bg: '#b0baee', soft: '#D7E2FF', ink: '#183b6b' },
+    { bg: 'rgb(166,231,180)', soft: '#D2E9D6', ink: '#24513A' },
+    { bg: 'rgb(245,223,188)', soft: '#F5E0B7', ink: '#6B4D15' },
+    { bg: 'rgb(225,188,245)', soft: '#E3D1F3', ink: '#5A3A72' },
+    { bg: 'rgb(248,208,223)', soft: '#F2D1D5', ink: '#8C3F44' },
+    { bg: 'rgb(173,224,231)', soft: '#CFE9F0', ink: '#2C6270' },
+];
 
-  const selectedShifts = selectedDay ? (D.SHIFTS_BY_DAY[keyFor(selectedDay)] || []) : [];
-  const H   = D.HOURS_SUMMARY || { acumuladas: 144, objetivo: 180 };
-  const pct = Math.round((H.acumuladas / H.objetivo) * 100);
-  const colOf = cellIdx => cellIdx % 7;
-
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
-      
-      {/* Header Personalizado */}
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        
-        {/* 2. BOTÓN DE VOLVER AÑADIDO AQUÍ */}
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-
-        <div style={{ flex: 1, fontSize: 19, fontWeight: 800, color: PA.ink }}>Noviembre 2026</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <IconBtn icon="bell" badge={D.PENDIENTES?.length || 0}/>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {/* Resumen de horas */}
-        <div style={{
-            margin:'10px 14px 0', padding:'9px 12px', background: PA.primarySoft,
-            borderRadius:12, display:'flex', alignItems:'center', gap:10,
-        }}>
-          <div style={{
-            width:38, height:38, borderRadius:10, background:'#fff', border:`2px solid ${PA.primary}`,
-            display:'grid', placeItems:'center', fontSize:11, fontWeight:800, color:PA.primary, flexShrink:0,
-          }}>
-            {pct}%
-          </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:PA.primary, textTransform:'uppercase', letterSpacing:0.4 }}>Horas del mes</div>
-            <div style={{ fontSize:14, fontWeight:800, color:PA.ink }}>
-              {H.acumuladas}h <span style={{ fontSize:11, color:PA.ink3, fontWeight:700 }}> / {H.objetivo}h objetivo</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Calendario */}
-        <div style={{ padding:'14px 14px 0' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', marginBottom:6 }}>
-            {DAY_LABELS.map((l, i) => (
-              <div key={l} style={{ textAlign:'center', fontSize:11, fontWeight:800, color: i >= 5 ? PA.ink3 : PA.ink2 }}>{l}</div>
-            ))}
-          </div>
-
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:'3px 2px' }}>
-            {cells.map((day, idx) => {
-              if (!day) return <div key={idx}/>;
-              const key      = keyFor(day);
-              const shifts   = D.SHIFTS_BY_DAY[key] || [];
-              const miShift  = shifts.find(s => s.miTurno);
-              const hasLibre = shifts.some(s => s.turnoLibre);
-              const isToday  = key === D.TODAY_KEY;
-              const isSel    = selectedDay === day;
-              const isWknd   = colOf(idx) >= 5;
-              const tappable = shifts.length > 0;
-
-              return (
-                <div key={idx} onClick={() => tappable && setSelectedDay(isSel ? null : day)} style={{
-                    textAlign:'center', padding:'5px 2px', borderRadius:10, cursor: tappable ? 'pointer' : 'default',
-                    background: isToday ? PA.primary : isSel ? PA.primarySoft : 'transparent',
-                    transition:'background 0.15s',
-                  }}>
-                  <div style={{
-                    fontSize:14, lineHeight:1, fontWeight: isToday || isSel ? 800 : 500,
-                    color: isToday ? '#fff' : isSel ? PA.primary : isWknd ? PA.ink3 : PA.ink, marginBottom: 4,
-                  }}>
-                    {day}
-                  </div>
-                  <div style={{ display:'flex', justifyContent:'center', gap:2, minHeight:6 }}>
-                    {miShift && <div style={{ width:5, height:5, borderRadius:99, background: isToday ? 'rgba(255,255,255,0.85)' : (D.TEAMS[miShift.equipo]?.ink || PA.primary) }}/>}
-                    {hasLibre && <div style={{ width:5, height:5, borderRadius:99, background: isToday ? 'rgba(255,255,255,0.6)' : PA.accent }}/>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Leyenda */}
-        <div style={{ display:'flex', gap:14, padding:'10px 18px', borderTop:`1px solid ${PA.line2}`, marginTop:10 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-            <div style={{ width:8, height:8, borderRadius:99, background:PA.primary }}/><span style={{ fontSize:10.5, fontWeight:700, color:PA.ink2 }}>Mi turno</span>
-          </div>
-          <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-            <div style={{ width:8, height:8, borderRadius:99, background:PA.accent }}/><span style={{ fontSize:10.5, fontWeight:700, color:PA.ink2 }}>Cupo libre</span>
-          </div>
-        </div>
-
-        {!selectedDay && (
-          <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'30px 24px' }}>
-            <span style={{ fontSize:12, color:PA.ink3, fontWeight:600, textAlign:'center' }}>Toca un día con punto para ver sus turnos</span>
-          </div>
-        )}
-      </div>
-
-      <Sheet open={!!selectedDay} onClose={() => setSelectedDay(null)} title={selectedDay ? `${D.WEEK_DAYS.find(d => d.key === keyFor(selectedDay))?.dia || ''} ${selectedDay} nov` : ''} maxHeight="72%">
-        <div style={{ padding:'4px 16px 20px', display:'flex', flexDirection:'column', gap:10 }}>
-          {selectedShifts.map(s => {
-            const t = D.TEAMS[s.equipo];
-            return (
-              <div key={s.id} onClick={() => onOpenDetail(s)} style={{ background: t.bg, border:`1px solid ${t.soft}`, borderRadius:12, padding:12, cursor:'pointer' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <SGTIcon name={s.tipo === 'dia' ? 'sun' : 'moon'} size={15} color={t.ink}/>
-                  <span style={{ fontSize:13.5, fontWeight:800, color:t.ink, flex:1 }}>{s.tipo === 'dia' ? 'Turno día' : 'Turno noche'} · {s.inicio}–{s.fin}</span>
-                  {s.miTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,0.75)', padding:'6px 8px', borderRadius:8 }}>
-                  <SGTAvatar person={s.team.jefe} size={22} ring="#E9D9C2"/>
-                  <span style={{ fontSize:11.5, fontWeight:700, color:PA.ink, flex:1 }}>{s.team.jefe.nombre}</span>
-                  <SGTIcon name="chevron-right" size={13} color={PA.ink3}/>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Sheet>
-    </div>
-  );
+const hashStr = (value = '') => {
+    let h = 0;
+    const s = String(value);
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return h;
 };
+
+// getTeamColor importado desde ShiftDetail — color determinista por tipo+piso
+
+const formatTime = (v) => (v ? String(v).slice(0, 5) : null);
+
+/** Devuelve el día de la semana para el 1ro del mes (0=Lun … 6=Dom) */
+const firstDayOfMonth = (year, month) => {
+    const d = new Date(year, month - 1, 1).getDay(); // 0=Dom
+    return d === 0 ? 6 : d - 1; // convierte a Lun=0
+};
+
+const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
+const dateKey = (year, month, day) =>
+    `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+// ---------------------------------------------------------------------------
+// CALENDARVIEW
+// ---------------------------------------------------------------------------
+
+const CalendarView = ({ onBack, onOpenBitacora }) => {
+    const { user } = useAuth();
+    const PA = SGT_DATA.PALETTE;
+
+    const esJefatura = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
+
+    // Mes visible — arranca en el mes actual
+    const now = new Date();
+    const [viewYear, setViewYear] = useState(now.getFullYear());
+    const [viewMonth, setViewMonth] = useState(now.getMonth() + 1); // 1-12
+
+    const [shiftsByDay, setShiftsByDay] = useState({});
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [selectedDay, setSelectedDay] = useState(null);
+    const [detailShift, setDetailShift] = useState(null);
+
+    // Carga al cambiar mes
+    useEffect(() => {
+        let mounted = true;
+        setLoading(true);
+        setError('');
+        setSelectedDay(null);
+
+        const servicioId = user?.servicioId || localStorage.getItem('servicioId');
+        const funcionarioId = Number(user?.id ?? user?.userId);
+
+        getTurnosCalendario({
+            servicioId,
+            funcionarioId,
+            year: viewYear,
+            month: viewMonth,
+            esJefatura,
+        }).then((result) => {
+            if (!mounted) return;
+            if (result.success) {
+                setShiftsByDay(result.data.shiftsByDay);
+            } else {
+                setError(result.error);
+                setShiftsByDay({});
+            }
+            setLoading(false);
+        });
+
+        return () => { mounted = false; };
+    }, [viewYear, viewMonth, user?.id, user?.servicioId]);
+
+    // Grilla de celdas del mes
+    const cells = useMemo(() => {
+        const leading = firstDayOfMonth(viewYear, viewMonth);
+        const days = daysInMonth(viewYear, viewMonth);
+        const arr = Array(leading).fill(null);
+        for (let d = 1; d <= days; d++) arr.push(d);
+        while (arr.length % 7 !== 0) arr.push(null);
+        return arr;
+    }, [viewYear, viewMonth]);
+
+    const today = todayKey();
+
+    const goToPrevMonth = () => {
+        if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); }
+        else setViewMonth(m => m - 1);
+    };
+    const goToNextMonth = () => {
+        if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); }
+        else setViewMonth(m => m + 1);
+    };
+
+    const selectedKey = selectedDay ? dateKey(viewYear, viewMonth, selectedDay) : null;
+    const selectedShifts = selectedKey ? (shiftsByDay[selectedKey] || []) : [];
+
+    const sheetTitle = selectedDay
+        ? `${DAY_LABELS[(new Date(viewYear, viewMonth - 1, selectedDay).getDay() + 6) % 7]} ${selectedDay} ${MONTH_NAMES[viewMonth - 1].slice(0, 3)}`
+        : '';
+
+    return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, overflow: 'hidden' }}>
+
+            {/* Header */}
+            <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                    <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                </button>
+
+                {/* Navegación de mes */}
+                <button onClick={goToPrevMonth} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                    <SGTIcon name="chevron-left" size={18} color={PA.ink2} />
+                </button>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 17, fontWeight: 800, color: PA.ink }}>
+                    {MONTH_NAMES[viewMonth - 1]} {viewYear}
+                </div>
+                <button onClick={goToNextMonth} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                    <SGTIcon name="chevron-right" size={18} color={PA.ink2} />
+                </button>
+            </div>
+
+            <div style={{ flex: 1, overflow: 'auto' }}>
+
+                {/* Error */}
+                {error && !loading && (
+                    <div style={{ margin: '10px 14px 0', padding: '10px 12px', borderRadius: 12, background: '#FFF4F5', color: '#8C3F44', border: '1px solid #F3D2D5', fontSize: 12.5, fontWeight: 700 }}>
+                        {error}
+                    </div>
+                )}
+
+                {/* Grilla del calendario */}
+                <div style={{ padding: '14px 14px 0' }}>
+                    {/* Cabecera de días */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 6 }}>
+                        {DAY_LABELS.map((l, i) => (
+                            <div key={l} style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: i >= 5 ? PA.ink3 : PA.ink2 }}>
+                                {l}
+                            </div>
+                        ))}
+                    </div>
+
+                    {loading ? (
+                        <div style={{ padding: '40px 0', textAlign: 'center', color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
+                            Cargando…
+                        </div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px 2px' }}>
+                            {cells.map((day, idx) => {
+                                if (!day) return <div key={idx} />;
+
+                                const key = dateKey(viewYear, viewMonth, day);
+                                const shifts = shiftsByDay[key] || [];
+                                const miShift = shifts.find(s => s.miTurno);
+                                const hasLibre = shifts.some(s => s.turnoLibre);
+                                const isToday = key === today;
+                                const isSel = selectedDay === day;
+                                const isWknd = idx % 7 >= 5;
+                                const tappable = shifts.length > 0;
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        onClick={() => tappable && setSelectedDay(isSel ? null : day)}
+                                        style={{
+                                            textAlign: 'center',
+                                            padding: '5px 2px',
+                                            borderRadius: 10,
+                                            cursor: tappable ? 'pointer' : 'default',
+                                            background: isToday ? PA.primary : isSel ? PA.primarySoft : 'transparent',
+                                            transition: 'background 0.15s',
+                                        }}
+                                    >
+                                        <div style={{
+                                            fontSize: 14,
+                                            lineHeight: 1,
+                                            fontWeight: isToday || isSel ? 800 : 500,
+                                            color: isToday ? '#fff' : isSel ? PA.primary : isWknd ? PA.ink3 : PA.ink,
+                                            marginBottom: 4,
+                                        }}>
+                                            {day}
+                                        </div>
+
+                                        {/* Puntos indicadores */}
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: 2, minHeight: 6 }}>
+                                            {miShift && (
+                                                <div style={{
+                                                    width: 5, height: 5, borderRadius: 99,
+                                                    background: isToday ? 'rgba(255,255,255,0.85)' : PA.primary,
+                                                }} />
+                                            )}
+                                            {hasLibre && (
+                                                <div style={{
+                                                    width: 5, height: 5, borderRadius: 99,
+                                                    background: isToday ? 'rgba(255,255,255,0.6)' : PA.accent,
+                                                }} />
+                                            )}
+                                            {/* Jefatura: punto gris por cada turno ajeno */}
+                                            {esJefatura && !miShift && shifts.filter(s => !s.turnoLibre).length > 0 && (
+                                                <div style={{
+                                                    width: 5, height: 5, borderRadius: 99,
+                                                    background: isToday ? 'rgba(255,255,255,0.5)' : 'rgba(240, 178, 43, 0.85)',
+                                                }} />
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Leyenda */}
+                <div style={{ display: 'flex', gap: 14, padding: '10px 18px', borderTop: `1px solid ${PA.line2}`, marginTop: 10, flexWrap: 'wrap' }}>
+                    <LegendDot color={PA.primary} label="Mi turno" />
+                    <LegendDot color={PA.accent} label="Cupo libre" />
+                    {esJefatura && <LegendDot color='rgba(240, 178, 43, 0.85)' label="Turno del servicio" />}
+                </div>
+
+                {!selectedDay && !loading && (
+                    <div style={{ padding: '24px', textAlign: 'center' }}>
+                        <span style={{ fontSize: 12, color: PA.ink3, fontWeight: 600 }}>
+                            Toca un día con punto para ver sus turnos
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            {/* Sheet de detalle del día */}
+            <Sheet
+                open={!!selectedDay}
+                onClose={() => setSelectedDay(null)}
+                title={sheetTitle}
+                maxHeight="72%"
+            >
+                <div style={{ padding: '4px 16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {selectedShifts.length === 0 ? (
+                        <p style={{ fontSize: 13, color: SGT_DATA.PALETTE.ink3, fontWeight: 600, textAlign: 'center', padding: '20px 0' }}>
+                            Sin turnos para mostrar.
+                        </p>
+                    ) : (
+                        selectedShifts.map(s => (
+                            <ShiftCard
+                                key={s.id}
+                                shift={s}
+                                esJefatura={esJefatura}
+                                onOpen={(shift) => setDetailShift(shift)}
+                            />
+                        ))
+                    )}
+                </div>
+            </Sheet>
+
+            {/* Sheet de detalle completo del turno — igual que en AgendaView */}
+            <Sheet
+                open={!!detailShift}
+                onClose={() => setDetailShift(null)}
+                title="Detalle del turno"
+                maxHeight="88%"
+            >
+                {detailShift && (
+                    <ShiftDetail
+                        shift={detailShift}
+                        onAction={(actionId) => {
+                            if (actionId === "historial") {
+                                onOpenBitacora?.();
+                            }
+                        }}
+                    />
+                )}
+            </Sheet>
+        </div>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// SHIFTCARD — card de turno dentro del Sheet del día
+// ---------------------------------------------------------------------------
+
+const ShiftCard = ({ shift, esJefatura, onOpen }) => {
+    const PA = SGT_DATA.PALETTE;
+    const color = getTeamColor(shift);
+
+    return (
+        <div
+            onClick={() => onOpen?.(shift)}
+            style={{
+                background: color.bg,
+                border: `1px solid ${color.soft}`,
+                borderRadius: 12,
+                padding: 12,
+                cursor: 'pointer',
+            }}
+        >
+            {/* Fila principal: icono + tipo + horario + badge */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: shift.nombreFuncionario || shift.nombrePiso ? 8 : 0 }}>
+                <SGTIcon
+                    name={shift.tipo === 'dia' ? 'sun' : 'moon'}
+                    size={15}
+                    color={color.ink}
+                />
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: color.ink, flex: 1 }}>
+                    {shift.nombreTipo || (shift.tipo === 'dia' ? 'Turno día' : 'Turno noche')}
+                    {shift.inicio && shift.fin ? ` · ${shift.inicio}–${shift.fin}` : ''}
+                </span>
+                {shift.miTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
+                {shift.turnoLibre && <SGTBadge tone="accent" size="xs">Cupo libre</SGTBadge>}
+            </div>
+
+            {/* Fila secundaria: piso + funcionario (jefatura ve quién está asignado) */}
+            {(shift.nombrePiso || (esJefatura && shift.nombreFuncionario)) && (
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: 'rgba(255,255,255,0.72)',
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                }}>
+                    {shift.nombrePiso && (
+                        <span style={{ fontSize: 11.5, fontWeight: 700, color: color.ink, flex: 1 }}>
+                            {shift.nombrePiso}
+                        </span>
+                    )}
+                    {esJefatura && shift.nombreFuncionario && (
+                        <span style={{ fontSize: 11.5, fontWeight: shift.miTurno ? 800 : 600, color: PA.ink }}>
+                            {shift.nombreFuncionario}
+                            {shift.miTurno ? ' (tú)' : ''}
+                        </span>
+                    )}
+                    <SGTIcon name="chevron-right" size={13} color={PA.ink3} />
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// LEGENDDOT — item de leyenda
+// ---------------------------------------------------------------------------
+
+const LegendDot = ({ color, label }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ width: 8, height: 8, borderRadius: 99, background: color }} />
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: SGT_DATA.PALETTE.ink2 }}>{label}</span>
+    </div>
+);
 
 export default CalendarView;

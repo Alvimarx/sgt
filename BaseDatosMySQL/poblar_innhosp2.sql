@@ -354,13 +354,13 @@ INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TUR
 -- ID_SOLICITUD es @OneToOne → un registro por solicitud.
 -- ==============================================================
 INSERT INTO Notificacion2 (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
-(1, 'NO_LEIDA', '2026-05-01 09:00:01',
+(1, 'NO_LEIDO', '2026-05-01 09:00:01',
  'Su solicitud de permiso para el 05-May ha sido recibida y está pendiente de aprobación.', 1),
-(2, 'NO_LEIDA', '2026-05-10 14:00:01',
+(2, 'NO_LEIDO', '2026-05-10 14:00:01',
  'Su solicitud de cobertura del turno 22-May ha sido recibida.', 2),
-(3, 'NO_LEIDA', '2026-05-08 11:30:01',
+(3, 'NO_LEIDO', '2026-05-08 11:30:01',
  'El funcionario receptor ha aceptado el intercambio. Pendiente de aprobación por jefatura.', 3),
-(4, 'LEIDA',    '2026-04-28 10:00:01',
+(4, 'LEIDO',    '2026-04-28 10:00:01',
  'Su solicitud de botar turno del 09-May ha sido aprobada.', 4);
 
 -- ==============================================================

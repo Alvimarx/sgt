@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { SGT_DATA } from "./data";
 import { getTurnosServicio } from "../../services/funcionarioService";
+import ShiftDetail, { getTeamColor, getAgendaTeam, formatShiftLabel } from "./ShiftDetail";
 
 import {
   AlertBanner,
@@ -12,83 +13,7 @@ import {
   Sheet,
   TopHeader,
 } from "./UIPrimitives";
-import { SGTRoleChip } from "./Perfil";
 import { useNotifications } from "../../context/NotificationContext";
-
-// ---------------------------------------------------------------------------
-// HELPERS DE PRESENTACIÓN (solo usados en esta vista)
-// ---------------------------------------------------------------------------
-
-
-const buildInitials = (name = "") =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("") || "?";
-
-const TEAM_COLORS = [
-  { bg: "#b0baee", soft: "#D7E2FF", ink: "#183b6b" },
-  { bg: "rgb(166, 231, 180)", soft: "#D2E9D6", ink: "#24513A" },
-  { bg: "rgb(245, 223, 188)", soft: "#F5E0B7", ink: "#6B4D15" },
-  { bg: "rgb(225, 188, 245)", soft: "#E3D1F3", ink: "#5A3A72" },
-  { bg: "rgb(248, 208, 223)", soft: "#F2D1D5", ink: "#8C3F44" },
-  { bg: "rgb(173, 224, 231)", soft: "#CFE9F0", ink: "#2C6270" },
-];
-
-const hashString = (value = "") => {
-  let hash = 0;
-  const seed = String(value);
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-};
-
-const getTeamColor = (shift) => {
-  const seed =
-    shift?.teamGroup?.key ||
-    shift?.teamKey ||
-    `${shift?.tipo || "sin-tipo"}-${shift?.idPiso ?? shift?.raw?.idPiso ?? "sin-piso"}`;
-
-  return TEAM_COLORS[hashString(seed) % TEAM_COLORS.length];
-};
-
-/**
- * Devuelve el objeto team del turno.
- * Si ya viene construido (mock o API enriquecida) lo usa directamente.
- * Si solo hay nombreFuncionario en raw, construye un team mínimo.
- * Si no hay datos suficientes, retorna null (el JSX lo protege).
- */
-const getAgendaTeam = (shift) => {
-  if (shift?.teamGroup?.integrantes?.length) {
-    const integrantes = shift.teamGroup.integrantes;
-    return {
-      jefe: integrantes[0],
-      integrantes,
-      urgenciologos: integrantes.slice(1, 3),
-      medicos: integrantes.slice(3),
-      total: integrantes.length,
-    };
-  }
-
-  if (shift?.team) return shift.team;
-  const nombreFuncionario = shift?.raw?.nombreFuncionario;
-  if (!nombreFuncionario) return null;
-  return {
-    jefe: {
-      id: shift?.raw?.idFuncionario ?? shift?.id ?? "sin-asignar",
-      nombre: nombreFuncionario,
-      rol: "MEDICO",
-      iniciales: buildInitials(nombreFuncionario),
-      esYo: Boolean(shift?.miTurno),
-    },
-    urgenciologos: [],
-    medicos: [],
-    total: 1,
-  };
-};
 
 /** Datos de fallback mientras carga o si la API falla. */
 const buildAgendaFallback = () => ({
@@ -105,23 +30,143 @@ const P2 = () => SGT_DATA.PALETTE;
 // AGENDAVIEW — contenedor principal
 // ---------------------------------------------------------------------------
 
-const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifications }) => {
+const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifications, onOpenSolicitudes, onOpenBitacora }) => {
   const [filter, setFilter] = useState("miTurno");
   const [detailShift, setDetailShift] = useState(null);
   const [bannerCollapsed, setBannerCollapsed] = useState(false);
   const [agendaData, setAgendaData] = useState(() => buildAgendaFallback());
   const [loadingAgenda, setLoadingAgenda] = useState(true);
   const [agendaError, setAgendaError] = useState("");
+  const [exchangeSelection, setExchangeSelection] = useState({ ownTurn: null, targetTurn: null, targetFuncionario: null });
+  const [selectionToast, setSelectionToast] = useState(null);
 
   const D = SGT_DATA;
   const PA = D.PALETTE;
   const agendaDays = agendaData.weekDays || D.WEEK_DAYS || [];
   const shiftsByDay = agendaData.shiftsByDay || D.SHIFTS_BY_DAY || {};
   const todayKey = agendaData.todayKey || D.TODAY_KEY;
-  const pendientes = D.PENDIENTES || [];
   const { unreadCount } = useNotifications();
 
+  const canSeeFreeTurnsInBanner = user?.rol === "JEFATURA" || user?.rol === "SUBROGANTE";
+
+  const freeTurnsCount = useMemo(
+    () => (agendaData.turnos || []).filter((turno) => turno.turnoLibre).length,
+    [agendaData.turnos]
+  );
+
+  const pendientes = useMemo(() => {
+    const items = [];
+
+    if (unreadCount > 0) {
+      items.push({
+        id: "notificaciones-sin-leer",
+        tipo: "notificacion",
+        titulo: `${unreadCount} notificacion${unreadCount > 1 ? "es" : ""} sin leer`,
+        sub: "Revisa tu bandeja",
+        urgencia: "info",
+      });
+    }
+
+    if (canSeeFreeTurnsInBanner && freeTurnsCount > 0) {
+      items.push({
+        id: "turnos-libres",
+        tipo: "turno_libre",
+        titulo: `${freeTurnsCount} turno${freeTurnsCount > 1 ? "s" : ""} libre${freeTurnsCount > 1 ? "s" : ""} en agenda`,
+        sub: "Revisa y asigna los cupos disponibles",
+        urgencia: "baja",
+      });
+    }
+
+    return items;
+  }, [unreadCount, canSeeFreeTurnsInBanner, freeTurnsCount]);
+
   const getShifts = (dayKey) => shiftsByDay[dayKey] || [];
+
+  const showSelectionToast = (message) => {
+    setSelectionToast(message);
+    if (showSelectionToast.timer) {
+      clearTimeout(showSelectionToast.timer);
+    }
+    showSelectionToast.timer = setTimeout(() => setSelectionToast(null), 2600);
+  };
+
+  const handleSelectTargetFuncionario = (sourceShift, targetShift) => {
+    const isSelf = Boolean(targetShift?.miTurno || targetShift?.esYo);
+
+    const targetFuncionario = {
+      id: targetShift?.idFuncionario ?? targetShift?.raw?.idFuncionario ?? targetShift?.id ?? null,
+      nombre: targetShift?.nombreFuncionario || targetShift?.raw?.nombreFuncionario || targetShift?.nombre || "Funcionario",
+    };
+
+    setExchangeSelection((prev) => ({
+      ...prev,
+      // if the selected item corresponds to the current user (own turno), store it as ownTurn
+      ownTurn: isSelf ? (targetShift || sourceShift) : prev.ownTurn,
+      // otherwise store as the receptor/target
+      targetTurn: isSelf ? prev.targetTurn : targetShift,
+      targetFuncionario: isSelf ? prev.targetFuncionario : targetFuncionario,
+    }));
+
+    showSelectionToast(
+      isSelf
+        ? `Seleccionaste tu turno: ${formatShiftLabel(targetShift || sourceShift)}`
+        : `Seleccionaste ${formatShiftLabel(targetShift)} de ${targetFuncionario.nombre}`
+    );
+  };
+
+  const handleOpenExchangeRequest = (currentShift) => {
+    const ownTurn = currentShift?.miTurno ? currentShift : exchangeSelection.ownTurn;
+    const targetTurn = currentShift?.miTurno ? exchangeSelection.targetTurn : currentShift;
+    const targetFuncionario = exchangeSelection.targetFuncionario;
+
+    // If we're viewing our own turno (or user explicitly selected their own turno),
+    // allow opening the create-solicitud flow prefilled with the offered turno (idTurnoPropio),
+    // and include receptor info only if present.
+    if (currentShift?.miTurno || exchangeSelection.ownTurn) {
+      const preset = {
+        tipoSolicitudId: 4,
+        idTurnoPropio: (ownTurn && ownTurn.id) || currentShift?.id,
+        turnoPropioLabel: formatShiftLabel(ownTurn || currentShift),
+      };
+
+      if (targetTurn && targetFuncionario) {
+        preset.idTurnoDeseado = targetTurn.id;
+        preset.idTurno = targetTurn.id;
+        preset.turnoDeseadoLabel = formatShiftLabel(targetTurn);
+        preset.idReceptor = targetFuncionario.id;
+        preset.receptorLabel = targetFuncionario.nombre;
+      }
+
+      onOpenSolicitudes?.(preset);
+      return;
+    }
+
+    // Otherwise (viewing someone else's turno), require a receptor/target selection
+    if (!targetTurn || !targetFuncionario) {
+      showSelectionToast(
+        !targetFuncionario
+          ? "Selecciona el funcionario antes de continuar"
+          : "Selecciona el turno objetivo para continuar"
+      );
+      return;
+    }
+
+    const preset = {
+      tipoSolicitudId: 4,
+      idTurnoDeseado: targetTurn.id,
+      idTurno: targetTurn.id,
+      turnoDeseadoLabel: formatShiftLabel(targetTurn),
+      idReceptor: targetFuncionario.id,
+      receptorLabel: targetFuncionario.nombre,
+    };
+
+    if (ownTurn) {
+      preset.idTurnoPropio = ownTurn.id;
+      preset.turnoPropioLabel = formatShiftLabel(ownTurn);
+    }
+
+    onOpenSolicitudes?.(preset);
+  };
 
   // Carga de turnos — se re-ejecuta si cambia el usuario o su servicio activo
   useEffect(() => {
@@ -318,8 +363,42 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
         title="Detalle del turno"
         maxHeight="88%"
       >
-        {detailShift && <ShiftDetail shift={detailShift} />}
+        {detailShift && (
+          <ShiftDetail
+            shift={detailShift}
+            exchangeSelection={exchangeSelection}
+            onSelectTargetFuncionario={handleSelectTargetFuncionario}
+            onAction={(actionId, shift) => {
+              if (actionId === "historial") {
+                onOpenBitacora?.();
+                return;
+              }
+
+              if (!onOpenSolicitudes) return;
+
+              if (actionId === "cambio") {
+                handleOpenExchangeRequest(shift);
+              }
+
+              if (actionId === "solicitar-turno") {
+                onOpenSolicitudes({
+                  tipoSolicitudId: 3,
+                  idTurno: shift.id,
+                  turnoLabel: formatShiftLabel(shift),
+                });
+              }
+            }}
+          />
+        )}
       </Sheet>
+
+      {selectionToast && (
+        <div style={{ position: "absolute", left: 14, right: 14, bottom: 76, zIndex: 110, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+          <div style={{ background: "rgba(23,65,108,0.96)", color: "#fff", borderRadius: 999, padding: "10px 14px", fontSize: 12.5, fontWeight: 700, boxShadow: "0 10px 24px rgba(15,23,42,0.18)", maxWidth: "100%", textAlign: "center" }}>
+            {selectionToast}
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -556,7 +635,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                         ))}
                       </div>
                       <span style={{ fontSize: 10.5, color: PA.ink3, fontWeight: 700 }}>
-                        +{Math.max(0, team.total - 3)} · Ver detalle →
+                        · Ver detalle →
                       </span>
                     </div>
                   )}
@@ -567,252 +646,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         </div>
       )}
     </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// SHIFTDETAIL — contenido del Sheet de detalle
-// ---------------------------------------------------------------------------
-
-const ShiftDetail = ({ shift }) => {
-  const teamColor = getTeamColor(shift);
-  const fecha = shift.fecha || shift.raw?.diaInicioTurno || null;
-
-  // teamGroup viene del servicio (datos reales de API, agrupados por piso+tipo)
-  // team viene del mock (objeto completo con jefe/urgenciologos/medicos)
-  // Mostramos teamGroup si existe, si no intentamos con team legacy
-  const groupData = shift.teamGroup ?? null;
-  const legacyTeam = shift.team ? getAgendaTeam(shift) : null;
-
-  return (
-    <div style={{ padding: "0 16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Header con horario */}
-      <div
-        style={{
-          background: teamColor.bg,
-          border: `1px solid ${teamColor.soft}`,
-          borderRadius: 14,
-          padding: 14,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-          <SGTIcon
-            name={shift.tipo === "dia" ? "sun" : "moon"}
-            size={18}
-            color={teamColor.ink}
-          />
-          <span style={{ fontSize: 13, fontWeight: 800, color: teamColor.ink, textTransform: "uppercase" }}>
-            {shift.nombreTipo || (shift.tipo === "dia" ? "Turno día" : "Turno noche")}
-          </span>
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: teamColor.ink }}>
-          {shift.inicio} – {shift.fin}
-        </div>
-        <div style={{ marginTop: 8, fontSize: 12.5, color: teamColor.ink }}>
-          {fecha ? `Fecha: ${fecha}` : "Fecha no disponible"}
-        </div>
-      </div>
-
-      {/* Información del turno */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: P2().ink3, textTransform: "uppercase", marginBottom: 8 }}>
-          Información del turno
-        </div>
-        <div
-          style={{
-            border: `1px solid ${P2().line}`,
-            borderRadius: 12,
-            background: "#fff",
-            padding: 12,
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-          }}
-        >
-          <DetailRow label="Piso" value={shift.nombrePiso || shift.raw?.nombrePiso || "Sin piso"} />
-          <DetailRow
-            label="Estado"
-            value={
-              shift.solicitudPendiente
-                ? `Solicitud pendiente${shift.solicitudCon ? ` con ${shift.solicitudCon}` : ""}`
-                : shift.cambioAprobado
-                ? `Cambio aprobado${shift.cambioAprobadoCon ? ` con ${shift.cambioAprobadoCon}` : ""}`
-                : shift.turnoLibre
-                ? `Cupo libre${shift.motivoLibre ? ` · ${shift.motivoLibre}` : ""}`
-                : shift.miTurno
-                ? "Tu turno"
-                : "Asignado"
-            }
-          />
-          {shift.horas && (
-            <DetailRow label="Duración" value={`${shift.horas} horas`} />
-          )}
-        </div>
-      </div>
-
-      {/* Equipo del turno — datos reales de API */}
-      {groupData && groupData.integrantes.length > 0 && (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: P2().ink3, textTransform: "uppercase", marginBottom: 8 }}>
-            Integrantes del mismo piso y horario
-          </div>
-          <TeamGroup group={groupData} />
-        </div>
-      )}
-
-      {/* Equipo legacy — datos del mock */}
-      {!groupData && legacyTeam && (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: P2().ink3, textTransform: "uppercase", marginBottom: 8 }}>
-            Integrantes del mismo piso y tipo
-          </div>
-          <TeamGroup
-            group={{
-              nombrePiso: legacyTeam.jefe?.nombre ? null : null,
-              integrantes: [
-                legacyTeam.jefe,
-                ...(legacyTeam.urgenciologos || []),
-                ...(legacyTeam.medicos || []),
-              ].filter(Boolean),
-            }}
-          />
-        </div>
-      )}
-
-      {/* Acciones */}
-      <div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: P2().ink3, textTransform: "uppercase", marginBottom: 8 }}>
-          Acciones
-        </div>
-        <ShiftActions shift={shift} />
-      </div>
-    </div>
-  );
-};
-
-/** Fila label/valor reutilizable */
-const DetailRow = ({ label, value }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-    <span style={{ color: P2().ink3, fontSize: 12, fontWeight: 700 }}>{label}</span>
-    <span style={{ color: P2().ink, fontSize: 12.5, fontWeight: 800, textAlign: "right" }}>{value}</span>
-  </div>
-);
-
-// ---------------------------------------------------------------------------
-// TEAMGROUP — lista simple de integrantes del equipo (sin roles)
-// ---------------------------------------------------------------------------
-
-/**
- * Muestra la lista plana de integrantes del turno agrupados por piso+tipo.
- * El usuario autenticado aparece destacado con fondo y "(tú)".
- */
-const TeamGroup = ({ group }) => {
-  const { integrantes = [] } = group;
-
-  return (
-    <div style={{ border: `1px solid ${P2().line}`, borderRadius: 12, background: "#fff", overflow: "hidden" }}>
-      {/* Encabezado con conteo */}
-      <div
-        style={{
-          padding: "8px 12px",
-          borderBottom: `1px solid ${P2().line2}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: P2().ink2 }}>
-          <SGTIcon name="users" size={13} color={P2().ink2} />
-          {integrantes.length} persona{integrantes.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-
-      {/* Lista de integrantes */}
-      <div style={{ padding: "4px 8px 8px" }}>
-        {integrantes.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "7px 6px",
-              borderRadius: 8,
-              background: p.esYo ? P2().primarySoft : "transparent",
-              marginTop: 2,
-            }}
-          >
-            <SGTAvatar person={p} size={28} />
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: p.esYo ? 800 : 500,
-                color: P2().ink,
-                flex: 1,
-              }}
-            >
-              {p.nombre}
-              {p.esYo && (
-                <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: P2().primary }}>
-                  (tú)
-                </span>
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// SHIFTACTIONS y ACTIONBTN
-// ---------------------------------------------------------------------------
-
-const ShiftActions = ({ shift }) => {
-  const actions = [];
-  if (shift.turnoLibre && !shift.solicitudPendiente) {
-    actions.push({ id: "solicitar-turno", label: "Solicitar turno", icon: "plus", tone: "primary" });
-  } else if (!shift.miTurno && !shift.solicitudPendiente) {
-    actions.push({ id: "cambio", label: "Solicitar cambio", icon: "swap", tone: "primary" });
-  }
-  actions.push({ id: "historial", label: "Ver historial", icon: "history", tone: "ghost" });
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {actions.map((a) => <ActionBtn key={a.id} {...a} />)}
-    </div>
-  );
-};
-
-const ActionBtn = ({ label, icon, tone = "primary" }) => {
-  const tones = {
-    primary: { bg: P2().primary, ink: "#fff", bd: P2().primary },
-    ghost: { bg: "#fff", ink: P2().ink, bd: P2().line },
-  };
-  const t = tones[tone] || tones.primary;
-
-  return (
-    <button
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        background: t.bg,
-        color: t.ink,
-        border: `1px solid ${t.bd}`,
-        padding: "12px 14px",
-        borderRadius: 12,
-        fontSize: 14,
-        fontWeight: 700,
-        cursor: "pointer",
-        textAlign: "left",
-      }}
-    >
-      <SGTIcon name={icon} size={17} color={t.ink} />
-      <span style={{ flex: 1 }}>{label}</span>
-      <SGTIcon name="chevron-right" size={14} color={t.ink} strokeWidth={2.4} />
-    </button>
   );
 };
 

@@ -33,6 +33,7 @@ const Prop4 = ({ tweaks = {} }) => {
   const [preAuthToken, setPreAuthToken] = useState(null);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
   const [solicitudesReturn, setSolicitudesReturn] = useState("agenda");
+  const [solicitudesCreatePreset, setSolicitudesCreatePreset] = useState(null);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -41,8 +42,16 @@ const Prop4 = ({ tweaks = {} }) => {
     if (tabId === "me") setCurrentView("perfil");
     if (tabId === "requests") {
       setSolicitudesReturn("agenda");
+      setSolicitudesCreatePreset(null);
       setCurrentView("solicitudes");
     }
+  };
+
+  const handleOpenSolicitudes = (preset = null) => {
+    setSolicitudesReturn("agenda");
+    setSolicitudesCreatePreset(preset);
+    setActiveTab("requests");
+    setCurrentView("solicitudes");
   };
 
   const handleLoginSuccess = ({ preAuthToken, servicios }) => {
@@ -118,6 +127,8 @@ const Prop4 = ({ tweaks = {} }) => {
           onSwitchService={handleBackToServiceSelection}
           onLogout={handleLogout}
           onOpenNotifications={handleOpenNotifications}
+          onOpenSolicitudes={handleOpenSolicitudes}
+          onOpenBitacora={() => setCurrentView("bitacora")}
         />
       )}
       {currentView === "notifications" && (
@@ -126,6 +137,7 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "calendar_view" && (
         <CalendarView
           onBack={() => { setCurrentView("agenda"); setActiveTab("home"); }}
+          onOpenBitacora={() => setCurrentView("bitacora")}
         />
       )}
       {currentView === "perfil" && (
@@ -160,7 +172,13 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "asignacion" && <AsignacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "jerarquia" && <JerarquiaView onBack={() => setCurrentView("admin")} />}
       {currentView === "pisos" && <PisosView onBack={() => setCurrentView("admin")} />}
-      {currentView === "solicitudes" && <SolicitudesView onBack={() => setCurrentView(solicitudesReturn)} />}
+      {currentView === "solicitudes" && (
+        <SolicitudesView
+          onBack={() => setCurrentView(solicitudesReturn)}
+          initialCreatePreset={solicitudesCreatePreset}
+          onInitialCreatePresetConsumed={() => setSolicitudesCreatePreset(null)}
+        />
+      )}
       {currentView === "admin_stats" && <AdminStats onBack={() => setCurrentView("admin")} />}
       {currentView === "bitacora" && <BitacoraView onBack={() => setCurrentView("admin")} />}
       {currentView === "auditoria" && <AuditoriaView onBack={() => setCurrentView("admin")} />}

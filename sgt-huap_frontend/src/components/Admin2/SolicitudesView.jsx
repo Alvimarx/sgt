@@ -184,7 +184,7 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
 
 // ── CrearSolicitudSheet ───────────────────────────────────────────────────────
 
-const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated }) => {
+const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, initialPreset }) => {
   const [step, setStep]         = useState(1); // 1=tipo, 2=form, 3=picker
   const [tipoSel, setTipoSel]   = useState(null);
   const [form, setForm]         = useState({});
@@ -199,6 +199,20 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated }) =
   const [loading, setLoading]   = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError]       = useState(null);
+
+  useEffect(() => {
+    if (!open || !initialPreset) return;
+
+    setStep(initialPreset.tipoSolicitudId ? 2 : 1);
+    setTipoSel(initialPreset.tipoSolicitudId || null);
+    setForm((prev) => ({
+      ...prev,
+      ...(initialPreset.idReceptor != null ? { idReceptor: initialPreset.idReceptor, receptorLabel: initialPreset.receptorLabel || null } : null),
+      ...(initialPreset.idTurno != null ? { idTurno: initialPreset.idTurno, turnoLabel: initialPreset.turnoLabel || null } : null),
+      ...(initialPreset.idTurnoPropio != null ? { idTurnoPropio: initialPreset.idTurnoPropio, turnoPropioLabel: initialPreset.turnoPropioLabel || null } : null),
+      ...(initialPreset.idTurnoDeseado != null ? { idTurnoDeseado: initialPreset.idTurnoDeseado, turnoDeseadoLabel: initialPreset.turnoDeseadoLabel || null } : null),
+    }));
+  }, [open, initialPreset]);
 
   useEffect(() => {
     if (!open || !tipoSel || step !== 2) return;
@@ -272,11 +286,11 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated }) =
   );
 
   const PICKERS = {
-    turnoBotar:     { title: 'Turno a liberar',        items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id })) },
-    turnoCobertura: { title: 'Turno a cubrir',          items: turnosLibres,                keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id })) },
+    turnoBotar:     { title: 'Turno a liberar',        items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
+    turnoCobertura: { title: 'Turno a cubrir',          items: turnosLibres,                keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
     turnoPropio:    { title: 'Tu turno a entregar',     items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoPropio: t.id })) },
     receptor:       { title: 'Funcionario receptor',    items: funcionarios,                keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario, idTurnoDeseado: undefined })) },
-    turnoDeseado:   { title: 'Turno del receptor',      items: turnosReceptor,             keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoDeseado: t.id })) },
+    turnoDeseado:   { title: 'Turno del receptor',      items: turnosReceptor,             keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoDeseado: t.id, turnoDeseadoLabel: null })) },
     fechaInicio:    { title: 'Fecha de inicio',  isDatePicker: true, onSel: (s) => setForm(prev => ({ ...prev, fechaInicio: s, fechaFin: prev.fechaFin && prev.fechaFin < s ? undefined : prev.fechaFin })) },
     fechaFin:       { title: 'Fecha de término', isDatePicker: true, onSel: (s) => setForm(prev => ({ ...prev, fechaFin: s })) },
   };
@@ -297,8 +311,8 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated }) =
   })();
 
   // ── Labels para mostrar selección ─────────────────────────────────────────
-  const turnoLabel = (list, id) => { const t = list.find(x => String(x.id) === String(id)); return t ? `${fmtFecha(t.diaInicioTurno)} ${fmtHora(t.horaInicio)}–${fmtHora(t.horaFin)}` : null; };
-  const funcLabel  = (id) => { const f = funcionarios.find(x => String(x.idFuncionario) === String(id)); return f ? [f.nombre, f.apellidoPaterno].filter(Boolean).join(' ') : null; };
+  const turnoLabel = (list, id, fallback = null) => { const t = list.find(x => String(x.id) === String(id)); return t ? `${fmtFecha(t.diaInicioTurno)} ${fmtHora(t.horaInicio)}–${fmtHora(t.horaFin)}` : fallback; };
+  const funcLabel  = (id, fallback = null) => { const f = funcionarios.find(x => String(x.idFuncionario) === String(id)); return f ? [f.nombre, f.apellidoPaterno].filter(Boolean).join(' ') : fallback; };
 
   const PickerBtn = ({ label, value, pkey }) => (
     <button onClick={() => openPicker(pkey)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: `1px solid ${value ? PA.primary : PA.line}`, background: '#fff', cursor: 'pointer' }}>
@@ -354,18 +368,18 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated }) =
             </>)}
 
             {tipoSel === 2 && (
-              <div><label style={lbl}>Turno a liberar</label><PickerBtn label="Seleccionar turno" value={turnoLabel(misTurnos, form.idTurno)} pkey="turnoBotar" /></div>
+              <div><label style={lbl}>Turno a liberar</label><PickerBtn label="Seleccionar turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoBotar" /></div>
             )}
 
             {tipoSel === 3 && (
-              <div><label style={lbl}>Turno a cubrir</label><PickerBtn label="Seleccionar turno disponible" value={turnoLabel(turnosLibres, form.idTurno)} pkey="turnoCobertura" /></div>
+              <div><label style={lbl}>Turno a cubrir</label><PickerBtn label="Seleccionar turno disponible" value={turnoLabel(turnosLibres, form.idTurno, form.turnoLabel)} pkey="turnoCobertura" /></div>
             )}
 
             {tipoSel === 4 && (<>
-              <div><label style={lbl}>Tu turno a entregar</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurnoPropio)} pkey="turnoPropio" /></div>
-              <div><label style={lbl}>Con quién intercambiar</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor)} pkey="receptor" /></div>
+              <div><label style={lbl}>Tu turno a entregar</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurnoPropio, form.turnoPropioLabel)} pkey="turnoPropio" /></div>
+              <div><label style={lbl}>Con quién intercambiar</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptor" /></div>
               {form.idReceptor && (
-                <div><label style={lbl}>Turno del receptor que quieres</label><PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado)} pkey="turnoDeseado" /></div>
+                <div><label style={lbl}>Turno del receptor que quieres</label><PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" /></div>
               )}
             </>)}
 
@@ -530,7 +544,7 @@ const EditMotivoSheet = ({ solicitud, onClose, onSaved }) => {
 
 // ── SolicitudesView ───────────────────────────────────────────────────────────
 
-const SolicitudesView = ({ onBack }) => {
+const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePresetConsumed }) => {
   const { user } = useAuth();
   const isMedico  = user?.rol === 'MEDICO';
   const canDecide = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
@@ -542,6 +556,19 @@ const SolicitudesView = ({ onBack }) => {
   const [error, setError]       = useState(null);
   const [showCrear, setShowCrear]     = useState(false);
   const [editSolicitud, setEditSolicitud] = useState(null);
+  const [crearPreset, setCrearPreset] = useState(null);
+
+  useEffect(() => {
+    if (!initialCreatePreset) return;
+    setCrearPreset(initialCreatePreset);
+    setShowCrear(true);
+    onInitialCreatePresetConsumed?.();
+  }, [initialCreatePreset, onInitialCreatePresetConsumed]);
+
+  const handleCloseCrear = () => {
+    setShowCrear(false);
+    setCrearPreset(null);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -672,10 +699,11 @@ const SolicitudesView = ({ onBack }) => {
 
       <CrearSolicitudSheet
         open={showCrear}
-        onClose={() => setShowCrear(false)}
+        onClose={handleCloseCrear}
         userId={user?.id}
         servicioId={user?.servicioId}
         onCreated={load}
+        initialPreset={crearPreset}
       />
 
       <EditMotivoSheet
