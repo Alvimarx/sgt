@@ -386,6 +386,130 @@ INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD,
  'Func 6 libera turno 09-May (id=5). Turno queda disponible para cobertura.',
  '2026-04-28 10:30:00', '2026-05-09 20:00:00', '2026-04-28 10:30:00', TRUE);
 
+-- ==============================================================
+-- DEMO: Turnos de Álvaro López (ID_FUNCIONARIO=1) + relleno mayo
+-- ==============================================================
+INSERT INTO Turnos (id_turno, nombre, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_piso, id_plantilla) VALUES
+-- Álvaro López – 10 turnos distribuidos en mayo 2026
+(36, 'Diurno 05-May',    '2026-05-05', '2026-05-05', '08:00:00', '20:00:00',  1, 1, 3, 1),
+(37, 'Nocturno 06-May',  '2026-05-06', '2026-05-07', '20:00:00', '08:00:00',  1, 1, 1, 1),
+(38, 'Diurno 09-May',    '2026-05-09', '2026-05-09', '08:00:00', '20:00:00',  1, 1, 2, 1),
+(39, 'Nocturno 13-May',  '2026-05-13', '2026-05-14', '20:00:00', '08:00:00',  1, 1, 3, 1),
+(40, 'Diurno 15-May',    '2026-05-15', '2026-05-15', '08:00:00', '20:00:00',  1, 1, 1, 1),
+(41, 'Nocturno 19-May',  '2026-05-19', '2026-05-20', '20:00:00', '08:00:00',  1, 1, 2, 1),
+(42, 'Diurno 21-May',    '2026-05-21', '2026-05-21', '08:00:00', '20:00:00',  1, 1, 3, 1),
+(43, 'Diurno 23-May',    '2026-05-23', '2026-05-23', '08:00:00', '20:00:00',  1, 1, 1, 1),
+(44, 'Nocturno 26-May',  '2026-05-26', '2026-05-27', '20:00:00', '08:00:00',  1, 1, 2, 1),
+(45, 'Diurno 29-May',    '2026-05-29', '2026-05-29', '08:00:00', '20:00:00',  1, 1, 3, 1),
+-- Turnos libres adicionales Medicina Interna
+(46, 'Diurno 24-May',    '2026-05-24', '2026-05-24', '08:00:00', '20:00:00', NULL, 1, 1, 1),
+(47, 'Nocturno 27-May',  '2026-05-27', '2026-05-28', '20:00:00', '08:00:00', NULL, 1, 2, 1),
+-- Turnos resto de equipo – última quincena de mayo
+(48, 'Diurno 21-May',    '2026-05-21', '2026-05-21', '08:00:00', '20:00:00', 17, 1, 1, 1),
+(49, 'Diurno 22-May',    '2026-05-22', '2026-05-22', '08:00:00', '20:00:00', 18, 1, 2, 1),
+(50, 'Nocturno 22-May',  '2026-05-22', '2026-05-23', '20:00:00', '08:00:00', 19, 1, 3, 1),
+(51, 'Diurno 26-May',    '2026-05-26', '2026-05-26', '08:00:00', '20:00:00', 20, 1, 1, 1),
+(52, 'Nocturno 23-May',  '2026-05-23', '2026-05-24', '20:00:00', '08:00:00',  2, 1, 3, 1),
+(53, 'Diurno 27-May',    '2026-05-27', '2026-05-27', '08:00:00', '20:00:00',  3, 1, 2, 1),
+(54, 'Diurno 28-May',    '2026-05-28', '2026-05-28', '08:00:00', '20:00:00',  4, 1, 1, 1),
+(55, 'Nocturno 28-May',  '2026-05-28', '2026-05-29', '20:00:00', '08:00:00',  5, 1, 3, 1);
+
+-- ==============================================================
+-- DEMO: Solicitudes adicionales (IDs 5-12)
+-- Tipo: 1=Permiso  2=Botar turno  3=Cobertura  4=Intercambio
+-- ==============================================================
+INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TURNO, ID_TURNO_RECEPTOR, ID_FUNCIONARIO_RECEPTOR, Aceptado_Receptor, Estado, Fecha_creacion, Fecha_inicio_permiso, Fecha_termino_permiso, Motivo) VALUES
+-- (5) Álvaro pide permiso para su propio turno 36 (05-May diurno) — PENDIENTE
+(5, 1, 1, 36, NULL, NULL, NULL, 'PENDIENTE',
+ '2026-05-02 08:30:00', '2026-05-05 08:00:00', '2026-05-05 20:00:00',
+ 'Congreso médico SOCHINMI — asistencia obligatoria como jefe de servicio'),
+-- (6) Sergio González (func 3) pide permiso para turno 2 (06-May diurno) — PENDIENTE
+(6, 3, 1, 2, NULL, NULL, NULL, 'PENDIENTE',
+ '2026-05-03 11:00:00', '2026-05-06 08:00:00', '2026-05-06 20:00:00',
+ 'Reunión académica universitaria con alumnos en práctica'),
+-- (7) Javier González (func 9) quiere botar turno 8 (14-May diurno) — PENDIENTE
+(7, 9, 2, 8, NULL, NULL, NULL, 'PENDIENTE',
+ '2026-05-10 16:00:00', NULL, NULL,
+ 'Acumulación de horas extra — solicito liberar el turno del 14-May'),
+-- (8) Andrés Tigre (func 4) propone intercambio: ofrece turno 3 (07-May) por turno 40 (Álvaro, 15-May); Álvaro aceptó — PENDIENTE jefatura
+(8, 4, 4, 3, 40, 1, TRUE, 'PENDIENTE',
+ '2026-05-05 09:00:00', NULL, NULL,
+ 'Necesito moverme al 15-May por asistencia a parto familiar'),
+-- (9) Fabián Díaz (func 7) solicita cubrir turno libre 46 (24-May diurno) — PENDIENTE
+(9, 7, 3, 46, NULL, NULL, NULL, 'PENDIENTE',
+ '2026-05-20 10:30:00', NULL, NULL,
+ 'Disponible para cubrir el diurno desocupado del 24-May'),
+-- (10) Tomás Ide (func 17) pide permiso para turno 48 (21-May diurno) — APROBADA
+(10, 17, 1, 48, NULL, NULL, NULL, 'APROBADA',
+ '2026-05-14 14:00:00', '2026-05-21 08:00:00', '2026-05-21 20:00:00',
+ 'Cita médica con especialista cardiólogo'),
+-- (11) Karla Rojas (func 10) pide cobertura del turno libre 47 (27-May nocturno) — RECHAZADA
+(11, 10, 3, 47, NULL, NULL, NULL, 'RECHAZADA',
+ '2026-05-22 09:00:00', NULL, NULL,
+ 'Me ofrezco voluntariamente para cubrir el nocturno del 27-May'),
+-- (12) María José Espinoza (func 8) propone intercambio: ofrece turno 7 (13-May) por turno 43 (Álvaro, 23-May); Álvaro aún no responde — PENDIENTE
+(12, 8, 4, 7, 43, 1, NULL, 'PENDIENTE',
+ '2026-05-12 17:30:00', NULL, NULL,
+ 'Me conviene más el turno del 23-May, ofrezco mi turno del 13-May');
+
+-- ==============================================================
+-- DEMO: Notificaciones adicionales (IDs 5-12)
+-- ==============================================================
+INSERT INTO Notificacion2 (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
+(5, 'NO_LEIDA', '2026-05-02 08:30:01',
+ 'Su solicitud de permiso para el 05-May (Congreso SOCHINMI) ha sido recibida y está pendiente de aprobación.', 5),
+(6, 'NO_LEIDA', '2026-05-03 11:00:01',
+ 'Su solicitud de permiso para el 06-May ha sido recibida y está pendiente de aprobación.', 6),
+(7, 'NO_LEIDA', '2026-05-10 16:00:01',
+ 'Su solicitud para liberar el turno del 14-May ha sido recibida y está en revisión.', 7),
+(8, 'NO_LEIDA', '2026-05-05 09:00:01',
+ 'El funcionario receptor (Álvaro López) ha aceptado el intercambio de turnos. Pendiente de aprobación por jefatura.', 8),
+(9, 'NO_LEIDA', '2026-05-20 10:30:01',
+ 'Su solicitud de cobertura del turno diurno 24-May ha sido recibida y está pendiente de asignación.', 9),
+(10, 'LEIDA',   '2026-05-14 14:00:01',
+ 'Su solicitud de permiso para el 21-May ha sido aprobada por jefatura.', 10),
+(11, 'LEIDA',   '2026-05-22 09:00:01',
+ 'Su solicitud de cobertura del nocturno 27-May ha sido rechazada. Contacte a su jefe de servicio para más información.', 11),
+(12, 'NO_LEIDA', '2026-05-12 17:30:01',
+ 'Ha recibido una propuesta de intercambio de turno del 13-May por el 23-May de parte de María José Espinoza. Revise su bandeja de solicitudes.', 12);
+
+-- ==============================================================
+-- DEMO: Bitácora adicional (IDs 5-12)
+-- ==============================================================
+INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD, Tipo_evento, Motivo, Observaciones, Fecha_inicio_afectada, Fecha_fin_afectada, Fecha_modificacion, Activo) VALUES
+(5, 1,  NULL, 5,  'SOLICITUD_CREADA',
+ 'Permiso por congreso médico',
+ 'Álvaro López — turno diurno 05-May (id=36), Pabellón MI. Solicita permiso como jefe de servicio.',
+ '2026-05-02 08:30:00', NULL, '2026-05-02 08:30:00', TRUE),
+(6, 3,  NULL, 6,  'SOLICITUD_CREADA',
+ 'Permiso por reunión académica',
+ 'Sergio González — turno diurno 06-May (id=2), Sala Mujeres.',
+ '2026-05-03 11:00:00', NULL, '2026-05-03 11:00:00', TRUE),
+(7, 9,  NULL, 7,  'SOLICITUD_CREADA',
+ 'Solicitud botar turno — horas extra',
+ 'Javier González — turno diurno 14-May (id=8), Pabellón MI. Solicita liberar por acumulación de horas.',
+ '2026-05-10 16:00:00', NULL, '2026-05-10 16:00:00', TRUE),
+(8, 4,  NULL, 8,  'OFERTA_ACEPTADA_POR_RECEPTOR',
+ 'Receptor acepta intercambio de turno',
+ 'Func 4 (Andrés Tigre) ↔ Func 1 (Álvaro López): turno 07-May ↔ turno 15-May. Pendiente aprobación jefatura.',
+ '2026-05-05 09:30:00', NULL, '2026-05-05 09:30:00', TRUE),
+(9, 7,  NULL, 9,  'SOLICITUD_CREADA',
+ 'Solicitud cobertura voluntaria',
+ 'Fabián Díaz — turno libre diurno 24-May (id=46), Sala Hombres MI. Se postula para cubrir.',
+ '2026-05-20 10:30:00', NULL, '2026-05-20 10:30:00', TRUE),
+(10, 1, NULL, 10, 'CAMBIO_ESTADO_APROBADA',
+ 'Permiso aprobado por jefatura',
+ 'Tomás Ide — turno diurno 21-May (id=48). Aprobado por Álvaro López.',
+ '2026-05-14 15:00:00', '2026-05-21 20:00:00', '2026-05-14 15:00:00', TRUE),
+(11, 1, NULL, 11, 'CAMBIO_ESTADO_RECHAZADA',
+ 'Cobertura rechazada por jefatura',
+ 'Karla Rojas — turno libre nocturno 27-May (id=47). Rechazado: cobertura ya asignada internamente.',
+ '2026-05-22 10:00:00', NULL, '2026-05-22 10:00:00', TRUE),
+(12, 8, NULL, 12, 'SOLICITUD_CREADA',
+ 'Propuesta de intercambio enviada a Álvaro López',
+ 'María José Espinoza ofrece turno 13-May (id=7) por turno 23-May de Álvaro (id=43). Pendiente respuesta receptor.',
+ '2026-05-12 17:30:00', NULL, '2026-05-12 17:30:00', TRUE);
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ==============================================================
