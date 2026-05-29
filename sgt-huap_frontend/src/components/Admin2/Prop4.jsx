@@ -24,6 +24,7 @@ import SelectServiceView from "./SelectServiceView";
 import ServiciosView from "./ServiciosView";
 import SolicitudesView from "./SolicitudesView";
 import TiposTurnoView from "./TiposTurnoView";
+import PlanificacionView from "./Planificacion";
 
 const Prop4 = ({ tweaks = {} }) => {
   const auth = useAuth();
@@ -153,8 +154,10 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoAuditoria={() => setCurrentView("auditoria")}
           onGoTiposTurno={() => setCurrentView("tipos_turno")}
           onGoPlantillas={() => setCurrentView("plantillas")}
+          onGoPlanificacion={() => setCurrentView("planificacion")}
         />
       )}
+      {currentView === "planificacion" && <PlanificacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "rotativa_wizard" && <RotativaWizard onExit={() => setCurrentView("admin")} />}
       {currentView === "servicios" && <ServiciosView onBack={() => setCurrentView("admin")} />}
       {currentView === "asignacion" && <AsignacionView onBack={() => setCurrentView("admin")} />}
