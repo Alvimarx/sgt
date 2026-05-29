@@ -4,6 +4,7 @@ import com.pingeso.HUAP.Entity.PisoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Repository.PisoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
+import com.pingeso.HUAP.Repository.TurnoRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -15,13 +16,16 @@ public class PisoService {
 
     private final PisoRepository pisoRepository;
     private final ServicioRepository servicioRepository;
+    private final TurnoRepository turnoRepository;
 
     public PisoService(
             PisoRepository pisoRepository,
-            ServicioRepository servicioRepository
+            ServicioRepository servicioRepository,
+            TurnoRepository turnoRepository
     ) {
         this.pisoRepository = pisoRepository;
         this.servicioRepository = servicioRepository;
+        this.turnoRepository = turnoRepository;
     }
 
     // Crear piso
@@ -82,10 +86,24 @@ public class PisoService {
         return pisoRepository.save(piso);
     }
 
-    // Eliminar piso
+    // Cantidad de turnos asociados a un piso (para advertir antes de eliminar).
+    public long contarTurnosAsociados(Long idPiso) {
+        obtenerPiso(idPiso);
+        return turnoRepository.countByPiso_IdPiso(idPiso);
+    }
+
+    // Eliminar piso. Se bloquea si el piso tiene turnos asociados.
     public void eliminarPiso(Long idPiso) {
 
         PisoEntity piso = obtenerPiso(idPiso);
+
+        long turnos = turnoRepository.countByPiso_IdPiso(idPiso);
+        if (turnos > 0) {
+            throw new RuntimeException(
+                    "No se puede eliminar: el piso está asociado a "
+                    + turnos + " turno(s). Reasigna esos turnos a otro piso antes de eliminarlo."
+            );
+        }
 
         pisoRepository.delete(piso);
     }

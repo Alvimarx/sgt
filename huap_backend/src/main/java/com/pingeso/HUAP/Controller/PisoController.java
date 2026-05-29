@@ -82,6 +82,17 @@ public class PisoController {
         );
     }
 
+    // Cantidad de turnos asociados a un piso (para advertir antes de eliminar)
+    @GetMapping("/{id}/turnos-asociados")
+    public ResponseEntity<Long> contarTurnosAsociados(
+            @PathVariable Long id
+    ) {
+
+        return ResponseEntity.ok(
+                pisoService.contarTurnosAsociados(id)
+        );
+    }
+
     // Eliminar piso
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarPiso(

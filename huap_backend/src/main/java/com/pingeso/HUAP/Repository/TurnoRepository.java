@@ -24,6 +24,9 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
     List<TurnoEntity> findByPiso_IdPiso(Long idPiso);
 
+    // Cantidad de turnos asociados a un piso. Si es > 0 no se permite eliminar el piso.
+    long countByPiso_IdPiso(Long idPiso);
+
     List<TurnoEntity> findByPlantilla_IdPlantilla(Long idPlantilla);
 
     // ====================================================================
