@@ -4,7 +4,7 @@ import { SGT_DATA } from './data';
 import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from './UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
-import ShiftDetail, { getTeamColor } from './ShiftDetail';
+import ShiftDetail, { getTeamColor, formatShiftLabel } from './ShiftDetail';
 
 // ---------------------------------------------------------------------------
 // HELPERS DE PRESENTACIÓN
@@ -52,7 +52,7 @@ const dateKey = (year, month, day) =>
 // CALENDARVIEW
 // ---------------------------------------------------------------------------
 
-const CalendarView = ({ onBack, onOpenBitacora }) => {
+const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
     const { user } = useAuth();
     const PA = SGT_DATA.PALETTE;
 
@@ -289,9 +289,14 @@ const CalendarView = ({ onBack, onOpenBitacora }) => {
                 {detailShift && (
                     <ShiftDetail
                         shift={detailShift}
-                        onAction={(actionId) => {
+                        onAction={(actionId, shift) => {
                             if (actionId === "historial") {
                                 onOpenBitacora?.();
+                                return;
+                            }
+                            if (actionId === "solicitar-turno") {
+                                onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: shift.id, turnoLabel: formatShiftLabel(shift) });
+                                return;
                             }
                         }}
                     />

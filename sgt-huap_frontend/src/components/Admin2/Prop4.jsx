@@ -138,6 +138,7 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "calendar_view" && (
         <CalendarView
           onBack={() => { setCurrentView("agenda"); setActiveTab("home"); }}
+          onOpenSolicitudes={handleOpenSolicitudes}
           onOpenBitacora={() => setCurrentView("bitacora")}
         />
       )}
