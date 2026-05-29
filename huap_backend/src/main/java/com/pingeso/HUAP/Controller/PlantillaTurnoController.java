@@ -70,6 +70,15 @@ public class PlantillaTurnoController {
     }
 
     /**
+     * Nombres de las rotativas que se verán afectadas al eliminar el tipo de turno.
+     * Lista vacía = el tipo no está en uso.
+     */
+    @GetMapping("/{id}/rotativas-afectadas")
+    public ResponseEntity<List<String>> obtenerRotativasAfectadas(@PathVariable Long id) {
+        return ResponseEntity.ok(plantillaTurnoService.obtenerRotativasAfectadas(id));
+    }
+
+    /**
      * 6. Elimina un tipo de turno del catálogo.
      */
     @DeleteMapping("/{id}")

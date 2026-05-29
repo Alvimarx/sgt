@@ -60,7 +60,19 @@ export const tiposTurnoService = {
         return res.data;
     },
 
-    /** DELETE /tipos-turno/{id} — elimina si no está en uso. */
+    /**
+     * GET /tipos-turno/{id}/rotativas-afectadas — nombres de las rotativas cuyos días
+     * pasarán a ser libres si se elimina este tipo de turno. Array vacío = no está en uso.
+     */
+    getRotativasAfectadas: async (id) => {
+        const res = await axiosInstance.get(`/tipos-turno/${id}/rotativas-afectadas`);
+        return Array.isArray(res.data) ? res.data : [];
+    },
+
+    /**
+     * DELETE /tipos-turno/{id} — elimina el tipo de turno. Si está en uso, libera
+     * sus referencias en las rotativas (los días quedan libres) y luego lo borra.
+     */
     delete: async (id) => {
         const res = await axiosInstance.delete(`/tipos-turno/${id}`);
         return res.data;

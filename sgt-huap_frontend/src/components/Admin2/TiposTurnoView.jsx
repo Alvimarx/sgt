@@ -28,54 +28,58 @@ const turnoColor = (index) => {
     return { bg: `oklch(0.93 0.05 ${h})`, ink: `oklch(0.30 0.10 ${h})`, border: `oklch(0.80 0.08 ${h})` };
 };
 
-// ─── Sub-componente: fila de tabla ──────────────────────────────────────────
-function TurnoRow({ turno, index, onEdit, onDelete }) {
+// ─── Sub-componente: card de tipo de turno ──────────────────────────────────
+function TurnoCard({ turno, index, onEdit, onDelete }) {
     const c = turnoColor(index);
     return (
-        <tr style={{ borderBottom: `1px solid ${PA.line}` }}>
-            <td style={{ padding: '12px 16px' }}>
-                <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    background: c.bg, color: c.ink, border: `1px solid ${c.border}`,
-                    borderRadius: 6, padding: '3px 10px', fontSize: 13, fontWeight: 600
+        <div style={{
+            background: '#fff', borderRadius: 14,
+            border: `1px solid ${PA.line}`, overflow: 'hidden',
+        }}>
+            <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                    width: 44, height: 44, borderRadius: 12,
+                    background: c.bg, display: 'grid', placeItems: 'center', flexShrink: 0,
                 }}>
-                    <Clock size={13} />
-                    {turno.nombre}
-                </span>
-            </td>
-            <td style={{ padding: '12px 16px', fontSize: 14, color: PA.ink2, fontFamily: 'monospace' }}>
-                {formatHora(turno.horaInicio)}
-            </td>
-            <td style={{ padding: '12px 16px', fontSize: 14, color: PA.ink2, fontFamily: 'monospace' }}>
-                {formatHora(turno.horaTermino)}
-            </td>
-            <td style={{ padding: '12px 16px' }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                        onClick={() => onEdit(turno)}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 4,
-                            padding: '5px 10px', borderRadius: 6, border: `1px solid ${PA.line}`,
-                            background: PA.surface2, color: PA.ink2, fontSize: 12,
-                            cursor: 'pointer'
-                        }}
-                    >
-                        <Pencil size={13} /> Editar
-                    </button>
-                    <button
-                        onClick={() => onDelete(turno)}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 4,
-                            padding: '5px 10px', borderRadius: 6, border: `1px solid ${PA.warnSoft}`,
-                            background: PA.warnSoft, color: PA.warn, fontSize: 12,
-                            cursor: 'pointer'
-                        }}
-                    >
-                        <Trash2 size={13} /> Eliminar
-                    </button>
+                    <Clock size={20} color={c.ink} />
                 </div>
-            </td>
-        </tr>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: c.ink, marginBottom: 4 }}>
+                        {turno.nombre}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: PA.ink3, fontWeight: 600 }}>
+                        <Clock size={11} />
+                        <span style={{ fontFamily: 'monospace' }}>{formatHora(turno.horaInicio)}</span>
+                        <span>–</span>
+                        <span style={{ fontFamily: 'monospace' }}>{formatHora(turno.horaTermino)}</span>
+                    </div>
+                </div>
+            </div>
+            <div style={{ display: 'flex', borderTop: `1px solid ${PA.line}` }}>
+                <button
+                    onClick={() => onEdit(turno)}
+                    style={{
+                        flex: 1, padding: '11px 0',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        background: 'none', border: 'none', borderRight: `1px solid ${PA.line}`,
+                        cursor: 'pointer', fontSize: 13, fontWeight: 600, color: PA.ink2,
+                    }}
+                >
+                    <Pencil size={14} /> Editar
+                </button>
+                <button
+                    onClick={() => onDelete(turno)}
+                    style={{
+                        flex: 1, padding: '11px 0',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        background: 'none', border: 'none',
+                        cursor: 'pointer', fontSize: 13, fontWeight: 600, color: PA.warn,
+                    }}
+                >
+                    <Trash2 size={14} /> Eliminar
+                </button>
+            </div>
+        </div>
     );
 }
 
@@ -175,38 +179,107 @@ function TurnoForm({ inicial, onSave, onCancel, saving }) {
     );
 }
 
-// ─── Sub-componente: diálogo de confirmación de eliminación ─────────────────
-function ConfirmDelete({ turno, onConfirm, onCancel, deleting }) {
+// ─── Sub-componente: confirmación de eliminación (bottom-sheet) ─────────────
+function ConfirmDelete({ turno, rotativas = [], loadingImpacto = false, onConfirm, onCancel, deleting }) {
+    const hayImpacto = rotativas.length > 0;
     return (
-        <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }}>
-            <div style={{
-                background: PA.surface, borderRadius: 16, padding: 28, maxWidth: 380, width: '90%',
-                boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
-            }}>
-                <div style={{ fontWeight: 700, fontSize: 17, color: PA.ink, marginBottom: 10 }}>
+        <div
+            onClick={onCancel}
+            style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+                display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000,
+            }}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                    background: '#fff', borderRadius: '20px 20px 0 0',
+                    padding: '8px 20px 36px', width: '100%', maxWidth: 480,
+                    boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
+                }}
+            >
+                {/* Handle */}
+                <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 16 }}>
+                    <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
+                </div>
+
+                {/* Ícono de advertencia */}
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                    <div style={{
+                        width: 56, height: 56, borderRadius: 16,
+                        background: PA.warnSoft, display: 'grid', placeItems: 'center',
+                    }}>
+                        <Trash2 size={26} color={PA.warn} />
+                    </div>
+                </div>
+
+                <div style={{ fontWeight: 800, fontSize: 18, color: PA.ink, textAlign: 'center', marginBottom: 10 }}>
                     ¿Eliminar tipo de turno?
                 </div>
-                <p style={{ fontSize: 14, color: PA.ink2, margin: 0, lineHeight: 1.5 }}>
-                    Se eliminará <strong>{turno.nombre}</strong> del catálogo.
-                    Esta acción no se puede deshacer. Si el turno ya está asignado
-                    a alguna rotativa, el sistema rechazará la eliminación.
+
+                <p style={{ fontSize: 14, color: PA.ink2, margin: '0 0 6px', lineHeight: 1.55, textAlign: 'center' }}>
+                    Estás a punto de eliminar <strong style={{ color: PA.ink }}>{turno.nombre}</strong> del catálogo.
                 </p>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
-                    <button onClick={onCancel} style={{
-                        padding: '7px 16px', borderRadius: 8, border: `1px solid ${PA.line}`,
-                        background: 'none', color: PA.ink2, fontSize: 13, cursor: 'pointer'
+
+                {loadingImpacto ? (
+                    <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
+                        Verificando uso en rotativas…
+                    </p>
+                ) : hayImpacto ? (
+                    <div style={{
+                        background: PA.warnSoft, borderRadius: 12, padding: '12px 14px',
+                        margin: '4px 0 22px', textAlign: 'left',
                     }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                            <AlertCircle size={16} color={PA.warn} style={{ flexShrink: 0, marginTop: 1 }} />
+                            <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>
+                                Este turno está en uso en{' '}
+                                <strong style={{ color: PA.ink }}>
+                                    {rotativas.length} rotativa{rotativas.length === 1 ? '' : 's'}
+                                </strong>. Esos días pasarán a quedar <strong style={{ color: PA.ink }}>libres</strong>.
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingLeft: 24 }}>
+                            {rotativas.map((nombre) => (
+                                <span key={nombre} style={{
+                                    fontSize: 12, fontWeight: 600, color: PA.warn,
+                                    background: '#fff', borderRadius: 999, padding: '3px 10px',
+                                    border: `1px solid ${PA.line}`,
+                                }}>
+                                    {nombre}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
+                        No está asignado a ninguna rotativa. Esta acción no se puede deshacer.
+                    </p>
+                )}
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                        onClick={onCancel}
+                        style={{
+                            flex: 1, padding: '13px 0', borderRadius: 12,
+                            border: `1.5px solid ${PA.line}`, background: 'none',
+                            color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                        }}
+                    >
                         Cancelar
                     </button>
-                    <button onClick={onConfirm} disabled={deleting} style={{
-                        padding: '7px 16px', borderRadius: 8, border: 'none',
-                        background: PA.warn, color: '#fff', fontSize: 13,
-                        cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1
-                    }}>
-                        {deleting ? 'Eliminando…' : 'Sí, eliminar'}
+                    <button
+                        onClick={onConfirm}
+                        disabled={deleting || loadingImpacto}
+                        style={{
+                            flex: 1, padding: '13px 0', borderRadius: 12,
+                            border: 'none', background: PA.warn, color: '#fff',
+                            fontSize: 15, fontWeight: 700,
+                            cursor: (deleting || loadingImpacto) ? 'not-allowed' : 'pointer',
+                            opacity: (deleting || loadingImpacto) ? 0.7 : 1,
+                        }}
+                    >
+                        {deleting ? 'Eliminando…' : hayImpacto ? 'Sí, eliminar igual' : 'Sí, eliminar'}
                     </button>
                 </div>
             </div>
@@ -224,6 +297,8 @@ export default function TiposTurnoView({ onBack }) {
     const [showForm,    setShowForm]    = useState(false);
     const [editing,     setEditing]     = useState(null);   // TurnoDTO siendo editado
     const [confirmDel,  setConfirmDel]  = useState(null);   // TurnoDTO a eliminar
+    const [afectadas,   setAfectadas]   = useState([]);     // nombres de rotativas afectadas
+    const [loadingImpacto, setLoadingImpacto] = useState(false);
     const [saving,      setSaving]      = useState(false);
     const [deleting,    setDeleting]    = useState(false);
 
@@ -260,6 +335,21 @@ export default function TiposTurnoView({ onBack }) {
         }
     }, [editing, user?.servicioId, load]);
 
+    const openConfirmDelete = useCallback(async (turno) => {
+        setConfirmDel(turno);
+        setAfectadas([]);
+        setLoadingImpacto(true);
+        try {
+            const rotativas = await tiposTurnoService.getRotativasAfectadas(turno.idPlantillaTurno);
+            setAfectadas(rotativas);
+        } catch {
+            // Si no se pudo consultar el impacto, se permite eliminar igual sin la advertencia.
+            setAfectadas([]);
+        } finally {
+            setLoadingImpacto(false);
+        }
+    }, []);
+
     const handleDelete = useCallback(async () => {
         if (!confirmDel) return;
         setDeleting(true);
@@ -280,7 +370,7 @@ export default function TiposTurnoView({ onBack }) {
     const closeForm  = () => { setEditing(null); setShowForm(false); };
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
             {/* Header con botón volver */}
             <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line}`, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -328,58 +418,44 @@ export default function TiposTurnoView({ onBack }) {
                     />
                 )}
 
-                {/* Tabla de tipos */}
-                <div style={{ background: PA.surface, borderRadius: 14, border: `1px solid ${PA.line}`, overflow: 'hidden' }}>
-                    {loading ? (
-                        <div style={{ padding: 40, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
-                            Cargando…
-                        </div>
-                    ) : tipos.length === 0 ? (
-                        <div style={{ padding: 48, textAlign: 'center' }}>
-                            <Clock size={36} style={{ color: PA.ink3, marginBottom: 12 }} />
-                            <p style={{ margin: 0, color: PA.ink3, fontSize: 14 }}>
-                                No hay tipos de turno definidos para este servicio.
-                            </p>
-                            <button
-                                onClick={openCreate}
-                                style={{
-                                    marginTop: 14, padding: '8px 18px', borderRadius: 8,
-                                    background: PA.primary, color: '#fff', border: 'none',
-                                    fontSize: 13, cursor: 'pointer'
-                                }}
-                            >
-                                Crear el primero
-                            </button>
-                        </div>
-                    ) : (
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ background: PA.surface2, borderBottom: `1px solid ${PA.line}` }}>
-                                    {['Turno', 'Hora inicio', 'Hora término', 'Acciones'].map(h => (
-                                        <th key={h} style={{
-                                            padding: '10px 16px', textAlign: 'left',
-                                            fontSize: 11, fontWeight: 700, color: PA.ink3,
-                                            textTransform: 'uppercase', letterSpacing: '0.05em'
-                                        }}>
-                                            {h}
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {tipos.map((t, i) => (
-                                    <TurnoRow
-                                        key={t.idPlantillaTurno}
-                                        turno={t}
-                                        index={i}
-                                        onEdit={openEdit}
-                                        onDelete={setConfirmDel}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
+                {/* Lista de tipos de turno */}
+                {loading ? (
+                    <div style={{ padding: 40, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
+                        Cargando…
+                    </div>
+                ) : tipos.length === 0 ? (
+                    <div style={{
+                        background: '#fff', borderRadius: 14, border: `1px solid ${PA.line}`,
+                        padding: 48, textAlign: 'center',
+                    }}>
+                        <Clock size={36} style={{ color: PA.ink3, marginBottom: 12 }} />
+                        <p style={{ margin: '0 0 14px', color: PA.ink3, fontSize: 14 }}>
+                            No hay tipos de turno definidos para este servicio.
+                        </p>
+                        <button
+                            onClick={openCreate}
+                            style={{
+                                padding: '9px 20px', borderRadius: 10,
+                                background: PA.primary, color: '#fff', border: 'none',
+                                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                            }}
+                        >
+                            Crear el primero
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {tipos.map((t, i) => (
+                            <TurnoCard
+                                key={t.idPlantillaTurno}
+                                turno={t}
+                                index={i}
+                                onEdit={openEdit}
+                                onDelete={openConfirmDelete}
+                            />
+                        ))}
+                    </div>
+                )}
 
             </div>
 
@@ -387,6 +463,8 @@ export default function TiposTurnoView({ onBack }) {
             {confirmDel && (
                 <ConfirmDelete
                     turno={confirmDel}
+                    rotativas={afectadas}
+                    loadingImpacto={loadingImpacto}
                     onConfirm={handleDelete}
                     onCancel={() => setConfirmDel(null)}
                     deleting={deleting}

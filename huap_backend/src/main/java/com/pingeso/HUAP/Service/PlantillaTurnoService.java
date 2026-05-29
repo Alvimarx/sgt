@@ -56,6 +56,15 @@ public class PlantillaTurnoService {
                 .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado"));
     }
 
+    /**
+     * Nombres de las rotativas que se verán afectadas al eliminar el tipo de turno
+     * (los días que lo usan pasarán a ser libres). Lista vacía = no está en uso.
+     */
+    public List<String> obtenerRotativasAfectadas(Long idPlantillaTurno) {
+        obtenerTipoDeTurno(idPlantillaTurno);
+        return plantillaDiaRepository.findNombresRotativasUsando(idPlantillaTurno);
+    }
+
     public List<PlantillaTurnoEntity> obtenerCatalogo() {
         return plantillaTurnoRepository.findAll();
     }
@@ -92,18 +101,16 @@ public class PlantillaTurnoService {
 
     /**
      * Elimina un tipo de turno del catálogo.
-     * Falla si el tipo está referenciado en la secuencia de alguna rotativa.
+     * Si el tipo está referenciado en la secuencia de alguna rotativa, primero libera
+     * esas referencias dejándolas en NULL (el día pasa a ser libre, conservando su
+     * posición en el patrón) y luego elimina el tipo de turno. La longitud del patrón
+     * de las rotativas afectadas no cambia.
      */
     public void eliminarTipoDeTurno(Long idPlantillaTurno) {
         obtenerTipoDeTurno(idPlantillaTurno);
 
-        long usos = plantillaDiaRepository.countByPlantillaTurno_IdPlantillaTurno(idPlantillaTurno);
-        if (usos > 0) {
-            throw new RuntimeException(
-                    "No se puede eliminar: el tipo de turno está asignado a "
-                    + usos + " día(s) en rotativas existentes."
-            );
-        }
+        // Libera las referencias en plantilla_secuencia_dias (id_plantilla_turno -> NULL).
+        plantillaDiaRepository.liberarReferenciasAlTipoTurno(idPlantillaTurno);
 
         plantillaTurnoRepository.deleteById(idPlantillaTurno);
     }
