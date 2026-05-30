@@ -1,7 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
-    CalendarDays, Plus, Copy, Trash2, X, Check,
-    ChevronDown, AlertCircle, RotateCcw, Clock,
+    CalendarDays, Plus, Trash2, X, Check, AlertCircle, Clock, Brush,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { plantillasService, tiposTurnoService, formatHora } from '../../services/plantillasService';
@@ -21,201 +20,312 @@ const PA = {
 // Paleta de colores por tipo de turno (asignada por índice en la lista)
 const HUES = [250, 150, 30, 85, 320, 200, 45, 170];
 const turnoColor = (index) => {
-    if (index == null) return null;
+    if (index == null || index < 0) return { bg: PA.surface2, ink: PA.ink3, border: PA.line };
     const h = HUES[index % HUES.length];
     return { bg: `oklch(0.93 0.05 ${h})`, ink: `oklch(0.28 0.10 ${h})`, border: `oklch(0.78 0.09 ${h})` };
 };
 
 const DIAS_LABEL = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
-// ─── Utilidades ──────────────────────────────────────────────────────────────
+// ─── Utilidades de secuencia (matriz: un array de tipos de turno por día) ─────
 
-/** Construye la secuenciaDias a partir del array de idsTurno (null = libre). */
-const buildSecuenciaDias = (idsDias) =>
-    idsDias.map((id, i) => ({
-        diaIndex: i,
-        turno: id != null ? { idPlantillaTurno: id } : null,
-    }));
+/** Matriz vacía de semanas*7 días, cada día = lista vacía (libre). */
+const matrizVacia = (semanas) => Array.from({ length: semanas * 7 }, () => []);
 
-/** Extrae el array de IDs desde la secuencia del backend. */
-const parseSecuenciaFromBackend = (secuenciaDias) =>
-    (secuenciaDias ?? []).map(d => d?.turno?.idPlantillaTurno ?? null);
+/** Reconstruye la matriz desde la secuencia del backend (filas {diaIndex, turno}). */
+const parseSecuenciaFromBackend = (secuenciaDias, semanas) => {
+    const matriz = matrizVacia(semanas);
+    for (const d of (secuenciaDias ?? [])) {
+        const idx = d?.diaIndex;
+        const tid = d?.turno?.idPlantillaTurno;
+        if (idx != null && idx >= 0 && idx < matriz.length && tid != null) {
+            matriz[idx].push(tid);
+        }
+    }
+    return matriz;
+};
 
-// ─── Sub: chip de una celda del calendario ───────────────────────────────────
-function DayCell({ diaIndex, idTurno, tipos, active, onClick }) {
-    const tipoIdx   = tipos.findIndex(t => t.idPlantillaTurno === idTurno);
-    const tipo      = tipoIdx >= 0 ? tipos[tipoIdx] : null;
-    const color     = tipo ? turnoColor(tipoIdx) : null;
-    const semanaNum = Math.floor(diaIndex / 7) + 1;
-    const dayPos    = diaIndex % 7;
+// ─── Utilidades de horario / superposición ────────────────────────────────────
+
+/** "HH:MM" | [H,M] → minutos desde 00:00. */
+const horaAMin = (hora) => {
+    const [hh, mm] = formatHora(hora).split(':').map(Number);
+    return (hh || 0) * 60 + (mm || 0);
+};
+
+/** Intervalo [inicio, fin) en minutos, anclado al inicio del día (maneja cruce de medianoche). */
+const intervaloTurno = (tipo) => {
+    const s = horaAMin(tipo.horaInicio);
+    const e = horaAMin(tipo.horaTermino);
+    let dur = (e - s + 1440) % 1440;
+    if (dur === 0) dur = 1440;
+    return [s, s + dur];
+};
+
+/** ¿Se superponen dos turnos en el mismo día? (tocarse en el borde no es superponer). */
+const seSuperponen = (a, b) => {
+    const [as, ae] = intervaloTurno(a);
+    const [bs, be] = intervaloTurno(b);
+    return as < be && bs < ae;
+};
+
+const rangoHoras = (t) => `${formatHora(t.horaInicio)}–${formatHora(t.horaTermino)}`;
+
+/** Duración de un turno en minutos (maneja cruce de medianoche). */
+const duracionMin = (tipo) => {
+    const [s, e] = intervaloTurno(tipo);
+    return e - s;
+};
+
+/** Formatea horas: 42 → "42", 42.5 → "42,5". */
+const fmtHoras = (h) => {
+    const r = Math.round(h * 10) / 10;
+    return (Number.isInteger(r) ? String(r) : r.toFixed(1)).replace('.', ',');
+};
+
+// Límite legal de referencia (jornada semanal, Chile).
+const HORAS_SEMANALES_REF = 44;
+
+// ─── Sub: celda de un día del calendario (puede mostrar varios turnos) ─────────
+function DayCell({ diaIndex, turnoIds, tipos, active, onClick }) {
+    const dayPos = diaIndex % 7;
+    const items = turnoIds
+        .map(id => {
+            const idx = tipos.findIndex(t => t.idPlantillaTurno === id);
+            return idx >= 0 ? { tipo: tipos[idx], color: turnoColor(idx) } : null;
+        })
+        .filter(Boolean);
 
     return (
         <button
             onClick={() => onClick(diaIndex)}
-            title={`Semana ${semanaNum} — ${DIAS_LABEL[dayPos]} (día ${diaIndex + 1})`}
+            title={`Semana ${Math.floor(diaIndex / 7) + 1} — ${DIAS_LABEL[dayPos]}`}
             style={{
-                width: '100%', minHeight: 56, padding: '6px 8px',
-                borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-                border: active ? `2px solid ${PA.primary}` : `1px solid ${color ? color.border : PA.line}`,
-                background: active
-                    ? PA.primarySoft
-                    : (color ? color.bg : PA.surface2),
-                color: active ? PA.primary : (color ? color.ink : PA.ink3),
-                fontSize: 11, fontWeight: tipo ? 700 : 400,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: 2, transition: 'border-color 0.15s, background 0.15s',
+                width: '100%', minWidth: 0, minHeight: 96, padding: '8px 6px',
+                borderRadius: 12, cursor: 'pointer', overflow: 'hidden',
+                border: active ? `2px solid ${PA.primary}` : `1px solid ${PA.line}`,
+                background: active ? PA.primarySoft : (items.length ? '#fff' : PA.surface2),
+                display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 4,
                 boxShadow: active ? `0 0 0 3px ${PA.primarySoft}` : 'none',
             }}
         >
-            <span style={{ fontSize: 9, opacity: 0.65 }}>{DIAS_LABEL[dayPos]}</span>
-            <span style={{ fontSize: 12 }}>{tipo ? tipo.nombre : 'Libre'}</span>
-            {tipo && (
-                <span style={{ fontSize: 9, opacity: 0.7 }}>
-                    {formatHora(tipo.horaInicio)}–{formatHora(tipo.horaTermino)}
+            {items.length === 0 ? (
+                <span style={{ fontSize: 12, color: PA.ink3, textAlign: 'center', margin: 'auto 0' }}>
+                    Libre
                 </span>
+            ) : (
+                items.map(({ tipo, color }, i) => (
+                    <span
+                        key={i}
+                        style={{
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                            fontSize: 11, fontWeight: 700, lineHeight: 1.2,
+                            borderRadius: 7, padding: '4px 4px',
+                            background: color.bg, color: color.ink,
+                            overflow: 'hidden',
+                        }}
+                    >
+                        <span style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {tipo.nombre}
+                        </span>
+                        <span style={{ fontSize: 9, fontWeight: 600, opacity: 0.75, fontFamily: 'monospace' }}>
+                            {formatHora(tipo.horaInicio)}–{formatHora(tipo.horaTermino)}
+                        </span>
+                    </span>
+                ))
             )}
         </button>
     );
 }
 
-// ─── Sub: picker flotante al hacer click en una celda ────────────────────────
-function TurnoPicker({ tipos, onSelect, onClose, anchorRef }) {
-    const pickerRef = useRef(null);
-
-    // Cierra al hacer clic fuera
-    useEffect(() => {
-        const handler = (e) => {
-            if (
-                pickerRef.current && !pickerRef.current.contains(e.target) &&
-                anchorRef.current && !anchorRef.current.contains(e.target)
-            ) {
-                onClose();
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, [onClose, anchorRef]);
+// ─── Sub: bottom-sheet para editar los turnos de un día ───────────────────────
+function TurnoSheet({ diaIndex, tipos, turnoIds, onToggle, onLibre, onClose }) {
+    const semana = Math.floor(diaIndex / 7) + 1;
+    const dia = DIAS_LABEL[diaIndex % 7];
+    const esLibre = turnoIds.length === 0;
 
     return (
-        <div ref={pickerRef} style={{
-            position: 'absolute', zIndex: 200, top: '100%', left: 0,
-            background: PA.surface, border: `1px solid ${PA.line}`,
-            borderRadius: 10, boxShadow: '0 6px 24px rgba(0,0,0,0.15)',
-            minWidth: 200, padding: 6,
-        }}>
-            {/* Opción: Libre */}
-            <button
-                onClick={() => onSelect(null)}
+        <div
+            onClick={onClose}
+            style={{
+                position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+                display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000,
+            }}
+        >
+            <div
+                onClick={e => e.stopPropagation()}
                 style={{
-                    width: '100%', padding: '8px 12px', borderRadius: 7,
-                    background: 'none', border: 'none', textAlign: 'left',
-                    fontSize: 13, color: PA.ink3, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: '#fff', borderRadius: '20px 20px 0 0',
+                    padding: '8px 16px 28px', width: '100%', maxWidth: 480,
+                    boxShadow: '0 -8px 40px rgba(0,0,0,0.18)', maxHeight: '80vh', overflowY: 'auto',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = PA.surface2}
-                onMouseLeave={e => e.currentTarget.style.background = 'none'}
             >
-                <span style={{
-                    width: 10, height: 10, borderRadius: '50%',
-                    border: `1.5px solid ${PA.line}`, display: 'inline-block'
-                }} />
-                Día libre
-            </button>
+                <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 12 }}>
+                    <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
+                </div>
 
-            {tipos.length > 0 && <div style={{ height: 1, background: PA.line, margin: '4px 0' }} />}
-
-            {tipos.map((t, i) => {
-                const c = turnoColor(i);
-                return (
-                    <button
-                        key={t.idPlantillaTurno}
-                        onClick={() => onSelect(t.idPlantillaTurno)}
-                        style={{
-                            width: '100%', padding: '8px 12px', borderRadius: 7,
-                            background: 'none', border: 'none', textAlign: 'left',
-                            fontSize: 13, color: PA.ink, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: 8,
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = c.bg}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                    >
-                        <span style={{
-                            width: 10, height: 10, borderRadius: '50%',
-                            background: c.ink, display: 'inline-block', flexShrink: 0
-                        }} />
-                        <span style={{ flex: 1 }}>{t.nombre}</span>
-                        <span style={{ fontSize: 11, color: PA.ink3, fontFamily: 'monospace' }}>
-                            {formatHora(t.horaInicio)}–{formatHora(t.horaTermino)}
-                        </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div>
+                        <div style={{ fontWeight: 800, fontSize: 17, color: PA.ink }}>Semana {semana} · {dia}</div>
+                        <div style={{ fontSize: 12, color: PA.ink3, marginTop: 2 }}>
+                            {esLibre ? 'Día libre' : `${turnoIds.length} turno${turnoIds.length === 1 ? '' : 's'} en este día`}
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: PA.ink3, display: 'flex', padding: 4 }}>
+                        <X size={20} />
                     </button>
-                );
-            })}
+                </div>
+
+                <button
+                    onClick={onLibre}
+                    style={{
+                        width: '100%', padding: '12px 14px', borderRadius: 10, marginBottom: 10,
+                        border: `1.5px solid ${esLibre ? PA.primary : PA.line}`,
+                        background: esLibre ? PA.primarySoft : PA.surface,
+                        color: esLibre ? PA.primary : PA.ink2, fontSize: 14, fontWeight: 700,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+                    }}
+                >
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', border: `1.5px solid currentColor` }} />
+                    Día libre
+                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {tipos.map((t, i) => {
+                        const c = turnoColor(i);
+                        const selected = turnoIds.includes(t.idPlantillaTurno);
+                        return (
+                            <button
+                                key={t.idPlantillaTurno}
+                                onClick={() => onToggle(t.idPlantillaTurno)}
+                                style={{
+                                    width: '100%', padding: '12px 14px', borderRadius: 10, textAlign: 'left',
+                                    border: `1.5px solid ${selected ? c.ink : PA.line}`,
+                                    background: selected ? c.bg : PA.surface,
+                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                                }}
+                            >
+                                <span style={{ width: 12, height: 12, borderRadius: '50%', background: c.ink, flexShrink: 0 }} />
+                                <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: PA.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {t.nombre}
+                                </span>
+                                <span style={{ fontSize: 12, color: PA.ink3, fontFamily: 'monospace' }}>
+                                    {rangoHoras(t)}
+                                </span>
+                                {selected && <Check size={18} color={c.ink} style={{ flexShrink: 0 }} />}
+                            </button>
+                        );
+                    })}
+                    {tipos.length === 0 && (
+                        <div style={{ fontSize: 13, color: PA.ink3, textAlign: 'center', padding: '12px 0' }}>
+                            No hay tipos de turno en este servicio.
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
 
 // ─── Sub: grid interactivo de días ───────────────────────────────────────────
-function DayGrid({ semanas, idsDias, tipos, onChange }) {
+function DayGrid({ semanas, diasMatrix, tipos, brush, onChange, onError }) {
     const [activeCell, setActiveCell] = useState(null);
-    const cellRefs   = useRef({});
-    const totalDias  = semanas * 7;
+    const totalDias = semanas * 7;
 
-    const handleCellClick = (idx) => {
-        setActiveCell(prev => (prev === idx ? null : idx));
+    // Agrega o quita un turno de un día, validando superposición al agregar.
+    const aplicarTurno = (idx, idTurno) => {
+        const dia = diasMatrix[idx] ?? [];
+
+        if (dia.includes(idTurno)) {
+            onChange(diasMatrix.map((d, i) => (i === idx ? d.filter(id => id !== idTurno) : d)));
+            onError('');
+            return;
+        }
+
+        const nuevo = tipos.find(t => t.idPlantillaTurno === idTurno);
+        const conflicto = dia
+            .map(id => tipos.find(t => t.idPlantillaTurno === id))
+            .filter(Boolean)
+            .find(existente => seSuperponen(existente, nuevo));
+
+        if (conflicto) {
+            onError(
+                `"${nuevo.nombre}" (${rangoHoras(nuevo)}) se superpone con ` +
+                `"${conflicto.nombre}" (${rangoHoras(conflicto)}) en ese día. ` +
+                `Ajusta los horarios para que no se solapen.`
+            );
+            return;
+        }
+
+        onChange(diasMatrix.map((d, i) => (i === idx ? [...d, idTurno] : d)));
+        onError('');
     };
 
-    const handleSelect = (idx, idTurno) => {
-        const next = [...idsDias];
-        next[idx] = idTurno;
-        onChange(next);
-        setActiveCell(null);
+    const marcarLibre = (idx) => {
+        onChange(diasMatrix.map((d, i) => (i === idx ? [] : d)));
+        onError('');
+    };
+
+    // Tap en un día: con pincel activo aplica directo; sin pincel abre el sheet.
+    const handleCellTap = (idx) => {
+        if (brush == null) {
+            setActiveCell(prev => (prev === idx ? null : idx));
+        } else if (brush === 'libre') {
+            marcarLibre(idx);
+        } else {
+            aplicarTurno(idx, brush);
+        }
     };
 
     return (
         <div>
+            {/* Cabecera de días (una sola vez) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6, marginBottom: 8 }}>
+                {DIAS_LABEL.map(d => (
+                    <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: PA.ink3, letterSpacing: '0.03em' }}>
+                        {d}
+                    </div>
+                ))}
+            </div>
+
             {Array.from({ length: semanas }, (_, semIdx) => (
                 <div key={semIdx} style={{ marginBottom: 12 }}>
                     <div style={{
                         fontSize: 11, fontWeight: 700, color: PA.ink3,
-                        textTransform: 'uppercase', letterSpacing: '0.07em',
-                        marginBottom: 6,
+                        textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6,
                     }}>
                         Semana {semIdx + 1}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6 }}>
                         {Array.from({ length: 7 }, (_, dayIdx) => {
                             const globalIdx = semIdx * 7 + dayIdx;
                             if (globalIdx >= totalDias) return null;
-                            const idTurno = idsDias[globalIdx] ?? null;
-                            const isActive = activeCell === globalIdx;
-
                             return (
-                                <div
-                                    key={globalIdx}
-                                    ref={el => cellRefs.current[globalIdx] = el}
-                                    style={{ position: 'relative' }}
-                                >
+                                <div key={globalIdx} style={{ minWidth: 0 }}>
                                     <DayCell
                                         diaIndex={globalIdx}
-                                        idTurno={idTurno}
+                                        turnoIds={diasMatrix[globalIdx] ?? []}
                                         tipos={tipos}
-                                        active={isActive}
-                                        onClick={handleCellClick}
+                                        active={activeCell === globalIdx}
+                                        onClick={handleCellTap}
                                     />
-                                    {isActive && (
-                                        <TurnoPicker
-                                            tipos={tipos}
-                                            onSelect={(id) => handleSelect(globalIdx, id)}
-                                            onClose={() => setActiveCell(null)}
-                                            anchorRef={{ current: cellRefs.current[globalIdx] }}
-                                        />
-                                    )}
                                 </div>
                             );
                         })}
                     </div>
                 </div>
             ))}
+
+            {activeCell != null && (
+                <TurnoSheet
+                    diaIndex={activeCell}
+                    tipos={tipos}
+                    turnoIds={diasMatrix[activeCell] ?? []}
+                    onToggle={(id) => aplicarTurno(activeCell, id)}
+                    onLibre={() => { marcarLibre(activeCell); setActiveCell(null); }}
+                    onClose={() => setActiveCell(null)}
+                />
+            )}
         </div>
     );
 }
@@ -224,23 +334,23 @@ function DayGrid({ semanas, idsDias, tipos, onChange }) {
 function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
     const isNew = !plantilla?.idPlantilla;
 
-    const [nombre,   setNombre]   = useState(plantilla?.nombre   ?? '');
-    const [semanas,  setSemanas]  = useState(plantilla?.semanas  ?? 2);
-    const [idsDias,  setIdsDias]  = useState(() => {
+    const [nombre, setNombre]   = useState(plantilla?.nombre ?? '');
+    const [semanas, setSemanas] = useState(plantilla?.semanas ?? 2);
+    const [diasMatrix, setDiasMatrix] = useState(() => {
         if (plantilla?.secuenciaDias?.length > 0)
-            return parseSecuenciaFromBackend(plantilla.secuenciaDias);
-        const total = (plantilla?.semanas ?? 2) * 7;
-        return Array(total).fill(null);
+            return parseSecuenciaFromBackend(plantilla.secuenciaDias, plantilla?.semanas ?? 2);
+        return matrizVacia(plantilla?.semanas ?? 2);
     });
-    const [saving,   setSaving]   = useState(false);
-    const [err,      setErr]      = useState('');
+    const [saving, setSaving] = useState(false);
+    const [err, setErr]       = useState('');
+    const [gridError, setGridError] = useState('');
+    const [brush, setBrush]   = useState(null);   // null | 'libre' | idPlantillaTurno
 
-    // Ajusta el array cuando cambia el número de semanas
     const handleSemanasChange = (val) => {
         const n = Math.max(1, Math.min(12, Number(val) || 1));
         setSemanas(n);
-        setIdsDias(prev => {
-            const next = Array(n * 7).fill(null);
+        setDiasMatrix(prev => {
+            const next = matrizVacia(n);
             for (let i = 0; i < Math.min(prev.length, next.length); i++) next[i] = prev[i];
             return next;
         });
@@ -252,21 +362,21 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
         setErr('');
         setSaving(true);
         try {
-            const secuenciaDias = buildSecuenciaDias(idsDias);
             let result;
             if (isNew) {
-                result = await plantillasService.create({
+                const creada = await plantillasService.create({
                     nombre: nombre.trim(),
                     semanas: Number(semanas),
                     idServicio: servicioId,
-                    secuenciaDias,
                 });
+                await plantillasService.setSecuencia(creada.idPlantilla, diasMatrix);
+                result = creada;
             } else {
-                // Actualizar la secuencia en una plantilla existente
-                result = await plantillasService.setSecuencia(
-                    plantilla.idPlantilla,
-                    idsDias,
-                );
+                await plantillasService.update(plantilla.idPlantilla, {
+                    nombre: nombre.trim(),
+                    semanas: Number(semanas),
+                });
+                result = await plantillasService.setSecuencia(plantilla.idPlantilla, diasMatrix);
             }
             onSaved(result);
         } catch (e) {
@@ -282,32 +392,37 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
         boxSizing: 'border-box',
     };
 
-    const completadas = idsDias.filter(id => id !== null).length;
-    const porcentaje  = idsDias.length > 0 ? Math.round((completadas / idsDias.length) * 100) : 0;
+    // Horas totales del patrón y promedio semanal que haría la persona.
+    const totalMin = diasMatrix.reduce((acc, dia) => acc + dia.reduce((a, id) => {
+        const t = tipos.find(tt => tt.idPlantillaTurno === id);
+        return a + (t ? duracionMin(t) : 0);
+    }, 0), 0);
+    const horasTotales  = totalMin / 60;
+    const horasSemana   = semanas > 0 ? horasTotales / semanas : 0;
+    const excedeRef     = horasSemana > HORAS_SEMANALES_REF;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
             {/* Cabecera del formulario */}
             <div style={{
-                background: PA.surface2, borderRadius: 12, padding: 18,
+                background: PA.surface2, borderRadius: 12, padding: 16,
                 border: `1px solid ${PA.line}`, display: 'flex', flexDirection: 'column', gap: 14,
             }}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: PA.ink }}>
-                    {isNew ? 'Nueva plantilla' : `Editando: ${plantilla.nombre}`}
+                    {isNew ? 'Nueva rotativa' : 'Editar rotativa'}
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                         <label style={{ fontSize: 12, color: PA.ink3, marginBottom: 4, display: 'block' }}>
-                            Nombre de la plantilla
+                            Nombre
                         </label>
                         <input
                             value={nombre}
                             onChange={e => setNombre(e.target.value)}
                             placeholder="ej. Rotativa 4 semanas — Medicina"
                             style={{ ...inputStyle, width: '100%' }}
-                            disabled={!isNew}
                         />
                     </div>
                     <div>
@@ -318,8 +433,7 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
                             type="number" min={1} max={12}
                             value={semanas}
                             onChange={e => handleSemanasChange(e.target.value)}
-                            style={{ ...inputStyle, width: 80, textAlign: 'center' }}
-                            disabled={!isNew}
+                            style={{ ...inputStyle, width: 72, textAlign: 'center' }}
                         />
                     </div>
                 </div>
@@ -331,83 +445,143 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
                 )}
             </div>
 
-            {/* Barra de progreso de días asignados */}
-            <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: PA.ink3, marginBottom: 6 }}>
-                    <span>Días configurados: <strong style={{ color: PA.ink }}>{completadas}</strong> / {idsDias.length}</span>
-                    <span style={{ color: porcentaje === 100 ? PA.success : PA.ink3 }}>
-                        {porcentaje}%
-                    </span>
-                </div>
-                <div style={{ height: 6, background: PA.surface2, borderRadius: 99, overflow: 'hidden' }}>
+            {/* Estadística de horas semanales */}
+            <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: excedeRef ? PA.warnSoft : PA.surface2,
+                border: `1px solid ${excedeRef ? PA.warn : PA.line}`,
+                borderRadius: 12, padding: '12px 16px',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                     <div style={{
-                        width: `${porcentaje}%`, height: '100%', borderRadius: 99,
-                        background: porcentaje === 100 ? PA.success : PA.primary,
-                        transition: 'width 0.3s',
-                    }} />
+                        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                        background: excedeRef ? PA.warn : PA.primary,
+                        display: 'grid', placeItems: 'center',
+                    }}>
+                        <Clock size={20} color="#fff" />
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>Horas por semana</div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: excedeRef ? PA.warn : PA.ink, lineHeight: 1.1 }}>
+                            {fmtHoras(horasSemana)} h
+                        </div>
+                    </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
+                        Total · {semanas} sem.
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: PA.ink2 }}>
+                        {fmtHoras(horasTotales)} h
+                    </div>
                 </div>
             </div>
 
-            {/* Leyenda de tipos de turno */}
-            {tipos.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {tipos.map((t, i) => {
-                        const c = turnoColor(i);
-                        return (
-                            <span key={t.idPlantillaTurno} style={{
-                                display: 'flex', alignItems: 'center', gap: 5,
-                                background: c.bg, color: c.ink, border: `1px solid ${c.border}`,
-                                borderRadius: 99, padding: '3px 10px', fontSize: 12,
-                            }}>
-                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.ink }} />
-                                {t.nombre}
-                                <span style={{ opacity: 0.65, fontFamily: 'monospace', fontSize: 10 }}>
-                                    {formatHora(t.horaInicio)}–{formatHora(t.horaTermino)}
-                                </span>
-                            </span>
-                        );
-                    })}
-                    <span style={{
-                        display: 'flex', alignItems: 'center', gap: 5,
-                        background: PA.surface2, color: PA.ink3, border: `1px solid ${PA.line}`,
-                        borderRadius: 99, padding: '3px 10px', fontSize: 12,
-                    }}>
-                        <span style={{ width: 8, height: 8, borderRadius: '50%', border: `1.5px solid ${PA.line}` }} />
-                        Libre
-                    </span>
+            {excedeRef && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: PA.warn, marginTop: -8 }}>
+                    <AlertCircle size={13} /> Supera las {HORAS_SEMANALES_REF} h semanales de referencia.
                 </div>
             )}
 
-            {/* Instrucción */}
-            <p style={{ margin: 0, fontSize: 12, color: PA.ink3 }}>
-                Haz clic en cada celda para asignar un tipo de turno o marcar el día como libre.
-            </p>
+            {/* Pincel rápido: elige un turno y toca los días para aplicarlo */}
+            {tipos.length > 0 && (
+                <div>
+                    <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginBottom: 8 }}>
+                        Pincel rápido — elige un turno y toca los días para aplicarlo
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {tipos.map((t, i) => {
+                            const c = turnoColor(i);
+                            const activo = brush === t.idPlantillaTurno;
+                            return (
+                                <button
+                                    key={t.idPlantillaTurno}
+                                    onClick={() => setBrush(activo ? null : t.idPlantillaTurno)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 5,
+                                        background: c.bg, color: c.ink,
+                                        border: `1.5px solid ${activo ? c.ink : c.border}`,
+                                        boxShadow: activo ? `0 0 0 3px ${c.bg}` : 'none',
+                                        borderRadius: 99, padding: '5px 11px', fontSize: 11.5,
+                                        fontWeight: 700, cursor: 'pointer',
+                                    }}
+                                >
+                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.ink }} />
+                                    {t.nombre}
+                                    <span style={{ opacity: 0.65, fontFamily: 'monospace', fontSize: 10, fontWeight: 600 }}>
+                                        {rangoHoras(t)}
+                                    </span>
+                                    {activo && <Check size={12} />}
+                                </button>
+                            );
+                        })}
+                        {/* Pincel de día libre */}
+                        <button
+                            onClick={() => setBrush(brush === 'libre' ? null : 'libre')}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                background: brush === 'libre' ? PA.primarySoft : PA.surface2,
+                                color: brush === 'libre' ? PA.primary : PA.ink3,
+                                border: `1.5px solid ${brush === 'libre' ? PA.primary : PA.line}`,
+                                borderRadius: 99, padding: '5px 11px', fontSize: 11.5,
+                                fontWeight: 700, cursor: 'pointer',
+                            }}
+                        >
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', border: `1.5px solid currentColor` }} />
+                            Libre
+                            {brush === 'libre' && <Check size={12} />}
+                        </button>
+                    </div>
+
+                    {brush != null && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: PA.primary, marginTop: 8, fontWeight: 600 }}>
+                            <Brush size={13} /> Modo pincel: toca los días para aplicar. Tócalo de nuevo en un día para quitarlo. Sin pincel, toca un día para ver todas las opciones.
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Error de superposición */}
+            {gridError && (
+                <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 8,
+                    background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 14px', fontSize: 13,
+                }}>
+                    <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span style={{ flex: 1 }}>{gridError}</span>
+                    <button onClick={() => setGridError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: PA.warn, display: 'flex' }}>
+                        <X size={14} />
+                    </button>
+                </div>
+            )}
 
             {/* Grid interactivo */}
             <DayGrid
                 semanas={semanas}
-                idsDias={idsDias}
+                diasMatrix={diasMatrix}
                 tipos={tipos}
-                onChange={setIdsDias}
+                brush={brush}
+                onChange={setDiasMatrix}
+                onError={setGridError}
             />
 
             {/* Acciones */}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8 }}>
                 <button onClick={onCancel} style={{
-                    padding: '8px 18px', borderRadius: 9, border: `1px solid ${PA.line}`,
+                    padding: '9px 18px', borderRadius: 9, border: `1px solid ${PA.line}`,
                     background: 'none', color: PA.ink2, fontSize: 14, cursor: 'pointer',
                 }}>
                     Cancelar
                 </button>
                 <button onClick={handleSave} disabled={saving} style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '8px 20px', borderRadius: 9,
+                    padding: '9px 20px', borderRadius: 9,
                     background: PA.primary, color: '#fff', border: 'none',
                     fontSize: 14, fontWeight: 600,
                     cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
                 }}>
                     <Check size={15} />
-                    {saving ? 'Guardando…' : 'Guardar plantilla'}
+                    {saving ? 'Guardando…' : 'Guardar rotativa'}
                 </button>
             </div>
         </div>
@@ -415,45 +589,40 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
 }
 
 // ─── Sub: tarjeta de plantilla en la lista ────────────────────────────────────
-function PlantillaCard({ plantilla, onEdit, onDuplicate, onDelete }) {
-    const completadas = (plantilla.secuenciaDias ?? []).filter(d => d.turno !== null).length;
+function PlantillaCard({ plantilla, onEdit, onDelete }) {
     const total       = plantilla.semanas * 7;
-    const pct         = total > 0 ? Math.round((completadas / total) * 100) : 0;
+    // Días distintos con al menos un turno asignado.
+    const diasConTurno = new Set(
+        (plantilla.secuenciaDias ?? [])
+            .filter(d => d.turno !== null && d.turno !== undefined)
+            .map(d => d.diaIndex)
+    ).size;
+    const pct = total > 0 ? Math.round((diasConTurno / total) * 100) : 0;
 
     return (
         <div style={{
             background: PA.surface, border: `1px solid ${PA.line}`,
-            borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 10,
+            borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: PA.ink }}>{plantilla.nombre}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: PA.ink, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {plantilla.nombre}
+                    </div>
                     <div style={{ fontSize: 12, color: PA.ink3, marginTop: 2 }}>
                         {plantilla.semanas} semana{plantilla.semanas !== 1 ? 's' : ''} · {total} días
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                        onClick={() => onDuplicate(plantilla.idPlantilla)}
-                        title="Duplicar plantilla"
-                        style={{
-                            padding: '5px 8px', borderRadius: 7, border: `1px solid ${PA.line}`,
-                            background: PA.surface2, color: PA.ink2, cursor: 'pointer',
-                        }}
-                    >
-                        <Copy size={14} />
-                    </button>
-                    <button
-                        onClick={() => onDelete(plantilla)}
-                        title="Eliminar plantilla"
-                        style={{
-                            padding: '5px 8px', borderRadius: 7, border: `1px solid ${PA.warnSoft}`,
-                            background: PA.warnSoft, color: PA.warn, cursor: 'pointer',
-                        }}
-                    >
-                        <Trash2 size={14} />
-                    </button>
-                </div>
+                <button
+                    onClick={() => onDelete(plantilla)}
+                    title="Eliminar rotativa"
+                    style={{
+                        padding: '6px 9px', borderRadius: 8, border: `1px solid ${PA.warnSoft}`,
+                        background: PA.warnSoft, color: PA.warn, cursor: 'pointer', flexShrink: 0,
+                    }}
+                >
+                    <Trash2 size={15} />
+                </button>
             </div>
 
             {/* Mini barra de progreso */}
@@ -464,14 +633,14 @@ function PlantillaCard({ plantilla, onEdit, onDuplicate, onDelete }) {
                 }} />
             </div>
             <div style={{ fontSize: 11, color: PA.ink3 }}>
-                {completadas} turnos asignados · {total - completadas} libres
+                {diasConTurno} días con turno · {total - diasConTurno} libres
             </div>
 
             <button
                 onClick={() => onEdit(plantilla)}
                 style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    padding: '7px 14px', borderRadius: 8,
+                    padding: '9px 14px', borderRadius: 8,
                     background: PA.primarySoft, color: PA.primary, border: 'none',
                     fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 }}
@@ -487,13 +656,13 @@ function PlantillaCard({ plantilla, onEdit, onDuplicate, onDelete }) {
 export default function PlantillasView({ onBack }) {
     const { user } = useAuth();
 
-    const [plantillas,  setPlantillas]  = useState([]);
-    const [tipos,       setTipos]       = useState([]);
-    const [loading,     setLoading]     = useState(false);
-    const [error,       setError]       = useState('');
-    const [editing,     setEditing]     = useState(null);  // plantilla o 'new'
-    const [confirmDel,  setConfirmDel]  = useState(null);
-    const [deleting,    setDeleting]    = useState(false);
+    const [plantillas, setPlantillas] = useState([]);
+    const [tipos,      setTipos]      = useState([]);
+    const [loading,    setLoading]    = useState(false);
+    const [error,      setError]      = useState('');
+    const [editing,    setEditing]    = useState(null);   // plantilla o 'new'
+    const [confirmDel, setConfirmDel] = useState(null);
+    const [deleting,   setDeleting]   = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -519,15 +688,6 @@ export default function PlantillasView({ onBack }) {
         await load();
     }, [load]);
 
-    const handleDuplicate = useCallback(async (id) => {
-        try {
-            await plantillasService.duplicar(id);
-            await load();
-        } catch (e) {
-            setError(e?.response?.data || e.message || 'Error al duplicar.');
-        }
-    }, [load]);
-
     const handleDelete = useCallback(async () => {
         if (!confirmDel) return;
         setDeleting(true);
@@ -546,13 +706,13 @@ export default function PlantillasView({ onBack }) {
     // Modo editor abierto
     if (editing !== null) {
         return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
                 <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
                     <button onClick={() => setEditing(null)} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
                         <SGTIcon name="chevron-left" size={24} color={PA.ink} />
                     </button>
-                    <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>
-                        {editing === 'new' ? 'Nueva rotativa' : `Editando: ${editing.nombre}`}
+                    <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {editing === 'new' ? 'Nueva rotativa' : `Editar: ${editing.nombre}`}
                     </div>
                 </div>
                 <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -562,7 +722,7 @@ export default function PlantillasView({ onBack }) {
                             background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13,
                         }}>
                             <AlertCircle size={14} />
-                            No hay tipos de turno definidos para este servicio. Créalos primero en «Tipos de Turno».
+                            No hay tipos de turno en este servicio. Créalos primero en «Tipos de Turno».
                         </div>
                     )}
                     <PlantillaEditor
@@ -579,9 +739,9 @@ export default function PlantillasView({ onBack }) {
 
     // Vista de lista
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
-            {/* Header con botón volver */}
+            {/* Header */}
             <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
                     <SGTIcon name="chevron-left" size={24} color={PA.ink} />
@@ -591,33 +751,31 @@ export default function PlantillasView({ onBack }) {
                     onClick={() => setEditing('new')}
                     style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '9px 18px', borderRadius: 10,
+                        padding: '9px 16px', borderRadius: 10,
                         background: PA.primary, color: '#fff', border: 'none',
-                        fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                        fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
                     }}
                 >
-                    <Plus size={16} /> Nueva rotativa
+                    <Plus size={16} /> Nueva
                 </button>
             </div>
 
             {/* Contenido scrollable */}
-            <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-                {/* Error global */}
                 {error && (
                     <div style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         background: PA.warnSoft, color: PA.warn, borderRadius: 10, padding: '10px 16px', fontSize: 13,
                     }}>
                         <AlertCircle size={15} />
-                        {error}
-                        <button onClick={() => setError('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: PA.warn }}>
+                        <span style={{ flex: 1 }}>{error}</span>
+                        <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: PA.warn, display: 'flex' }}>
                             <X size={14} />
                         </button>
                     </div>
                 )}
 
-                {/* Lista de plantillas */}
                 {loading ? (
                     <div style={{ padding: 48, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
                         Cargando…
@@ -625,11 +783,11 @@ export default function PlantillasView({ onBack }) {
                 ) : plantillas.length === 0 ? (
                     <div style={{
                         background: PA.surface, border: `1px solid ${PA.line}`, borderRadius: 14,
-                        padding: 56, textAlign: 'center',
+                        padding: 48, textAlign: 'center',
                     }}>
                         <CalendarDays size={40} style={{ color: PA.ink3, marginBottom: 14 }} />
                         <p style={{ margin: '0 0 16px', color: PA.ink3, fontSize: 14 }}>
-                            No hay rotativas definidas para este servicio.
+                            No hay rotativas en este servicio.
                         </p>
                         <button
                             onClick={() => setEditing('new')}
@@ -643,48 +801,60 @@ export default function PlantillasView({ onBack }) {
                         </button>
                     </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-                        {plantillas.map(p => (
-                            <PlantillaCard
-                                key={p.idPlantilla}
-                                plantilla={p}
-                                onEdit={setEditing}
-                                onDuplicate={handleDuplicate}
-                                onDelete={setConfirmDel}
-                            />
-                        ))}
-                    </div>
+                    plantillas.map(p => (
+                        <PlantillaCard
+                            key={p.idPlantilla}
+                            plantilla={p}
+                            onEdit={setEditing}
+                            onDelete={setConfirmDel}
+                        />
+                    ))
                 )}
 
             </div>
 
-            {/* Diálogo de confirmación de eliminación (overlay fijo, fuera del scroll) */}
+            {/* Confirmación de eliminación (bottom-sheet) */}
             {confirmDel && (
-                <div style={{
-                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-                }}>
-                    <div style={{
-                        background: PA.surface, borderRadius: 16, padding: 28,
-                        maxWidth: 380, width: '90%', boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
-                    }}>
-                        <div style={{ fontWeight: 700, fontSize: 17, color: PA.ink, marginBottom: 10 }}>
+                <div
+                    onClick={() => setConfirmDel(null)}
+                    style={{
+                        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+                        display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000,
+                    }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: '#fff', borderRadius: '20px 20px 0 0',
+                            padding: '8px 20px 36px', width: '100%', maxWidth: 480,
+                            boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 16 }}>
+                            <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                            <div style={{ width: 56, height: 56, borderRadius: 16, background: PA.warnSoft, display: 'grid', placeItems: 'center' }}>
+                                <Trash2 size={26} color={PA.warn} />
+                            </div>
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: 18, color: PA.ink, textAlign: 'center', marginBottom: 10 }}>
                             ¿Eliminar rotativa?
                         </div>
-                        <p style={{ fontSize: 14, color: PA.ink2, margin: 0, lineHeight: 1.5 }}>
-                            Se eliminará <strong>{confirmDel.nombre}</strong> y toda su secuencia de días configurada.
-                            Esta acción no se puede deshacer.
+                        <p style={{ fontSize: 14, color: PA.ink2, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
+                            Se eliminará <strong style={{ color: PA.ink }}>{confirmDel.nombre}</strong> y toda su
+                            secuencia de días. Esta acción no se puede deshacer.
                         </p>
-                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+                        <div style={{ display: 'flex', gap: 10 }}>
                             <button onClick={() => setConfirmDel(null)} style={{
-                                padding: '7px 16px', borderRadius: 8, border: `1px solid ${PA.line}`,
-                                background: 'none', color: PA.ink2, fontSize: 13, cursor: 'pointer',
+                                flex: 1, padding: '13px 0', borderRadius: 12, border: `1.5px solid ${PA.line}`,
+                                background: 'none', color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: 'pointer',
                             }}>
                                 Cancelar
                             </button>
                             <button onClick={handleDelete} disabled={deleting} style={{
-                                padding: '7px 16px', borderRadius: 8, border: 'none',
-                                background: PA.warn, color: '#fff', fontSize: 13,
+                                flex: 1, padding: '13px 0', borderRadius: 12, border: 'none',
+                                background: PA.warn, color: '#fff', fontSize: 15, fontWeight: 700,
                                 cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1,
                             }}>
                                 {deleting ? 'Eliminando…' : 'Sí, eliminar'}

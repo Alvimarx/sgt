@@ -111,31 +111,39 @@ public class PlantillaService {
     // =========================================================
 
     /**
-     * Un valor null en la lista indica un día libre (no generará TurnoEntity).
+     * Reemplaza la secuencia completa. Cada posición de la lista exterior es un día
+     * (diaIndex); la lista interior son los tipos de turno de ese día. Varios turnos
+     * en un mismo día generan filas con el mismo diaIndex (p. ej. día + noche para
+     * cubrir 24h). Una lista interior vacía o null representa un día libre.
      */
-    public PlantillaEntity establecerSecuencia(Long idPlantilla, List<Long> idsDias) {
+    public PlantillaEntity establecerSecuencia(Long idPlantilla, List<List<Long>> dias) {
         PlantillaEntity plantilla = obtenerPlantilla(idPlantilla);
+        Long idServicio = plantilla.getServicio().getIdServicio();
 
         // 1. Limpiar la secuencia actual
         plantilla.getSecuenciaDias().clear();
         plantillaRepository.flush();
 
-        // 2. Insertar la nueva secuencia con validación de seguridad
-        for (Long idTipo : idsDias) {
-            PlantillaTurnoEntity tipo = null;
-            if (idTipo != null) {
-                tipo = plantillaTurnoRepository.findById(idTipo)
-                        .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado: ID " + idTipo));
+        // 2. Insertar la nueva secuencia con su diaIndex explícito
+        for (int diaIndex = 0; diaIndex < dias.size(); diaIndex++) {
+            List<Long> turnosDelDia = dias.get(diaIndex);
 
-                if (!tipo.getServicio().getIdServicio().equals(plantilla.getServicio().getIdServicio())) {
-                    throw new RuntimeException("Seguridad: El turno '" + tipo.getNombre() + 
+            if (turnosDelDia == null || turnosDelDia.isEmpty()) {
+                // Día libre: una fila con turno null para conservar el diaIndex.
+                plantilla.getSecuenciaDias().add(new PlantillaDiaEntity(plantilla, diaIndex, null));
+                continue;
+            }
+
+            for (Long idTipo : turnosDelDia) {
+                if (idTipo == null) continue;
+                PlantillaTurnoEntity tipo = plantillaTurnoRepository.findById(idTipo)
+                        .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado: ID " + idTipo));
+                if (!tipo.getServicio().getIdServicio().equals(idServicio)) {
+                    throw new RuntimeException("Seguridad: El turno '" + tipo.getNombre() +
                             "' no pertenece al servicio (" + plantilla.getServicio().getNombre() + ") de esta plantilla.");
                 }
+                plantilla.getSecuenciaDias().add(new PlantillaDiaEntity(plantilla, diaIndex, tipo));
             }
-            // Añadir el día de forma segura usando la instancia actual de la lista para calcular el index
-            plantilla.getSecuenciaDias().add(
-                    new PlantillaDiaEntity(plantilla, plantilla.getSecuenciaDias().size(), tipo)
-            );
         }
 
         return plantillaRepository.save(plantilla);
@@ -193,10 +201,14 @@ public class PlantillaService {
         }
 
         int esperado = plantilla.getSemanas() * 7;
-        int actual = plantilla.getSecuenciaDias().size();
+        // Cuenta días distintos (un día puede tener varias filas: día + noche, etc.).
+        long actual = plantilla.getSecuenciaDias().stream()
+                .map(PlantillaDiaEntity::getDiaIndex)
+                .distinct()
+                .count();
         if (actual != esperado) {
             throw new RuntimeException(
-                    "El patrón tiene " + actual + " días pero se esperan " + esperado
+                    "El patrón cubre " + actual + " días pero se esperan " + esperado
                     + " (" + plantilla.getSemanas() + " semana/s × 7 días)"
             );
         }

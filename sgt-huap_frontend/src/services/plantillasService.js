@@ -108,6 +108,15 @@ export const plantillasService = {
         return res.data;
     },
 
+    /** PUT /plantillas/{id} — actualiza nombre y semanas (no la secuencia). */
+    update: async (id, { nombre, semanas }) => {
+        const res = await axiosInstance.put(`/plantillas/${id}`, {
+            nombre,
+            semanas: Number(semanas),
+        });
+        return res.data;
+    },
+
     /** DELETE /plantillas/{id} */
     delete: async (id) => {
         const res = await axiosInstance.delete(`/plantillas/${id}`);
@@ -122,10 +131,11 @@ export const plantillasService = {
 
     /**
      * PUT /plantillas/{id}/secuencia — reemplaza la secuencia completa.
-     * idsDias: (Long | null)[] donde null = día libre.
+     * dias: (Long[])[] — una lista de tipos de turno por día (varios = jornada
+     * compuesta como día + noche). Lista interior vacía = día libre.
      */
-    setSecuencia: async (id, idsDias) => {
-        const res = await axiosInstance.put(`/plantillas/${id}/secuencia`, idsDias);
+    setSecuencia: async (id, dias) => {
+        const res = await axiosInstance.put(`/plantillas/${id}/secuencia`, dias);
         return res.data;
     },
 

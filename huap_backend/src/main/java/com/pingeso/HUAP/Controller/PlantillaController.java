@@ -59,6 +59,22 @@ public class PlantillaController {
         return ResponseEntity.ok(respuesta);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<PlantillaDTO> actualizarPlantilla(@PathVariable Long id, @RequestBody PlantillaDTO dto) {
+        PlantillaEntity entidad = plantillaService.actualizarPlantilla(
+                id,
+                dto.getNombre(),
+                dto.getSemanas()
+        );
+        return ResponseEntity.ok(convertToDTO(entidad));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarPlantilla(@PathVariable Long id) {
+        plantillaService.eliminarPlantilla(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/duplicar")
     public ResponseEntity<PlantillaDTO> duplicarPlantilla(@PathVariable Long id) {
         return ResponseEntity.ok(convertToDTO(plantillaService.duplicarPlantilla(id)));
@@ -73,9 +89,9 @@ public class PlantillaController {
     @PutMapping("/{id}/secuencia")
     public ResponseEntity<PlantillaDTO> establecerSecuencia(
             @PathVariable Long id,
-            @RequestBody List<Long> idsDias
+            @RequestBody List<List<Long>> dias
     ) {
-        PlantillaEntity entidad = plantillaService.establecerSecuencia(id, idsDias);
+        PlantillaEntity entidad = plantillaService.establecerSecuencia(id, dias);
         return ResponseEntity.ok(convertToDTO(entidad));
     }
 
