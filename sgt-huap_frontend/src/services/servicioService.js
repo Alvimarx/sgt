@@ -47,15 +47,44 @@ export const updateServicio = async (id, nombre) => {
 };
 
 /**
+ * Obtiene la cantidad de turnos asociados a un servicio
+ * @param {number} id 
+ */
+export const getTurnosAsociadosServicio = async (id) => {
+    try {
+        // Ajusta la URL base si es necesario según la configuración de tu axiosInstance
+        const response = await axiosInstance.get(`${API_BASE}/${id}/turnos-asociados`);
+        return { success: true, data: response.data };
+    } catch (error) {
+        const mensaje = error.response?.data?.error || 'Error al consultar turnos asociados';
+        return { success: false, error: mensaje };
+    }
+};
+
+/**
  * Elimina un servicio
  * @param {number} id 
  */
-export const deleteServicio = async (id) => {
+export const eliminarServicio = async (id) => {
     try {
         await axiosInstance.delete(`${API_BASE}/${id}`);
         return { success: true };
     } catch (error) {
         const mensaje = error.response?.data?.error || 'Error al eliminar el servicio';
+        return { success: false, error: mensaje };
+    }
+};
+
+/**
+ * Obtiene las dependencias de un servicio
+ * @param {number} id 
+ */
+export const getDependenciasServicio = async (id) => {
+    try {
+        const response = await axiosInstance.get(`${API_BASE}/${id}/dependencias`);
+        return { success: true, data: response.data };
+    } catch (error) {
+        const mensaje = error.response?.data?.error || 'Error al verificar dependencias del servicio';
         return { success: false, error: mensaje };
     }
 };

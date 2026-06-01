@@ -36,5 +36,8 @@ public interface FuncionarioRepository extends JpaRepository<FuncionarioEntity, 
            "WHERE f.estado = :estado " +
            "AND (:servicioId IS NULL OR sf.servicio.idServicio = :servicioId)")
     Long countByEstadoAndServicioId(@Param("estado") Integer estado, @Param("servicioId") Long servicioId);
-    
+
+
+    @Query("SELECT COUNT(sf) FROM FuncionarioEntity f JOIN f.serviciosFuncionario sf WHERE sf.servicio.idServicio = :idServicio")
+    long contarFuncionariosPorServicio(@Param("idServicio") Long idServicio);
 }

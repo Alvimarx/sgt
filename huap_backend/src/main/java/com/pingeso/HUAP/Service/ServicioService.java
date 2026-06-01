@@ -1,7 +1,9 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
+import com.pingeso.HUAP.Repository.TurnoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,10 +21,15 @@ public class ServicioService {
     private static final Logger logger = LoggerFactory.getLogger(ServicioService.class);
 
     private final ServicioRepository servicioRepository;
+    private final TurnoRepository turnoRepository;
+    @Autowired
+    private FuncionarioRepository funcionarioRepository;
+
 
     @Autowired
-    public ServicioService(ServicioRepository servicioRepository) {
+    public ServicioService(ServicioRepository servicioRepository, TurnoRepository turnoRepository) {
         this.servicioRepository = servicioRepository;
+        this.turnoRepository = turnoRepository;
     }
 
     private Map<String, Object> convertirServicioAMap(ServicioEntity s) {
@@ -92,6 +99,21 @@ public class ServicioService {
         
         servicioRepository.save(servicio);
         return getServicioSummary(servicio.getIdServicio());
+    }
+
+    public long contarTurnosAsociados(Long idServicio) {
+        getServicioById(idServicio);
+        return turnoRepository.countByServicio_IdServicio(idServicio);
+    }
+
+    public long contarFuncionariosAsociados(Long idServicio) {
+        return funcionarioRepository.contarFuncionariosPorServicio(idServicio);
+    }
+
+    public long contarDependencias(Long idServicio) {
+        long turnos = contarTurnosAsociados(idServicio);
+        long funcionarios = contarFuncionariosAsociados(idServicio);
+        return turnos + funcionarios;
     }
 
     public boolean deleteServicio(Long id) {

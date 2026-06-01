@@ -24,7 +24,7 @@ import java.util.List;
                 )
         }
 )
-public class FuncionarioEntity {
+public class    FuncionarioEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -71,6 +71,21 @@ public class ServicioController {
         }
     }
 
+    @GetMapping("/{id}/turnos-asociados")
+    public ResponseEntity<Long> contarTurnosAsociados(
+            @PathVariable Long id
+    ) {
+
+        return ResponseEntity.ok(
+                servicioService.contarTurnosAsociados(id)
+        );
+    }
+
+    @GetMapping("/{id}/dependencias")
+    public ResponseEntity<Long> contarDependencias(@PathVariable Long id) {
+        return ResponseEntity.ok(servicioService.contarDependencias(id));
+    }
+
     // Eliminar servicio
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteServicio(@PathVariable Long id) { // Actualizado a Long
