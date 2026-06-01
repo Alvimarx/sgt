@@ -6,7 +6,12 @@ import { useAuth } from '../../context/AuthContext';
 
 // Exportamos el chip de roles por si lo necesitas en otras vistas
 export const SGTRoleChip = ({ role }) => {
-  const tones = { JEFATURA: 'warn', URGENCIOLOGO: 'primary', MEDICO: 'neutral' };
+  const tones = { 
+    JEFATURA: 'warn', 
+    SUBROGANTE: 'warn', // <-- Agregado para que tenga el mismo color que Jefatura
+    URGENCIOLOGO: 'primary', 
+    MEDICO: 'neutral' 
+  };
   return <SGTBadge tone={tones[role] || 'neutral'} size="xs">{role}</SGTBadge>;
 };
 
@@ -20,6 +25,9 @@ const ProfileView = ({ onGoAdmin, onBack, onGoPersonalDash }) => {
   const me = user || SGT_DATA.PEOPLE.me;
 
   const nombreServicioActivo = localStorage.getItem('sgt_servicio_activo_nombre') || 'Servicio Asignado';
+
+  // Verificamos si el usuario tiene rol de Jefatura o Subrogante
+  const isAdmin = me?.rol === 'JEFATURA' || me?.rol === 'SUBROGANTE';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
@@ -62,22 +70,24 @@ const ProfileView = ({ onGoAdmin, onBack, onGoPersonalDash }) => {
           </div>
           <SGTIcon name="chevron-right" size={16} color={PA.primary} strokeWidth={2.5}/>
         </button>
-
-        <button onClick={onGoAdmin} style={{
-          width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-          background: '#fff', border: `1px solid ${PA.warn}`, borderRadius: 14,
-          padding: '16px', cursor: 'pointer', textAlign: 'left',
-          boxShadow: '0 4px 12px rgba(200, 135, 0, 0.1)'
-        }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: PA.warnSoft, display: 'grid', placeItems: 'center', color: PA.warn }}>
-            <SGTIcon name="crown" size={20} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: PA.ink }}>Panel de Administración</div>
-            <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>Configura servicios y rotativas</div>
-          </div>
-          <SGTIcon name="chevron-right" size={16} color={PA.warn} strokeWidth={2.5}/>
-        </button>
+        {/* Mostramos el menu tan solo si tiene las facultades para este*/}
+        {isAdmin && (
+          <button onClick={onGoAdmin} style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+            background: '#fff', border: `1px solid ${PA.warn}`, borderRadius: 14,
+            padding: '16px', cursor: 'pointer', textAlign: 'left',
+            boxShadow: '0 4px 12px rgba(200, 135, 0, 0.1)'
+          }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: PA.warnSoft, display: 'grid', placeItems: 'center', color: PA.warn }}>
+              <SGTIcon name="crown" size={20} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: PA.ink }}>Panel de Administración</div>
+              <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>Configura servicios y rotativas</div>
+            </div>
+            <SGTIcon name="chevron-right" size={16} color={PA.warn} strokeWidth={2.5}/>
+          </button>
+        )}
       </div>
     </div>
   );

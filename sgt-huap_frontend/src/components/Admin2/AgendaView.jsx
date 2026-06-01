@@ -15,36 +15,34 @@ import {
 } from "./UIPrimitives";
 import { useNotifications } from "../../context/NotificationContext";
 
-/** Datos de fallback mientras carga o si la API falla. */
-const buildAgendaFallback = () => ({
-  todayKey: SGT_DATA.TODAY_KEY,
-  weekDays: SGT_DATA.WEEK_DAYS,
-  shiftsByDay: SGT_DATA.SHIFTS_BY_DAY,
+// Estado inicial vacío (sin fallbacks a datos estáticos)
+const emptyAgendaState = {
+  todayKey: "",
+  weekDays: [],
+  shiftsByDay: {},
   turnos: [],
-});
-
-// Acceso directo a la paleta sin re-crear objetos en cada render
-const P2 = () => SGT_DATA.PALETTE;
-
-// ---------------------------------------------------------------------------
-// AGENDAVIEW — contenedor principal
-// ---------------------------------------------------------------------------
+};
 
 const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifications, onOpenSolicitudes, onOpenBitacora }) => {
   const [filter, setFilter] = useState("miTurno");
   const [detailShift, setDetailShift] = useState(null);
   const [bannerCollapsed, setBannerCollapsed] = useState(false);
-  const [agendaData, setAgendaData] = useState(() => buildAgendaFallback());
+  
+  // Inicializamos con el estado vacío
+  const [agendaData, setAgendaData] = useState(emptyAgendaState);
   const [loadingAgenda, setLoadingAgenda] = useState(true);
   const [agendaError, setAgendaError] = useState("");
+  
   const [exchangeSelection, setExchangeSelection] = useState({ ownTurn: null, targetTurn: null, targetFuncionario: null });
   const [selectionToast, setSelectionToast] = useState(null);
 
-  const D = SGT_DATA;
-  const PA = D.PALETTE;
-  const agendaDays = agendaData.weekDays || D.WEEK_DAYS || [];
-  const shiftsByDay = agendaData.shiftsByDay || D.SHIFTS_BY_DAY || {};
-  const todayKey = agendaData.todayKey || D.TODAY_KEY;
+  const PA = SGT_DATA.PALETTE;
+  
+  // Extraemos directamente de los datos reales (sin condicionales de fallback)
+  const agendaDays = agendaData.weekDays || [];
+  const shiftsByDay = agendaData.shiftsByDay || {};
+  const todayKey = agendaData.todayKey || "";
+  
   const { unreadCount } = useNotifications();
 
   const canSeeFreeTurnsInBanner = user?.rol === "JEFATURA" || user?.rol === "SUBROGANTE";
@@ -100,9 +98,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
 
     setExchangeSelection((prev) => ({
       ...prev,
-      // if the selected item corresponds to the current user (own turno), store it as ownTurn
       ownTurn: isSelf ? (targetShift || sourceShift) : prev.ownTurn,
-      // otherwise store as the receptor/target
       targetTurn: isSelf ? prev.targetTurn : targetShift,
       targetFuncionario: isSelf ? prev.targetFuncionario : targetFuncionario,
     }));
@@ -119,9 +115,6 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     const targetTurn = currentShift?.miTurno ? exchangeSelection.targetTurn : currentShift;
     const targetFuncionario = exchangeSelection.targetFuncionario;
 
-    // If we're viewing our own turno (or user explicitly selected their own turno),
-    // allow opening the create-solicitud flow prefilled with the offered turno (idTurnoPropio),
-    // and include receptor info only if present.
     if (currentShift?.miTurno || exchangeSelection.ownTurn) {
       const preset = {
         tipoSolicitudId: 4,
@@ -141,7 +134,6 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       return;
     }
 
-    // Otherwise (viewing someone else's turno), require a receptor/target selection
     if (!targetTurn || !targetFuncionario) {
       showSelectionToast(
         !targetFuncionario
@@ -168,7 +160,6 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     onOpenSolicitudes?.(preset);
   };
 
-  // Carga de turnos — se re-ejecuta si cambia el usuario o su servicio activo
   useEffect(() => {
     let mounted = true;
 
@@ -183,7 +174,8 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       if (result.success && result.data) {
         setAgendaData(result.data);
       } else {
-        setAgendaData(buildAgendaFallback());
+        // En caso de error, seteamos el estado vacío real
+        setAgendaData(emptyAgendaState);
         setAgendaError(result.error || "No se pudieron cargar los turnos.");
       }
 
@@ -195,14 +187,35 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     return () => { mounted = false; };
   }, [user?.id, user?.userId, user?.servicioId]);
 
+  // -------------------------------------------------------------------------
+  // Contadores para los filtros (basados 100% en los datos reales de la API)
+  // -------------------------------------------------------------------------
   const countMisTurnos = useMemo(
     () => agendaDays.filter((day) => getShifts(day.key).some((s) => s.miTurno)).length,
+    [agendaDays, shiftsByDay]
+  );
+
+  const countCambios = useMemo(
+    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter(s => s.solicitudPendiente || s.cambioAprobado).length, 0),
+    [agendaDays, shiftsByDay]
+  );
+
+  const countLibres = useMemo(
+    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter(s => s.turnoLibre).length, 0),
+    [agendaDays, shiftsByDay]
+  );
+
+  const countAprobados = useMemo(
+    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter(s => s.cambioAprobado).length, 0),
     [agendaDays, shiftsByDay]
   );
 
   const FILTERS = [
     { id: "todos", label: "Todos los días" },
     { id: "miTurno", label: "Mis turnos", count: countMisTurnos },
+    { id: "cambios", label: "Cambios", count: countCambios },
+    { id: "libres", label: "Libres", count: countLibres },
+    { id: "aprobados", label: "Aprobados", count: countAprobados },
   ];
 
   const visibleDays = useMemo(() => {
@@ -210,6 +223,9 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       const shifts = getShifts(day.key);
       if (filter === "todos") return true;
       if (filter === "miTurno") return shifts.some((s) => s.miTurno);
+      if (filter === "cambios") return shifts.some((s) => s.solicitudPendiente || s.cambioAprobado);
+      if (filter === "libres") return shifts.some((s) => s.turnoLibre);
+      if (filter === "aprobados") return shifts.some((s) => s.cambioAprobado);
       return true;
     });
   }, [agendaDays, filter, shiftsByDay]);
@@ -269,7 +285,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
         onToggle={() => setBannerCollapsed(!bannerCollapsed)}
       />
 
-      {/* Error de carga — en lenguaje humano, sin detalles técnicos */}
+      {/* Error de carga */}
       {agendaError && !loadingAgenda && (
         <div
           style={{
@@ -412,14 +428,10 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
 
   const hoy = day.key === todayKey;
   const PA = SGT_DATA.PALETTE;
-  const D = SGT_DATA;
   const vpad = density === "compact" ? "8px 12px" : "11px 14px";
 
-  // Usamos el resumen precalculado por buildDaySummary si existe,
-  // y derivamos miShift y libres desde los turnos del día.
   const miShift = shifts.find((s) => s.miTurno) || null;
   const libres = shifts.filter((s) => s.turnoLibre);
-
 
   return (
     <div
@@ -432,7 +444,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         boxShadow: hoy ? "0 4px 14px rgba(23,65,108,0.08)" : "none",
       }}
     >
-      {/* Header colapsable */}
       <button
         onClick={() => setExpanded((e) => !e)}
         style={{
@@ -447,7 +458,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
           gap: 12,
         }}
       >
-        {/* Fecha */}
         <div
           style={{
             minWidth: 40,
@@ -468,7 +478,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
           )}
         </div>
 
-        {/* Resumen del día */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {miShift ? (
             (() => {
@@ -477,7 +486,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
               return (
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                {/* Badge turno día/noche */}
                 <div
                   style={{
                     padding: "3px 8px",
@@ -501,7 +509,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                 <span style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>
                   {miShift.inicio}–{miShift.fin}
                 </span>
-                {/* Si hay más de un turno propio ese día, lo indicamos */}
                 {day.resumen?.tieneMultiplesTurnos && (
                   <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 700 }}>
                     +{day.resumen.misTurnos.length - 1} más
@@ -531,7 +538,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
           )}
         </div>
 
-        {/* Indicadores lado derecho */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
           {libres.length > 0 && miShift && (
             <span
@@ -560,7 +566,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         </div>
       </button>
 
-      {/* Detalle expandido: lista de todos los turnos del día */}
       {expanded && (
         <div style={{ padding: "0 14px 12px", borderTop: `1px solid ${PA.line2}` }}>
           {shifts.length === 0 ? (
@@ -570,7 +575,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
           ) : (
             shifts.map((s) => {
               const t = getTeamColor(s);
-              // team puede ser null si la API no devuelve datos de equipo
               const team = getAgendaTeam(s);
 
               return (
@@ -586,7 +590,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                     cursor: "pointer",
                   }}
                 >
-                  {/* Fila superior: icono + horario + badges */}
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: team ? 7 : 0 }}>
                     <SGTIcon
                       name={s.tipo === "dia" ? "sun" : "moon"}
@@ -600,7 +603,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                     {s.turnoLibre && <SGTBadge tone="accent" size="xs">Cupo libre</SGTBadge>}
                   </div>
 
-                  {/* Fila del equipo — solo si hay datos */}
                   {team && (
                     <div
                       style={{
