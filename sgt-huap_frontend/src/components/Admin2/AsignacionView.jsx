@@ -1,7 +1,7 @@
 // AsignacionView.jsx
 import React, { useState, useEffect } from 'react';
 import { SGT_DATA } from './data';
-import { SGTIcon } from './UIPrimitives';
+import { SGTIcon } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getFuncionariosSummary, asignarServicio } from '../../services/funcionarioService';
 

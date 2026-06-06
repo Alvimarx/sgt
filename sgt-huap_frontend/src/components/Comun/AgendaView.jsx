@@ -1,6 +1,6 @@
 // AgendaView.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { SGT_DATA } from "./data";
+import { SGT_DATA } from "../Admin2/data";
 import { getTurnosServicio } from "../../services/funcionarioService";
 import ShiftDetail, { getTeamColor, getAgendaTeam, formatShiftLabel } from "./ShiftDetail";
 
@@ -12,7 +12,7 @@ import {
   SGTIcon,
   Sheet,
   TopHeader,
-} from "./UIPrimitives";
+} from "../Style/UIPrimitives";
 import { useNotifications } from "../../context/NotificationContext";
 
 // Estado inicial vacío (sin fallbacks a datos estáticos)

@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon } from './UIPrimitives';
+import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
 
 // ──────────────────────────────────────────────
 // Helpers

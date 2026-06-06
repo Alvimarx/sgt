@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Clock, Plus, Pencil, Trash2, X, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { tiposTurnoService, formatHora } from '../../services/plantillasService';
-import { SGTIcon } from './UIPrimitives';
+import { SGTIcon } from '../Style/UIPrimitives';
 
 // ─── Paleta de colores reutilizable ────────────────────────────────────────
 const PA = {

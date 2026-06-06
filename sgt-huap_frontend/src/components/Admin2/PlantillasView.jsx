@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { plantillasService, tiposTurnoService, formatHora } from '../../services/plantillasService';
-import { SGTIcon } from './UIPrimitives';
+import { SGTIcon } from '../Style/UIPrimitives';
 
 // ─── Paleta ─────────────────────────────────────────────────────────────────
 const PA = {

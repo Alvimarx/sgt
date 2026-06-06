@@ -3,8 +3,8 @@
 // Muestra el detalle completo de un turno dentro de un Sheet.
 
 import React, { useState } from "react";
-import { SGT_DATA } from "./data";
-import { SGTAvatar, SGTBadge, SGTIcon } from "./UIPrimitives";
+import { SGT_DATA } from "../Admin2/data";
+import { SGTAvatar, SGTBadge, SGTIcon } from "../Style/UIPrimitives";
 
 // ---------------------------------------------------------------------------
 // HELPERS (duplicados mínimos para que este archivo sea autocontenido)

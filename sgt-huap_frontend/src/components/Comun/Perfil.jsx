@@ -1,7 +1,7 @@
 // ProfileView.jsx
 import React from 'react';
-import { SGT_DATA } from './data';
-import { TopHeader, SGTAvatar, SGTIcon, SGTBadge } from './UIPrimitives';
+import { SGT_DATA } from '../Admin2/data';
+import { TopHeader, SGTAvatar, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 
 // Exportamos el chip de roles por si lo necesitas en otras vistas
@@ -17,17 +17,22 @@ export const SGTRoleChip = ({ role }) => {
 
 
 
-const ProfileView = ({ onGoAdmin, onBack, onGoPersonalDash }) => {
+const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPersonalDash }) => {
   const PA = SGT_DATA.PALETTE;
+
   const { user } = useAuth();
-  
-  // Usamos el usuario de la sesión, con fallback a data local por seguridad
+    
+    // Usamos el usuario de la sesión, con fallback a data local por seguridad
   const me = user || SGT_DATA.PEOPLE.me;
+  
 
   const nombreServicioActivo = localStorage.getItem('sgt_servicio_activo_nombre') || 'Servicio Asignado';
 
-  // Verificamos si el usuario tiene rol de Jefatura o Subrogante
-  const isAdmin = me?.rol === 'JEFATURA' || me?.rol === 'SUBROGANTE';
+  const rol = JSON.parse(localStorage.getItem("user_data") || "{}")?.rol;
+
+  const isAdmin = rol === 'ADMINISTRADOR';
+  const isJefatura = rol === 'JEFATURA';
+  const isSubrogante = rol === 'SUBROGANTE';
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
@@ -85,6 +90,40 @@ const ProfileView = ({ onGoAdmin, onBack, onGoPersonalDash }) => {
               <div style={{ fontSize: 15, fontWeight: 800, color: PA.ink }}>Panel de Administración</div>
               <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>Configura servicios y rotativas</div>
             </div>
+            <SGTIcon name="chevron-right" size={16} color={PA.warn} strokeWidth={2.5}/>
+          </button>
+        )}
+        {isJefatura && (
+          <button onClick={onGoJefatura} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+              background: '#fff', border: `1px solid ${PA.primary}`, borderRadius: 14,
+              padding: '16px', cursor: 'pointer', textAlign: 'left',
+              boxShadow: '0 4px 12px rgba(23,65,108,0.08)'
+            }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center', color: PA.primary }}>
+                <SGTIcon name="shield-check" size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: PA.ink }}>Panel de Jefatura</div>
+                <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>Gestiona turnos y personal</div>
+              </div>
+            <SGTIcon name="chevron-right" size={16} color={PA.primary} strokeWidth={2.5}/>
+          </button>
+        )}
+        {isSubrogante && (
+          <button onClick={onGoSubrogante} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+              background: '#fff', border: `1px solid ${PA.warn}`, borderRadius: 14,
+              padding: '16px', cursor: 'pointer', textAlign: 'left',
+              boxShadow: '0 4px 12px rgba(200, 135, 0, 0.1)'
+            }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: PA.warnSoft, display: 'grid', placeItems: 'center', color: PA.warn }}>
+                <SGTIcon name="user-gear" size={20} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: PA.ink }}>Panel de Subrogante</div>
+                <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>Gestiona tus subrogancias</div>
+              </div>
             <SGTIcon name="chevron-right" size={16} color={PA.warn} strokeWidth={2.5}/>
           </button>
         )}

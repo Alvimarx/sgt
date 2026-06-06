@@ -1,26 +1,42 @@
 // Prop4.jsx
 import React, { useState } from "react";
-import "./style.css";
 
-import { PhoneShell, TabBar } from "./UIPrimitives";
+//Importaciones Style
+import "../Style/style.css";
+import { PhoneShell, TabBar } from "../Style/UIPrimitives";
+
 import { useAuth } from "../../context/AuthContext";
+
+//Importaciones de Comun
+import AgendaView from "../Comun/AgendaView";
+import CalendarView from "../Comun/calendarView";
+import NotificationView from "../Comun/NotificationView";
+import SelectServiceView from "../Comun/SelectServiceView";
+import ProfileView from "../Comun/Perfil";
+import PersonalDashboard from "../Comun/PersonalDashboard";
+
+//Importaciones Jefatura
+import JefaturaDashboard from "../Jefatura/JefaturaDashboardView";
+
+//Importaciones Subrogante
+import SubroganteDashboard from "../Subrogante/SubroganteDashboardView";
 
 import AdminDashboard from "./AdminDashboard";
 import AdminStats from "./AdminStats";
-import AgendaView from "./AgendaView";
+
 import AsignacionView from "./AsignacionView";
 import AuditoriaView from "./AuditoriaView";
 import BitacoraView from "./BitacoraView";
-import CalendarView from "./calendarView";
+
 import JerarquiaView from "./JerarquiaView";
-import LoginView from "./LoginView";
-import PersonalDashboard from "./PersonalDashboard";
+import LoginView from "../Login/LoginView";
+
 import PuestosView from "./PuestosView";
 import PlantillasView from "./PlantillasView";
-import NotificationView from "./NotificationView";
-import ProfileView from "./Perfil";
+
+
 import RotativaWizard from "./Rotativa";
-import SelectServiceView from "./SelectServiceView";
+
 import ServiciosView from "./ServiciosView";
 import SolicitudesView from "./SolicitudesView";
 import TiposTurnoView from "./TiposTurnoView";
@@ -145,6 +161,8 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "perfil" && (
         <ProfileView
           onGoAdmin={() => setCurrentView("admin")}
+          onGoJefatura={() => setCurrentView("jefatura")}
+          onGoSubrogante={() => setCurrentView("subrogante")}
           onGoPersonalDash={() => setCurrentView("personal_dashboard")}
           onBack={() => { setCurrentView("agenda"); setActiveTab("home"); }}
           onChangeService={handleBackToServiceSelection}
@@ -169,6 +187,14 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoPlantillas={() => setCurrentView("plantillas")}
           onGoPlanificacion={() => setCurrentView("planificacion")}
         />
+      )}
+      {currentView === "jefatura" && (
+        <JefaturaDashboard
+          onBack={() => setCurrentView("perfil")}/>
+      )}
+      {currentView === "subrogante" && (
+        <SubroganteDashboard
+          onBack={() => setCurrentView("perfil")}/>
       )}
       {currentView === "planificacion" && <PlanificacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "rotativa_wizard" && <RotativaWizard onExit={() => setCurrentView("admin")} />}

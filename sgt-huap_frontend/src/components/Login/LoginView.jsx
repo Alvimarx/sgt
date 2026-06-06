@@ -1,7 +1,7 @@
 // LoginView.jsx
 import React, { useState, useRef, useEffect } from 'react';
-import { SGT_DATA } from './data';
-import { SGTIcon } from './UIPrimitives';
+import { SGT_DATA } from '../Admin2/data';
+import { SGTIcon } from '../Style/UIPrimitives';
 import { login } from '../../services/authService';
 import huapLogo from "../../assets/huap_logo.png";
 

@@ -1,10 +1,10 @@
 // calendarView.jsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { SGT_DATA } from './data';
-import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from './UIPrimitives';
+import { SGT_DATA } from '../Admin2/data';
+import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
-import ShiftDetail, { getTeamColor, formatShiftLabel } from './ShiftDetail';
+import ShiftDetail, { getTeamColor, formatShiftLabel } from '../Comun/ShiftDetail';
 
 // ---------------------------------------------------------------------------
 // HELPERS DE PRESENTACIÓN

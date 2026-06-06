@@ -1,9 +1,8 @@
-// AdminDashboard.jsx
 import React from 'react';
-import { SGT_DATA } from './data';
+import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon } from '../Style/UIPrimitives';
 
-const AdminCard = ({ icon, title, desc, tone, onClick }) => {
+const SubroganteCard = ({ icon, title, desc, tone, onClick }) => {
   const PA = SGT_DATA.PALETTE;
   const isPrimary = tone === 'primary';
   const color = isPrimary ? PA.primary : '#B85A60';
@@ -25,7 +24,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -41,49 +40,28 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
         <p style={{ margin: '0 0 10px', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Selecciona un módulo para configurar la plataforma.</p>
 
         {/* AÑADIDO: onClick={onGoServicios} */}
-        <AdminCard 
-          icon="briefcase" 
-          title="Crear Servicio" 
-          desc="Agrega y configura nuevas unidades de trabajo." 
-          tone="primary" 
-          onClick={onGoServicios}
-        />
-        <AdminCard 
-          icon="users" 
-          title="Asignación de Funcionarios" 
-          desc="Asigna funcionarios a servicios y rotativas." 
-          tone="primary" 
-          onClick={onGoAsignacion}
-        />
-        <AdminCard 
+        <SubroganteCard 
           icon="users" 
           title="Asignación de turnos" 
           desc="Asigna o quita funcionarios de turnos" 
           tone="accent" 
           onClick={onGoSolitudes} 
         />
-        <AdminCard 
-          icon="user" 
-          title="Jerarquía de Funcionarios" 
-          desc="Designa nuevas jefaturas al sistema." 
-          tone="primary" 
-          onClick={onGoFuncionarios}
-        />
-        <AdminCard 
+        <SubroganteCard
           icon="calendar" 
           title="Crear tipo de Turno" 
           desc="Diseña un nuevo tipo de turno." 
           tone="accent" 
           onClick={onGoTiposTurno} 
         />
-        <AdminCard 
+        <SubroganteCard 
           icon="calendar" 
           title="Crear Rotativa" 
           desc="Diseña una nueva rotativa." 
           tone="accent" 
           onClick={onGoPlantillas} 
         />
-        <AdminCard 
+        <SubroganteCard 
           icon="calendar" 
           title="Crear Planificación Mensual" 
           desc="Diseña una nueva planificación mensual." 
@@ -91,35 +69,35 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
           onClick={onGoPlanificacion} 
         />
 
-        <AdminCard 
+        <SubroganteCard 
           icon="alert" 
           title="Evaluar Solicitudes" 
           desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos." 
           tone="accent" 
           onClick={onGoSolitudes} 
         />
-        <AdminCard
+        <SubroganteCard
           icon="home"
           title="Gestionar Puestos"
           desc="Crea, edita y elimina puestos del sistema."
           tone="primary"
           onClick={onGoPuestos}
         />
-        <AdminCard
+        <SubroganteCard
           icon="sliders"
           title="Estadísticas del Servicio"
           desc="Cobertura, turnos vacantes y horas cubiertas."
           tone="primary"
           onClick={onGoStats}
         />
-        <AdminCard
+        <SubroganteCard
           icon="history"
           title="Bitácora de Cambios"
           desc="Registro cronológico de todos los eventos del sistema."
           tone="accent"
           onClick={onGoBitacora}
         />
-        <AdminCard
+        <SubroganteCard
           icon="check-circle"
           title="Auditoría de Asistencia"
           desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
@@ -133,4 +111,4 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
   );
 };
 
-export default AdminDashboard;
+export default SubroganteDashboard;

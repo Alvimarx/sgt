@@ -1,7 +1,7 @@
 // RotativaWizard.jsx
 import React, { useState } from 'react';
 import { SGT_DATA } from './data';
-import { SGTIcon } from './UIPrimitives';
+import { SGTIcon } from '../Style/UIPrimitives';
 
 const RotativaWizard = ({ onExit }) => {
   const PA = SGT_DATA.PALETTE;

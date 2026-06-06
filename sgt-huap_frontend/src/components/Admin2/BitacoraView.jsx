@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { eventosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon } from './UIPrimitives';
+import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
 
 // ──────────────────────────────────────────────
 // Mapeo de enums

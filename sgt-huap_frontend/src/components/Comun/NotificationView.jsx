@@ -1,8 +1,8 @@
 // NotificationView.jsx
 import React, { useEffect } from "react";
 import { useNotifications } from "../../context/NotificationContext";
-import { SGTBadge, SGTIcon, TopHeader } from "./UIPrimitives";
-import { SGT_DATA } from "./data";
+import { SGTBadge, SGTIcon, TopHeader } from "../Style/UIPrimitives";
+import { SGT_DATA } from "../Admin2/data";
 
 const P = () => SGT_DATA.PALETTE;
 

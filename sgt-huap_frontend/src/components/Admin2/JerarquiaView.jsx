@@ -1,7 +1,7 @@
 // JerarquiaView.jsx
 import React, { useEffect, useState } from 'react';
 import { SGT_DATA } from './data';
-import { SGTIcon, SGTAvatar } from './UIPrimitives';
+import { SGTIcon, SGTAvatar } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getFuncionariosSummary, asignarRolJerarquia } from '../../services/funcionarioService';
 

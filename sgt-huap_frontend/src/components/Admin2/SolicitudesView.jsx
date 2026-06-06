@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
-import { TopHeader, Sheet, SGTIcon, SGTBadge } from './UIPrimitives';
+import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 
 const PA = SGT_DATA.PALETTE;
 

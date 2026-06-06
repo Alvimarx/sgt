@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
-import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon, TopHeader } from './UIPrimitives';
+import { SGT_DATA } from '../Admin2/data';
+import { SGTBadge, SGTIcon, TopHeader } from '../Style/UIPrimitives';
 
 // ──────────────────────────────────────────────
 // Helpers

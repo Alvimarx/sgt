@@ -1,7 +1,7 @@
 // SelectServiceView.jsx
 import React, { useState } from 'react';
-import { SGT_DATA } from './data';
-import { SGTIcon, TopHeader } from './UIPrimitives';
+import { SGT_DATA } from '../Admin2/data';
+import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import { selectService } from '../../services/authService';
 import { switchService } from '../../services/authService';
 

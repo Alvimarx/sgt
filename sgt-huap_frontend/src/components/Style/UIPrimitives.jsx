@@ -1,6 +1,6 @@
 // src/components/AgendaMockup/UIPrimitives.jsx
 import React from 'react';
-import { SGT_DATA } from './data';
+import { SGT_DATA } from '../Admin2/data';
 
 const P = () => SGT_DATA.PALETTE;
 
