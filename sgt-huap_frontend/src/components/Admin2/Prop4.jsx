@@ -17,6 +17,7 @@ import PersonalDashboard from "../Comun/PersonalDashboard";
 
 //Importaciones Jefatura
 import JefaturaDashboard from "../Jefatura/JefaturaDashboardView";
+import JerarquiaJefaturaView from "../Jefatura/JerarquiaJefaturaView";
 
 //Importaciones Subrogante
 import SubroganteDashboard from "../Subrogante/SubroganteDashboardView";
@@ -190,12 +191,19 @@ const Prop4 = ({ tweaks = {} }) => {
       )}
       {currentView === "jefatura" && (
         <JefaturaDashboard
-          onBack={() => setCurrentView("perfil")}/>
+          onBack={() => setCurrentView("perfil")}
+          onGoFuncionariosJefatura={() => setCurrentView("jerarquiaJefatura")}
+          />
       )}
+
+      {currentView === "jerarquiaJefatura" && <JerarquiaJefaturaView onBack={() => setCurrentView("jefatura")} />}
       {currentView === "subrogante" && (
         <SubroganteDashboard
           onBack={() => setCurrentView("perfil")}/>
       )}
+
+
+
       {currentView === "planificacion" && <PlanificacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "rotativa_wizard" && <RotativaWizard onExit={() => setCurrentView("admin")} />}
       {currentView === "servicios" && <ServiciosView onBack={() => setCurrentView("admin")} />}

@@ -24,7 +24,7 @@ const JefaturaCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const JefaturaDashboard = ({ onBack, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const JefaturaDashboard = ({ onBack, onGoFuncionariosJefatura, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -52,7 +52,7 @@ const JefaturaDashboard = ({ onBack, onGoFuncionarios, onGoSolitudes, onGoPuesto
           title="Jerarquía de Funcionarios" 
           desc="Designa nuevas jefaturas al sistema." 
           tone="primary" 
-          onClick={onGoFuncionarios}
+          onClick={onGoFuncionariosJefatura}
         />
         <JefaturaCard 
           icon="calendar" 
