@@ -90,7 +90,7 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
     const tipo = inferirTipo(turno?.nombre, turno?.horaInicio);
     const miTurno = funcionarioId != null && Number(turno?.idFuncionario) === Number(funcionarioId);
     const turnoLibre = turno?.idFuncionario == null;
-    const teamKey = `${fecha || 'sin-fecha'}-${tipo}-${turno?.idPuesto ?? turno?.puestoId ?? 'sin-puesto'}`;
+    const teamKey = `${fecha || 'sin-fecha'}-tipo-${turno?.idTipoTurno ?? 'sin-tipo'}`;
 
     return {
         id: turno?.id,
@@ -101,6 +101,8 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         fin,
         nombrePuesto: turno?.nombrePuesto ?? null,
         idPuesto: turno?.idPuesto ?? null,
+        idTipoTurno: turno?.idTipoTurno ?? null,
+        nombreTipoTurno: turno?.nombreTipoTurno ?? null,
         nombreFuncionario: turnoLibre ? null : (turno?.nombreFuncionario ?? null),
         idFuncionario: turno?.idFuncionario ?? null,
         miTurno,
@@ -119,8 +121,10 @@ const buildTurnoTeams = (turnos, funcionarioId) => {
                 key: turno.teamKey,
                 fecha: turno.fecha,
                 tipo: turno.tipo,
-                idPuesto: turno.idPuesto ?? null,
-                nombrePuesto: turno.nombrePuesto ?? null,
+                idTipoTurno: turno.idTipoTurno ?? null,
+                nombreTipoTurno: turno.nombreTipoTurno ?? null,
+                inicio: turno.inicio ?? null,
+                fin: turno.fin ?? null,
                 integrantes: [],
                 turnos: [],
             };
@@ -136,6 +140,38 @@ const buildTurnoTeams = (turnos, funcionarioId) => {
 
         return acc;
     }, {});
+
+    // Enriquecimiento de cada equipo: cobertura (asignados/total) y desglose por puesto.
+    Object.values(teamsByKey).forEach((group) => {
+        const grupoTurnos = group.turnos ?? [];
+        group.totalTurnos = grupoTurnos.length;
+        group.asignados = grupoTurnos.filter((t) => t.idFuncionario != null).length;
+        group.completo = group.totalTurnos > 0 && group.asignados === group.totalTurnos;
+
+        const porPuestoMap = grupoTurnos.reduce((acc, t) => {
+            const idPuesto = t.idPuesto ?? 'sin-puesto';
+            if (!acc[idPuesto]) {
+                acc[idPuesto] = {
+                    idPuesto: t.idPuesto ?? null,
+                    nombrePuesto: t.nombrePuesto ?? 'Sin puesto',
+                    integrantes: [],
+                    vacantes: 0,
+                };
+            }
+            if (t.idFuncionario != null) {
+                acc[idPuesto].integrantes.push({
+                    id: t.idFuncionario,
+                    nombre: t.nombreFuncionario,
+                    turnoId: t.id,
+                    esYo: Boolean(t.miTurno),
+                });
+            } else {
+                acc[idPuesto].vacantes += 1;
+            }
+            return acc;
+        }, {});
+        group.porPuesto = Object.values(porPuestoMap);
+    });
 
     turnos.forEach((turno) => {
         if (!turno.teamKey || !teamsByKey[turno.teamKey]) return;

@@ -433,6 +433,22 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
   const miShift = shifts.find((s) => s.miTurno) || null;
   const libres = shifts.filter((s) => s.turnoLibre);
 
+  // Una tarjeta por EQUIPO (tipo de turno), no por turno individual: los turnos del
+  // mismo tipo (a través de los puestos) se consolidan en un solo equipo.
+  const dayTeams = useMemo(() => {
+    const seen = new Map();
+    shifts.forEach((s) => {
+      const key = s.teamGroup?.key || s.teamKey || `solo-${s.id}`;
+      if (!seen.has(key)) {
+        seen.set(key, { key, group: s.teamGroup ?? null, rep: s, shifts: [] });
+      }
+      const entry = seen.get(key);
+      entry.shifts.push(s);
+      if (s.miTurno) entry.rep = s; // preferimos el turno propio como representante
+    });
+    return Array.from(seen.values());
+  }, [shifts]);
+
   return (
     <div
       style={{
@@ -573,14 +589,20 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
               No hay turnos este día.
             </p>
           ) : (
-            shifts.map((s) => {
-              const t = getTeamColor(s);
-              const team = getAgendaTeam(s);
+            dayTeams.map(({ key, group, rep, shifts: teamShifts }) => {
+              const t = getTeamColor(rep);
+              const team = getAgendaTeam(rep);
+              const total = group?.totalTurnos ?? teamShifts.length;
+              const asignados = group?.asignados ?? teamShifts.filter((x) => x.idFuncionario != null).length;
+              const vacantes = total - asignados;
+              const hayMiTurno = teamShifts.some((x) => x.miTurno);
+              const inicio = group?.inicio ?? rep.inicio;
+              const fin = group?.fin ?? rep.fin;
 
               return (
                 <div
-                  key={s.id}
-                  onClick={() => onOpen(s)}
+                  key={key}
+                  onClick={() => onOpen(rep)}
                   style={{
                     marginTop: 10,
                     background: t.bg,
@@ -590,17 +612,19 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                     cursor: "pointer",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: team ? 7 : 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: team ? 7 : 0, flexWrap: "wrap" }}>
                     <SGTIcon
-                      name={s.tipo === "dia" ? "sun" : "moon"}
+                      name={rep.tipo === "dia" ? "sun" : "moon"}
                       size={14}
                       color={t.ink}
                     />
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: t.ink, flex: 1 }}>
-                      {s.tipo === "dia" ? "Turno día" : "Turno noche"} · {s.inicio}–{s.fin}
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: t.ink, flex: 1, minWidth: 0 }}>
+                      {rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")} · {inicio}–{fin}
                     </span>
-                    {s.miTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
-                    {s.turnoLibre && <SGTBadge tone="accent" size="xs">Cupo libre</SGTBadge>}
+                    {hayMiTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
+                    <SGTBadge tone={vacantes > 0 ? "accent" : "success"} size="xs">
+                      {vacantes > 0 ? `${asignados}/${total} · ${vacantes} libre` : `Completo ${asignados}/${total}`}
+                    </SGTBadge>
                   </div>
 
                   {team && (

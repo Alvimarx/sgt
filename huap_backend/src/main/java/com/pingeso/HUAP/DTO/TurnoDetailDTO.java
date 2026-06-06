@@ -29,4 +29,7 @@ public class TurnoDetailDTO {
 
     private Long idPlantilla;
     private String nombrePlantilla;
+
+    private Long idTipoTurno;
+    private String nombreTipoTurno;
 }

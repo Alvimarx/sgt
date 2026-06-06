@@ -3,6 +3,7 @@ package com.pingeso.HUAP.Controller;
 import com.pingeso.HUAP.DTO.PlantillaTurnoDTO;
 import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Service.PlantillaTurnoService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -82,9 +83,15 @@ public class PlantillaTurnoController {
      * 6. Elimina un tipo de turno del catálogo.
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarTipoDeTurno(@PathVariable Long id) {
-        plantillaTurnoService.eliminarTipoDeTurno(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> eliminarTipoDeTurno(@PathVariable Long id) {
+        try {
+            plantillaTurnoService.eliminarTipoDeTurno(id);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException e) {
+            // p. ej. bloqueo por turnos asociados: devolvemos el mensaje como texto plano
+            // para que el frontend lo muestre directo (lee e.response.data).
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        }
     }
 
     // =========================================================================

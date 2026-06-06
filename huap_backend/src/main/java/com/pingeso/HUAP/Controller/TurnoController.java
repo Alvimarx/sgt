@@ -5,6 +5,7 @@ import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.PlantillaRepository;
+import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Service.TurnoService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,9 @@ public class TurnoController {
 
     @Autowired
     private PlantillaRepository plantillaRepository;
+
+    @Autowired
+    private PlantillaTurnoRepository plantillaTurnoRepository;
 
 
     // ====================================================================
@@ -291,9 +295,6 @@ public class TurnoController {
     private TurnoEntity buildTurnoFromPayload(Map<String, Object> payload) {
         TurnoEntity turno = new TurnoEntity();
 
-        if (payload.get("nombre") != null)
-            turno.setNombre(payload.get("nombre").toString());
-
         if (payload.get("diaInicioTurno") != null)
             turno.setDiaInicioTurno(LocalDate.parse(payload.get("diaInicioTurno").toString()));
         if (payload.get("diaFinalTurno") != null)
@@ -321,6 +322,11 @@ public class TurnoController {
         if (payload.get("idPlantilla") != null) {
             Long idPlantilla = Long.parseLong(payload.get("idPlantilla").toString());
             plantillaRepository.findById(idPlantilla).ifPresent(turno::setPlantilla);
+        }
+
+        if (payload.get("idTipoTurno") != null) {
+            Long idTipoTurno = Long.parseLong(payload.get("idTipoTurno").toString());
+            plantillaTurnoRepository.findById(idTipoTurno).ifPresent(turno::setTipoTurno);
         }
 
         return turno;

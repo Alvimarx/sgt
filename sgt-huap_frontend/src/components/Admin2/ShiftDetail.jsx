@@ -28,10 +28,12 @@ const hashStr = (value = "") => {
 
 export const getTeamColor = (shift) => {
     const seed =
-        shift?.teamGroup?.key ||
-        shift?.teamKey ||
-        `${shift?.tipo || "sin-tipo"}-${shift?.idPuesto ?? shift?.raw?.idPuesto ?? "sin-puesto"}`;
-    return TEAM_COLORS[hashStr(seed) % TEAM_COLORS.length];
+        shift?.idTipoTurno ??
+        shift?.teamGroup?.idTipoTurno ??
+        shift?.teamGroup?.key ??
+        shift?.teamKey ??
+        `tipo-${shift?.tipo || "sin-tipo"}`;
+    return TEAM_COLORS[hashStr(String(seed)) % TEAM_COLORS.length];
 };
 
 const buildInitials = (name = "") =>
@@ -49,7 +51,8 @@ export const getAgendaTeam = (shift) => {
 
 export const formatShiftLabel = (shift) => {
     if (!shift) return "";
-    return `${shift.tipo === "dia" ? "Turno día" : "Turno noche"} · ${shift.fecha || ""} ${shift.inicio}–${shift.fin}`.trim();
+    const tipoLabel = shift.nombreTipoTurno || shift.nombreTipo || (shift.tipo === "dia" ? "Turno día" : "Turno noche");
+    return `${tipoLabel} · ${shift.fecha || ""} ${shift.inicio}–${shift.fin}`.trim();
 };
 
 const P2 = () => SGT_DATA.PALETTE;
@@ -73,6 +76,12 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
 
     const groupData = shift.teamGroup ?? null;
     const legacyTeam = shift.team ? getAgendaTeam(shift) : null;
+
+    // Cobertura del equipo (cuántos turnos del tipo tienen persona asignada).
+    const totalTurnos = groupData?.totalTurnos ?? null;
+    const asignados = groupData?.asignados ?? null;
+    const equipoCompleto = groupData?.completo ?? false;
+    const faltanPorCubrir = totalTurnos != null && asignados != null ? totalTurnos - asignados : null;
     const selectedTargetTurn = exchangeSelection?.targetTurn ?? null;
     const selectedTargetFuncionario = exchangeSelection?.targetFuncionario ?? null;
 
@@ -109,7 +118,7 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                     <SGTIcon name={shift.tipo === "dia" ? "sun" : "moon"} size={18} color={teamColor.ink} />
                     <span style={{ fontSize: 13, fontWeight: 800, color: teamColor.ink, textTransform: "uppercase" }}>
-                        {shift.nombreTipo || (shift.tipo === "dia" ? "Turno día" : "Turno noche")}
+                        {shift.nombreTipoTurno || shift.nombreTipo || (shift.tipo === "dia" ? "Turno día" : "Turno noche")}
                     </span>
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: teamColor.ink }}>
@@ -118,6 +127,18 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
                 <div style={{ marginTop: 8, fontSize: 12.5, color: teamColor.ink }}>
                     {fecha ? `Fecha: ${fecha}` : "Fecha no disponible"}
                 </div>
+
+                {/* Cobertura del equipo: cuántos turnos del tipo tienen persona asignada */}
+                {totalTurnos != null && (
+                    <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.7)", borderRadius: 999, padding: "5px 10px" }}>
+                        <SGTIcon name={equipoCompleto ? "check-circle" : "users"} size={13} color={teamColor.ink} />
+                        <span style={{ fontSize: 12, fontWeight: 800, color: teamColor.ink }}>
+                            {equipoCompleto
+                                ? `Equipo completo · ${asignados}/${totalTurnos}`
+                                : `${asignados}/${totalTurnos} asignados · faltan ${faltanPorCubrir}`}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Badge de selección de intercambio (si aplica) */}
@@ -133,7 +154,6 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
             <div>
                 <SectionLabel>Información del turno</SectionLabel>
                 <div style={{ border: `1px solid ${P2().line}`, borderRadius: 12, background: "#fff", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <DetailRow label="Puesto" value={shift.nombrePuesto || shift.raw?.nombrePuesto || "Sin puesto"} />
                     <DetailRow
                         label="Estado"
                         value={
@@ -151,19 +171,15 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
                     {shift.horas != null && (
                         <DetailRow label="Duración" value={`${shift.horas} horas`} />
                     )}
-                    {/* Para turnos ajenos en vista de jefatura mostramos el funcionario */}
-                    {!shift.miTurno && shift.nombreFuncionario && (
-                        <DetailRow label="Asignado a" value={shift.nombreFuncionario} />
-                    )}
                 </div>
             </div>
 
-            {/* Equipo — datos reales de API agrupados por puesto+tipo */}
-            {groupData && (
+            {/* Equipo — integrantes del mismo tipo de turno, sub-agrupados por puesto */}
+            {groupData?.porPuesto?.length > 0 && (
                 <div>
-                    <SectionLabel>Integrantes del mismo puesto y horario</SectionLabel>
-                    <TeamGroup
-                        group={groupData}
+                    <SectionLabel>Integrantes del equipo por puesto</SectionLabel>
+                    <TeamByPuesto
+                        porPuesto={groupData.porPuesto}
                         onSelectMember={onSelectTargetFuncionario ? handleSelectTarget : undefined}
                         selectedMemberId={selectedTargetFuncionario?.id}
                     />
@@ -263,6 +279,69 @@ const TeamGroup = ({ group, onSelectMember, selectedMemberId = null }) => {
         </div>
     );
 };
+
+/**
+ * Integrantes del equipo (mismo tipo de turno) sub-agrupados por puesto.
+ * Cada puesto muestra a quién(es) lo cubren y, si hay turnos vacantes, "Falta cubrir".
+ */
+const TeamByPuesto = ({ porPuesto = [], onSelectMember, selectedMemberId = null }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {porPuesto.map((puesto) => (
+            <div key={puesto.idPuesto ?? "sin-puesto"} style={{ border: `1px solid ${P2().line}`, borderRadius: 12, background: "#fff", overflow: "hidden" }}>
+                <div style={{ padding: "8px 12px", borderBottom: `1px solid ${P2().line2}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 800, color: P2().ink }}>
+                        <SGTIcon name="home" size={13} color={P2().ink2} />
+                        {puesto.nombrePuesto}
+                    </span>
+                    {puesto.vacantes > 0 && (
+                        <SGTBadge tone="accent" size="xs">
+                            Falta cubrir{puesto.vacantes > 1 ? ` ×${puesto.vacantes}` : ""}
+                        </SGTBadge>
+                    )}
+                </div>
+                <div style={{ padding: "4px 8px 8px" }}>
+                    {puesto.integrantes.map((p) => (
+                        <button
+                            key={p.turnoId ?? p.id}
+                            type="button"
+                            onClick={() => onSelectMember?.(p)}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                padding: "7px 6px", borderRadius: 8, marginTop: 2,
+                                background: p.esYo || String(p.id) === String(selectedMemberId) ? P2().primarySoft : "transparent",
+                                border: "none", width: "100%", textAlign: "left",
+                                cursor: onSelectMember ? "pointer" : "default",
+                            }}
+                        >
+                            <SGTAvatar person={p} size={28} />
+                            <span style={{ fontSize: 13, fontWeight: p.esYo || String(p.id) === String(selectedMemberId) ? 800 : 500, color: P2().ink, flex: 1 }}>
+                                {p.nombre}
+                                {p.esYo && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: P2().primary }}>(tú)</span>}
+                            </span>
+                        </button>
+                    ))}
+                    {/* Filas de cupos vacantes del puesto */}
+                    {Array.from({ length: puesto.vacantes }).map((_, i) => (
+                        <div
+                            key={`vacante-${i}`}
+                            style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                padding: "7px 6px", borderRadius: 8, marginTop: 2,
+                            }}
+                        >
+                            <div style={{ width: 28, height: 28, borderRadius: 99, border: `1.5px dashed ${P2().line}`, display: "grid", placeItems: "center" }}>
+                                <SGTIcon name="hand-raised" size={13} color={P2().ink3} />
+                            </div>
+                            <span style={{ fontSize: 12.5, fontWeight: 700, color: P2().ink3, flex: 1, fontStyle: "italic" }}>
+                                Cupo libre — falta cubrir
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </div>
+);
 
 const ShiftActions = ({ shift, onAction, canRequestExchange = false }) => {
     const actions = [];

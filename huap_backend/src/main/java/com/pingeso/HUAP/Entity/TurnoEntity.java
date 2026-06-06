@@ -22,9 +22,6 @@ public class TurnoEntity {
     @Column(name = "id_turno", unique = true, nullable = false)
     private Long idTurno;
 
-    @Column(name = "nombre")
-    private String nombre;
-
     @Column(name = "dia_inicio_turno", nullable = false)
     private LocalDate diaInicioTurno;
 
@@ -54,5 +51,9 @@ public class TurnoEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_plantilla")
     private PlantillaEntity plantilla;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_tipo_turno")
+    private PlantillaTurnoEntity tipoTurno;
 
 }

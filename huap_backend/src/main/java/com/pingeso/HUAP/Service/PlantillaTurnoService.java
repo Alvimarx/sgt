@@ -5,6 +5,7 @@ import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Repository.PlantillaDiaRepository;
 import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
+import com.pingeso.HUAP.Repository.TurnoRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -18,15 +19,18 @@ public class PlantillaTurnoService {
     private final PlantillaTurnoRepository plantillaTurnoRepository;
     private final PlantillaDiaRepository plantillaDiaRepository;
     private final ServicioRepository servicioRepository;
+    private final TurnoRepository turnoRepository;
 
     public PlantillaTurnoService(
             PlantillaTurnoRepository plantillaTurnoRepository,
             PlantillaDiaRepository plantillaDiaRepository,
-            ServicioRepository servicioRepository
+            ServicioRepository servicioRepository,
+            TurnoRepository turnoRepository
     ) {
         this.plantillaTurnoRepository = plantillaTurnoRepository;
         this.plantillaDiaRepository = plantillaDiaRepository;
         this.servicioRepository = servicioRepository;
+        this.turnoRepository = turnoRepository;
     }
 
     // =========================================================
@@ -108,6 +112,12 @@ public class PlantillaTurnoService {
      */
     public void eliminarTipoDeTurno(Long idPlantillaTurno) {
         obtenerTipoDeTurno(idPlantillaTurno);
+
+        long turnosAsociados = turnoRepository.countByTipoTurno_IdPlantillaTurno(idPlantillaTurno);
+        if (turnosAsociados > 0) {
+            throw new RuntimeException(
+                    "No se puede eliminar el tipo de turno: tiene " + turnosAsociados + " turno(s) asociado(s).");
+        }
 
         // Libera las referencias en plantilla_secuencia_dias (id_plantilla_turno -> NULL).
         plantillaDiaRepository.liberarReferenciasAlTipoTurno(idPlantillaTurno);

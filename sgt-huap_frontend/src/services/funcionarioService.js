@@ -102,7 +102,7 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
     const tipo = normalizeDateString(turno?.diaInicioTurno) === normalizeDateString(turno?.diaFinalTurno)
         ? 'dia'
         : 'noche';
-    const teamKey = `${fechaInicio || 'sin-fecha'}-${tipo}-${turno?.idPuesto ?? turno?.puestoId ?? 'sin-puesto'}`;
+    const teamKey = `${fechaInicio || 'sin-fecha'}-tipo-${turno?.idTipoTurno ?? 'sin-tipo'}`;
 
     return {
         id: turno?.id ?? turno?.idTurno ?? null,
@@ -116,6 +116,8 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         equipo: turno?.equipo || turno?.codigoEquipo || turno?.idEquipo || null,
         nombrePuesto: turno?.nombrePuesto || turno?.puesto || null,
         idPuesto: turno?.idPuesto || turno?.puestoId || null,
+        idTipoTurno: turno?.idTipoTurno ?? null,
+        nombreTipoTurno: turno?.nombreTipoTurno ?? null,
         miTurno: Boolean(
             turno?.miTurno ||
             turno?.esMiTurno ||
@@ -193,8 +195,10 @@ const buildAgendaData = (turnos, funcionarioId) => {
                 key: turno.teamKey,
                 fecha: turno.fecha,
                 tipo: turno.tipo,
-                idPuesto: turno.idPuesto ?? null,
-                nombrePuesto: turno.nombrePuesto ?? null,
+                idTipoTurno: turno.idTipoTurno ?? null,
+                nombreTipoTurno: turno.nombreTipoTurno ?? null,
+                inicio: turno.inicio ?? null,
+                fin: turno.fin ?? null,
                 integrantes: [],
                 turnos: [],
             };
@@ -210,6 +214,38 @@ const buildAgendaData = (turnos, funcionarioId) => {
 
         return acc;
     }, {});
+
+    // Enriquecimiento de cada equipo: cobertura (asignados/total) y desglose por puesto.
+    Object.values(teamsByKey).forEach((group) => {
+        const turnos = group.turnos ?? [];
+        group.totalTurnos = turnos.length;
+        group.asignados = turnos.filter((t) => t.idFuncionario != null).length;
+        group.completo = group.totalTurnos > 0 && group.asignados === group.totalTurnos;
+
+        const porPuestoMap = turnos.reduce((acc, t) => {
+            const idPuesto = t.idPuesto ?? 'sin-puesto';
+            if (!acc[idPuesto]) {
+                acc[idPuesto] = {
+                    idPuesto: t.idPuesto ?? null,
+                    nombrePuesto: t.nombrePuesto ?? 'Sin puesto',
+                    integrantes: [],
+                    vacantes: 0,
+                };
+            }
+            if (t.idFuncionario != null) {
+                acc[idPuesto].integrantes.push({
+                    id: t.idFuncionario,
+                    nombre: t.nombreFuncionario,
+                    turnoId: t.id,
+                    esYo: Boolean(t.miTurno),
+                });
+            } else {
+                acc[idPuesto].vacantes += 1;
+            }
+            return acc;
+        }, {});
+        group.porPuesto = Object.values(porPuestoMap);
+    });
 
     mappedTurnos.forEach((turno) => {
         if (!turno.teamKey || !teamsByKey[turno.teamKey]) return;

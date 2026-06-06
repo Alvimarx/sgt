@@ -72,18 +72,18 @@ public class TurnoService {
             throw new Exception("No se encontró el turno con ID: " + id);
         }
         TurnoEntity turnoExistente = optTurno.get();
-        
-        turnoExistente.setNombre(turnoActualizado.getNombre());
+
         turnoExistente.setDiaInicioTurno(turnoActualizado.getDiaInicioTurno());
         turnoExistente.setDiaFinalTurno(turnoActualizado.getDiaFinalTurno());
         turnoExistente.setHoraInicio(turnoActualizado.getHoraInicio());
         turnoExistente.setHoraFin(turnoActualizado.getHoraFin());
 
-        // 2. Relaciones (Puesto, Servicio, Funcionario, Plantilla)
+        // 2. Relaciones (Puesto, Servicio, Funcionario, Plantilla, TipoTurno)
         turnoExistente.setFuncionario(turnoActualizado.getFuncionario());
         turnoExistente.setServicio(turnoActualizado.getServicio());
         turnoExistente.setPuesto(turnoActualizado.getPuesto());
         turnoExistente.setPlantilla(turnoActualizado.getPlantilla());
+        turnoExistente.setTipoTurno(turnoActualizado.getTipoTurno());
 
         return saveTurno(turnoExistente);
     }
@@ -253,10 +253,21 @@ public class TurnoService {
      */
     private Map<String, Object> convertirTurnoAMap(TurnoEntity t) {
         Map<String, Object> m = new HashMap<>();
-        
+
         // --- 1. Identificadores y Datos Básicos ---
         m.put("id", t.getIdTurno());
-        m.put("nombre", t.getNombre());
+
+        if (t.getTipoTurno() != null) {
+            m.put("idTipoTurno", t.getTipoTurno().getIdPlantillaTurno());
+            m.put("nombre", t.getTipoTurno().getNombre());
+            m.put("nombreTipo", t.getTipoTurno().getNombre());
+            m.put("nombreTipoTurno", t.getTipoTurno().getNombre());
+        } else {
+            m.put("idTipoTurno", null);
+            m.put("nombre", "Sin Tipo");
+            m.put("nombreTipo", "Sin Tipo");
+            m.put("nombreTipoTurno", "Sin Tipo");
+        }
 
         // --- 2. Fechas y Horas ---
         m.put("diaInicioTurno", t.getDiaInicioTurno() != null ? t.getDiaInicioTurno().toString() : null);

@@ -172,7 +172,7 @@ public class PlanificacionService {
                 if (enConflicto) vacantesPorConflicto++;
 
                 TurnoEntity turno = TurnoEntity.builder()
-                        .nombre(tipo.getNombre())
+                        .tipoTurno(tipo)
                         .diaInicioTurno(fechaDia)
                         .diaFinalTurno(diaFinal)
                         .horaInicio(hi)

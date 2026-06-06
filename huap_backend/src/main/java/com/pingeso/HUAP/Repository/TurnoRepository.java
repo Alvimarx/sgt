@@ -16,8 +16,6 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
     // BÚSQUEDAS BÁSICAS POR ENTIDAD
     // ====================================================================
 
-    List<TurnoEntity> findByNombre(String nombre);
-
     List<TurnoEntity> findByFuncionario_IdFuncionario(Long idFuncionario);
 
     List<TurnoEntity> findByServicio_IdServicio(Long idServicio);
@@ -26,6 +24,9 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
     // Cantidad de turnos asociados a un puesto. Si es > 0 no se permite eliminar el puesto.
     long countByPuesto_IdPuesto(Long idPuesto);
+
+    // Cantidad de turnos asociados a un tipo de turno. Si es > 0 no se permite eliminar el tipo.
+    long countByTipoTurno_IdPlantillaTurno(Long idPlantillaTurno);
 
     long countByServicio_IdServicio(Long idServicio);
 
