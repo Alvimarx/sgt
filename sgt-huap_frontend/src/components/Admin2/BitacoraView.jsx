@@ -61,11 +61,11 @@ function fmtHora(val) {
   if (!val) return null;
   return val.slice(0, 5);
 }
-function fmtTurno(dia, horaIni, horaFin, piso) {
+function fmtTurno(dia, horaIni, horaFin, puesto) {
   if (!dia) return null;
   const d = fmtFecha(dia);
   const h = horaIni && horaFin ? ` · ${fmtHora(horaIni)}–${fmtHora(horaFin)}` : '';
-  const p = piso ? ` (${piso})` : '';
+  const p = puesto ? ` (${puesto})` : '';
   return `${d}${h}${p}`;
 }
 function fmtRango(ini, fin) {
@@ -116,7 +116,7 @@ const BloquePermiso = ({ ev }) => (
 const BloqueBotarTurno = ({ ev }) => (
   <>
     <Row label="Solicitante"  value={ev.nombreFuncionarioEmisor || ev.nombreFuncionario} />
-    <Row label="Turno a botar" value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePisoSolicitud)} />
+    <Row label="Turno a botar" value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePuestoSolicitud)} />
     <Row label="Motivo"        value={ev.motivoSolicitud || ev.motivo} />
     <Row label="Estado"        value={ev.estadoSolicitud} />
     {ev.nombreFuncionario && ev.nombreFuncionario !== ev.nombreFuncionarioEmisor && (
@@ -127,7 +127,7 @@ const BloqueBotarTurno = ({ ev }) => (
 
 const BloqueCobertura = ({ ev }) => (
   <>
-    <Row label="Turno a cubrir"       value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePisoSolicitud)} />
+    <Row label="Turno a cubrir"       value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePuestoSolicitud)} />
     <Row label="Funcionario que cubre" value={ev.nombreFuncionarioEmisor || ev.nombreFuncionario} />
     <Row label="Motivo"                value={ev.motivoSolicitud || ev.motivo} />
     <Row label="Estado"                value={ev.estadoSolicitud} />
@@ -147,10 +147,10 @@ const BloqueIntercambio = ({ ev }) => {
   return (
     <>
       <Row label="Solicitante" value={ev.nombreFuncionarioEmisor} />
-      <Row label="Su turno"    value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePisoSolicitud)} />
+      <Row label="Su turno"    value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePuestoSolicitud)} />
       <Divider />
       <Row label="Receptor"    value={ev.nombreFuncionarioReceptor} />
-      <Row label="Su turno"    value={fmtTurno(ev.diaInicioTurnoReceptor, ev.horaInicioTurnoReceptor, ev.horaFinTurnoReceptor, ev.nombrePisoReceptor)} />
+      <Row label="Su turno"    value={fmtTurno(ev.diaInicioTurnoReceptor, ev.horaInicioTurnoReceptor, ev.horaFinTurnoReceptor, ev.nombrePuestoReceptor)} />
       <Row label="Respuesta receptor" value={receptorAcepto} />
       <Divider />
       <Row label="Estado final"  value={ev.estadoSolicitud} />
@@ -164,7 +164,7 @@ const BloqueIntercambio = ({ ev }) => {
 const BloqueGenerico = ({ ev }) => (
   <>
     <Row label="Actor"          value={ev.nombreFuncionario} />
-    <Row label="Turno"          value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePisoSolicitud)} />
+    <Row label="Turno"          value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePuestoSolicitud)} />
     <Row label="Rango afectado" value={fmtRango(ev.fechaInicioAfectada, ev.fechaFinAfectada)} />
     <Row label="Motivo"         value={ev.motivoSolicitud || ev.motivo} />
     <Row label="Observaciones"  value={ev.observaciones} />

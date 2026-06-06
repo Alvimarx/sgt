@@ -121,9 +121,9 @@ public class PlanificacionController {
             dto.setIdFuncionario(entidad.getFuncionario().getIdFuncionario());
             dto.setNombreFuncionario(entidad.getFuncionario().getNombre());
         }
-        if (entidad.getPiso() != null) {
-            dto.setIdPiso(entidad.getPiso().getIdPiso());
-            dto.setNombrePiso(entidad.getPiso().getNombre());
+        if (entidad.getPuesto() != null) {
+            dto.setIdPuesto(entidad.getPuesto().getIdPuesto());
+            dto.setNombrePuesto(entidad.getPuesto().getNombre());
         }
 
         return dto;

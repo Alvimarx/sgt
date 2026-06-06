@@ -1,42 +1,42 @@
-// PisosView.jsx
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// PuestosView.jsx
+import React, { useState, useEffect, useCallback } from 'react';
 import { Building2, Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
 import { SGT_DATA } from './data';
 import { SGTIcon } from './UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import {
-    getPisosPorServicio,
-    crearPiso,
-    actualizarPiso,
-    eliminarPiso,
+    getPuestosPorServicio,
+    crearPuesto,
+    actualizarPuesto,
+    eliminarPuesto,
     getTurnosAsociados,
-} from '../../services/pisosService';
+} from '../../services/puestosService';
 
-const PisosView = ({ onBack }) => {
+const PuestosView = ({ onBack }) => {
     const PA = SGT_DATA.PALETTE;
     const { user } = useAuth();
     const servicioId = user?.servicioId;
 
-    const [pisos, setPisos] = useState([]);
+    const [puestos, setPuestos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const [nuevoPiso, setNuevoPiso] = useState('');
+    const [nuevoPuesto, setNuevoPuesto] = useState('');
     const [creando, setCreando] = useState(false);
 
-    const [editId, setEditId] = useState(null);     // idPiso en edición
+    const [editId, setEditId] = useState(null);     // idPuesto en edición
     const [editNombre, setEditNombre] = useState('');
     const [guardando, setGuardando] = useState(false);
 
-    const [confirmDel, setConfirmDel] = useState(null);   // piso a eliminar
+    const [confirmDel, setConfirmDel] = useState(null);   // puesto a eliminar
     const [turnosAsociados, setTurnosAsociados] = useState(0);
     const [loadingImpacto, setLoadingImpacto] = useState(false);
     const [eliminando, setEliminando] = useState(false);
 
-    const pisoId = (p) => p.idPiso ?? p.id;
-    const pisoNombre = (p) => p.nombre ?? p.nombrePiso ?? p.descripcion ?? 'Piso sin nombre';
+    const puestoId = (p) => p.idPuesto ?? p.id;
+    const puestoNombre = (p) => p.nombre ?? p.nombrePuesto ?? p.descripcion ?? 'Puesto sin nombre';
 
-    const cargarPisos = useCallback(async () => {
+    const cargarPuestos = useCallback(async () => {
         if (!servicioId) {
             setError('No hay un servicio activo.');
             setLoading(false);
@@ -44,27 +44,27 @@ const PisosView = ({ onBack }) => {
         }
         setLoading(true);
         setError('');
-        const result = await getPisosPorServicio(servicioId);
+        const result = await getPuestosPorServicio(servicioId);
         if (result.success) {
-            setPisos(Array.isArray(result.data) ? result.data : []);
+            setPuestos(Array.isArray(result.data) ? result.data : []);
         } else {
             setError(result.error);
         }
         setLoading(false);
     }, [servicioId]);
 
-    useEffect(() => { cargarPisos(); }, [cargarPisos]);
+    useEffect(() => { cargarPuestos(); }, [cargarPuestos]);
 
     // ─── Crear ───────────────────────────────────────────────────────────────
     const handleCrear = async (e) => {
         e.preventDefault();
-        if (!nuevoPiso.trim() || creando) return;
+        if (!nuevoPuesto.trim() || creando) return;
         setCreando(true);
         setError('');
-        const result = await crearPiso(servicioId, nuevoPiso.trim());
+        const result = await crearPuesto(servicioId, nuevoPuesto.trim());
         if (result.success) {
-            setPisos((prev) => [...prev, result.data]);
-            setNuevoPiso('');
+            setPuestos((prev) => [...prev, result.data]);
+            setNuevoPuesto('');
         } else {
             setError(result.error);
         }
@@ -72,9 +72,9 @@ const PisosView = ({ onBack }) => {
     };
 
     // ─── Editar ──────────────────────────────────────────────────────────────
-    const abrirEdicion = (piso) => {
-        setEditId(pisoId(piso));
-        setEditNombre(pisoNombre(piso));
+    const abrirEdicion = (puesto) => {
+        setEditId(puestoId(puesto));
+        setEditNombre(puestoNombre(puesto));
     };
     const cancelarEdicion = () => { setEditId(null); setEditNombre(''); };
 
@@ -82,9 +82,9 @@ const PisosView = ({ onBack }) => {
         if (!editNombre.trim() || guardando) return;
         setGuardando(true);
         setError('');
-        const result = await actualizarPiso(editId, editNombre.trim());
+        const result = await actualizarPuesto(editId, editNombre.trim());
         if (result.success) {
-            setPisos((prev) => prev.map((p) => (pisoId(p) === editId ? result.data : p)));
+            setPuestos((prev) => prev.map((p) => (puestoId(p) === editId ? result.data : p)));
             cancelarEdicion();
         } else {
             setError(result.error);
@@ -93,11 +93,11 @@ const PisosView = ({ onBack }) => {
     };
 
     // ─── Eliminar ──────────────────────────────────────────────────────────────
-    const abrirConfirmEliminar = async (piso) => {
-        setConfirmDel(piso);
+    const abrirConfirmEliminar = async (puesto) => {
+        setConfirmDel(puesto);
         setTurnosAsociados(0);
         setLoadingImpacto(true);
-        const result = await getTurnosAsociados(pisoId(piso));
+        const result = await getTurnosAsociados(puestoId(puesto));
         setTurnosAsociados(result.success ? result.data : 0);
         setLoadingImpacto(false);
     };
@@ -106,9 +106,9 @@ const PisosView = ({ onBack }) => {
         if (!confirmDel || eliminando) return;
         setEliminando(true);
         setError('');
-        const result = await eliminarPiso(pisoId(confirmDel));
+        const result = await eliminarPuesto(puestoId(confirmDel));
         if (result.success) {
-            setPisos((prev) => prev.filter((p) => pisoId(p) !== pisoId(confirmDel)));
+            setPuestos((prev) => prev.filter((p) => puestoId(p) !== puestoId(confirmDel)));
             setConfirmDel(null);
         } else {
             setError(result.error);
@@ -130,12 +130,12 @@ const PisosView = ({ onBack }) => {
                 <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
                     <SGTIcon name="chevron-left" size={24} color={PA.ink} />
                 </button>
-                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Pisos del Servicio</div>
+                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Puestos del Servicio</div>
             </div>
 
             <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
                 <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600 }}>
-                    Administra los pisos o niveles disponibles en este servicio.
+                    Administra los puestos o posiciones disponibles en este servicio.
                 </p>
 
                 {error && (
@@ -154,25 +154,25 @@ const PisosView = ({ onBack }) => {
 
                 {/* Formulario de creación */}
                 <div style={{ marginBottom: 24 }}>
-                    <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3 }}>Nuevo Piso</label>
+                    <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3 }}>Nuevo Puesto</label>
                     <form onSubmit={handleCrear} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                         <input
                             type="text"
-                            placeholder="Ej: Piso 1, Urgencias…"
-                            value={nuevoPiso}
-                            onChange={(e) => setNuevoPiso(e.target.value)}
+                            placeholder="Ej: Reanimación, Box 1, Triage…"
+                            value={nuevoPuesto}
+                            onChange={(e) => setNuevoPuesto(e.target.value)}
                             disabled={creando}
                             style={inputStyle}
                         />
                         <button
                             type="submit"
-                            disabled={!nuevoPiso.trim() || creando}
+                            disabled={!nuevoPuesto.trim() || creando}
                             style={{
                                 display: 'flex', alignItems: 'center', gap: 6,
-                                padding: '0 18px', background: (!nuevoPiso.trim() || creando) ? PA.line : PA.primary,
-                                color: (!nuevoPiso.trim() || creando) ? PA.ink3 : '#fff',
+                                padding: '0 18px', background: (!nuevoPuesto.trim() || creando) ? PA.line : PA.primary,
+                                color: (!nuevoPuesto.trim() || creando) ? PA.ink3 : '#fff',
                                 border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 800,
-                                cursor: (!nuevoPiso.trim() || creando) ? 'not-allowed' : 'pointer',
+                                cursor: (!nuevoPuesto.trim() || creando) ? 'not-allowed' : 'pointer',
                                 transition: 'all 0.2s',
                             }}>
                             <Plus size={16} /> {creando ? 'Guardando…' : 'Agregar'}
@@ -180,24 +180,24 @@ const PisosView = ({ onBack }) => {
                     </form>
                 </div>
 
-                {/* Lista de pisos */}
+                {/* Lista de puestos */}
                 <div>
                     <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, marginBottom: 8, display: 'block' }}>
-                        Pisos Registrados
+                        Puestos Registrados
                     </label>
 
                     {loading ? (
                         <div style={{ padding: '16px', textAlign: 'center', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
                             Cargando datos…
                         </div>
-                    ) : pisos.length === 0 ? (
+                    ) : puestos.length === 0 ? (
                         <div style={{ padding: '16px', textAlign: 'center', background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12, color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
-                            No hay pisos registrados en este servicio.
+                            No hay puestos registrados en este servicio.
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {pisos.map((piso) => {
-                                const pId = pisoId(piso);
+                            {puestos.map((puesto) => {
+                                const pId = puestoId(puesto);
                                 const enEdicion = editId === pId;
                                 return (
                                     <div key={pId} style={{
@@ -253,17 +253,17 @@ const PisosView = ({ onBack }) => {
                                         ) : (
                                             <>
                                                 <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: PA.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {pisoNombre(piso)}
+                                                    {puestoNombre(puesto)}
                                                 </div>
                                                 <button
-                                                    onClick={() => abrirEdicion(piso)}
+                                                    onClick={() => abrirEdicion(puesto)}
                                                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.ink3 }}
                                                     title="Editar"
                                                 >
                                                     <Pencil size={17} />
                                                 </button>
                                                 <button
-                                                    onClick={() => abrirConfirmEliminar(piso)}
+                                                    onClick={() => abrirConfirmEliminar(puesto)}
                                                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.warn || '#DC2626' }}
                                                     title="Eliminar"
                                                 >
@@ -281,9 +281,9 @@ const PisosView = ({ onBack }) => {
 
             {/* Confirmación de eliminación */}
             {confirmDel && (
-                <ConfirmDeletePiso
+                <ConfirmDeletePuesto
                     PA={PA}
-                    nombre={pisoNombre(confirmDel)}
+                    nombre={puestoNombre(confirmDel)}
                     turnos={turnosAsociados}
                     loadingImpacto={loadingImpacto}
                     eliminando={eliminando}
@@ -296,7 +296,7 @@ const PisosView = ({ onBack }) => {
 };
 
 // ─── Bottom-sheet de confirmación de eliminación ────────────────────────────
-function ConfirmDeletePiso({ PA, nombre, turnos, loadingImpacto, eliminando, onConfirm, onCancel }) {
+function ConfirmDeletePuesto({ PA, nombre, turnos, loadingImpacto, eliminando, onConfirm, onCancel }) {
     const bloqueado = turnos > 0;
     const warn = PA.warn || '#DC2626';
     const warnSoft = PA.warnSoft || '#FEF2F2';
@@ -328,7 +328,7 @@ function ConfirmDeletePiso({ PA, nombre, turnos, loadingImpacto, eliminando, onC
                 </div>
 
                 <div style={{ fontWeight: 800, fontSize: 18, color: PA.ink, textAlign: 'center', marginBottom: 10 }}>
-                    ¿Eliminar piso?
+                    ¿Eliminar puesto?
                 </div>
 
                 <p style={{ fontSize: 14, color: PA.ink2, margin: '0 0 6px', lineHeight: 1.55, textAlign: 'center' }}>
@@ -343,9 +343,9 @@ function ConfirmDeletePiso({ PA, nombre, turnos, loadingImpacto, eliminando, onC
                     <div style={{ background: warnSoft, borderRadius: 12, padding: '12px 14px', margin: '4px 0 22px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                         <AlertCircle size={16} color={warn} style={{ flexShrink: 0, marginTop: 1 }} />
                         <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>
-                            No se puede eliminar: el piso está asociado a{' '}
+                            No se puede eliminar: el puesto está asociado a{' '}
                             <strong style={{ color: PA.ink }}>{turnos} turno{turnos === 1 ? '' : 's'}</strong>.
-                            Reasigna esos turnos a otro piso antes de eliminarlo.
+                            Reasigna esos turnos a otro puesto antes de eliminarlo.
                         </div>
                     </div>
                 ) : (
@@ -386,4 +386,4 @@ function ConfirmDeletePiso({ PA, nombre, turnos, loadingImpacto, eliminando, onC
     );
 }
 
-export default PisosView;
+export default PuestosView;

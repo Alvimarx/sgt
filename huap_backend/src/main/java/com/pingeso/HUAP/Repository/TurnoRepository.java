@@ -22,10 +22,10 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
     List<TurnoEntity> findByServicio_IdServicio(Long idServicio);
 
-    List<TurnoEntity> findByPiso_IdPiso(Long idPiso);
+    List<TurnoEntity> findByPuesto_IdPuesto(Long idPuesto);
 
-    // Cantidad de turnos asociados a un piso. Si es > 0 no se permite eliminar el piso.
-    long countByPiso_IdPiso(Long idPiso);
+    // Cantidad de turnos asociados a un puesto. Si es > 0 no se permite eliminar el puesto.
+    long countByPuesto_IdPuesto(Long idPuesto);
 
     long countByServicio_IdServicio(Long idServicio);
 
@@ -109,16 +109,16 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
-    // Búsqueda en un Piso específico
+    // Búsqueda en un Puesto específico
     @Query("""
            SELECT t
            FROM TurnoEntity t
-           WHERE t.piso.idPiso = :pisoId
+           WHERE t.puesto.idPuesto = :puestoId
            AND t.diaFinalTurno >= :fechaInicio
            AND t.diaInicioTurno <= :fechaFin
            """)
-    List<TurnoEntity> findByPisoIdAndDateRange(
-            @Param("pisoId") Long pisoId,
+    List<TurnoEntity> findByPuestoIdAndDateRange(
+            @Param("puestoId") Long puestoId,
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin
     );

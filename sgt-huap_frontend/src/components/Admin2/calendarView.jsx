@@ -32,7 +32,7 @@ const hashStr = (value = '') => {
     return h;
 };
 
-// getTeamColor importado desde ShiftDetail — color determinista por tipo+piso
+// getTeamColor importado desde ShiftDetail — color determinista por tipo+puesto
 
 const formatTime = (v) => (v ? String(v).slice(0, 5) : null);
 
@@ -326,7 +326,7 @@ const ShiftCard = ({ shift, esJefatura, onOpen }) => {
             }}
         >
             {/* Fila principal: icono + tipo + horario + badge */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: shift.nombreFuncionario || shift.nombrePiso ? 8 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: shift.nombreFuncionario || shift.nombrePuesto ? 8 : 0 }}>
                 <SGTIcon
                     name={shift.tipo === 'dia' ? 'sun' : 'moon'}
                     size={15}
@@ -340,8 +340,8 @@ const ShiftCard = ({ shift, esJefatura, onOpen }) => {
                 {shift.turnoLibre && <SGTBadge tone="accent" size="xs">Cupo libre</SGTBadge>}
             </div>
 
-            {/* Fila secundaria: piso + funcionario (jefatura ve quién está asignado) */}
-            {(shift.nombrePiso || (esJefatura && shift.nombreFuncionario)) && (
+            {/* Fila secundaria: puesto + funcionario (jefatura ve quién está asignado) */}
+            {(shift.nombrePuesto || (esJefatura && shift.nombreFuncionario)) && (
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -350,9 +350,9 @@ const ShiftCard = ({ shift, esJefatura, onOpen }) => {
                     padding: '6px 10px',
                     borderRadius: 8,
                 }}>
-                    {shift.nombrePiso && (
+                    {shift.nombrePuesto && (
                         <span style={{ fontSize: 11.5, fontWeight: 700, color: color.ink, flex: 1 }}>
-                            {shift.nombrePiso}
+                            {shift.nombrePuesto}
                         </span>
                     )}
                     {esJefatura && shift.nombreFuncionario && (

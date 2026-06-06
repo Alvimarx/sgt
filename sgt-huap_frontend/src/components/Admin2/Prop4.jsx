@@ -15,7 +15,7 @@ import CalendarView from "./calendarView";
 import JerarquiaView from "./JerarquiaView";
 import LoginView from "./LoginView";
 import PersonalDashboard from "./PersonalDashboard";
-import PisosView from "./PisosView";
+import PuestosView from "./PuestosView";
 import PlantillasView from "./PlantillasView";
 import NotificationView from "./NotificationView";
 import ProfileView from "./Perfil";
@@ -160,7 +160,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoServicios={() => setCurrentView("servicios")}
           onGoAsignacion={() => setCurrentView("asignacion")}
           onGoFuncionarios={() => setCurrentView("jerarquia")}
-          onGoPisos={() => setCurrentView("pisos")}
+          onGoPuestos={() => setCurrentView("puestos")}
           onGoSolitudes={() => { setSolicitudesReturn("admin"); setCurrentView("solicitudes"); }}
           onGoStats={() => setCurrentView("admin_stats")}
           onGoBitacora={() => setCurrentView("bitacora")}
@@ -175,7 +175,7 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "servicios" && <ServiciosView onBack={() => setCurrentView("admin")} />}
       {currentView === "asignacion" && <AsignacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "jerarquia" && <JerarquiaView onBack={() => setCurrentView("admin")} />}
-      {currentView === "pisos" && <PisosView onBack={() => setCurrentView("admin")} />}
+      {currentView === "puestos" && <PuestosView onBack={() => setCurrentView("admin")} />}
       {currentView === "solicitudes" && (
         <SolicitudesView
           onBack={() => setCurrentView(solicitudesReturn)}

@@ -3,7 +3,7 @@ package com.pingeso.HUAP.DTO;
 import lombok.Data;
 
 @Data
-public class PisoRequestDTO {
+public class PuestoRequestDTO {
     private Long idServicio;
     private String nombre;
 }

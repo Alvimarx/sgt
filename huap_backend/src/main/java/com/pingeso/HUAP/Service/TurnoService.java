@@ -3,7 +3,7 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.Solicitud2Repository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
-import com.pingeso.HUAP.Repository.PisoRepository;
+import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,7 +27,7 @@ public class TurnoService {
     private TurnoRepository turnoRepository;
 
     @Autowired
-    private PisoRepository pisoRepository;
+    private PuestoRepository puestoRepository;
 
     @Autowired
     private FuncionarioRepository funcionarioRepository;
@@ -79,10 +79,10 @@ public class TurnoService {
         turnoExistente.setHoraInicio(turnoActualizado.getHoraInicio());
         turnoExistente.setHoraFin(turnoActualizado.getHoraFin());
 
-        // 2. Relaciones (Piso, Servicio, Funcionario, Plantilla)
+        // 2. Relaciones (Puesto, Servicio, Funcionario, Plantilla)
         turnoExistente.setFuncionario(turnoActualizado.getFuncionario());
         turnoExistente.setServicio(turnoActualizado.getServicio());
-        turnoExistente.setPiso(turnoActualizado.getPiso());
+        turnoExistente.setPuesto(turnoActualizado.getPuesto());
         turnoExistente.setPlantilla(turnoActualizado.getPlantilla());
 
         return saveTurno(turnoExistente);
@@ -264,13 +264,13 @@ public class TurnoService {
         m.put("horaInicio", t.getHoraInicio() != null ? t.getHoraInicio().toString() : null);
         m.put("horaFin", t.getHoraFin() != null ? t.getHoraFin().toString() : null);
 
-        // --- 3. Ubicación (Piso) ---
-        if (t.getPiso() != null) {
-            m.put("idPiso", t.getPiso().getIdPiso());
-            m.put("nombrePiso", t.getPiso().getNombre());
+        // --- 3. Ubicación (Puesto) ---
+        if (t.getPuesto() != null) {
+            m.put("idPuesto", t.getPuesto().getIdPuesto());
+            m.put("nombrePuesto", t.getPuesto().getNombre());
         } else {
-            m.put("idPiso", null);
-            m.put("nombrePiso", "Sin Piso");
+            m.put("idPuesto", null);
+            m.put("nombrePuesto", "Sin Puesto");
         }
 
         // --- 4. Médico Asignado ---
@@ -308,10 +308,10 @@ public class TurnoService {
     }
 
     /**
-     * Obtiene todos los turnos de un piso específico.
+     * Obtiene todos los turnos de un puesto específico.
      */
-    public List<Map<String, Object>> getTurnosByPiso(Long pisoId) {
-        return turnoRepository.findByPiso_IdPiso(pisoId).stream()
+    public List<Map<String, Object>> getTurnosByPuesto(Long puestoId) {
+        return turnoRepository.findByPuesto_IdPuesto(puestoId).stream()
                 .map(this::convertirTurnoAMap)
                 .collect(Collectors.toList());
     }
@@ -420,12 +420,12 @@ public class TurnoService {
     **/
 
     /**
-     * Obtiene los turnos "vacantes" (sin asignar) para un piso y rango de fechas.
+     * Obtiene los turnos "vacantes" (sin asignar) para un puesto y rango de fechas.
      * Reutiliza nuestra poderosa función de mapeo del Bloque 3.
      */
-    public List<Map<String, Object>> getTurnosParaAsignacion(Long pisoId, LocalDate inicio, LocalDate fin) {
-        // 1. Buscamos todos los turnos del piso en esa fecha
-        List<TurnoEntity> turnos = turnoRepository.findByPisoIdAndDateRange(pisoId, inicio, fin);
+    public List<Map<String, Object>> getTurnosParaAsignacion(Long puestoId, LocalDate inicio, LocalDate fin) {
+        // 1. Buscamos todos los turnos del puesto en esa fecha
+        List<TurnoEntity> turnos = turnoRepository.findByPuestoIdAndDateRange(puestoId, inicio, fin);
 
         // 2. Filtramos solo los que NO tienen funcionario y los convertimos a DTO
         return turnos.stream()
@@ -505,24 +505,24 @@ public class TurnoService {
     }
 
     /**
-     * Calcula las horas reales de cobertura para un Piso específico.
+     * Calcula las horas reales de cobertura para un Puesto específico.
      * Solo toma en cuenta los turnos que YA tienen un funcionario asignado.
-     * getCoveragePerPisoLastMonth, getCoveragePerPisoCurrentMonth, getCoveragePerPisoByMonth
+     * getCoveragePerPuestoLastMonth, getCoveragePerPuestoCurrentMonth, getCoveragePerPuestoByMonth
      */
-    public Map<String, Object> getCoberturaRealByPiso(Long pisoId, LocalDate inicio, LocalDate fin) {
-        List<TurnoEntity> turnosDelPiso = turnoRepository.findByPisoIdAndDateRange(pisoId, inicio, fin);
-        
+    public Map<String, Object> getCoberturaRealByPuesto(Long puestoId, LocalDate inicio, LocalDate fin) {
+        List<TurnoEntity> turnosDelPuesto = turnoRepository.findByPuestoIdAndDateRange(puestoId, inicio, fin);
+
         // Filtramos solo los turnos que tienen un médico/funcionario asignado
-        List<TurnoEntity> turnosAsignados = turnosDelPiso.stream()
+        List<TurnoEntity> turnosAsignados = turnosDelPuesto.stream()
                 .filter(t -> t.getFuncionario() != null)
                 .collect(Collectors.toList());
-                
+
         double horasReales = computeUnionHours(turnosAsignados);
-        
+
         Map<String, Object> cobertura = new HashMap<>();
-        cobertura.put("idPiso", pisoId);
+        cobertura.put("idPuesto", puestoId);
         cobertura.put("horasRealesCubiertas", horasReales);
-        
+
         return cobertura;
     }
 
@@ -566,13 +566,13 @@ public class TurnoService {
     }
 
     /**
-     * Calcula la cobertura real agrupada DÍA POR DÍA para un piso específico.
+     * Calcula la cobertura real agrupada DÍA POR DÍA para un puesto específico.
      * Reutiliza el motor matemático computeUnionHours para evitar repetir código.
      */
-    public Map<String, Map<LocalDate, Double>> computeUnionHoursByPiso(Long pisoId, LocalDate inicio, LocalDate fin) {
-        
+    public Map<String, Map<LocalDate, Double>> computeUnionHoursByPuesto(Long puestoId, LocalDate inicio, LocalDate fin) {
+
         // 1. Buscamos los turnos con médico asignado
-        List<TurnoEntity> turnos = turnoRepository.findByPisoIdAndDateRange(pisoId, inicio, fin);
+        List<TurnoEntity> turnos = turnoRepository.findByPuestoIdAndDateRange(puestoId, inicio, fin);
         List<TurnoEntity> turnosAsignados = turnos.stream()
                 .filter(t -> t.getFuncionario() != null && t.getDiaInicioTurno() != null)
                 .collect(Collectors.toList());
@@ -596,7 +596,7 @@ public class TurnoService {
 
         // 4. Armamos la respuesta para el frontend
         Map<String, Map<LocalDate, Double>> resultado = new HashMap<>();
-        resultado.put(String.valueOf(pisoId), horasPorDia);
+        resultado.put(String.valueOf(puestoId), horasPorDia);
 
         return resultado;
     }

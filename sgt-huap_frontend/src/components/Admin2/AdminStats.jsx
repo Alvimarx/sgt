@@ -59,7 +59,7 @@ const TurnoLibreItem = ({ turno }) => {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>{fecha}</div>
         <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 1 }}>
-          {turno.horaInicio || '?'} – {turno.horaFin || '?'} · {turno.nombrePiso || 'Sin piso'}
+          {turno.horaInicio || '?'} – {turno.horaFin || '?'} · {turno.nombrePuesto || 'Sin puesto'}
         </div>
       </div>
       <SGTBadge tone="accent" size="xs">Vacante</SGTBadge>

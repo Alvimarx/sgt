@@ -69,7 +69,7 @@ const TurnoProximoItem = ({ turno }) => {
   const PA = SGT_DATA.PALETTE;
   const fecha  = turno.diaInicioTurno ? dayjs(turno.diaInicioTurno).format('ddd D MMM') : '—';
   const horas  = `${turno.horaInicio || '?'} – ${turno.horaFin || '?'}`;
-  const piso   = turno.nombrePiso || 'Sin piso';
+  const puesto   = turno.nombrePuesto || 'Sin puesto';
   const esHoy  = turno.diaInicioTurno && dayjs(turno.diaInicioTurno).isSame(dayjs(), 'day');
 
   return (
@@ -87,7 +87,7 @@ const TurnoProximoItem = ({ turno }) => {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>{horas}</div>
-        <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>{piso}</div>
+        <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>{puesto}</div>
       </div>
       {esHoy && <SGTBadge tone="primary" size="xs">Hoy</SGTBadge>}
     </div>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { plantillasService, tiposTurnoService, formatHora } from '../../services/plantillasService';
-import { getPisosPorServicio } from '../../services/pisosService';
+import { getPuestosPorServicio } from '../../services/puestosService';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { planificacionService } from '../../services/planificacionService';
 
@@ -167,25 +167,25 @@ function KPIBar({instancias,dense=false}){
   );
 }
 
-/* ─── PisoTag ────────────────────────────────────────────────────────────────── */
-function PisoTag({inst,size='sm'}){
-  if(!inst||!inst.nombrePiso)return null;
+/* ─── PuestoTag ────────────────────────────────────────────────────────────────── */
+function PuestoTag({inst,size='sm'}){
+  if(!inst||!inst.nombrePuesto)return null;
   const fs=size==='xs'?9.5:10.5;
-  return <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:fs,fontWeight:900,letterSpacing:0.2,padding:'1px 6px',borderRadius:99,background:'var(--primary-soft)',color:'var(--primary)',whiteSpace:'nowrap'}}><SGTIcon name="home" size={fs-1} color="var(--primary)"/>{inst.nombrePiso}</span>;
+  return <span style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:fs,fontWeight:900,letterSpacing:0.2,padding:'1px 6px',borderRadius:99,background:'var(--primary-soft)',color:'var(--primary)',whiteSpace:'nowrap'}}><SGTIcon name="home" size={fs-1} color="var(--primary)"/>{inst.nombrePuesto}</span>;
 }
 
-/* ─── PisoSelector ───────────────────────────────────────────────────────────── */
-function PisoSelector({pisos,value,onChange}){
+/* ─── PuestoSelector ───────────────────────────────────────────────────────────── */
+function PuestoSelector({puestos,value,onChange}){
   const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
   return(
     <div>
-      <span style={lbl}>Asociar a piso / unidad</span>
-      {pisos.length===0?(
-        <div style={{fontSize:12,color:'var(--ink3)',fontWeight:600}}>No hay pisos en este servicio.</div>
+      <span style={lbl}>Asociar a puesto / unidad</span>
+      {puestos.length===0?(
+        <div style={{fontSize:12,color:'var(--ink3)',fontWeight:600}}>No hay puestos en este servicio.</div>
       ):(
         <div style={{display:'flex',flexWrap:'wrap',gap:7}}>
-          {pisos.map(p=>{ const sel=String(p.idPiso)===String(value); return(
-            <button key={p.idPiso} onClick={()=>onChange(String(p.idPiso))} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 13px',borderRadius:99,cursor:'pointer',fontFamily:'inherit',background:sel?'var(--primary)':'#fff',border:`1.5px solid ${sel?'var(--primary)':'var(--line)'}`,color:sel?'#fff':'var(--ink)',fontSize:13,fontWeight:800}}>
+          {puestos.map(p=>{ const sel=String(p.idPuesto)===String(value); return(
+            <button key={p.idPuesto} onClick={()=>onChange(String(p.idPuesto))} style={{display:'flex',alignItems:'center',gap:6,padding:'9px 13px',borderRadius:99,cursor:'pointer',fontFamily:'inherit',background:sel?'var(--primary)':'#fff',border:`1.5px solid ${sel?'var(--primary)':'var(--line)'}`,color:sel?'#fff':'var(--ink)',fontSize:13,fontWeight:800}}>
               <SGTIcon name="home" size={13} color={sel?'#fff':'var(--ink3)'}/>{p.nombre}
             </button>
           );})}
@@ -208,7 +208,7 @@ function buildDayCoverage(entradasDelDia){
 }
 
 /* ─── Estado de planificación (sobre datos reales) ─────────────────────────── */
-function usePlanificacionState({plantillas,funcionarios,pisos}){
+function usePlanificacionState({plantillas,funcionarios,puestos}){
   const[instancias,setInstancias]=useState([]);
   const counter=useRef(0);
 
@@ -221,14 +221,14 @@ function usePlanificacionState({plantillas,funcionarios,pisos}){
       idPlantilla:plantilla.idPlantilla, nombrePlantilla:plantilla.nombre,
       semanas:plantilla.semanas, secuencia:buildSecuencia(plantilla),
       idFuncionario:null, nombreFuncionario:null, iniciales:null, profesion:null,
-      idPiso:null, nombrePiso:null, ...extra,
+      idPuesto:null, nombrePuesto:null, ...extra,
     };
   };
 
-  const inject=({idPlantilla,idPiso})=>{
+  const inject=({idPlantilla,idPuesto})=>{
     const plantilla=plantillas.find(p=>p.idPlantilla===Number(idPlantilla)); if(!plantilla)return null;
-    const piso=idPiso?pisos.find(p=>p.idPiso===Number(idPiso)):null;
-    const nueva=instanciaDesdePlantilla(plantilla,{idPiso:piso?.idPiso||null,nombrePiso:piso?.nombre||null});
+    const puesto=idPuesto?puestos.find(p=>p.idPuesto===Number(idPuesto)):null;
+    const nueva=instanciaDesdePlantilla(plantilla,{idPuesto:puesto?.idPuesto||null,nombrePuesto:puesto?.nombre||null});
     setInstancias(prev=>[...prev,nueva]);
     return nueva;
   };
@@ -254,14 +254,14 @@ function usePlanificacionState({plantillas,funcionarios,pisos}){
         semanas:plantilla?.semanas||0, secuencia:plantilla?buildSecuencia(plantilla):[],
         idFuncionario:a.idFuncionario||null, nombreFuncionario:a.nombreFuncionario||null,
         iniciales:a.nombreFuncionario?a.nombreFuncionario.split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||'').join(''):null,
-        profesion:null, idPiso:a.idPiso||null, nombrePiso:a.nombrePiso||null,
+        profesion:null, idPuesto:a.idPuesto||null, nombrePuesto:a.nombrePuesto||null,
       };
     });
     setInstancias(nuevas);
   };
 
   // Asignaciones para enviar al backend.
-  const toAsignaciones=()=>instancias.map(i=>({ idPlantilla:i.idPlantilla, idFuncionario:i.idFuncionario||null, idPiso:i.idPiso||null }));
+  const toAsignaciones=()=>instancias.map(i=>({ idPlantilla:i.idPlantilla, idFuncionario:i.idFuncionario||null, idPuesto:i.idPuesto||null }));
 
   const daysIndex=useMemo(()=>{
     const m={};
@@ -274,19 +274,19 @@ function usePlanificacionState({plantillas,funcionarios,pisos}){
 }
 
 /* ─── InyectarSheet ──────────────────────────────────────────────────────────── */
-function InyectarSheet({open,onClose,onInject,plantillas,pisos,tipoColor}){
+function InyectarSheet({open,onClose,onInject,plantillas,puestos,tipoColor}){
   const[idPlantilla,setIdPlantilla]=useState('');
-  const[idPiso,setIdPiso]=useState('');
+  const[idPuesto,setIdPuesto]=useState('');
   const[err,setErr]=useState('');
   if(!open)return null;
 
-  const handle=()=>{ if(!idPlantilla)return setErr('Selecciona una rotativa.'); if(!idPiso)return setErr('Selecciona el piso.'); setErr(''); onInject({idPlantilla:Number(idPlantilla),idPiso:Number(idPiso)}); setIdPlantilla(''); setIdPiso(''); };
+  const handle=()=>{ if(!idPlantilla)return setErr('Selecciona una rotativa.'); if(!idPuesto)return setErr('Selecciona el puesto.'); setErr(''); onInject({idPlantilla:Number(idPlantilla),idPuesto:Number(idPuesto)}); setIdPlantilla(''); setIdPuesto(''); };
   const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
 
   return(
     <Sheet open={open} onClose={onClose} title="Agregar rotativa" maxHeight="90%">
       <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:14}}>
-        <div style={{fontSize:12.5,color:'var(--ink3)',fontWeight:600,lineHeight:1.4}}>La rotativa quedará <strong style={{color:'var(--ink)'}}>pendiente de asignación</strong> y asociada al piso que elijas.</div>
+        <div style={{fontSize:12.5,color:'var(--ink3)',fontWeight:600,lineHeight:1.4}}>La rotativa quedará <strong style={{color:'var(--ink)'}}>pendiente de asignación</strong> y asociada al puesto que elijas.</div>
         {err&&<div style={{display:'flex',alignItems:'center',gap:6,background:'var(--warn-soft)',color:'var(--warn)',borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:700}}><SGTIcon name="alert" size={14}/>{err}</div>}
         <div>
           <span style={lbl}>Rotativa</span>
@@ -303,7 +303,7 @@ function InyectarSheet({open,onClose,onInject,plantillas,pisos,tipoColor}){
             </div>
           )}
         </div>
-        <PisoSelector pisos={pisos} value={idPiso} onChange={setIdPiso}/>
+        <PuestoSelector puestos={puestos} value={idPuesto} onChange={setIdPuesto}/>
         <button onClick={handle} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:12,background:'var(--primary)',color:'#fff',border:'none',fontSize:14.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
           <SGTIcon name="plus" size={16} color="#fff"/> Agregar al molde
         </button>
@@ -334,7 +334,7 @@ function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onR
       <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:14}}>
         <div style={{background:'var(--surface2)',borderRadius:14,padding:14}}>
           <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}><span style={{fontSize:10.5,fontWeight:900,color:'#fff',background:'var(--primary)',padding:'2px 7px',borderRadius:99}}>{instancia.label}</span><span style={{fontSize:13.5,fontWeight:800,color:'var(--ink)'}}>{instancia.nombrePlantilla}</span></div>
-          <div style={{fontSize:11.5,color:'var(--ink3)',fontWeight:600,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{instancia.semanas} semanas · {totalTurnos} turnos<PisoTag inst={instancia} size="xs"/></div>
+          <div style={{fontSize:11.5,color:'var(--ink3)',fontWeight:600,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{instancia.semanas} semanas · {totalTurnos} turnos<PuestoTag inst={instancia} size="xs"/></div>
         </div>
         {err&&<div style={{display:'flex',alignItems:'center',gap:6,background:'var(--warn-soft)',color:'var(--warn)',borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:700}}><SGTIcon name="alert" size={14}/>{err}</div>}
         <div>
@@ -454,7 +454,7 @@ function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssig
                 {asignadas.map(inst=>(
                   <button key={inst.id} onClick={()=>onAssignInstance&&onAssignInstance(inst)} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 9px',background:'var(--surface2)',borderRadius:9,border:'none',cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
                     <SGTAvatar person={{iniciales:inst.iniciales}} size={30}/>
-                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:800,color:'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{inst.nombreFuncionario}</div><div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontSize:10,fontWeight:800,color:'var(--ink3)'}}>{inst.label}</span><PisoTag inst={inst} size="xs"/></div></div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:800,color:'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{inst.nombreFuncionario}</div><div style={{display:'flex',alignItems:'center',gap:5,marginTop:2}}><span style={{fontSize:10,fontWeight:800,color:'var(--ink3)'}}>{inst.label}</span><PuestoTag inst={inst} size="xs"/></div></div>
                   </button>
                 ))}
               </div>}
@@ -462,7 +462,7 @@ function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssig
                 {pendientes.map(inst=>(
                   <button key={inst.id} onClick={()=>onAssignInstance&&onAssignInstance(inst)} style={{display:'flex',alignItems:'center',gap:9,padding:'8px 9px',background:`repeating-linear-gradient(45deg,${c.soft} 0 5px,transparent 5px 10px)`,border:`1px dashed ${c.bar}`,borderRadius:9,cursor:'pointer',fontFamily:'inherit',textAlign:'left',width:'100%'}}>
                     <div style={{width:30,height:30,borderRadius:99,background:'#fff',display:'grid',placeItems:'center',border:`1px solid ${c.bg}`,flexShrink:0}}><SGTIcon name="user" size={14} color={c.ink}/></div>
-                    <div style={{flex:1,minWidth:0}}><div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:12,fontWeight:800,color:c.ink}}>Vacante · {inst.label}</span><PisoTag inst={inst} size="xs"/></div><div style={{fontSize:10,fontWeight:700,color:c.ink,opacity:0.7,marginTop:1}}>Toca para asignar funcionario</div></div>
+                    <div style={{flex:1,minWidth:0}}><div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:12,fontWeight:800,color:c.ink}}>Vacante · {inst.label}</span><PuestoTag inst={inst} size="xs"/></div><div style={{fontSize:10,fontWeight:700,color:c.ink,opacity:0.7,marginTop:1}}>Toca para asignar funcionario</div></div>
                     <SGTIcon name="arrow-right" size={13} color={c.ink}/>
                   </button>
                 ))}
@@ -508,7 +508,7 @@ function RotativasList({instancias,onAssign,tipoColor}){
                       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
                         <span style={{fontSize:10,fontWeight:900,color:'#fff',background:c.bar,padding:'2px 7px',borderRadius:99,flexShrink:0}}>{inst.label}</span>
                         <span style={{fontSize:10.5,fontWeight:700,color:'var(--ink3)',flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{turnos} turnos · {inst.semanas} sem</span>
-                        <PisoTag inst={inst} size="xs"/>
+                        <PuestoTag inst={inst} size="xs"/>
                       </div>
                       {assigned?(
                         <div style={{display:'flex',alignItems:'center',gap:7,marginTop:4}}>
@@ -724,7 +724,7 @@ function PlanGuardarBase({onBack}){
 
   const[plantillas,setPlantillas]=useState([]);
   const[funcionarios,setFuncionarios]=useState([]);
-  const[pisos,setPisos]=useState([]);
+  const[puestos,setPuestos]=useState([]);
   const[tipos,setTipos]=useState([]);
   const[moldes,setMoldes]=useState([]);
   const[cargandoDatos,setCargandoDatos]=useState(true);
@@ -733,7 +733,7 @@ function PlanGuardarBase({onBack}){
 
   const tipoColor=useMemo(()=>makeTipoColor(tipos),[tipos]);
 
-  const{instancias,inject,assign,unassign,removeInstancia,reset,loadMolde,toAsignaciones,daysIndex,maxSemanas}=usePlanificacionState({plantillas,funcionarios,pisos});
+  const{instancias,inject,assign,unassign,removeInstancia,reset,loadMolde,toAsignaciones,daysIndex,maxSemanas}=usePlanificacionState({plantillas,funcionarios,puestos});
 
   const[planActualId,setPlanActualId]=useState(null);
   const[planNombre,setPlanNombre]=useState(null);
@@ -757,13 +757,13 @@ function PlanGuardarBase({onBack}){
         const [pl,ti,pi,fu]=await Promise.all([
           plantillasService.getByServicio(servicioId),
           tiposTurnoService.getByServicio(servicioId),
-          getPisosPorServicio(servicioId),
+          getPuestosPorServicio(servicioId),
           getFuncionariosSummary(servicioId),
         ]);
         if(!activo)return;
         setPlantillas(Array.isArray(pl)?pl:[]);
         setTipos(Array.isArray(ti)?ti:[]);
-        setPisos(pi?.success?(Array.isArray(pi.data)?pi.data:[]):[]);
+        setPuestos(pi?.success?(Array.isArray(pi.data)?pi.data:[]):[]);
         setFuncionarios(fu?.success?(Array.isArray(fu.data)?fu.data:[]):[]);
       }catch(e){ if(activo)setError(e?.response?.data?.error||e.message||'Error al cargar datos.'); }
       finally{ if(activo)setCargandoDatos(false); }
@@ -779,7 +779,7 @@ function PlanGuardarBase({onBack}){
     finally{ setCargandoMoldes(false); }
   };
 
-  const onInject=(dto)=>{ const created=inject(dto); setInjectOpen(false); if(created)flash(`${created.label} · ${created.nombrePlantilla}${created.nombrePiso?' · '+created.nombrePiso:''}`); };
+  const onInject=(dto)=>{ const created=inject(dto); setInjectOpen(false); if(created)flash(`${created.label} · ${created.nombrePlantilla}${created.nombrePuesto?' · '+created.nombrePuesto:''}`); };
   const onAssign=(id,idFunc)=>{ assign(id,idFunc); setAssignInstance(null); flash('Funcionario asignado'); };
 
   const onSave=async(nombre)=>{
@@ -890,7 +890,7 @@ function PlanGuardarBase({onBack}){
         <button onClick={()=>setGenerarOpen(true)} disabled={instancias.length===0} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:12,background:instancias.length===0?'var(--line)':'var(--primary)',color:instancias.length===0?'var(--ink3)':'#fff',border:'none',fontSize:14.5,fontWeight:800,cursor:instancias.length===0?'not-allowed':'pointer',fontFamily:'inherit'}}><SGTIcon name="check" size={17} color={instancias.length===0?'var(--ink3)':'#fff'}/> Generar planificación</button>
       </div>
 
-      <InyectarSheet open={injectOpen} onClose={()=>setInjectOpen(false)} onInject={onInject} plantillas={plantillas} pisos={pisos} tipoColor={tipoColor}/>
+      <InyectarSheet open={injectOpen} onClose={()=>setInjectOpen(false)} onInject={onInject} plantillas={plantillas} puestos={puestos} tipoColor={tipoColor}/>
       <MoldesSheet open={moldesOpen} onClose={()=>setMoldesOpen(false)} onSave={onSave} onLoad={onLoad} onDelete={onDeleteMolde} instancias={instancias} moldes={moldes} loading={cargandoMoldes} nombreInicial={planNombre} planActualId={planActualId}/>
       <AsignarFuncionarioSheet open={!!assignInstance} onClose={()=>setAssignInstance(null)} instancia={assignInstance?instancias.find(i=>i.id===assignInstance.id):null} instancias={instancias} funcionarios={funcionarios} onAssign={onAssign} onUnassign={(id)=>{ unassign(id); flash('Asignación retirada'); }} onRemove={(id)=>{ removeInstancia(id); flash('Rotativa quitada'); }}/>
       <DetalleDiaSheet open={detailDia!=null} onClose={()=>setDetailDia(null)} diaIndex={detailDia} entradasDelDia={dayEntradas} tipoColor={tipoColor} onAssignInstance={(inst)=>{ setDetailDia(null); setTimeout(()=>setAssignInstance(inst),220); }}/>

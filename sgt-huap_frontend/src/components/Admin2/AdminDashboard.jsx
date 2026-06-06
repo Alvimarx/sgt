@@ -25,7 +25,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPisos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -100,10 +100,10 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
         />
         <AdminCard
           icon="home"
-          title="Gestionar Pisos"
-          desc="Crea, edita y elimina pisos del sistema."
+          title="Gestionar Puestos"
+          desc="Crea, edita y elimina puestos del sistema."
           tone="primary"
-          onClick={onGoPisos}
+          onClick={onGoPuestos}
         />
         <AdminCard
           icon="sliders"

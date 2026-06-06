@@ -30,7 +30,7 @@ export const getTeamColor = (shift) => {
     const seed =
         shift?.teamGroup?.key ||
         shift?.teamKey ||
-        `${shift?.tipo || "sin-tipo"}-${shift?.idPiso ?? shift?.raw?.idPiso ?? "sin-piso"}`;
+        `${shift?.tipo || "sin-tipo"}-${shift?.idPuesto ?? shift?.raw?.idPuesto ?? "sin-puesto"}`;
     return TEAM_COLORS[hashStr(seed) % TEAM_COLORS.length];
 };
 
@@ -133,7 +133,7 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
             <div>
                 <SectionLabel>Información del turno</SectionLabel>
                 <div style={{ border: `1px solid ${P2().line}`, borderRadius: 12, background: "#fff", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <DetailRow label="Piso" value={shift.nombrePiso || shift.raw?.nombrePiso || "Sin piso"} />
+                    <DetailRow label="Puesto" value={shift.nombrePuesto || shift.raw?.nombrePuesto || "Sin puesto"} />
                     <DetailRow
                         label="Estado"
                         value={
@@ -158,10 +158,10 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
                 </div>
             </div>
 
-            {/* Equipo — datos reales de API agrupados por piso+tipo */}
+            {/* Equipo — datos reales de API agrupados por puesto+tipo */}
             {groupData && (
                 <div>
-                    <SectionLabel>Integrantes del mismo piso y horario</SectionLabel>
+                    <SectionLabel>Integrantes del mismo puesto y horario</SectionLabel>
                     <TeamGroup
                         group={groupData}
                         onSelectMember={onSelectTargetFuncionario ? handleSelectTarget : undefined}
@@ -173,10 +173,10 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
             {/* Equipo legacy — datos del mock */}
             {!groupData && legacyTeam && (
                 <div>
-                    <SectionLabel>Integrantes del mismo piso y tipo</SectionLabel>
+                    <SectionLabel>Integrantes del mismo puesto y tipo</SectionLabel>
                     <TeamGroup
                         group={{
-                            nombrePiso: null,
+                            nombrePuesto: null,
                             integrantes: [
                                 legacyTeam.jefe,
                                 ...(legacyTeam.urgenciologos || []),

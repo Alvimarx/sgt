@@ -22,10 +22,10 @@ public class ServicioEntity {
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
-    // Relación con Piso: 1 Servicio tiene muchos Pisos.
+    // Relación con Puesto: 1 Servicio tiene muchos Puestos.
     @JsonIgnore
     @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<PisoEntity> pisos;
+    private List<PuestoEntity> puestos;
 
     @JsonIgnore
     @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)

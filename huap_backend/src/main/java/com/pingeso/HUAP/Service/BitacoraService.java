@@ -109,7 +109,7 @@ public class BitacoraService {
                 .diaFinalTurno(turno != null && turno.getDiaFinalTurno() != null ? turno.getDiaFinalTurno().toString() : null)
                 .horaInicioTurno(turno != null && turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null)
                 .horaFinTurno(turno != null && turno.getHoraFin() != null ? turno.getHoraFin().toString() : null)
-                .nombrePiso(turno != null && turno.getPiso() != null ? turno.getPiso().getNombre() : null)
+                .nombrePuesto(turno != null && turno.getPuesto() != null ? turno.getPuesto().getNombre() : null)
                 // solicitud base
                 .idSolicitud(s != null ? s.getIdSolicitud() : null)
                 .tipoSolicitud(s != null && s.getTipoSolicitud() != null ? tipoSolicitudLabel(s.getTipoSolicitud().getTipo()) : null)
@@ -127,7 +127,7 @@ public class BitacoraService {
                 .diaFinalTurnoSolicitud(tSol != null && tSol.getDiaFinalTurno() != null ? tSol.getDiaFinalTurno().toString() : null)
                 .horaInicioTurnoSolicitud(tSol != null && tSol.getHoraInicio() != null ? tSol.getHoraInicio().toString() : null)
                 .horaFinTurnoSolicitud(tSol != null && tSol.getHoraFin() != null ? tSol.getHoraFin().toString() : null)
-                .nombrePisoSolicitud(tSol != null && tSol.getPiso() != null ? tSol.getPiso().getNombre() : null)
+                .nombrePuestoSolicitud(tSol != null && tSol.getPuesto() != null ? tSol.getPuesto().getNombre() : null)
                 // receptor e intercambio
                 .idFuncionarioReceptor(receptor != null ? receptor.getIdFuncionario() : null)
                 .nombreFuncionarioReceptor(nombreCompleto(receptor))
@@ -136,7 +136,7 @@ public class BitacoraService {
                 .diaFinalTurnoReceptor(tReceptor != null && tReceptor.getDiaFinalTurno() != null ? tReceptor.getDiaFinalTurno().toString() : null)
                 .horaInicioTurnoReceptor(tReceptor != null && tReceptor.getHoraInicio() != null ? tReceptor.getHoraInicio().toString() : null)
                 .horaFinTurnoReceptor(tReceptor != null && tReceptor.getHoraFin() != null ? tReceptor.getHoraFin().toString() : null)
-                .nombrePisoReceptor(tReceptor != null && tReceptor.getPiso() != null ? tReceptor.getPiso().getNombre() : null)
+                .nombrePuestoReceptor(tReceptor != null && tReceptor.getPuesto() != null ? tReceptor.getPuesto().getNombre() : null)
                 .build();
     }
 

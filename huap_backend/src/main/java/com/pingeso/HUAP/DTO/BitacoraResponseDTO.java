@@ -29,7 +29,7 @@ public class BitacoraResponseDTO {
     private String diaFinalTurno;
     private String horaInicioTurno;
     private String horaFinTurno;
-    private String nombrePiso;
+    private String nombrePuesto;
 
     // Solicitud — datos base
     private Long idSolicitud;
@@ -52,7 +52,7 @@ public class BitacoraResponseDTO {
     private String diaFinalTurnoSolicitud;
     private String horaInicioTurnoSolicitud;
     private String horaFinTurnoSolicitud;
-    private String nombrePisoSolicitud;
+    private String nombrePuestoSolicitud;
 
     // Solicitud — receptor e intercambio
     private Long idFuncionarioReceptor;
@@ -62,5 +62,5 @@ public class BitacoraResponseDTO {
     private String diaFinalTurnoReceptor;
     private String horaInicioTurnoReceptor;
     private String horaFinTurnoReceptor;
-    private String nombrePisoReceptor;
+    private String nombrePuestoReceptor;
 }

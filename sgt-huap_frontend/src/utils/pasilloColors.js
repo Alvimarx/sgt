@@ -64,18 +64,18 @@ function lightenColor(hexColor, factor = 0.45) {
   return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
 }
 
-// Agrupa los turnos. Nota: Ahora usa el nombre del piso que viene en el turno
-// Agrupa los turnos. Nota: Se agregó soporte para pisosMap para resolver nombres reales
-function groupTurnosByPasillo(turnos = [], pisosMap = {}) {
+// Agrupa los turnos. Nota: Ahora usa el nombre del puesto que viene en el turno
+// Agrupa los turnos. Nota: Se agregó soporte para puestosMap para resolver nombres reales
+function groupTurnosByPasillo(turnos = [], puestosMap = {}) {
   const map = new Map();
 
   turnos.forEach((turno) => {
-    // Si tenemos pisosMap, tratamos de resolver el nombre usando id_piso o Sección si es el ID
+    // Si tenemos puestosMap, tratamos de resolver el nombre usando id_puesto o Sección si es el ID
     let realName = null;
-    if (pisosMap) {
-      if (turno.id_piso && pisosMap[turno.id_piso]) realName = pisosMap[turno.id_piso];
-      else if (turno.idPiso && pisosMap[turno.idPiso]) realName = pisosMap[turno.idPiso];
-      else if (turno.Seccion && pisosMap[turno.Seccion]) realName = pisosMap[turno.Seccion];
+    if (puestosMap) {
+      if (turno.id_puesto && puestosMap[turno.id_puesto]) realName = puestosMap[turno.id_puesto];
+      else if (turno.idPuesto && puestosMap[turno.idPuesto]) realName = puestosMap[turno.idPuesto];
+      else if (turno.Seccion && puestosMap[turno.Seccion]) realName = puestosMap[turno.Seccion];
     }
 
     const labelToUse = realName || turno?.Seccion || "SIN ASIGNAR";

@@ -90,7 +90,7 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
     const tipo = inferirTipo(turno?.nombre, turno?.horaInicio);
     const miTurno = funcionarioId != null && Number(turno?.idFuncionario) === Number(funcionarioId);
     const turnoLibre = turno?.idFuncionario == null;
-    const teamKey = `${fecha || 'sin-fecha'}-${tipo}-${turno?.idPiso ?? turno?.pisoId ?? 'sin-piso'}`;
+    const teamKey = `${fecha || 'sin-fecha'}-${tipo}-${turno?.idPuesto ?? turno?.puestoId ?? 'sin-puesto'}`;
 
     return {
         id: turno?.id,
@@ -99,8 +99,8 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         nombreTipo: turno?.nombre ?? null,
         inicio,
         fin,
-        nombrePiso: turno?.nombrePiso ?? null,
-        idPiso: turno?.idPiso ?? null,
+        nombrePuesto: turno?.nombrePuesto ?? null,
+        idPuesto: turno?.idPuesto ?? null,
         nombreFuncionario: turnoLibre ? null : (turno?.nombreFuncionario ?? null),
         idFuncionario: turno?.idFuncionario ?? null,
         miTurno,
@@ -119,8 +119,8 @@ const buildTurnoTeams = (turnos, funcionarioId) => {
                 key: turno.teamKey,
                 fecha: turno.fecha,
                 tipo: turno.tipo,
-                idPiso: turno.idPiso ?? null,
-                nombrePiso: turno.nombrePiso ?? null,
+                idPuesto: turno.idPuesto ?? null,
+                nombrePuesto: turno.nombrePuesto ?? null,
                 integrantes: [],
                 turnos: [],
             };

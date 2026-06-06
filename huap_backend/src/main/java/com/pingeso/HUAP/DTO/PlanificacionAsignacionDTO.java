@@ -20,6 +20,6 @@ public class PlanificacionAsignacionDTO {
     private Long idFuncionario;     // opcional (puede ser null)
     private String nombreFuncionario;
 
-    private Long idPiso;            // opcional (puede ser null)
-    private String nombrePiso;
+    private Long idPuesto;          // opcional (puede ser null)
+    private String nombrePuesto;
 }

@@ -2,7 +2,7 @@ package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.DTO.PlanificacionAsignacionDTO;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
-import com.pingeso.HUAP.Entity.PisoEntity;
+import com.pingeso.HUAP.Entity.PuestoEntity;
 import com.pingeso.HUAP.Entity.PlanificacionAsignacionEntity;
 import com.pingeso.HUAP.Entity.PlanificacionEntity;
 import com.pingeso.HUAP.Entity.PlantillaDiaEntity;
@@ -11,7 +11,7 @@ import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
-import com.pingeso.HUAP.Repository.PisoRepository;
+import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.PlanificacionRepository;
 import com.pingeso.HUAP.Repository.PlantillaDiaRepository;
 import com.pingeso.HUAP.Repository.PlantillaRepository;
@@ -42,7 +42,7 @@ public class PlanificacionService {
     private final ServicioRepository servicioRepository;
     private final PlantillaRepository plantillaRepository;
     private final FuncionarioRepository funcionarioRepository;
-    private final PisoRepository pisoRepository;
+    private final PuestoRepository puestoRepository;
     private final PlantillaDiaRepository plantillaDiaRepository;
     private final TurnoRepository turnoRepository;
 
@@ -51,7 +51,7 @@ public class PlanificacionService {
             ServicioRepository servicioRepository,
             PlantillaRepository plantillaRepository,
             FuncionarioRepository funcionarioRepository,
-            PisoRepository pisoRepository,
+            PuestoRepository puestoRepository,
             PlantillaDiaRepository plantillaDiaRepository,
             TurnoRepository turnoRepository
     ) {
@@ -59,7 +59,7 @@ public class PlanificacionService {
         this.servicioRepository = servicioRepository;
         this.plantillaRepository = plantillaRepository;
         this.funcionarioRepository = funcionarioRepository;
-        this.pisoRepository = pisoRepository;
+        this.puestoRepository = puestoRepository;
         this.plantillaDiaRepository = plantillaDiaRepository;
         this.turnoRepository = turnoRepository;
     }
@@ -179,7 +179,7 @@ public class PlanificacionService {
                         .horaFin(hf)
                         .funcionario(funcAsignado)
                         .servicio(servicio)
-                        .piso(asignacion.getPiso())
+                        .puesto(asignacion.getPuesto())
                         .plantilla(asignacion.getPlantilla())
                         .build();
 
@@ -303,15 +303,15 @@ public class PlanificacionService {
                     .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: ID " + dto.getIdFuncionario()));
         }
 
-        PisoEntity piso = null;
-        if (dto.getIdPiso() != null) {
-            piso = pisoRepository.findById(dto.getIdPiso())
-                    .orElseThrow(() -> new RuntimeException("Piso no encontrado: ID " + dto.getIdPiso()));
-            if (!piso.getServicio().getIdServicio().equals(idServicio)) {
-                throw new RuntimeException("El piso '" + piso.getNombre() + "' no pertenece a este servicio.");
+        PuestoEntity puesto = null;
+        if (dto.getIdPuesto() != null) {
+            puesto = puestoRepository.findById(dto.getIdPuesto())
+                    .orElseThrow(() -> new RuntimeException("Puesto no encontrado: ID " + dto.getIdPuesto()));
+            if (!puesto.getServicio().getIdServicio().equals(idServicio)) {
+                throw new RuntimeException("El puesto '" + puesto.getNombre() + "' no pertenece a este servicio.");
             }
         }
 
-        return new PlanificacionAsignacionEntity(plan, plantilla, funcionario, piso);
+        return new PlanificacionAsignacionEntity(plan, plantilla, funcionario, puesto);
     }
 }

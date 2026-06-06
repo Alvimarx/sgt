@@ -163,17 +163,17 @@ export const turnosService = {
         return response.data;
     },
 
-    // GET /turnos/piso/{pisoId}
-    getByPiso: async (pisoId) => {
-        if (!pisoId) throw new Error('pisoId es requerido');
-        const response = await axiosInstance.get(`/turnos/piso/${pisoId}`);
+    // GET /turnos/puesto/{puestoId}
+    getByPuesto: async (puestoId) => {
+        if (!puestoId) throw new Error('puestoId es requerido');
+        const response = await axiosInstance.get(`/turnos/puesto/${puestoId}`);
         return response.data;
     },
 
-    // GET /turnos/asignacion?pisoId=&fechaInicio=&fechaFin=
-    getParaAsignacion: async (pisoId, fechaInicio, fechaFin) => {
+    // GET /turnos/asignacion?puestoId=&fechaInicio=&fechaFin=
+    getParaAsignacion: async (puestoId, fechaInicio, fechaFin) => {
         const response = await axiosInstance.get(
-            `/turnos/asignacion?pisoId=${pisoId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
+            `/turnos/asignacion?puestoId=${puestoId}&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`
         );
         return response.data;
     },
@@ -196,7 +196,7 @@ export const turnosService = {
         return response.data;
     }
 
-    // getCoveragePerPiso* eliminados — sin equivalente en el backend v2
+    // getCoveragePerPuesto* eliminados — sin equivalente en el backend v2
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -339,41 +339,41 @@ export const notificacionesService = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PISOS  →  /api/v2/pisos
+// PISOS  →  /api/v2/puestos
 // ─────────────────────────────────────────────────────────────────────────────
-export const pisosService = {
+export const puestosService = {
 
     getAll: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
-        const url = `/pisos${sId ? `?servicioId=${sId}` : ''}`;
+        const url = `/puestos${sId ? `?servicioId=${sId}` : ''}`;
         const response = await axiosInstance.get(url);
         return response.data;
     },
 
     getById: async (id) => {
-        const response = await axiosInstance.get(`/pisos/${id}`);
+        const response = await axiosInstance.get(`/puestos/${id}`);
         return response.data;
     },
 
     getByServicio: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
         if (!sId) throw new Error('servicioId es requerido');
-        const response = await axiosInstance.get(`/pisos/servicio/${sId}`);
+        const response = await axiosInstance.get(`/puestos/servicio/${sId}`);
         return response.data;
     },
 
-    create: async (pisoData) => {
-        const response = await axiosInstance.post('/pisos', pisoData);
+    create: async (puestoData) => {
+        const response = await axiosInstance.post('/puestos', puestoData);
         return response.data;
     },
 
-    update: async (id, pisoData) => {
-        const response = await axiosInstance.put(`/pisos/${id}`, pisoData);
+    update: async (id, puestoData) => {
+        const response = await axiosInstance.put(`/puestos/${id}`, puestoData);
         return response.data;
     },
 
     delete: async (id) => {
-        const response = await axiosInstance.delete(`/pisos/${id}`);
+        const response = await axiosInstance.delete(`/puestos/${id}`);
         return response.data;
     }
 };
@@ -474,7 +474,7 @@ export const normalizeSolicitud = (s) => {
         if (!t) return null;
         return {
             id_turno:    t.id || t.idTurno || null,
-            seccion:     t.idPiso || t.piso || t.seccion || null,
+            seccion:     t.idPuesto || t.puesto || t.seccion || null,
             fecha:       t.diaInicioTurno || t.diaInicio || t.fecha || null,
             hora_inicio: t.horaInicio || t.hora_inicio || null,
             hora_fin:    t.horaFin || t.hora_fin || null,
@@ -516,7 +516,7 @@ export default {
     turnos:         turnosService,
     solicitudes:    solicitudesService,
     notificaciones: notificacionesService,
-    pisos:          pisosService,
+    puestos:          puestosService,
     eventos:        eventosService,    // mantiene nombre externo para no romper imports
     bitacoras:      eventosService,    // alias explícito con el nombre nuevo
     servicios:      serviciosService,

@@ -1,8 +1,8 @@
 package com.pingeso.HUAP.Controller;
 
-import com.pingeso.HUAP.DTO.PisoRequestDTO;
-import com.pingeso.HUAP.Entity.PisoEntity;
-import com.pingeso.HUAP.Service.PisoService;
+import com.pingeso.HUAP.DTO.PuestoRequestDTO;
+import com.pingeso.HUAP.Entity.PuestoEntity;
+import com.pingeso.HUAP.Service.PuestoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,96 +10,96 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v2/pisos")
+@RequestMapping("/api/v2/puestos")
 @CrossOrigin("*")
-public class PisoController {
+public class PuestoController {
 
     @Autowired
-    private PisoService pisoService;
+    private PuestoService puestoService;
 
-    // Crear piso
+    // Crear puesto
     @PostMapping
-        public ResponseEntity<PisoEntity> crearPiso(@RequestBody PisoRequestDTO request) {
-        PisoEntity piso = pisoService.crearPiso(
+    public ResponseEntity<PuestoEntity> crearPuesto(@RequestBody PuestoRequestDTO request) {
+        PuestoEntity puesto = puestoService.crearPuesto(
                 request.getIdServicio(),
                 request.getNombre()
         );
 
-        return ResponseEntity.ok(piso);
-        }
+        return ResponseEntity.ok(puesto);
+    }
 
-    // Obtener piso por id
+    // Obtener puesto por id
     @GetMapping("/{id}")
-    public ResponseEntity<PisoEntity> obtenerPiso(
+    public ResponseEntity<PuestoEntity> obtenerPuesto(
             @PathVariable Long id
     ) {
 
         return ResponseEntity.ok(
-                pisoService.obtenerPiso(id)
+                puestoService.obtenerPuesto(id)
         );
     }
 
     // Obtener todos
     @GetMapping
-    public ResponseEntity<List<PisoEntity>> obtenerTodosPisos() {
+    public ResponseEntity<List<PuestoEntity>> obtenerTodosPuestos() {
 
         return ResponseEntity.ok(
-                pisoService.obtenerTodosPisos()
+                puestoService.obtenerTodosPuestos()
         );
     }
 
     // Obtener por servicio
     @GetMapping("/servicio/{idServicio}")
-    public ResponseEntity<List<PisoEntity>> obtenerPorServicio(
+    public ResponseEntity<List<PuestoEntity>> obtenerPorServicio(
             @PathVariable Long idServicio
     ) {
 
         return ResponseEntity.ok(
-                pisoService.obtenerPisosPorServicio(idServicio)
+                puestoService.obtenerPuestosPorServicio(idServicio)
         );
     }
 
     // Obtener por nombre
     @GetMapping("/nombre/{nombre}")
-    public ResponseEntity<PisoEntity> obtenerPorNombre(
+    public ResponseEntity<PuestoEntity> obtenerPorNombre(
             @PathVariable String nombre
     ) {
 
         return ResponseEntity.ok(
-                pisoService.obtenerPisosPorNombre(nombre)
+                puestoService.obtenerPuestosPorNombre(nombre)
         );
     }
 
-    // Actualizar piso
+    // Actualizar puesto
     @PutMapping("/{id}")
-    public ResponseEntity<PisoEntity> actualizarPiso(
+    public ResponseEntity<PuestoEntity> actualizarPuesto(
             @PathVariable Long id,
             @RequestParam String nombre
     ) {
 
         return ResponseEntity.ok(
-                pisoService.actualizarPiso(id, nombre)
+                puestoService.actualizarPuesto(id, nombre)
         );
     }
 
-    // Cantidad de turnos asociados a un piso (para advertir antes de eliminar)
+    // Cantidad de turnos asociados a un puesto (para advertir antes de eliminar)
     @GetMapping("/{id}/turnos-asociados")
     public ResponseEntity<Long> contarTurnosAsociados(
             @PathVariable Long id
     ) {
 
         return ResponseEntity.ok(
-                pisoService.contarTurnosAsociados(id)
+                puestoService.contarTurnosAsociados(id)
         );
     }
 
-    // Eliminar piso
+    // Eliminar puesto
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminarPiso(
+    public ResponseEntity<Void> eliminarPuesto(
             @PathVariable Long id
     ) {
 
-        pisoService.eliminarPiso(id);
+        puestoService.eliminarPuesto(id);
 
         return ResponseEntity.noContent().build();
     }

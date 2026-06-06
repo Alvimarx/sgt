@@ -6,7 +6,7 @@ import lombok.*;
 
 /**
  * Una designación dentro de una planificación: una rotativa (plantilla) cubierta
- * por un funcionario en un piso. funcionario y piso son opcionales (se puede
+ * por un funcionario en un puesto. funcionario y puesto son opcionales (se puede
  * colocar la rotativa antes de decidir quién la cubre o dónde).
  */
 @Entity
@@ -35,18 +35,18 @@ public class PlanificacionAsignacionEntity {
     private FuncionarioEntity funcionario;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "id_piso", nullable = true)
-    private PisoEntity piso;
+    @JoinColumn(name = "id_puesto", nullable = true)
+    private PuestoEntity puesto;
 
     public PlanificacionAsignacionEntity(
             PlanificacionEntity planificacion,
             PlantillaEntity plantilla,
             FuncionarioEntity funcionario,
-            PisoEntity piso
+            PuestoEntity puesto
     ) {
         this.planificacion = planificacion;
         this.plantilla = plantilla;
         this.funcionario = funcionario;
-        this.piso = piso;
+        this.puesto = puesto;
     }
 }

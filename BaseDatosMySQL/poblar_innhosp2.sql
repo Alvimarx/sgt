@@ -8,7 +8,7 @@
 --
 -- Tablas gestionadas por Hibernate en innhosp2:
 --   Rol_Sistema, Rol_Servicio, servicios, Funcionario,
---   Servicios_Funcionario, pisos, Tipo_Solicitud,
+--   Servicios_Funcionario, puestos, Tipo_Solicitud,
 --   Turnos, plantilla, planti--   plantilla_secuencia_dias,
 --   Solicitudes, Notificacion2, Bitacora_eventos
 --
@@ -41,7 +41,7 @@ TRUNCATE TABLE plantilla_secuencia_dias;
 TRUNCATE TABLE plantilla_turno;
 TRUNCATE TABLE plantilla;
 TRUNCATE TABLE Servicios_Funcionario;
-TRUNCATE TABLE pisos;
+TRUNCATE TABLE puestos;
 TRUNCATE TABLE Funcionario;
 TRUNCATE TABLE servicios;
 TRUNCATE TABLE Rol_Servicio;
@@ -179,24 +179,34 @@ INSERT INTO Servicios_Funcionario (ID_FUNCIONARIO, id_servicio, id_rol_servicio)
 (206, 3, 3);
 
 -- ==============================================================
--- 6. PISOS  →  tabla: pisos
+-- 6. PUESTOS  →  tabla: puestos
 -- Columnas: nombre, id_servicio
--- AdminOnboardingGuard redirige a /onboarding si no hay pisos
+-- AdminOnboardingGuard redirige a /onboarding si no hay puestos
 -- para el servicio activo. Estos datos permiten acceder
 -- directamente al panel de administración.
 -- ==============================================================
-INSERT INTO pisos (nombre, id_servicio) VALUES
--- Medicina Interna (id_servicio = 1)
-('Sala Hombres', 1),
-('Sala Mujeres', 1),
-('Pabellón',     1),
--- Enfermería (id_servicio = 2)
-('Piso A',       2),
-('Piso B',       2),
--- Cirugía (id_servicio = 3)
-('Pabellón Central', 3),
-('Recuperación',     3),
-('Pre-Quirúrgico',   3);
+INSERT INTO puestos (nombre, id_servicio) VALUES
+-- === Medicina Interna (id_servicio = 1) ===
+('Médico Internista Residente', 1),
+('Médico Urgenciólogo de Turno', 1),
+('Médico Tratante de Sala / Piso', 1),
+('Médico Interconsultor Residente', 1),
+('Médico de Continuidad y Altas', 1),
+
+-- === Enfermería (id_servicio = 2) ===
+('Enfermero/a Clínico de Turno', 2),
+('Enfermero/a Supervisor / Gestión de Camas', 2),
+('Enfermero/a de Triage y Categorización', 2),
+('TENS Clínico de Turno', 2),
+('TENS de Procedimientos y Medicación', 2),
+
+-- === Cirugía (id_servicio = 3) ===
+('Médico Cirujano Residente Pabellón', 3),
+('Médico Anestesiólogo Residente', 3),
+('Médico Cirujano de Llamada / Retén', 3),
+('Enfermero/a Pabellonero / Circulante', 3),
+('Enfermero/a de Recuperación Post-Anestésica', 3),
+('TENS Arsenalero/a', 3);
 
 -- ==============================================================
 -- 7. TIPO_SOLICITUD  →  tabla: Tipo_Solicitud
@@ -280,13 +290,13 @@ INSERT INTO plantilla_secuencia_dias (id_plantilla, dia_index, id_plantilla_turn
 -- ==============================================================
 -- 11. TURNOS  →  tabla: Turnos
 -- Turnos concretos para mayo 2026, generados desde plantilla.
--- Pisos (auto-increment tras TRUNCATE+INSERT ordenado):
+-- Puestos (auto-increment tras TRUNCATE+INSERT ordenado):
 --   1=Sala Hombres(MI)  2=Sala Mujeres(MI)  3=Pabellón(MI)
---   4=Piso A(ENF)        5=Piso B(ENF)
+--   4=Puesto A(ENF)      5=Puesto B(ENF)
 --   6=Pabellón Central(CIR) 7=Recuperación(CIR) 8=Pre-Quirúrgico(CIR)
 -- ID_FUNCIONARIO NULL = turno libre disponible para cobertura.
 -- ==============================================================
-INSERT INTO Turnos (id_turno, nombre, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_piso, id_plantilla) VALUES
+INSERT INTO Turnos (id_turno, nombre, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla) VALUES
 -- === Medicina Interna (id_servicio=1, id_plantilla=1) ===
 (1,  'Diurno 05-May',   '2026-05-05', '2026-05-05', '08:00:00', '20:00:00',  2,    1, 1, 1),
 (2,  'Diurno 06-May',   '2026-05-06', '2026-05-06', '08:00:00', '20:00:00',  3,    1, 2, 1),
@@ -389,7 +399,7 @@ INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD,
 -- ==============================================================
 -- DEMO: Turnos de Álvaro López (ID_FUNCIONARIO=1) + relleno mayo
 -- ==============================================================
-INSERT INTO Turnos (id_turno, nombre, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_piso, id_plantilla) VALUES
+INSERT INTO Turnos (id_turno, nombre, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla) VALUES
 -- Álvaro López – 10 turnos distribuidos en mayo 2026
 (36, 'Diurno 05-May',    '2026-05-05', '2026-05-05', '08:00:00', '20:00:00',  1, 1, 3, 1),
 (37, 'Nocturno 06-May',  '2026-05-06', '2026-05-07', '20:00:00', '08:00:00',  1, 1, 1, 1),
@@ -510,65 +520,55 @@ INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD,
  'María José Espinoza ofrece turno 13-May (id=7) por turno 23-May de Álvaro (id=43). Pendiente respuesta receptor.',
  '2026-05-12 17:30:00', NULL, '2026-05-12 17:30:00', TRUE);
 
+-- ==============================================================
+-- 15. MULTI-SERVICIO  →  tabla: Servicios_Funcionario
+-- Personas asociadas a MÁS de un servicio. Médicos de Medicina
+-- Interna que también cubren Cirugía (y viceversa). Habilita
+-- probar choques de horario CROSS-SERVICIO al generar.
+-- id_rol_servicio: 3 = MEDICO
+-- ==============================================================
+INSERT INTO Servicios_Funcionario (ID_FUNCIONARIO, id_servicio, id_rol_servicio) VALUES
+(2,   3, 3),   -- Fernando Roman  (MI) → también Cirugía
+(3,   3, 3),   -- Sergio González (MI) → también Cirugía
+(4,   3, 3),   -- Andrés Tigre    (MI) → también Cirugía
+(202, 1, 3);   -- Felipe Castillo (Cirugía) → también Medicina Interna
+
+-- ==============================================================
+-- 16. TURNOS EXISTENTES EN OTRO SERVICIO (semana del lun 01-Jun-2026)
+-- Estos turnos están en un servicio DISTINTO al que la persona usaría
+-- al generar su molde, y caen en la semana Mon 01-Jun … Sun 07-Jun.
+-- Patrón Medicina Interna desde el lunes 01-Jun genera:
+--   Jun 1 Diurno · Jun 2 Diurno · Jun 3 Nocturno · Jun 4 Nocturno · Jun 5-7 libre
+-- Por lo tanto, al asignar a estos médicos en un molde de Medicina Interna
+-- y generar desde el 01-Jun, esos turnos saldrán VACANTES por conflicto
+-- con su turno ya existente en Cirugía (cross-servicio).
+-- (La inyección es libre de conflictos: cada persona tiene UN solo turno en junio.)
+--   plantilla_turno CIR: 5=Diurno CIR  6=Nocturno CIR · puestos CIR: 6,7,8
+-- ==============================================================
+INSERT INTO Turnos (id_turno, nombre, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla) VALUES
+(56, 'Diurno 01-Jun (CIR)',   '2026-06-01', '2026-06-01', '08:00:00', '20:00:00',   2, 3, 6, 3),  -- Fernando, Cirugía → choca con MI-gen Jun 1 diurno
+(57, 'Diurno 02-Jun (CIR)',   '2026-06-02', '2026-06-02', '08:00:00', '20:00:00',   3, 3, 7, 3),  -- Sergio,   Cirugía → choca con MI-gen Jun 2 diurno
+(58, 'Nocturno 03-Jun (CIR)', '2026-06-03', '2026-06-04', '20:00:00', '08:00:00',   4, 3, 8, 3),  -- Andrés,   Cirugía → choca con MI-gen Jun 3 nocturno
+(59, 'Diurno 02-Jun (MI)',    '2026-06-02', '2026-06-02', '08:00:00', '20:00:00', 202, 1, 1, 1);  -- Felipe (CIR) en MI → choca con un molde de Cirugía generado desde Jun 1
+
+-- ==============================================================
+-- 17. TURNOS DE HOY (05-06-2026) — datos para "hoy" en cada servicio
+-- Viernes 05-Jun-2026. Mezcla de asignados y libres, sin conflictos
+-- (ninguna persona queda con dos turnos solapados ese día).
+-- ==============================================================
+INSERT INTO Turnos (id_turno, nombre, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla) VALUES
+-- Medicina Interna (servicio 1)
+(60, 'Diurno 05-Jun',   '2026-06-05', '2026-06-05', '08:00:00', '20:00:00',   1, 1, 3, 1),  -- Álvaro López
+(61, 'Diurno 05-Jun',   '2026-06-05', '2026-06-05', '08:00:00', '20:00:00',   6, 1, 1, 1),  -- Tania Bustos
+(62, 'Nocturno 05-Jun', '2026-06-05', '2026-06-06', '20:00:00', '08:00:00',   7, 1, 2, 1),  -- Fabián Díaz
+(63, 'Diurno 05-Jun',   '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', NULL, 1, 2, 1),  -- libre
+-- Enfermería (servicio 2)
+(64, 'Diurno 05-Jun',   '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', 102, 2, 4, 2),  -- Carlos Silva
+(65, 'Nocturno 05-Jun', '2026-06-05', '2026-06-06', '20:00:00', '08:00:00', 104, 2, 5, 2),  -- Roberto Herrera
+(66, 'Diurno 05-Jun',   '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', NULL, 2, 4, 2),  -- libre
+-- Cirugía (servicio 3)
+(67, 'Diurno 05-Jun',   '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', 205, 3, 6, 3),  -- Camila Vega
+(68, 'Nocturno 05-Jun', '2026-06-05', '2026-06-06', '20:00:00', '08:00:00', 206, 3, 7, 3),  -- Diego Rojas
+(69, 'Diurno 05-Jun',   '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', NULL, 3, 8, 3);  -- libre
+
 SET FOREIGN_KEY_CHECKS = 1;
-
--- ==============================================================
--- VERIFICACIÓN
--- ==============================================================
-SELECT 'Roles Sistema'      AS tabla, COUNT(*) AS filas FROM Rol_Sistema              UNION ALL
-SELECT 'Roles Servicio'     AS tabla, COUNT(*) AS filas FROM Rol_Servicio             UNION ALL
-SELECT 'Servicios'          AS tabla, COUNT(*) AS filas FROM servicios                UNION ALL
-SELECT 'Pisos'              AS tabla, COUNT(*) AS filas FROM pisos                    UNION ALL
-SELECT 'Tipo_Solicitud'     AS tabla, COUNT(*) AS filas FROM Tipo_Solicitud           UNION ALL
-SELECT 'Funcionarios'       AS tabla, COUNT(*) AS filas FROM Funcionario              UNION ALL
-SELECT 'Srv_Func'           AS tabla, COUNT(*) AS filas FROM Servicios_Funcionario    UNION ALL
-SELECT 'Plantillas'         AS tabla, COUNT(*) AS filas FROM plantilla                UNION ALL
-SELECT 'Plantilla_turno'    AS tabla, COUNT(*) AS filas FROM plantilla_turno          UNION ALL
-SELECT 'Plantilla_dias'     AS tabla, COUNT(*) AS filas FROM plantilla_secuencia_dias UNION ALL
-SELECT 'Turnos'             AS tabla, COUNT(*) AS filas FROM Turnos                   UNION ALL
-SELECT 'Solicitudes'        AS tabla, COUNT(*) AS filas FROM Solicitudes              UNION ALL
-SELECT 'Notificacion2'      AS tabla, COUNT(*) AS filas FROM Notificacion2            UNION ALL
-SELECT 'Bitacora_eventos'   AS tabla, COUNT(*) AS filas FROM Bitacora_eventos;
-
-SELECT 'Funcionarios con servicio y rol' AS detalle;
-SELECT
-    f.ID_FUNCIONARIO                              AS id,
-    CONCAT(f.Nombre, ' ', f.Apel_pat)             AS nombre,
-    CONCAT(f.Rut, '-', f.DV)                      AS rut,
-    rs.nombre_rol                                  AS rol_sistema,
-    s.nombre                                       AS servicio,
-    rv.nombre_rol                                  AS rol_en_servicio
-FROM Funcionario f
-JOIN Rol_Sistema           rs ON f.ID_ROL_SISTEMA   = rs.id_rol_sistema
-JOIN Servicios_Funcionario sf ON f.ID_FUNCIONARIO   = sf.ID_FUNCIONARIO
-JOIN servicios             s  ON sf.id_servicio      = s.id_servicio
-JOIN Rol_Servicio          rv ON sf.id_rol_servicio  = rv.id_rol_servicio
-ORDER BY s.nombre, rv.id_rol_servicio, f.Apel_pat;
-
-SELECT 'Tipos de turno por servicio' AS detalle;
-SELECT
-    s.nombre        AS servicio,
-    pt.nombre       AS tipo_turno,
-    pt.hora_inicio,
-    pt.hora_termino
-FROM plantilla_turno pt
-JOIN servicios s ON pt.id_servicio = s.id_servicio
-ORDER BY s.id_servicio, pt.id_plantilla_turno;
-
-SELECT 'Secuencia de días por plantilla (primeros 14 de cada una)' AS detalle;
-SELECT
-    p.nombre                                          AS plantilla,
-    psd.dia_index,
-    COALESCE(pt.nombre, 'LIBRE')                      AS tipo_turno
-FROM plantilla_secuencia_dias psd
-JOIN plantilla       p  ON psd.id_plantilla      = p.id_plantilla
-LEFT JOIN plantilla_turno pt ON psd.id_plantilla_turno = pt.id_plantilla_turno
-WHERE psd.dia_index < 14
-ORDER BY p.id_plantilla, psd.dia_index;
-en_servicio
-FROM Funcionario f
-JOIN Rol_Sistema           rs ON f.ID_ROL_SISTEMA   = rs.id_rol_sistema
-JOIN Servicios_Funcionario sf ON f.ID_FUNCIONARIO   = sf.ID_FUNCIONARIO
-JOIN servicios             s  ON sf.id_servicio      = s.id_servicio
-JOIN Rol_Servicio          rv ON sf.id_rol_servicio  = rv.id_rol_servicio
-ORDER BY s.nombre, rv.id_rol_servicio, f.Apel_pat;

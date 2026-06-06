@@ -56,7 +56,7 @@ const TurnoAuditoriaItem = ({ turno }) => {
           <span style={{ fontSize: 12, color: PA.ink3, fontWeight: 600 }}>· {horas}</span>
         </div>
         <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>
-          {turno.nombrePiso || 'Sin piso'}
+          {turno.nombrePuesto || 'Sin puesto'}
         </div>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>

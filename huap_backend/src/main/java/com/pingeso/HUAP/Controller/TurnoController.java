@@ -3,7 +3,7 @@ package com.pingeso.HUAP.Controller;
 import com.pingeso.HUAP.DTO.AlterarTurnoRequest;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
-import com.pingeso.HUAP.Repository.PisoRepository;
+import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.PlantillaRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Service.TurnoService;
@@ -29,7 +29,7 @@ public class TurnoController {
     private ServicioRepository servicioRepository;
 
     @Autowired
-    private PisoRepository pisoRepository;
+    private PuestoRepository puestoRepository;
 
     @Autowired
     private FuncionarioRepository funcionarioRepository;
@@ -183,9 +183,9 @@ public class TurnoController {
     // CONSULTAS POR PISO
     // ====================================================================
 
-    @GetMapping("/piso/{pisoId}")
-    public ResponseEntity<List<Map<String, Object>>> getTurnosByPiso(@PathVariable Long pisoId) {
-        return ResponseEntity.ok(turnoService.getTurnosByPiso(pisoId));
+    @GetMapping("/puesto/{puestoId}")
+    public ResponseEntity<List<Map<String, Object>>> getTurnosByPuesto(@PathVariable Long puestoId) {
+        return ResponseEntity.ok(turnoService.getTurnosByPuesto(puestoId));
     }
 
     // ====================================================================
@@ -194,13 +194,13 @@ public class TurnoController {
 
     @GetMapping("/asignacion")
     public ResponseEntity<?> getTurnosParaAsignacion(
-            @RequestParam Long pisoId,
+            @RequestParam Long puestoId,
             @RequestParam String fechaInicio,
             @RequestParam String fechaFin) {
         try {
             LocalDate inicio = LocalDate.parse(fechaInicio);
             LocalDate fin = LocalDate.parse(fechaFin);
-            return ResponseEntity.ok(turnoService.getTurnosParaAsignacion(pisoId, inicio, fin));
+            return ResponseEntity.ok(turnoService.getTurnosParaAsignacion(puestoId, inicio, fin));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -308,9 +308,9 @@ public class TurnoController {
             servicioRepository.findById(idServicio).ifPresent(turno::setServicio);
         }
 
-        if (payload.get("idPiso") != null) {
-            Long idPiso = Long.parseLong(payload.get("idPiso").toString());
-            pisoRepository.findById(idPiso).ifPresent(turno::setPiso);
+        if (payload.get("idPuesto") != null) {
+            Long idPuesto = Long.parseLong(payload.get("idPuesto").toString());
+            puestoRepository.findById(idPuesto).ifPresent(turno::setPuesto);
         }
 
         if (payload.get("idFuncionario") != null) {

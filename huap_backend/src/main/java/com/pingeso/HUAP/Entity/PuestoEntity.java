@@ -10,13 +10,13 @@ import lombok.*;
 @AllArgsConstructor
 
 @Entity
-@Table(name = "pisos")
-public class PisoEntity {
+@Table(name = "puestos")
+public class PuestoEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", unique = true, nullable = false)
-    private Long idPiso;
+    private Long idPuesto;
 
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;

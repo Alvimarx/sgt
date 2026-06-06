@@ -102,7 +102,7 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
     const tipo = normalizeDateString(turno?.diaInicioTurno) === normalizeDateString(turno?.diaFinalTurno)
         ? 'dia'
         : 'noche';
-    const teamKey = `${fechaInicio || 'sin-fecha'}-${tipo}-${turno?.idPiso ?? turno?.pisoId ?? 'sin-piso'}`;
+    const teamKey = `${fechaInicio || 'sin-fecha'}-${tipo}-${turno?.idPuesto ?? turno?.puestoId ?? 'sin-puesto'}`;
 
     return {
         id: turno?.id ?? turno?.idTurno ?? null,
@@ -114,8 +114,8 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         fin: formatTime(turno?.horaFin || turno?.hora_fin) ?? turno?.fin ?? null,
         horas: getHoursFromTurno(turno),
         equipo: turno?.equipo || turno?.codigoEquipo || turno?.idEquipo || null,
-        nombrePiso: turno?.nombrePiso || turno?.piso || null,
-        idPiso: turno?.idPiso || turno?.pisoId || null,
+        nombrePuesto: turno?.nombrePuesto || turno?.puesto || null,
+        idPuesto: turno?.idPuesto || turno?.puestoId || null,
         miTurno: Boolean(
             turno?.miTurno ||
             turno?.esMiTurno ||
@@ -193,8 +193,8 @@ const buildAgendaData = (turnos, funcionarioId) => {
                 key: turno.teamKey,
                 fecha: turno.fecha,
                 tipo: turno.tipo,
-                idPiso: turno.idPiso ?? null,
-                nombrePiso: turno.nombrePiso ?? null,
+                idPuesto: turno.idPuesto ?? null,
+                nombrePuesto: turno.nombrePuesto ?? null,
                 integrantes: [],
                 turnos: [],
             };
@@ -298,7 +298,7 @@ export const getTurnos = async (funcionarioId = null, year = null, month = null)
 
 /**
  * Obtiene todos los turnos de un servicio y los transforma al formato de agenda.
- * Se usa para que la vista pueda construir el equipo completo por piso/tipo
+ * Se usa para que la vista pueda construir el equipo completo por puesto/tipo
  * y filtrar "Mis turnos" únicamente en el frontend.
  */
 export const getTurnosServicio = async (servicioId = null, funcionarioId = null) => {

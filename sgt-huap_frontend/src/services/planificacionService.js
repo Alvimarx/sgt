@@ -1,7 +1,7 @@
 // planificacionService.js
-// Moldes de planificación (rotativas + funcionarios + pisos) y generación de turnos.
+// Moldes de planificación (rotativas + funcionarios + puestos) y generación de turnos.
 //
-// asignaciones: [{ idPlantilla, idFuncionario|null, idPiso|null }]
+// asignaciones: [{ idPlantilla, idFuncionario|null, idPuesto|null }]
 
 import axiosInstance from '../utils/axiosConfig';
 
