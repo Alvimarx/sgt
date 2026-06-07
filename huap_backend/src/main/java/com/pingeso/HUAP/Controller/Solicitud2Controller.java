@@ -32,6 +32,12 @@ public class Solicitud2Controller {
         return ResponseEntity.ok(solicitud2Service.crearSolicitud(dto));
     }
 
+    @PutMapping("/{id}/oferta-particular")
+    public ResponseEntity<Solicitud2Entity> responderOfertaParticular(@PathVariable Long id, @RequestParam Long idReceptor,
+            @RequestParam boolean respuesta) {
+        return ResponseEntity.ok(solicitud2Service.responderOfertaParticular(id, idReceptor, respuesta));
+    }
+
     @PutMapping("/{id}/intercambio")
     public ResponseEntity<Solicitud2Entity> responderIntercambio(@PathVariable Long id, @RequestParam Long idReceptor,
             @RequestParam boolean respuesta) {

@@ -211,13 +211,14 @@ INSERT INTO puestos (nombre, id_servicio) VALUES
 -- ==============================================================
 -- 7. TIPO_SOLICITUD  →  tabla: Tipo_Solicitud
 -- Columnas: ID_TIPO_SOLICITUD, Tipo
--- 1=Permiso  2=Botar turno  3=Cobertura  4=Intercambio
+-- 1=Permiso  2=Botar turno  3=Cobertura  4=Intercambio  5=Oferta Particular
 -- ==============================================================
 INSERT INTO Tipo_Solicitud (ID_TIPO_SOLICITUD, Tipo) VALUES
 (1, 1),
 (2, 2),
 (3, 3),
-(4, 4);
+(4, 4),
+(5, 5);
 
 -- ==============================================================
 -- 8. PLANTILLA  →  tabla: plantilla

@@ -277,6 +277,14 @@ export const solicitudesService = {
         return response.data;
     },
 
+    // PUT /solicitudes/{id}/oferta-particular?idReceptor=&respuesta=
+    responderOfertaParticular: async (solicitudId, idReceptor, respuesta) => {
+        const response = await axiosInstance.put(
+            `/solicitudes/${solicitudId}/oferta-particular?idReceptor=${idReceptor}&respuesta=${respuesta}`
+        );
+        return response.data;
+    },
+
     // PUT /solicitudes/{id}/intercambio?idReceptor=&respuesta=
     responderIntercambio: async (solicitudId, idReceptor, respuesta) => {
         const response = await axiosInstance.put(

@@ -6,11 +6,11 @@ import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 
 const PA = SGT_DATA.PALETTE;
 
-const TIPO_LABEL  = { 1: 'Permiso', 2: 'Botar turno', 3: 'Cobertura', 4: 'Intercambio' };
-const TIPO_COLOR  = { 1: '#94B8E0', 2: '#D4888D', 3: '#88C4A8', 4: '#B89FD8' };
+const TIPO_LABEL  = { 1: 'Permiso', 2: 'Botar turno', 3: 'Cobertura', 4: 'Intercambio', 5: 'Oferta particular' };
+const TIPO_COLOR  = { 1: '#94B8E0', 2: '#D4888D', 3: '#88C4A8', 4: '#B89FD8', 5: '#E0B87A' };
 const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MESES_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-const TIPO_ICON  = { 1: 'calendar', 2: 'close', 3: 'hand-raised', 4: 'swap' };
+const TIPO_ICON  = { 1: 'calendar', 2: 'close', 3: 'hand-raised', 4: 'swap', 5: 'hand-raised' };
 const ESTADO_TONE = { PENDIENTE: 'warn', APROBADA: 'success', RECHAZADA: 'accent' };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -68,21 +68,23 @@ function btnStyle(tone) {
 
 // ── SolicitudCard ─────────────────────────────────────────────────────────────
 
-const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, esMiReceptor }) => {
+const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, esMiReceptor }) => {
   const tipo  = solicitud?.tipoSolicitud?.tipo;
   const estado = solicitud?.estado;
-  const esperandoReceptor = tipo === 4 && solicitud.aceptadoReceptor == null;
-  const receptorAcepto    = tipo === 4 && solicitud.aceptadoReceptor === true;
-  const receptorRechazo   = tipo === 4 && solicitud.aceptadoReceptor === false;
+
+  const esBifasico = tipo === 4 || tipo === 5;
+  const esperandoReceptor = esBifasico && solicitud.aceptadoReceptor == null;
+  const receptorAcepto    = esBifasico && solicitud.aceptadoReceptor === true;
+  const receptorRechazo   = esBifasico && solicitud.aceptadoReceptor === false;
 
   const canDecideThis = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
-  const canRespond    = esMiReceptor && tipo === 4 && esperandoReceptor && estado === 'PENDIENTE';
+  const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && estado === 'PENDIENTE';
   const canEditMotivo = !canDecide && !esMiReceptor && estado === 'PENDIENTE' && !!onEditMotivo;
 
-  // Badge contextual para intercambio tipo=4
+  // Badge contextual para tipos bifásicos (4 y 5)
   let badgeLabel = estado;
   let badgeTone  = ESTADO_TONE[estado] || 'neutral';
-  if (tipo === 4 && estado === 'PENDIENTE') {
+  if (esBifasico && estado === 'PENDIENTE') {
     if (esMiReceptor && esperandoReceptor) {
       badgeLabel = 'Requiere tu respuesta';
       badgeTone  = 'warn';
@@ -116,7 +118,7 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       )}
       {solicitud.turno && (
         <Row
-          label={tipo === 2 ? 'Turno a liberar' : tipo === 3 ? 'Turno a cubrir' : tipo === 4 ? 'Turno a recibir' : 'Turno'}
+          label={tipo === 2 ? 'Turno a liberar' : tipo === 3 ? 'Turno a cubrir' : tipo === 4 ? 'Turno a recibir' : tipo === 5 ? 'Turno ofrecido' : 'Turno'}
           value={`${fmtFecha(solicitud.turno.diaInicioTurno)}  ${fmtHora(solicitud.turno.horaInicio)}–${fmtHora(solicitud.turno.horaFin)}`}
         />
       )}
@@ -160,13 +162,25 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
         </div>
       )}
 
-      {/* Acciones receptor intercambio */}
-      {canRespond && (
+      {/* Acciones receptor intercambio (tipo 4) */}
+      {canRespond && tipo === 4 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button onClick={() => onResponderIntercambio(solicitud.idSolicitud, false)} style={btnStyle('accent')}>
             <SGTIcon name="close" size={13} color="#B85A60" /> Rechazar
           </button>
           <button onClick={() => onResponderIntercambio(solicitud.idSolicitud, true)} style={{ ...btnStyle('primary'), flex: 1 }}>
+            <SGTIcon name="check" size={13} color="#fff" /> Aceptar
+          </button>
+        </div>
+      )}
+
+      {/* Acciones receptor oferta particular (tipo 5) */}
+      {canRespond && tipo === 5 && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={() => onResponderOfertaParticular(solicitud.idSolicitud, false)} style={btnStyle('accent')}>
+            <SGTIcon name="close" size={13} color="#B85A60" /> Rechazar
+          </button>
+          <button onClick={() => onResponderOfertaParticular(solicitud.idSolicitud, true)} style={{ ...btnStyle('primary'), flex: 1 }}>
             <SGTIcon name="check" size={13} color="#fff" /> Aceptar
           </button>
         </div>
@@ -218,11 +232,11 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     if (!open || !tipoSel || step !== 2) return;
     setLoadingData(true);
     const fetches = [];
-    if (tipoSel === 2 || tipoSel === 4)
+    if (tipoSel === 2 || tipoSel === 4 || tipoSel === 5)
       fetches.push(turnosService.getByMedico(userId).then(d => setMisTurnos(Array.isArray(d) ? d : [])).catch(() => {}));
     if (tipoSel === 3)
       fetches.push(turnosService.getSinAsignar(servicioId).then(d => setTurnosLibres(Array.isArray(d) ? d : [])).catch(() => {}));
-    if (tipoSel === 4)
+    if (tipoSel === 4 || tipoSel === 5)
       fetches.push(usuariosService.getAll(servicioId).then(d => {
         const lista = (Array.isArray(d) ? d : [])
           .filter(f => String(f.idFuncionario) !== String(userId))
@@ -257,6 +271,10 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
       if (!form.idTurnoDeseado || !form.idTurnoPropio || !form.idReceptor) return null;
       return { ...base, idTurno: Number(form.idTurnoDeseado), idTurnoIntercambio: Number(form.idTurnoPropio), idFuncionarioReceptor: Number(form.idReceptor) };
     }
+    if (tipoSel === 5) {
+      if (!form.idTurno || !form.idReceptor) return null;
+      return { ...base, idTurno: Number(form.idTurno), idFuncionarioReceptor: Number(form.idReceptor) };
+    }
     return null;
   };
 
@@ -286,6 +304,8 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   );
 
   const PICKERS = {
+    turnoOferta:    { title: 'Tu turno a ofrecer',      items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
+    receptorOferta: { title: 'Funcionario destinatario', items: funcionarios,               keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario })) },
     turnoBotar:     { title: 'Turno a liberar',        items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
     turnoCobertura: { title: 'Turno a cubrir',          items: turnosLibres,                keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
     turnoPropio:    { title: 'Tu turno a entregar',     items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoPropio: t.id })) },
@@ -322,10 +342,11 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   );
 
   const tipos = [
-    { id: 1, label: 'Permiso',     desc: 'Solicitar un permiso o licencia',            icon: 'calendar'    },
-    { id: 2, label: 'Botar turno', desc: 'Liberar un turno ya asignado',               icon: 'close'       },
-    { id: 3, label: 'Cobertura',   desc: 'Ofrecerse a cubrir un turno disponible',     icon: 'hand-raised' },
-    { id: 4, label: 'Intercambio', desc: 'Intercambiar un turno con otro funcionario', icon: 'swap'        },
+    { id: 1, label: 'Permiso',            desc: 'Solicitar un permiso o licencia',                    icon: 'calendar'    },
+    { id: 2, label: 'Botar turno',        desc: 'Liberar un turno ya asignado',                       icon: 'close'       },
+    { id: 3, label: 'Cobertura',          desc: 'Ofrecerse a cubrir un turno disponible',             icon: 'hand-raised' },
+    { id: 4, label: 'Intercambio',        desc: 'Intercambiar un turno con otro funcionario',         icon: 'swap'        },
+    { id: 5, label: 'Oferta particular',  desc: 'Ceder un turno propio a un funcionario específico',  icon: 'hand-raised' },
   ];
   const lbl = { fontSize: 12, fontWeight: 800, color: PA.ink3, display: 'block', marginBottom: 4 };
   const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1px solid ${PA.line}`, fontSize: 14, color: PA.ink, fontWeight: 600, background: '#fff', outline: 'none', boxSizing: 'border-box' };
@@ -381,6 +402,11 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
               {form.idReceptor && (
                 <div><label style={lbl}>Turno del receptor que quieres</label><PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" /></div>
               )}
+            </>)}
+
+            {tipoSel === 5 && (<>
+              <div><label style={lbl}>Tu turno a ofrecer</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoOferta" /></div>
+              <div><label style={lbl}>Ofrecer a</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptorOferta" /></div>
             </>)}
 
             <div>
@@ -618,6 +644,13 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     } catch { setError('Error al responder el intercambio.'); }
   };
 
+  const handleResponderOfertaParticular = async (id, acepta) => {
+    try {
+      await solicitudesService.responderOfertaParticular(id, user.id, acepta);
+      load();
+    } catch { setError('Error al responder la oferta.'); }
+  };
+
   const currentList = (() => {
     if (tab === 'recibidas')  return recibidas;
     if (tab === 'mis')        return solicitudes;
@@ -692,6 +725,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             onRechazar={handleRechazar}
             onEditMotivo={isMedico ? setEditSolicitud : null}
             onResponderIntercambio={handleResponder}
+            onResponderOfertaParticular={handleResponderOfertaParticular}
             esMiReceptor={tab === 'recibidas'}
           />
         ))}

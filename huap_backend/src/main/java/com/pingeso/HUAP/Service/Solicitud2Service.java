@@ -91,6 +91,32 @@ public class Solicitud2Service {
     }
 
     @Transactional
+    public Solicitud2Entity responderOfertaParticular(Long idSolicitud, Long idReceptor, boolean acepta) {
+        Solicitud2Entity solicitud = solicitud2Repository.findById(idSolicitud)
+                .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
+
+        if (!solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
+            throw new RuntimeException("No eres el receptor de esta solicitud");
+        }
+
+        FuncionarioEntity receptor = funcionarioRepository.findById(idReceptor).orElseThrow();
+
+        if (acepta) {
+            solicitud.setAceptadoReceptor(true);
+        } else {
+            solicitud.setAceptadoReceptor(false);
+            solicitud.setEstado(Solicitud2Entity.EstadoSolicitud.RECHAZADA);
+        }
+
+        Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
+
+        String evento = acepta ? "OFERTA_PARTICULAR_ACEPTADA_POR_RECEPTOR" : "OFERTA_PARTICULAR_RECHAZADA_POR_RECEPTOR";
+        agendarBitacora(evento, guardada.getIdSolicitud(), receptor.getIdFuncionario());
+
+        return guardada;
+    }
+
+    @Transactional
     public Solicitud2Entity responderOfertaIntercambio(Long idSolicitud, Long idReceptor, boolean acepta) {
         Solicitud2Entity solicitud = solicitud2Repository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
@@ -146,6 +172,10 @@ public class Solicitud2Service {
                 turnoPropio.setFuncionario(solicitud.getFuncionarioReceptor());
                 turnoRepository.save(turnoDeseado);
                 turnoRepository.save(turnoPropio);
+            } else if (tipoSolicitud.equals(5)) {
+                TurnoEntity turno = solicitud.getTurno();
+                turno.setFuncionario(solicitud.getFuncionarioReceptor());
+                turnoRepository.save(turno);
             }
         }
 
