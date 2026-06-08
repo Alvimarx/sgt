@@ -15,6 +15,12 @@ import SelectServiceView from "../Comun/SelectServiceView";
 import ProfileView from "../Comun/Perfil";
 import PersonalDashboard from "../Comun/PersonalDashboard";
 
+//Importaciones de ComunAdministracion
+import PuestosView from "../ComunAdministracion/PuestosView";
+import AdminStats from "../ComunAdministracion/AdminStats";
+
+//Importaciones Administrador
+
 //Importaciones Jefatura
 import JefaturaDashboard from "../Jefatura/JefaturaDashboardView";
 import JerarquiaJefaturaView from "../Jefatura/JerarquiaJefaturaView";
@@ -22,8 +28,9 @@ import JerarquiaJefaturaView from "../Jefatura/JerarquiaJefaturaView";
 //Importaciones Subrogante
 import SubroganteDashboard from "../Subrogante/SubroganteDashboardView";
 
+
 import AdminDashboard from "./AdminDashboard";
-import AdminStats from "./AdminStats";
+
 
 import AsignacionView from "./AsignacionView";
 import AuditoriaView from "./AuditoriaView";
@@ -32,7 +39,7 @@ import BitacoraView from "./BitacoraView";
 import JerarquiaView from "./JerarquiaView";
 import LoginView from "../Login/LoginView";
 
-import PuestosView from "./PuestosView";
+
 import PlantillasView from "./PlantillasView";
 
 
@@ -52,6 +59,10 @@ const Prop4 = ({ tweaks = {} }) => {
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
   const [solicitudesReturn, setSolicitudesReturn] = useState("agenda");
   const [solicitudesCreatePreset, setSolicitudesCreatePreset] = useState(null);
+
+  //Para Jefatura y subrogacia es lo mismo por lo cual es mejor compartir la vista
+  const [statsReturn, setStatsReturn] = useState("admin");
+  const[puestosReturn, setPuestosReturn] = useState("admin");
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -179,9 +190,9 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoServicios={() => setCurrentView("servicios")}
           onGoAsignacion={() => setCurrentView("asignacion")}
           onGoFuncionarios={() => setCurrentView("jerarquia")}
-          onGoPuestos={() => setCurrentView("puestos")}
+          onGoPuestos={() => { setPuestosReturn("admin"); setCurrentView("puestos"); }}
           onGoSolitudes={() => { setSolicitudesReturn("admin"); setCurrentView("solicitudes"); }}
-          onGoStats={() => setCurrentView("admin_stats")}
+          onGoStats={() => { setStatsReturn("admin"); setCurrentView("admin_stats"); }}
           onGoBitacora={() => setCurrentView("bitacora")}
           onGoAuditoria={() => setCurrentView("auditoria")}
           onGoTiposTurno={() => setCurrentView("tipos_turno")}
@@ -193,13 +204,21 @@ const Prop4 = ({ tweaks = {} }) => {
         <JefaturaDashboard
           onBack={() => setCurrentView("perfil")}
           onGoFuncionariosJefatura={() => setCurrentView("jerarquiaJefatura")}
+          onGoPuestos={() => { setPuestosReturn("jefatura"); setCurrentView("puestos"); }}
+          onGoStats={() => { setStatsReturn("jefatura"); setCurrentView("admin_stats"); }}
           />
       )}
 
       {currentView === "jerarquiaJefatura" && <JerarquiaJefaturaView onBack={() => setCurrentView("jefatura")} />}
+      {currentView === "admin_stats" && <AdminStats onBack={() => setCurrentView(statsReturn)} />}
+      {currentView === "puestos" && <PuestosView onBack={() => setCurrentView(puestosReturn)} />}
+
       {currentView === "subrogante" && (
         <SubroganteDashboard
-          onBack={() => setCurrentView("perfil")}/>
+          onBack={() => setCurrentView("perfil")}
+          onGoStats={() => { setStatsReturn("subrogante"); setCurrentView("admin_stats"); }}
+          onGoPuestos={() => { setPuestosReturn("subrogante"); setCurrentView("puestos"); }}
+          />
       )}
 
 
@@ -209,7 +228,6 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "servicios" && <ServiciosView onBack={() => setCurrentView("admin")} />}
       {currentView === "asignacion" && <AsignacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "jerarquia" && <JerarquiaView onBack={() => setCurrentView("admin")} />}
-      {currentView === "puestos" && <PuestosView onBack={() => setCurrentView("admin")} />}
       {currentView === "solicitudes" && (
         <SolicitudesView
           onBack={() => setCurrentView(solicitudesReturn)}
@@ -217,7 +235,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onInitialCreatePresetConsumed={() => setSolicitudesCreatePreset(null)}
         />
       )}
-      {currentView === "admin_stats" && <AdminStats onBack={() => setCurrentView("admin")} />}
+      
       {currentView === "bitacora" && <BitacoraView onBack={() => setCurrentView("admin")} />}
       {currentView === "auditoria" && <AuditoriaView onBack={() => setCurrentView("admin")} />}
       {currentView === "tipos_turno" && <TiposTurnoView onBack={() => setCurrentView("admin")} />}

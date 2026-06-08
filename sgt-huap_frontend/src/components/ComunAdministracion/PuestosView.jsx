@@ -1,7 +1,7 @@
 // PuestosView.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Building2, Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
-import { SGT_DATA } from './data';
+import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import {
