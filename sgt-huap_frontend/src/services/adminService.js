@@ -307,6 +307,59 @@ export const solicitudesService = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// OFERTAS GENERALES  →  /api/v2/ofertas-generales
+// ─────────────────────────────────────────────────────────────────────────────
+export const ofertasGeneralesService = {
+
+    // POST /ofertas-generales
+    crear: async ({ idFuncionario, idTurno, motivo }) => {
+        const response = await axiosInstance.post('/ofertas-generales', { idFuncionario, idTurno, motivo });
+        return response.data;
+    },
+
+    // PUT /ofertas-generales/{id}/aprobar?idJefatura=
+    aprobar: async (idOferta, idJefatura) => {
+        const response = await axiosInstance.put(`/ofertas-generales/${idOferta}/aprobar?idJefatura=${idJefatura}`);
+        return response.data;
+    },
+
+    // PUT /ofertas-generales/{id}/rechazar?idJefatura=
+    rechazar: async (idOferta, idJefatura) => {
+        const response = await axiosInstance.put(`/ofertas-generales/${idOferta}/rechazar?idJefatura=${idJefatura}`);
+        return response.data;
+    },
+
+    // POST /ofertas-generales/{id}/postular?idFuncionario=
+    postular: async (idOferta, idFuncionario) => {
+        const response = await axiosInstance.post(`/ofertas-generales/${idOferta}/postular?idFuncionario=${idFuncionario}`);
+        return response.data;
+    },
+
+    // DELETE /ofertas-generales/{id}/postular/{idPostulacion}?idFuncionario=
+    retirarPostulacion: async (idOferta, idPostulacion, idFuncionario) => {
+        await axiosInstance.delete(`/ofertas-generales/${idOferta}/postular/${idPostulacion}?idFuncionario=${idFuncionario}`);
+    },
+
+    // PUT /ofertas-generales/{id}/seleccionar/{idPostulacion}?idJefatura=
+    seleccionar: async (idOferta, idPostulacion, idJefatura) => {
+        const response = await axiosInstance.put(`/ofertas-generales/${idOferta}/seleccionar/${idPostulacion}?idJefatura=${idJefatura}`);
+        return response.data;
+    },
+
+    // GET /ofertas-generales/servicio/{idServicio}
+    getByServicio: async (idServicio) => {
+        const response = await axiosInstance.get(`/ofertas-generales/servicio/${idServicio}`);
+        return response.data;
+    },
+
+    // GET /ofertas-generales/ofertor/{idFuncionario}
+    getByOfertor: async (idFuncionario) => {
+        const response = await axiosInstance.get(`/ofertas-generales/ofertor/${idFuncionario}`);
+        return response.data;
+    },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICACIONES  →  /api/v2/notificaciones
 // ─────────────────────────────────────────────────────────────────────────────
 export const notificacionesService = {
@@ -519,14 +572,15 @@ export const normalizeSolicitud = (s) => {
 // EXPORT DEFAULT
 // ─────────────────────────────────────────────────────────────────────────────
 export default {
-    usuarios:       usuariosService,
-    funcionarios:   usuariosService,   // alias explícito con el nombre nuevo
-    turnos:         turnosService,
-    solicitudes:    solicitudesService,
-    notificaciones: notificacionesService,
-    puestos:          puestosService,
-    eventos:        eventosService,    // mantiene nombre externo para no romper imports
-    bitacoras:      eventosService,    // alias explícito con el nombre nuevo
-    servicios:      serviciosService,
+    usuarios:           usuariosService,
+    funcionarios:       usuariosService,   // alias explícito con el nombre nuevo
+    turnos:             turnosService,
+    solicitudes:        solicitudesService,
+    ofertasGenerales:   ofertasGeneralesService,
+    notificaciones:     notificacionesService,
+    puestos:            puestosService,
+    eventos:            eventosService,    // mantiene nombre externo para no romper imports
+    bitacoras:          eventosService,    // alias explícito con el nombre nuevo
+    servicios:          serviciosService,
     normalizeSolicitud
 };

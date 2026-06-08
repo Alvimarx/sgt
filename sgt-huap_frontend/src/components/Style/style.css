@@ -94,6 +94,15 @@
   color: #fff;
 }
 
+/* Solicitudes view — hide scrollbars without losing scroll */
+.sgt-no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.sgt-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Días y Turnos */
 .days-list {
   flex: 1;

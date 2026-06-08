@@ -156,6 +156,25 @@ public class BitacoraService {
         };
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void registrarEventoOferta(String tipoEvento, Long idOferta, Long idFuncionario) {
+        try {
+            FuncionarioEntity actor = idFuncionario != null
+                    ? funcionarioRepository.findById(idFuncionario).orElse(null) : null;
+
+            BitacoraEntity log = BitacoraEntity.builder()
+                    .tipoEvento(tipoEvento)
+                    .motivo("idOferta=" + idOferta)
+                    .funcionario(actor)
+                    .fechaInicioAfectada(LocalDateTime.now())
+                    .activo(true)
+                    .build();
+            bitacoraRepository.save(log);
+        } catch (Exception e) {
+            System.err.println("Error guardando en bitácora (oferta): " + e.getMessage());
+        }
+    }
+
     // Llamar siempre desde un afterCommit hook para evitar lock conflicts con la TX principal
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrarEvento(String tipoEvento, Long idSolicitud, Long idFuncionario) {

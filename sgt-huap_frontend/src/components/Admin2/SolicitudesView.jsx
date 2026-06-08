@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { solicitudesService, turnosService, usuariosService } from '../../services/adminService';
+import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
 import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
+import '../Style/style.css';
 
 const PA = SGT_DATA.PALETTE;
 
@@ -196,6 +197,138 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
   );
 };
 
+// ── OfertaGeneralCard ─────────────────────────────────────────────────────────
+
+const COLOR_OFERTA = '#E0A040';
+const COLOR_OFERTA_SOFT = '#FDF3E3';
+
+const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, onPostular, onRetirar, onSeleccionar }) => {
+  const estado = oferta?.estado;
+  const esOfertor = String(oferta?.ofertor?.idFuncionario) === String(userId);
+  const miPostulacion = oferta?.postulaciones?.find(p => String(p.postulante?.idFuncionario) === String(userId));
+  const yaPostulado = !!miPostulacion;
+  const postulaciones = oferta?.postulaciones || [];
+  const seleccionado = postulaciones.find(p => p.seleccionado);
+
+  const [confirmando, setConfirmando] = useState(null); // { idPostulacion, nombrePostulante }
+
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${COLOR_OFERTA}`, borderLeft: `4px solid ${COLOR_OFERTA}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: COLOR_OFERTA_SOFT, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <SGTIcon name="hand-raised" size={18} color={COLOR_OFERTA} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Oferta general</div>
+          <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>{fmtFecha(oferta.fechaCreacion)}</div>
+        </div>
+        <SGTBadge tone={estado === 'ABIERTA' ? 'success' : estado === 'PENDIENTE_APROBACION' ? 'warn' : estado === 'CERRADA' ? 'neutral' : 'accent'} size="xs">
+          {estado === 'PENDIENTE_APROBACION' ? 'Pend. apertura' : estado === 'ABIERTA' ? 'Abierta' : estado === 'CERRADA' ? 'Cerrada' : 'Rechazada'}
+        </SGTBadge>
+      </div>
+
+      {/* Datos */}
+      <Row label="Ofertor" value={nombreFuncionario(oferta.ofertor)} />
+      {oferta.turno && (
+        <Row label="Turno ofertado" value={`${fmtFecha(oferta.turno.diaInicioTurno)}  ${fmtHora(oferta.turno.horaInicio)}–${fmtHora(oferta.turno.horaFin)}`} />
+      )}
+      {estado === 'CERRADA' && seleccionado && (
+        <Row label="Asignado a" value={nombreFuncionario(seleccionado.postulante)} />
+      )}
+      <div style={{ marginTop: 8, background: PA.surface2, borderRadius: 8, padding: '8px 10px' }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, color: PA.ink3, marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.4 }}>Motivo</div>
+        <div style={{ fontSize: 13, color: PA.ink, fontWeight: 600, lineHeight: 1.45 }}>{oferta.motivo || '—'}</div>
+      </div>
+
+      {/* Jefatura: aprobar/rechazar si pendiente */}
+      {canDecide && estado === 'PENDIENTE_APROBACION' && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={() => onRechazar(oferta.idOfertaGeneral)} style={btnStyle('accent')}>
+            <SGTIcon name="close" size={13} color="#B85A60" /> Rechazar
+          </button>
+          <button onClick={() => onAprobar(oferta.idOfertaGeneral)} style={{ ...btnStyle('primary'), flex: 1 }}>
+            <SGTIcon name="check" size={13} color="#fff" /> Aprobar
+          </button>
+        </div>
+      )}
+
+      {/* Jefatura: lista de postulantes si abierta */}
+      {canDecide && estado === 'ABIERTA' && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
+            Postulantes ({postulaciones.length})
+          </div>
+          {postulaciones.length === 0 && (
+            <div style={{ fontSize: 13, color: PA.ink3, fontWeight: 600 }}>Sin postulantes aún.</div>
+          )}
+          {postulaciones.map(p => (
+            <div key={p.idPostulacion} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: PA.surface2, borderRadius: 8, marginBottom: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: PA.ink }}>{nombreFuncionario(p.postulante)}</div>
+              <button
+                onClick={() => setConfirmando({ idPostulacion: p.idPostulacion, nombrePostulante: nombreFuncionario(p.postulante) })}
+                style={{ background: COLOR_OFERTA, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}
+              >
+                Seleccionar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Médico: postular / retirar */}
+      {!canDecide && !esOfertor && estado === 'ABIERTA' && (
+        <div style={{ marginTop: 12 }}>
+          {!yaPostulado ? (
+            <button onClick={() => onPostular(oferta.idOfertaGeneral)} style={{ ...btnStyle('primary'), width: '100%' }}>
+              <SGTIcon name="hand-raised" size={13} color="#fff" /> Postular
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <SGTBadge tone="success" size="xs">Postulado</SGTBadge>
+              <button onClick={() => onRetirar(oferta.idOfertaGeneral, miPostulacion.idPostulacion)} style={btnStyle('accent')}>
+                <SGTIcon name="close" size={13} color="#B85A60" /> Retirar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Médico ofertor: indicar que está en proceso */}
+      {!canDecide && esOfertor && estado === 'ABIERTA' && (
+        <div style={{ marginTop: 8, padding: '6px 10px', background: COLOR_OFERTA_SOFT, borderRadius: 8, fontSize: 12, color: COLOR_OFERTA, fontWeight: 700 }}>
+          Tu oferta está abierta · {postulaciones.length} postulante{postulaciones.length !== 1 ? 's' : ''}
+        </div>
+      )}
+
+      {/* Diálogo de confirmación selección */}
+      <Sheet open={!!confirmando} onClose={() => setConfirmando(null)} title="Confirmar selección">
+        <div style={{ padding: '8px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 14, color: PA.ink, fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
+            Se asignará el turno de <strong>{nombreFuncionario(oferta.ofertor)}</strong> a <strong>{confirmando?.nombrePostulante}</strong>.
+          </p>
+          {oferta.turno && (
+            <div style={{ background: PA.surface2, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: PA.ink2, fontWeight: 600 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>Turno</div>
+              <div>{fmtFecha(oferta.turno.diaInicioTurno)}</div>
+              <div style={{ color: PA.ink3 }}>{fmtHora(oferta.turno.horaInicio)} – {fmtHora(oferta.turno.horaFin)}</div>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setConfirmando(null)} style={{ ...btnStyle('ghost'), flex: 1 }}>Cancelar</button>
+            <button
+              onClick={() => { onSeleccionar(oferta.idOfertaGeneral, confirmando.idPostulacion); setConfirmando(null); }}
+              style={{ ...btnStyle('primary'), flex: 1 }}
+            >
+              <SGTIcon name="check" size={13} color="#fff" /> Confirmar
+            </button>
+          </div>
+        </div>
+      </Sheet>
+    </div>
+  );
+};
+
 // ── CrearSolicitudSheet ───────────────────────────────────────────────────────
 
 const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, initialPreset }) => {
@@ -232,7 +365,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     if (!open || !tipoSel || step !== 2) return;
     setLoadingData(true);
     const fetches = [];
-    if (tipoSel === 2 || tipoSel === 4 || tipoSel === 5)
+    if (tipoSel === 2 || tipoSel === 4 || tipoSel === 5 || tipoSel === 6)
       fetches.push(turnosService.getByMedico(userId).then(d => setMisTurnos(Array.isArray(d) ? d : [])).catch(() => {}));
     if (tipoSel === 3)
       fetches.push(turnosService.getSinAsignar(servicioId).then(d => setTurnosLibres(Array.isArray(d) ? d : [])).catch(() => {}));
@@ -281,9 +414,14 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   const handleSubmit = async () => {
     setLoading(true); setError(null);
     try {
-      const dto = buildDTO();
-      if (!dto) { setError('Rellena todos los campos requeridos.'); setLoading(false); return; }
-      await solicitudesService.crear(dto);
+      if (tipoSel === 6) {
+        if (!form.idTurno || !form.motivo?.trim()) { setError('Rellena todos los campos requeridos.'); setLoading(false); return; }
+        await ofertasGeneralesService.crear({ idFuncionario: Number(userId), idTurno: Number(form.idTurno), motivo: form.motivo });
+      } else {
+        const dto = buildDTO();
+        if (!dto) { setError('Rellena todos los campos requeridos.'); setLoading(false); return; }
+        await solicitudesService.crear(dto);
+      }
       onCreated?.(); handleClose();
     } catch { setError('No se pudo crear la solicitud.'); }
     finally { setLoading(false); }
@@ -304,6 +442,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   );
 
   const PICKERS = {
+    turnoOfertaGeneral: { title: 'Tu turno a ofrecer', items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
     turnoOferta:    { title: 'Tu turno a ofrecer',      items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
     receptorOferta: { title: 'Funcionario destinatario', items: funcionarios,               keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario })) },
     turnoBotar:     { title: 'Turno a liberar',        items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
@@ -347,6 +486,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     { id: 3, label: 'Cobertura',          desc: 'Ofrecerse a cubrir un turno disponible',             icon: 'hand-raised' },
     { id: 4, label: 'Intercambio',        desc: 'Intercambiar un turno con otro funcionario',         icon: 'swap'        },
     { id: 5, label: 'Oferta particular',  desc: 'Ceder un turno propio a un funcionario específico',  icon: 'hand-raised' },
+    { id: 6, label: 'Oferta general',     desc: 'Ofrecer tu turno a todos los funcionarios del servicio', icon: 'hand-raised' },
   ];
   const lbl = { fontSize: 12, fontWeight: 800, color: PA.ink3, display: 'block', marginBottom: 4 };
   const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1px solid ${PA.line}`, fontSize: 14, color: PA.ink, fontWeight: 600, background: '#fff', outline: 'none', boxSizing: 'border-box' };
@@ -408,6 +548,10 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
               <div><label style={lbl}>Tu turno a ofrecer</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoOferta" /></div>
               <div><label style={lbl}>Ofrecer a</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptorOferta" /></div>
             </>)}
+
+            {tipoSel === 6 && (
+              <div><label style={lbl}>Tu turno a ofrecer</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoOfertaGeneral" /></div>
+            )}
 
             <div>
               <label style={lbl}>Motivo *</label>
@@ -578,11 +722,15 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const [tab, setTab]           = useState(isMedico ? 'mis' : 'pendientes');
   const [solicitudes, setSolicitudes] = useState([]);
   const [recibidas, setRecibidas]     = useState([]);
+  const [ofertas, setOfertas]         = useState([]);
+  const [servicioNombre, setServicioNombre] = useState('');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState(null);
   const [showCrear, setShowCrear]     = useState(false);
   const [editSolicitud, setEditSolicitud] = useState(null);
   const [crearPreset, setCrearPreset] = useState(null);
+  const [sortBy, setSortBy]     = useState('reciente');
+  const [showSort, setShowSort] = useState(false);
 
   useEffect(() => {
     if (!initialCreatePreset) return;
@@ -596,23 +744,35 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     setCrearPreset(null);
   };
 
+  useEffect(() => {
+    if (!user?.servicioId) return;
+    serviciosService.getById(user.servicioId)
+      .then(s => setServicioNombre(s?.nombre || ''))
+      .catch(() => {});
+  }, [user?.servicioId]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       if (isMedico) {
-        const [mis, recv] = await Promise.all([
+        const [mis, recv, ofs] = await Promise.all([
           solicitudesService.getByFuncionario(user.id),
           solicitudesService.getByReceptor(user.id),
+          ofertasGeneralesService.getByServicio(user.servicioId),
         ]);
         setSolicitudes(Array.isArray(mis) ? mis : []);
         setRecibidas(Array.isArray(recv) ? recv : []);
+        setOfertas(Array.isArray(ofs) ? ofs : []);
       } else {
-        const all = await solicitudesService.getAll();
+        const [all, ofs] = await Promise.all([
+          solicitudesService.getAll(),
+          ofertasGeneralesService.getByServicio(user.servicioId),
+        ]);
         const arr = Array.isArray(all) ? all : [];
-        // Filtrar por servicio: incluir si el turno pertenece al servicio activo o si no tiene turno (permiso)
         const filtered = arr.filter(s => !s.turno || String(s.turno.servicio?.idServicio) === String(user.servicioId));
         setSolicitudes(filtered);
+        setOfertas(Array.isArray(ofs) ? ofs : []);
       }
     } catch {
       setError('No se pudieron cargar las solicitudes.');
@@ -651,20 +811,69 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     } catch { setError('Error al responder la oferta.'); }
   };
 
-  const currentList = (() => {
+  const handleOfertaAprobar = async (id) => {
+    try { await ofertasGeneralesService.aprobar(id, user.id); load(); }
+    catch { setError('Error al aprobar la oferta.'); }
+  };
+
+  const handleOfertaRechazar = async (id) => {
+    try { await ofertasGeneralesService.rechazar(id, user.id); load(); }
+    catch { setError('Error al rechazar la oferta.'); }
+  };
+
+  const handlePostular = async (idOferta) => {
+    try { await ofertasGeneralesService.postular(idOferta, user.id); load(); }
+    catch { setError('Error al postular.'); }
+  };
+
+  const handleRetirar = async (idOferta, idPostulacion) => {
+    try { await ofertasGeneralesService.retirarPostulacion(idOferta, idPostulacion, user.id); load(); }
+    catch (err) { console.error('[Retirar]', err); setError('Error al retirar la postulación.'); }
+  };
+
+  const handleSeleccionar = async (idOferta, idPostulacion) => {
+    try { await ofertasGeneralesService.seleccionar(idOferta, idPostulacion, user.id); load(); }
+    catch { setError('Error al seleccionar postulante.'); }
+  };
+
+  const SORT_OPTIONS = [
+    { id: 'reciente', label: 'Más reciente', desc: 'De la más nueva a la más antigua' },
+    { id: 'antigua',  label: 'Más antigua',  desc: 'De la más antigua a la más nueva' },
+    { id: 'tipo',     label: 'Por tipo',      desc: 'Agrupa por tipo de solicitud'     },
+  ];
+
+  const applySort = (list) => {
+    const copy = [...list];
+    if (sortBy === 'reciente') return copy.sort((a, b) => new Date(b.fechaCreacion) - new Date(a.fechaCreacion));
+    if (sortBy === 'antigua')  return copy.sort((a, b) => new Date(a.fechaCreacion) - new Date(b.fechaCreacion));
+    if (sortBy === 'tipo')     return copy.sort((a, b) => (a.tipoSolicitud?.tipo ?? 0) - (b.tipoSolicitud?.tipo ?? 0));
+    return copy;
+  };
+
+  const currentList = applySort((() => {
     if (tab === 'recibidas')  return recibidas;
     if (tab === 'mis')        return solicitudes;
     if (tab === 'pendientes') return solicitudes.filter(s => s.estado === 'PENDIENTE');
     if (tab === 'historial')  return solicitudes.filter(s => s.estado !== 'PENDIENTE');
     return solicitudes;
-  })();
+  })());
 
   const pendienteCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length;
   const recibidasCount = recibidas.filter(s => s.estado === 'PENDIENTE').length;
 
+  const ofertasPendientes = ofertas.filter(o => o.estado === 'PENDIENTE_APROBACION').length;
+
   const TABS = isMedico
-    ? [{ id: 'mis', label: 'Mis solicitudes', badge: null }, { id: 'recibidas', label: 'Recibidas', badge: recibidasCount }]
-    : [{ id: 'pendientes', label: 'Pendientes', badge: pendienteCount }, { id: 'historial', label: 'Historial', badge: null }];
+    ? [
+        { id: 'mis',     label: 'Mis solicitudes',   badge: null },
+        { id: 'recibidas', label: 'Recibidas',        badge: recibidasCount },
+        { id: 'ofertas', label: 'Ofertas generales',  badge: null },
+      ]
+    : [
+        { id: 'pendientes', label: 'Pendientes',      badge: pendienteCount },
+        { id: 'historial',  label: 'Historial',       badge: null },
+        { id: 'ofertas',    label: 'Ofertas generales', badge: ofertasPendientes || null },
+      ];
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
@@ -684,39 +893,105 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         }
       />
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 6, padding: '10px 14px 8px', background: '#fff', borderBottom: `1px solid ${PA.line2}` }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            background: tab === t.id ? PA.primary : 'transparent',
-            color: tab === t.id ? '#fff' : PA.ink2,
-            border: `1px solid ${tab === t.id ? PA.primary : PA.line}`,
-            borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 800,
-            cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
-          }}>
-            {t.label}
-            {t.badge != null && t.badge > 0 && (
-              <span style={{ background: tab === t.id ? 'rgba(255,255,255,0.25)' : PA.line2, color: tab === t.id ? '#fff' : PA.ink3, padding: '1px 6px', borderRadius: 99, fontSize: 10.5, fontWeight: 800 }}>{t.badge}</span>
-            )}
-          </button>
-        ))}
+      {/* Tabs + botón orden */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 8px', background: '#fff', borderBottom: `1px solid ${PA.line2}` }}>
+        <div className="sgt-no-scrollbar" style={{ display: 'flex', gap: 6, flex: 1, overflowX: 'auto' }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              background: tab === t.id ? PA.primary : 'transparent',
+              color: tab === t.id ? '#fff' : PA.ink2,
+              border: `1px solid ${tab === t.id ? PA.primary : PA.line}`,
+              borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 800,
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+            }}>
+              {t.label}
+              {t.badge != null && t.badge > 0 && (
+                <span style={{ background: tab === t.id ? 'rgba(255,255,255,0.25)' : PA.line2, color: tab === t.id ? '#fff' : PA.ink3, padding: '1px 6px', borderRadius: 99, fontSize: 10.5, fontWeight: 800 }}>{t.badge}</span>
+              )}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowSort(true)}
+          style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 10, border: `1px solid ${sortBy !== 'reciente' ? PA.primary : PA.line}`, background: sortBy !== 'reciente' ? PA.primarySoft : '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+        >
+          <SGTIcon name="sliders" size={16} color={sortBy !== 'reciente' ? PA.primary : PA.ink2} />
+        </button>
       </div>
 
+      {/* Mini bottom sheet de orden */}
+      <Sheet open={showSort} onClose={() => setShowSort(false)} title="Ordenar por">
+        <div style={{ padding: '4px 16px 32px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => { setSortBy(opt.id); setShowSort(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px', borderRadius: 12,
+                border: `1.5px solid ${sortBy === opt.id ? PA.primary : PA.line}`,
+                background: sortBy === opt.id ? PA.primarySoft : '#fff',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: sortBy === opt.id ? PA.primary : PA.ink }}>{opt.label}</div>
+                <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>{opt.desc}</div>
+              </div>
+              {sortBy === opt.id && <SGTIcon name="check" size={16} color={PA.primary} />}
+            </button>
+          ))}
+        </div>
+      </Sheet>
+
       {/* Lista */}
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 14px 24px' }}>
+      <div className="sgt-no-scrollbar" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 14px 24px' }}>
         {loading && (
           <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Cargando...</div>
         )}
         {!loading && error && (
           <div style={{ background: PA.accentSoft, color: '#B85A60', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{error}</div>
         )}
-        {!loading && !error && currentList.length === 0 && (
+
+        {/* Tab: Ofertas generales */}
+        {!loading && tab === 'ofertas' && (
+          <>
+            <div style={{ background: '#FDF3E3', border: `1px solid ${COLOR_OFERTA}`, borderRadius: 12, padding: '10px 14px', marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#996520' }}>Ofertas generales</div>
+              <div style={{ fontSize: 12, color: '#996520', fontWeight: 600, marginTop: 2 }}>
+                Turnos ofertados por funcionarios en el servicio de <strong>{servicioNombre}</strong>
+              </div>
+            </div>
+            {ofertas.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 48, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
+                <SGTIcon name="check-circle" size={32} color={PA.line} />
+                <div style={{ marginTop: 10 }}>Sin ofertas en este servicio.</div>
+              </div>
+            )}
+            {ofertas.map(o => (
+              <OfertaGeneralCard
+                key={o.idOfertaGeneral}
+                oferta={o}
+                userId={user?.id}
+                canDecide={canDecide}
+                onAprobar={handleOfertaAprobar}
+                onRechazar={handleOfertaRechazar}
+                onPostular={handlePostular}
+                onRetirar={handleRetirar}
+                onSeleccionar={handleSeleccionar}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Tabs de solicitudes normales */}
+        {!loading && tab !== 'ofertas' && !error && currentList.length === 0 && (
           <div style={{ textAlign: 'center', padding: 48, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
             <SGTIcon name="check-circle" size={32} color={PA.line} />
             <div style={{ marginTop: 10 }}>Sin solicitudes aquí.</div>
           </div>
         )}
-        {!loading && currentList.map(s => (
+        {!loading && tab !== 'ofertas' && currentList.map(s => (
           <SolicitudCard
             key={s.idSolicitud}
             solicitud={s}
