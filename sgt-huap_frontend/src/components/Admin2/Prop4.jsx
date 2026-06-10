@@ -63,6 +63,8 @@ const Prop4 = ({ tweaks = {} }) => {
   //Para Jefatura y subrogacia es lo mismo por lo cual es mejor compartir la vista
   const [statsReturn, setStatsReturn] = useState("admin");
   const[puestosReturn, setPuestosReturn] = useState("admin");
+  const [bitacoraReturn, setBitacoraReturn] = useState("admin");
+  const [auditoriaReturn, setAuditoriaReturn] = useState("admin");
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -157,7 +159,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onLogout={handleLogout}
           onOpenNotifications={handleOpenNotifications}
           onOpenSolicitudes={handleOpenSolicitudes}
-          onOpenBitacora={() => setCurrentView("bitacora")}
+          onOpenBitacora={() => { setBitacoraReturn("agenda"); setCurrentView("bitacora"); }}
         />
       )}
       {currentView === "notifications" && (
@@ -167,7 +169,7 @@ const Prop4 = ({ tweaks = {} }) => {
         <CalendarView
           onBack={() => { setCurrentView("agenda"); setActiveTab("home"); }}
           onOpenSolicitudes={handleOpenSolicitudes}
-          onOpenBitacora={() => setCurrentView("bitacora")}
+          onOpenBitacora={() => { setBitacoraReturn("calendar_view"); setCurrentView("bitacora"); }}
         />
       )}
       {currentView === "perfil" && (
@@ -193,8 +195,8 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoPuestos={() => { setPuestosReturn("admin"); setCurrentView("puestos"); }}
           onGoSolitudes={() => { setSolicitudesReturn("admin"); setCurrentView("solicitudes"); }}
           onGoStats={() => { setStatsReturn("admin"); setCurrentView("admin_stats"); }}
-          onGoBitacora={() => setCurrentView("bitacora")}
-          onGoAuditoria={() => setCurrentView("auditoria")}
+          onGoBitacora={() => { setBitacoraReturn("admin"); setCurrentView("bitacora"); }}
+          onGoAuditoria={() => { setAuditoriaReturn("admin"); setCurrentView("auditoria"); }}
           onGoTiposTurno={() => setCurrentView("tipos_turno")}
           onGoPlantillas={() => setCurrentView("plantillas")}
           onGoPlanificacion={() => setCurrentView("planificacion")}
@@ -206,6 +208,9 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoFuncionariosJefatura={() => setCurrentView("jerarquiaJefatura")}
           onGoPuestos={() => { setPuestosReturn("jefatura"); setCurrentView("puestos"); }}
           onGoStats={() => { setStatsReturn("jefatura"); setCurrentView("admin_stats"); }}
+          onGoSolitudes={() => { setSolicitudesReturn("jefatura"); setCurrentView("solicitudes"); }}
+          onGoBitacora={() => { setBitacoraReturn("jefatura"); setCurrentView("bitacora"); }}
+          onGoAuditoria={() => { setAuditoriaReturn("jefatura"); setCurrentView("auditoria"); }}
           />
       )}
 
@@ -218,6 +223,9 @@ const Prop4 = ({ tweaks = {} }) => {
           onBack={() => setCurrentView("perfil")}
           onGoStats={() => { setStatsReturn("subrogante"); setCurrentView("admin_stats"); }}
           onGoPuestos={() => { setPuestosReturn("subrogante"); setCurrentView("puestos"); }}
+          onGoSolitudes={() => { setSolicitudesReturn("subrogante"); setCurrentView("solicitudes"); }}
+          onGoBitacora={() => { setBitacoraReturn("subrogante"); setCurrentView("bitacora"); }}
+          onGoAuditoria={() => { setAuditoriaReturn("subrogante"); setCurrentView("auditoria"); }}
           />
       )}
 
@@ -236,8 +244,8 @@ const Prop4 = ({ tweaks = {} }) => {
         />
       )}
       
-      {currentView === "bitacora" && <BitacoraView onBack={() => setCurrentView("admin")} />}
-      {currentView === "auditoria" && <AuditoriaView onBack={() => setCurrentView("admin")} />}
+      {currentView === "bitacora" && <BitacoraView onBack={() => setCurrentView(bitacoraReturn)} />}
+      {currentView === "auditoria" && <AuditoriaView onBack={() => setCurrentView(auditoriaReturn)} />}
       {currentView === "tipos_turno" && <TiposTurnoView onBack={() => setCurrentView("admin")} />}
       {currentView === "plantillas" && <PlantillasView onBack={() => setCurrentView("admin")} />}
 

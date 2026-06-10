@@ -37,73 +37,92 @@ const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, on
       </div>
 
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', flex: 1 }}>
-        <p style={{ margin: '0 0 10px', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Selecciona un módulo para configurar la plataforma.</p>
+        <p style={{ margin: '0 0 10px', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Selecciona un módulo de tu servicio.</p>
 
-        {/* AÑADIDO: onClick={onGoServicios} */}
-        <SubroganteCard 
-          icon="users" 
-          title="Asignación de turnos" 
-          desc="Asigna o quita funcionarios de turnos" 
-          tone="accent" 
-          onClick={onGoSolitudes} 
-        />
-        <SubroganteCard
-          icon="calendar" 
-          title="Crear tipo de Turno" 
-          desc="Diseña un nuevo tipo de turno." 
-          tone="accent" 
-          onClick={onGoTiposTurno} 
-        />
-        <SubroganteCard 
-          icon="calendar" 
-          title="Crear Rotativa" 
-          desc="Diseña una nueva rotativa." 
-          tone="accent" 
-          onClick={onGoPlantillas} 
-        />
-        <SubroganteCard 
-          icon="calendar" 
-          title="Crear Planificación Mensual" 
-          desc="Diseña una nueva planificación mensual." 
-          tone="accent" 
-          onClick={onGoPlanificacion} 
-        />
-
-        <SubroganteCard 
-          icon="alert" 
-          title="Evaluar Solicitudes" 
-          desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos." 
-          tone="accent" 
-          onClick={onGoSolitudes} 
-        />
-        <SubroganteCard
-          icon="home"
-          title="Gestionar Puestos"
-          desc="Crea, edita y elimina puestos del sistema."
-          tone="primary"
-          onClick={onGoPuestos}
-        />
-        <SubroganteCard
-          icon="sliders"
-          title="Estadísticas del Servicio"
-          desc="Cobertura, turnos vacantes y horas cubiertas."
-          tone="primary"
-          onClick={onGoStats}
-        />
-        <SubroganteCard
-          icon="history"
-          title="Bitácora de Cambios"
-          desc="Registro cronológico de todos los eventos del sistema."
-          tone="accent"
-          onClick={onGoBitacora}
-        />
-        <SubroganteCard
-          icon="check-circle"
-          title="Auditoría de Asistencia"
-          desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
-          tone="accent"
-          onClick={onGoAuditoria}
-        />
+        {/* Solo se muestran las acciones habilitadas (handler provisto). Las acciones
+            globales (tipos de turno, rotativas, planificación) son exclusivas de
+            ADMINISTRADOR y no se cablean aquí, por lo que quedan ocultas. */}
+        {onGoSolitudes && (
+          <SubroganteCard
+            icon="users"
+            title="Asignación de turnos"
+            desc="Asigna o quita funcionarios de turnos"
+            tone="accent"
+            onClick={onGoSolitudes}
+          />
+        )}
+        {onGoTiposTurno && (
+          <SubroganteCard
+            icon="calendar"
+            title="Crear tipo de Turno"
+            desc="Diseña un nuevo tipo de turno."
+            tone="accent"
+            onClick={onGoTiposTurno}
+          />
+        )}
+        {onGoPlantillas && (
+          <SubroganteCard
+            icon="calendar"
+            title="Crear Rotativa"
+            desc="Diseña una nueva rotativa."
+            tone="accent"
+            onClick={onGoPlantillas}
+          />
+        )}
+        {onGoPlanificacion && (
+          <SubroganteCard
+            icon="calendar"
+            title="Crear Planificación Mensual"
+            desc="Diseña una nueva planificación mensual."
+            tone="accent"
+            onClick={onGoPlanificacion}
+          />
+        )}
+        {onGoSolitudes && (
+          <SubroganteCard
+            icon="alert"
+            title="Evaluar Solicitudes"
+            desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos."
+            tone="accent"
+            onClick={onGoSolitudes}
+          />
+        )}
+        {onGoPuestos && (
+          <SubroganteCard
+            icon="home"
+            title="Gestionar Puestos"
+            desc="Crea, edita y elimina puestos del sistema."
+            tone="primary"
+            onClick={onGoPuestos}
+          />
+        )}
+        {onGoStats && (
+          <SubroganteCard
+            icon="sliders"
+            title="Estadísticas del Servicio"
+            desc="Cobertura, turnos vacantes y horas cubiertas."
+            tone="primary"
+            onClick={onGoStats}
+          />
+        )}
+        {onGoBitacora && (
+          <SubroganteCard
+            icon="history"
+            title="Bitácora de Cambios"
+            desc="Registro cronológico de todos los eventos del sistema."
+            tone="accent"
+            onClick={onGoBitacora}
+          />
+        )}
+        {onGoAuditoria && (
+          <SubroganteCard
+            icon="check-circle"
+            title="Auditoría de Asistencia"
+            desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
+            tone="accent"
+            onClick={onGoAuditoria}
+          />
+        )}
       </div>
 
       

@@ -11,7 +11,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v2/tipos-turno")
-@CrossOrigin("*")
 public class PlantillaTurnoController {
 
     private final PlantillaTurnoService plantillaTurnoService;

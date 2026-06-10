@@ -14,7 +14,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v2/plantillas")
-@CrossOrigin("*")
 public class PlantillaController {
 
     private final PlantillaService plantillaService;

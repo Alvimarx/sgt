@@ -19,7 +19,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v2/solicitudes")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class Solicitud2Controller {
 
     private final FuncionarioRepository funcionarioRepository;

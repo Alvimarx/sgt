@@ -24,10 +24,12 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
                          HttpServletResponse response,
                          AuthenticationException authException) throws IOException, ServletException {
         
-        logger.error("Responding with unauthorized error. Message - {}", authException.getMessage());
-        
+        // El detalle se registra solo del lado del servidor; NO se expone al cliente
+        // (evita fuga de información y inyección en el cuerpo JSON).
+        logger.warn("Acceso no autorizado a {}: {}", request.getRequestURI(), authException.getMessage());
+
         response.setContentType("application/json");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.getWriter().write("{\"error\": \"No autorizado\", \"message\": \"" + authException.getMessage() + "\"}");
+        response.getWriter().write("{\"error\": \"No autorizado\"}");
     }
 }

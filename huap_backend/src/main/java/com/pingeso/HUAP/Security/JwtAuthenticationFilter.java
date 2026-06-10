@@ -16,7 +16,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Filtro JWT que intercepta todas las peticiones HTTP para validar el token
@@ -47,11 +48,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 Long userId = tokenProvider.getUserIdFromToken(jwt);
                 String rol = tokenProvider.getRolFromToken(jwt);
+                String rolSistema = tokenProvider.getRolSistemaFromToken(jwt);
 
-                // Crear autenticación con el rol como autoridad
-                SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + rol);
+                // Autoridades: rol de servicio (JEFATURA/SUBROGANTE/MEDICO) +
+                // rol de sistema (ADMINISTRADOR/USUARIO), ambos como ROLE_<valor>.
+                List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                if (rol != null) authorities.add(new SimpleGrantedAuthority("ROLE_" + rol));
+                if (rolSistema != null) authorities.add(new SimpleGrantedAuthority("ROLE_" + rolSistema));
+
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userId,
-                        null, Collections.singletonList(authority));
+                        null, authorities);
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 

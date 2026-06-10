@@ -11,11 +11,17 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.MessageDigestPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.http.HttpMethod;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
@@ -28,11 +34,36 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // 2. ACTUALIZACIÓN DEL BEAN: Cambiar BCrypt por SHA-512
+    // Administración GLOBAL del sistema: solo ADMINISTRADOR (super-admin).
+    private static final String[] GLOBAL_ADMIN_PATHS = {
+            "/api/v2/servicios/**",
+            "/api/v2/tipos-turno/**",
+            "/api/v2/plantillas/**",
+            "/api/v2/planificaciones/**"
+    };
+
+    // Administración a nivel de SERVICIO: JEFATURA/SUBROGANTE (y ADMINISTRADOR como super-admin).
+    private static final String[] SERVICE_ADMIN_PATHS = {
+            "/api/v2/puestos/**",
+            "/api/v2/gestion-turnos/**",
+            "/api/v2/turnos/**"
+    };
+
+    /**
+     * Codificador de contraseñas con migración:
+     *  - Las contraseñas NUEVAS se almacenan con BCrypt (prefijo {bcrypt}).
+     *  - Las heredadas (SHA-512 sin prefijo) se siguen validando para no romper el login;
+     *    conviene forzar un cambio de contraseña o re-hashear en el próximo login válido.
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Esto hará que Spring compare las claves usando SHA-512
-        return new MessageDigestPasswordEncoder("SHA-512");
+        Map<String, PasswordEncoder> encoders = new HashMap<>();
+        encoders.put("bcrypt", new BCryptPasswordEncoder(12));
+
+        DelegatingPasswordEncoder delegating = new DelegatingPasswordEncoder("bcrypt", encoders);
+        // Hashes antiguos sin prefijo {id}: validados con el SHA-512 heredado.
+        delegating.setDefaultPasswordEncoderForMatches(new MessageDigestPasswordEncoder("SHA-512"));
+        return delegating;
     }
 
     @Bean
@@ -43,31 +74,43 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf.disable()) // API stateless con Bearer token en header (no cookies)
                 .cors(cors -> {
                 })
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(headers -> headers
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                        .frameOptions(frame -> frame.deny())
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; frame-ancestors 'none'; object-src 'none'"))
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v2/health").permitAll()
-                        .requestMatchers("/api/v2/info").permitAll()
-
+                        // --- Públicos (sin token) ---
+                        .requestMatchers("/api/v2/health", "/api/v2/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login").permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/api/v2/funcionarios/{id}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v2/funcionarios").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login/select-service").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/{id}").permitAll()
+                        // Listado de servicios necesario para la pantalla de selección de servicio.
                         .requestMatchers(HttpMethod.GET, "/api/v2/servicios").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/api/v2/servicios/{id}").permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/api/v2/funcionarios/{id}").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v2/funcionarios").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v2/funcionarios/summary").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login/select-service").permitAll()
+
+                        // --- Administración GLOBAL: solo ADMINISTRADOR (super-admin) ---
+                        .requestMatchers(HttpMethod.POST, GLOBAL_ADMIN_PATHS).hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PUT, GLOBAL_ADMIN_PATHS).hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, GLOBAL_ADMIN_PATHS).hasRole("ADMINISTRADOR")
+
+                        // --- Administración por SERVICIO: JEFATURA / SUBROGANTE / ADMINISTRADOR ---
+                        .requestMatchers(HttpMethod.POST, SERVICE_ADMIN_PATHS).hasAnyRole("ADMINISTRADOR", "JEFATURA", "SUBROGANTE")
+                        .requestMatchers(HttpMethod.PUT, SERVICE_ADMIN_PATHS).hasAnyRole("ADMINISTRADOR", "JEFATURA", "SUBROGANTE")
+                        .requestMatchers(HttpMethod.DELETE, SERVICE_ADMIN_PATHS).hasAnyRole("ADMINISTRADOR", "JEFATURA", "SUBROGANTE")
+
+                        // --- Solicitudes: cualquier rol autenticado ---
                         .requestMatchers(HttpMethod.PUT, "/api/v2/solicitudes/*/estado")
                         .hasAnyRole("JEFATURA", "SUBROGANTE", "MEDICO")
                         .requestMatchers(HttpMethod.PUT, "/api/v2/solicitudes/*/intercambio")
                         .hasAnyRole("JEFATURA", "SUBROGANTE", "MEDICO")
 
+                        // --- Todo lo demás requiere autenticación ---
                         .anyRequest().authenticated());
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

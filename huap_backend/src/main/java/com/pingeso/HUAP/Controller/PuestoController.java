@@ -11,7 +11,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v2/puestos")
-@CrossOrigin("*")
 public class PuestoController {
 
     @Autowired

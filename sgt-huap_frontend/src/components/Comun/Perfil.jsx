@@ -28,9 +28,11 @@ const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPerso
 
   const nombreServicioActivo = localStorage.getItem('sgt_servicio_activo_nombre') || 'Servicio Asignado';
 
-  const rol = JSON.parse(localStorage.getItem("user_data") || "{}")?.rol;
+  const storedUser = JSON.parse(localStorage.getItem("user_data") || "{}");
+  const rol = user?.rol ?? storedUser?.rol;                       // rol de servicio
+  const rolSistema = user?.rolSistema ?? storedUser?.rolSistema;  // rol de sistema
 
-  const isAdmin = rol === 'ADMINISTRADOR';
+  const isAdmin = rolSistema === 'ADMINISTRADOR';   // Panel de Administración (global)
   const isJefatura = rol === 'JEFATURA';
   const isSubrogante = rol === 'SUBROGANTE';
 

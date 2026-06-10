@@ -14,7 +14,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v2/planificaciones")
-@CrossOrigin("*")
 public class PlanificacionController {
 
     private final PlanificacionService planificacionService;

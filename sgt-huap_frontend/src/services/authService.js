@@ -10,7 +10,8 @@ import {
     clearAuth,
     getToken,
     isTokenValid,
-    getUserData
+    getUserData,
+    decodeToken
 } from '../utils/tokenManager';
 
 /**
@@ -60,6 +61,7 @@ export const selectService = async (preAuthToken, servicioId) => {
             userId: perfil.idFuncionario,
             servicioId: servicioActivo,
             rol: rolActivo,
+            rolSistema: decodeToken(token)?.rolSistema ?? 'USUARIO',
             nombre: perfil.nombre || 'Usuario',
             apellidoPaterno: perfil.apellidoPaterno || '',
             apellidoMaterno: perfil.apellidoMaterno || '',
@@ -104,6 +106,7 @@ export const switchService = async (servicioId) => {
             userId: perfil.idFuncionario,
             servicioId: servicioActivo,
             rol: rolActivo,
+            rolSistema: decodeToken(token)?.rolSistema ?? 'USUARIO',
             nombre: perfil.nombre || 'Usuario',
             apellidoPaterno: perfil.apellidoPaterno || '',
             apellidoMaterno: perfil.apellidoMaterno || '',

@@ -20,7 +20,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v2/turnos")
-@CrossOrigin(origins = "*")
 public class TurnoController {
 
     @Autowired

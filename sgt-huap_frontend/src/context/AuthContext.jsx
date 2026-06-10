@@ -26,6 +26,7 @@ export function AuthProvider({ children }) {
                             id: userData.userId,
                             nombre: userData.nombreCompleto || userData.nombre,
                             rol: userData.rol,
+                            rolSistema: userData.rolSistema,
                             servicioId: userData.servicioId,
                             userId: userData.userId
                         })

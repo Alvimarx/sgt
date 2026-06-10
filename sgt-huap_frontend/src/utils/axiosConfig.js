@@ -23,8 +23,6 @@ axiosInstance.interceptors.request.use(
     (config) => {
         const token = getToken();
 
-        console.log(`[Token] ${config.method?.toUpperCase()} ${config.url} → ${token ? token.slice(0, 30) + '...' : 'NULL'}`);
-
         // Si existe token pero ya expiró, limpiar sesión y redirigir antes de hacer la petición
         if (token && !isTokenValid()) {
             console.warn('[Axios] Token expirado. Limpiando sesión antes de la petición.');
@@ -68,7 +66,9 @@ axiosInstance.interceptors.response.use(
         return response;
     },
     (error) => {
-        console.error('[Axios] Response error:', error);
+        if (import.meta.env.VITE_DEBUG === 'true') {
+            console.error('[Axios] Response error:', error);
+        }
 
         if (error.response) {
             const { status, data } = error.response;

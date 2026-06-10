@@ -16,7 +16,8 @@ public class JwtTokenProvider {
 
     private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
 
-    @Value("${app.jwt.secret:***JWT_SECRET_PURGADO***}")
+    // Sin default: el secreto DEBE entregarse por configuracion/entorno (app.jwt.secret).
+    @Value("${app.jwt.secret}")
     private String jwtSecret;
 
     @Value("${app.jwt.expiration:86400000}") // 24 horas por defecto
@@ -31,14 +32,15 @@ public class JwtTokenProvider {
     /**
      * Genera el token final con todo el contexto de trabajo. V2
      */
-    public String generateToken(Long id, String rut, String rol, Long servicioId) {
+    public String generateToken(Long id, String rut, String rol, String rolSistema, Long servicioId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
         return Jwts.builder()
                 .subject(Long.toString(id))
                 .claim("rut", rut)
-                .claim("rol", rol)
+                .claim("rol", rol)                 // rol de servicio (JEFATURA/SUBROGANTE/MEDICO)
+                .claim("rolSistema", rolSistema)   // rol de sistema (ADMINISTRADOR/USUARIO)
                 .claim("servicioId", servicioId)
                 .claim("tipo", "FINAL") // <--- El marcador de seguridad
                 .issuedAt(new Date())
@@ -152,6 +154,19 @@ public class JwtTokenProvider {
                 .getPayload();
 
         return claims.get("rol", String.class);
+    }
+
+    /**
+     * Obtiene el rol de sistema (ADMINISTRADOR/USUARIO) del token JWT
+     */
+    public String getRolSistemaFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.get("rolSistema", String.class);
     }
 
     /**

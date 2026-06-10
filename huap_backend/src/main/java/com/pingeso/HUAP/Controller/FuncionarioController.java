@@ -16,6 +16,7 @@ import com.pingeso.HUAP.DTO.ServicioDisponibleDTO;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.ServiciosFuncionarioEntity;
 import com.pingeso.HUAP.Security.JwtTokenProvider;
+import com.pingeso.HUAP.Security.LoginAttemptService;
 import com.pingeso.HUAP.Service.FuncionarioService;
 
 import java.util.List;
@@ -24,7 +25,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v2/funcionarios")
-@CrossOrigin
 public class FuncionarioController {
     
     @Autowired
@@ -33,6 +33,9 @@ public class FuncionarioController {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         // Validaciones básicas
@@ -40,14 +43,39 @@ public class FuncionarioController {
             return ResponseEntity.badRequest().body(Map.of("error", "Credenciales incompletas"));
         }
 
+        final String rut = loginRequest.getRut();
+
+        // Bloqueo por fuerza bruta: demasiados intentos fallidos para este RUT.
+        if (loginAttemptService.isBlocked(rut)) {
+            long segundos = loginAttemptService.getSecondsToUnlock(rut);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Cuenta bloqueada por demasiados intentos fallidos. "
+                            + "Intenta nuevamente en " + segundos + " segundos."));
+        }
+
         FuncionarioEntity usuario;
         try {
             usuario = funcionarioService.authenticateWithPassword(
-                    loginRequest.getRut(), loginRequest.getPassword());
+                    rut, loginRequest.getPassword());
         } catch (RuntimeException e) {
+            loginAttemptService.loginFailed(rut);
+
+            // Si este fallo gatilló el bloqueo, avisamos del bloqueo y el tiempo de espera.
+            if (loginAttemptService.isBlocked(rut)) {
+                long segundos = loginAttemptService.getSecondsToUnlock(rut);
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(Map.of("error", "Has superado el número de intentos permitidos. "
+                                + "Acceso bloqueado por " + segundos + " segundos."));
+            }
+
+            // Mensaje genérico (no revela si el RUT existe). Avisa los intentos restantes
+            // cuando quedan pocos, para dar retroalimentación al usuario.
+            int restantes = loginAttemptService.getRemainingAttempts(rut);
+            String msg = "Credenciales inválidas.";
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", msg));
         }
+        loginAttemptService.loginSucceeded(rut);
 
         // 2. Mapear los servicios a los que tiene acceso el funcionario
         List<ServicioDisponibleDTO> opciones = usuario.getServiciosFuncionario().stream()
@@ -94,9 +122,29 @@ public class FuncionarioController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<FuncionarioSummaryDTO> update(
+    public ResponseEntity<?> update(
             @PathVariable Long id,
             @RequestBody Map<String, Object> payload) {
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Long currentUserId = (Long) auth.getPrincipal();
+        boolean isJefatura = auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_JEFATURA".equals(a.getAuthority()));
+
+        // Ownership: quien no es JEFATURA solo puede modificar su propio registro.
+        if (!isJefatura && !currentUserId.equals(id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "No tienes permiso para modificar a otro funcionario"));
+        }
+        // Escalada de privilegios: solo JEFATURA puede cambiar el rol.
+        if (!isJefatura && (payload.containsKey("rol") || payload.containsKey("estado"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "No tienes permiso para cambiar el rol o el estado"));
+        }
+
         FuncionarioSummaryDTO updated = funcionarioService.updateUser(id, payload);
         if (updated == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(updated);
@@ -129,14 +177,19 @@ public class FuncionarioController {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Acceso denegado al servicio indicado"));
 
-        String rolFinal = (relacion.getRolServicio() != null) 
-                ? relacion.getRolServicio().getNombreRol() 
+        String rolFinal = (relacion.getRolServicio() != null)
+                ? relacion.getRolServicio().getNombreRol()
                 : "MEDICO";
+
+        String rolSistema = (usuario.getRolSistema() != null)
+                ? usuario.getRolSistema().getNombreRol()
+                : "USUARIO";
 
         String finalToken = jwtTokenProvider.generateToken(
                 usuario.getIdFuncionario(),
                 usuario.getRut(),
                 rolFinal,
+                rolSistema,
                 relacion.getServicio().getIdServicio()
         );
 
@@ -176,10 +229,15 @@ public class FuncionarioController {
                 ? relacion.getRolServicio().getNombreRol()
                 : "MEDICO";
 
+        String rolSistema = (usuario.getRolSistema() != null)
+                ? usuario.getRolSistema().getNombreRol()
+                : "USUARIO";
+
         String nuevoToken = jwtTokenProvider.generateToken(
                 usuario.getIdFuncionario(),
                 usuario.getRut(),
                 rolFinal,
+                rolSistema,
                 relacion.getServicio().getIdServicio());
 
         FuncionarioSummaryDTO perfil = funcionarioService.getUserSummary(usuario.getIdFuncionario());

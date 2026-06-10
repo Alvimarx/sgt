@@ -37,80 +37,101 @@ const JefaturaDashboard = ({ onBack, onGoFuncionariosJefatura, onGoSolitudes, on
       </div>
 
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', flex: 1 }}>
-        <p style={{ margin: '0 0 10px', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Selecciona un módulo para configurar la plataforma.</p>
+        <p style={{ margin: '0 0 10px', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Selecciona un módulo de tu servicio.</p>
 
-        {/* AÑADIDO: onClick={onGoServicios} */}
-        <JefaturaCard 
-          icon="users" 
-          title="Asignación de turnos" 
-          desc="Asigna o quita funcionarios de turnos" 
-          tone="accent" 
-          onClick={onGoSolitudes} 
-        />
-        <JefaturaCard 
-          icon="user" 
-          title="Jerarquía de Funcionarios" 
-          desc="Designa nuevas jefaturas al sistema." 
-          tone="primary" 
-          onClick={onGoFuncionariosJefatura}
-        />
-        <JefaturaCard 
-          icon="calendar" 
-          title="Crear tipo de Turno" 
-          desc="Diseña un nuevo tipo de turno." 
-          tone="accent" 
-          onClick={onGoTiposTurno} 
-        />
-        <JefaturaCard 
-          icon="calendar" 
-          title="Crear Rotativa" 
-          desc="Diseña una nueva rotativa." 
-          tone="accent" 
-          onClick={onGoPlantillas} 
-        />
-        <JefaturaCard 
-          icon="calendar" 
-          title="Crear Planificación Mensual" 
-          desc="Diseña una nueva planificación mensual." 
-          tone="accent" 
-          onClick={onGoPlanificacion} 
-        />
-
-        <JefaturaCard 
-          icon="alert" 
-          title="Evaluar Solicitudes" 
-          desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos." 
-          tone="accent" 
-          onClick={onGoSolitudes} 
-        />
-        <JefaturaCard
-          icon="home"
-          title="Gestionar Puestos"
-          desc="Crea, edita y elimina puestos del sistema."
-          tone="primary"
-          onClick={onGoPuestos}
-        />
-        <JefaturaCard
-          icon="sliders"
-          title="Estadísticas del Servicio"
-          desc="Cobertura, turnos vacantes y horas cubiertas."
-          tone="primary"
-          onClick={onGoStats}
-        />
-        <JefaturaCard
-          icon="history"
-          title="Bitácora de Cambios"
-          desc="Registro cronológico de todos los eventos del sistema."
-          tone="accent"
-          onClick={onGoBitacora}
-        />
-        <JefaturaCard
-          icon="check-circle"
-          title="Auditoría de Asistencia"
-          desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
-          tone="accent"
-          onClick={onGoAuditoria}
-        />
+        {/* Cada tarjeta se muestra solo si su acción está habilitada (handler provisto).
+            Las acciones globales (servicios, tipos de turno, rotativas, planificación) son
+            exclusivas de ADMINISTRADOR y no se cablean aquí, por lo que quedan ocultas. */}
+        {onGoSolitudes && (
+          <JefaturaCard
+            icon="users"
+            title="Asignación de turnos"
+            desc="Asigna o quita funcionarios de turnos"
+            tone="accent"
+            onClick={onGoSolitudes}
+          />
+        )}
+        {onGoFuncionariosJefatura && (
+          <JefaturaCard
+            icon="user"
+            title="Jerarquía de Funcionarios"
+            desc="Designa nuevas jefaturas al sistema."
+            tone="primary"
+            onClick={onGoFuncionariosJefatura}
+          />
+        )}
+        {onGoTiposTurno && (
+          <JefaturaCard
+            icon="calendar"
+            title="Crear tipo de Turno"
+            desc="Diseña un nuevo tipo de turno."
+            tone="accent"
+            onClick={onGoTiposTurno}
+          />
+        )}
+        {onGoPlantillas && (
+          <JefaturaCard
+            icon="calendar"
+            title="Crear Rotativa"
+            desc="Diseña una nueva rotativa."
+            tone="accent"
+            onClick={onGoPlantillas}
+          />
+        )}
+        {onGoPlanificacion && (
+          <JefaturaCard
+            icon="calendar"
+            title="Crear Planificación Mensual"
+            desc="Diseña una nueva planificación mensual."
+            tone="accent"
+            onClick={onGoPlanificacion}
+          />
+        )}
+        {onGoSolitudes && (
+          <JefaturaCard
+            icon="alert"
+            title="Evaluar Solicitudes"
+            desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos."
+            tone="accent"
+            onClick={onGoSolitudes}
+          />
+        )}
+        {onGoPuestos && (
+          <JefaturaCard
+            icon="home"
+            title="Gestionar Puestos"
+            desc="Crea, edita y elimina puestos del sistema."
+            tone="primary"
+            onClick={onGoPuestos}
+          />
+        )}
+        {onGoStats && (
+          <JefaturaCard
+            icon="sliders"
+            title="Estadísticas del Servicio"
+            desc="Cobertura, turnos vacantes y horas cubiertas."
+            tone="primary"
+            onClick={onGoStats}
+          />
+        )}
+        {onGoBitacora && (
+          <JefaturaCard
+            icon="history"
+            title="Bitácora de Cambios"
+            desc="Registro cronológico de todos los eventos del sistema."
+            tone="accent"
+            onClick={onGoBitacora}
+          />
+        )}
+        {onGoAuditoria && (
+          <JefaturaCard
+            icon="check-circle"
+            title="Auditoría de Asistencia"
+            desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
+            tone="accent"
+            onClick={onGoAuditoria}
+          />
+        )}
       </div>
 
       

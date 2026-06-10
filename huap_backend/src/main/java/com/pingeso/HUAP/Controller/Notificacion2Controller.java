@@ -13,7 +13,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v2/notificaciones")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class Notificacion2Controller {
 
     private final Notificacion2Service notificacion2Service;
