@@ -90,8 +90,8 @@ INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Cl
 -- Jefatura → ADMINISTRADOR (1)
 (1,  'Álvaro',     'López',       '',           '22222222', '2', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Urgenciólogo',  1),
 -- Médicos → USUARIO (2)
-(2,  'Fernando',   'Roman',       '',           '22222222', '3', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Internista',    2),
-(3,  'Sergio',     'González',    '',           '22222222', '4', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Internista',    2),
+(2,  'Fernando',   'Roman',       '',           '22222223', '3', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Internista',    2),
+(3,  'Sergio',     'González',    '',           '22222224', '4', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Internista',    2),
 (4,  'Andrés',     'Tigre',       '',           '18155637', '4', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Internista',    2),
 (5,  'Francisca',  'Álvarez',     '',           '19091609', 'k', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Internista',    2),
 (6,  'Tania',      'Bustos',      'Jorge',      '19178519', '3', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Internista',    2),
@@ -125,7 +125,7 @@ INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Cl
 -- Jefatura → ADMINISTRADOR (1)
 (200, 'Ricardo',     'Morales',  'Vega',      '11111111', '1', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Cirujano',         2),
 -- Subrogante → ADMINISTRADOR (1)
-(201, 'Isabel',      'Parra',    'Cáceres',   '11111111', '2', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Cirujano',         2),
+(201, 'Isabel',      'Parra',    'Cáceres',   '11111112', '2', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Cirujano',         2),
 -- Médicos → USUARIO (2)
 (202, 'Felipe',      'Castillo', 'Arenas',    '11111113', '3', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Cirujano',         2),
 (203, 'Valentina',   'Ríos',     'Fuentes',   '11111114', '4', '560c4bda6fb495087a5b01a914db50999ad7310d09788c1611af41c15f820fa69542434a0164e5bce8ebcc63ce6cc3bea034d6639f16463e37e29ba3a6344e48', 1, 'Médico Cirujano',         2),
