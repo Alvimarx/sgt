@@ -24,7 +24,7 @@ const JefaturaCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const JefaturaDashboard = ({ onBack, onGoFuncionariosJefatura, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServicioJefatura ,onGoFuncionariosJefatura, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -49,6 +49,24 @@ const JefaturaDashboard = ({ onBack, onGoFuncionariosJefatura, onGoSolitudes, on
             desc="Asigna o quita funcionarios de turnos"
             tone="accent"
             onClick={onGoSolitudes}
+          />
+        )}
+        {onGoAsignacionJefatura && (
+          <JefaturaCard
+            icon="users"
+            title="Asignación de Funcionarios"
+            desc="Asigna funcionarios a servicios y rotativas."
+            tone="primary"
+            onClick={onGoAsignacionJefatura}
+          />
+        )}
+        {onGoFuncionariosServicioJefatura && (
+          <JefaturaCard
+            icon="briefcase"
+            title="Personal del Servicio"
+            desc="Visualiza y gestiona el personal asociado a tu servicio."
+            tone="primary"
+            onClick={onGoFuncionariosServicioJefatura}
           />
         )}
         {onGoFuncionariosJefatura && (

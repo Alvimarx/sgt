@@ -25,7 +25,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -54,6 +54,14 @@ const AdminDashboard = ({ onBack, onGoRotativa, onGoServicios, onGoAsignacion, o
           desc="Asigna funcionarios a servicios y rotativas." 
           tone="primary" 
           onClick={onGoAsignacion}
+        />
+        <AdminCard
+        
+          icon="user" 
+          title="Personal del Sistema"
+          desc="Visualiza el personal asociado al servicio."
+          tone="primary"
+          onClick={onGoFuncionariosSistema}
         />
         <AdminCard 
           icon="users" 
