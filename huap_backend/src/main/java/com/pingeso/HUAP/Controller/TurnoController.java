@@ -140,6 +140,17 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.getUnassignedTurnosByServicio(servicioId));
     }
 
+    @GetMapping("/servicio/{servicioId}/sin-asignar/periodo")
+    public ResponseEntity<List<Map<String, Object>>> getUnassignedTurnosByServicioAndPeriodo(
+            @PathVariable Long servicioId,
+            @RequestParam(required = false) String fechaInicio,
+            @RequestParam(required = false) String fechaFin) {
+        LocalDate inicio = fechaInicio != null ? LocalDate.parse(fechaInicio) : LocalDate.now().withDayOfMonth(1);
+        LocalDate fin = fechaFin != null ? LocalDate.parse(fechaFin)
+                : LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        return ResponseEntity.ok(turnoService.getUnassignedTurnosByServicioAndPeriodo(servicioId, inicio, fin));
+    }
+
     @GetMapping("/servicio/{servicioId}/stats")
     public ResponseEntity<Map<String, Object>> getTurnosStatsByServicio(
             @PathVariable Long servicioId,
@@ -149,6 +160,39 @@ public class TurnoController {
         LocalDate fin = fechaFin != null ? LocalDate.parse(fechaFin)
                 : LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         return ResponseEntity.ok(turnoService.getTurnosStatsByServicio(servicioId, inicio, fin));
+    }
+
+    @GetMapping("/servicio/{servicioId}/todos-detalle")
+    public ResponseEntity<List<Map<String, Object>>> getTurnosDetalleByServicio(
+            @PathVariable Long servicioId,
+            @RequestParam(required = false) String fechaInicio,
+            @RequestParam(required = false) String fechaFin) {
+        LocalDate inicio = fechaInicio != null ? LocalDate.parse(fechaInicio) : LocalDate.now().withDayOfMonth(1);
+        LocalDate fin = fechaFin != null ? LocalDate.parse(fechaFin)
+                : LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        return ResponseEntity.ok(turnoService.getTurnosDetalleServicio(servicioId, inicio, fin));
+    }
+
+    @GetMapping("/servicio/{servicioId}/funcionarios-detalle")
+    public ResponseEntity<List<Map<String, Object>>> getFuncionariosConTurnosByServicio(
+            @PathVariable Long servicioId,
+            @RequestParam(required = false) String fechaInicio,
+            @RequestParam(required = false) String fechaFin) {
+        LocalDate inicio = fechaInicio != null ? LocalDate.parse(fechaInicio) : LocalDate.now().withDayOfMonth(1);
+        LocalDate fin = fechaFin != null ? LocalDate.parse(fechaFin)
+                : LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        return ResponseEntity.ok(turnoService.getFuncionariosConTurnosServicio(servicioId, inicio, fin));
+    }
+
+    @GetMapping("/servicio/{servicioId}/funcionarios-stats")
+    public ResponseEntity<Map<String, Object>> getFuncionariosStatsByServicio(
+            @PathVariable Long servicioId,
+            @RequestParam(required = false) String fechaInicio,
+            @RequestParam(required = false) String fechaFin) {
+        LocalDate inicio = fechaInicio != null ? LocalDate.parse(fechaInicio) : LocalDate.now().withDayOfMonth(1);
+        LocalDate fin = fechaFin != null ? LocalDate.parse(fechaFin)
+                : LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        return ResponseEntity.ok(turnoService.getFuncionariosStatsServicio(servicioId, inicio, fin));
     }
 
     @GetMapping("/servicio/{servicioId}/cobertura")

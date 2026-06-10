@@ -1,22 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
 import { SGT_DATA } from '../Admin2/data';
 import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
 
-// ──────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────
-
-function rangoPeriodo(periodo) {
-  const hoy = dayjs();
-  if (periodo === 'mes_anterior') {
-    const mes = hoy.subtract(1, 'month');
-    return { inicio: mes.startOf('month'), fin: mes.endOf('month') };
-  }
-  return { inicio: hoy.startOf('month'), fin: hoy.endOf('month') };
-}
+dayjs.locale('es');
 
 // ──────────────────────────────────────────────
 // Subcomponentes
@@ -36,7 +27,7 @@ const StatCard = ({ icon, label, value, tone }) => {
       background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14,
       padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1,
     }}>
-      <div style={{ width: 34, height: 34, borderRadius: 10, background: t.bg, display: 'grid', placeItems: 'center' }}>
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: t.bg, display: 'grid', placeItems: 'center', alignSelf: 'center' }}>
         <SGTIcon name={icon} size={18} color={t.color} />
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, color: PA.ink, lineHeight: 1 }}>{value}</div>
@@ -75,12 +66,31 @@ const AdminStats = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const { user } = useAuth();
 
-  const [periodo, setPeriodo]     = useState('este_mes');
-  const [stats, setStats]         = useState(null);
-  const [cobertura, setCobertura] = useState(null);
-  const [vacantes, setVacantes]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState(null);
+  const [mesOffset, setMesOffset]               = useState(0);
+  const [semanaKey, setSemanaKey]               = useState(null);
+  const [stats, setStats]                       = useState(null);
+  const [vacantes, setVacantes]                 = useState([]);
+  const [funcsStats, setFuncsStats]             = useState(null);
+  const [puestoMasCritico, setPuestoMasCritico] = useState(null);
+  const [loading, setLoading]                   = useState(true);
+  const [error, setError]                       = useState(null);
+
+  const [showDetalle, setShowDetalle]               = useState(false);
+  const [detalle, setDetalle]                       = useState(null);
+  const [loadingDetalle, setLoadingDetalle]         = useState(false);
+  const [expandedIds, setExpandedIds]               = useState(new Set());
+
+  const [showCobertura, setShowCobertura]           = useState(false);
+  const [showPuestos, setShowPuestos]               = useState(false);
+  const [todosDetalle, setTodosDetalle]             = useState(null);
+  const [loadingTodos, setLoadingTodos]             = useState(false);
+  const [expandedPuestosIds, setExpandedPuestosIds] = useState(new Set());
+
+  const [filtroOpen, setFiltroOpen]     = useState(false);
+  const [filtroActivo, setFiltroActivo] = useState(new Set());
+  const [filtroTipo, setFiltroTipo]     = useState(null);
+  const [filtroPuesto, setFiltroPuesto] = useState(null);
+  const [filtroFecha, setFiltroFecha]   = useState(null);
 
   const servicioId = user?.servicioId;
 
@@ -88,28 +98,126 @@ const AdminStats = ({ onBack }) => {
     if (!servicioId) return;
     setLoading(true);
     setError(null);
+    setDetalle(null);
+    setTodosDetalle(null);
+    setFiltroTipo(null);
+    setFiltroPuesto(null);
+    setFiltroFecha(null);
+    setFiltroOpen(false);
+    setFiltroActivo(new Set());
 
-    const { inicio, fin } = rangoPeriodo(periodo);
+    const mesActual = dayjs().subtract(mesOffset, 'month');
+    const semanas   = buildSemanasDelMes(mesActual.year(), mesActual.month() + 1);
+    const { inicio, fin } = rangoPeriodo(mesOffset, semanaKey, semanas);
     const fmt = d => d.format('YYYY-MM-DD');
 
     Promise.all([
       turnosService.getStats(servicioId, fmt(inicio), fmt(fin)),
-      turnosService.getCobertura(servicioId, fmt(inicio), fmt(fin)),
-      turnosService.getSinAsignar(servicioId),
+      turnosService.getSinAsignarPorPeriodo(servicioId, fmt(inicio), fmt(fin)),
+      turnosService.getFuncionariosStats(servicioId, fmt(inicio), fmt(fin)),
     ])
-      .then(([s, c, v]) => {
+      .then(([s, v, f]) => {
         setStats(s || {});
-        setCobertura(c || {});
+        setFuncsStats(f || {});
+        const counts = {};
+        (v || []).forEach(t => {
+          const p = t.nombrePuesto || 'Sin puesto';
+          counts[p] = (counts[p] || 0) + 1;
+        });
+        const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        setPuestoMasCritico(entries.length > 0 ? { nombre: entries[0][0], vacantes: entries[0][1] } : null);
         setVacantes((v || []).slice(0, 8));
       })
       .catch(() => setError('No se pudieron cargar las estadísticas.'))
       .finally(() => setLoading(false));
-  }, [servicioId, periodo]);
+  }, [servicioId, mesOffset, semanaKey]);
 
   const pct = stats?.porcentajeCobertura ?? 0;
 
+  const mesActualForDetalle = dayjs().subtract(mesOffset, 'month');
+  const semanasForDetalle   = buildSemanasDelMes(mesActualForDetalle.year(), mesActualForDetalle.month() + 1);
+  const { inicio: inicioDetalle, fin: finDetalle } = rangoPeriodo(mesOffset, semanaKey, semanasForDetalle);
+  const fmt = d => d.format('YYYY-MM-DD');
+
+  const periodoLabel = (() => {
+    const mesLabel = mesActualForDetalle.format('MMMM YYYY');
+    if (semanaKey) {
+      const s = semanasForDetalle.find(s => s.key === semanaKey);
+      return s ? `${s.key} · ${mesLabel}` : mesLabel;
+    }
+    return mesLabel;
+  })();
+
+  const avatarColores = [PA.primary, '#B85A60', PA.success, PA.warn, '#7C6FCD', '#2E9E8A'];
+  const getAvatarColor = (idx) => avatarColores[idx % avatarColores.length];
+  const getInitials = (nombre) => {
+    const parts = nombre.trim().split(' ').filter(Boolean);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : (parts[0]?.[0] ?? '?').toUpperCase();
+  };
+
+  const handleAbrirDetalle = () => {
+    setShowDetalle(true);
+    setExpandedIds(new Set());
+    if (!detalle) {
+      setLoadingDetalle(true);
+      turnosService.getFuncionariosDetalle(servicioId, fmt(inicioDetalle), fmt(finDetalle))
+        .then(d => setDetalle(d || []))
+        .catch(() => setDetalle([]))
+        .finally(() => setLoadingDetalle(false));
+    }
+  };
+
+  const cargarTodosDetalle = () => {
+    if (!todosDetalle) {
+      setLoadingTodos(true);
+      turnosService.getTodosDetalle(servicioId, fmt(inicioDetalle), fmt(finDetalle))
+        .then(d => setTodosDetalle(d || []))
+        .catch(() => setTodosDetalle([]))
+        .finally(() => setLoadingTodos(false));
+    }
+  };
+
+  const handleAbrirCobertura = () => { setShowCobertura(true); cargarTodosDetalle(); };
+  const handleAbrirPuestos   = () => { setShowPuestos(true); setExpandedPuestosIds(new Set()); cargarTodosDetalle(); };
+
+  const togglePuesto = (nombre) => setExpandedPuestosIds(prev => {
+    const next = new Set(prev);
+    next.has(nombre) ? next.delete(nombre) : next.add(nombre);
+    return next;
+  });
+
+  const opcionesTipo   = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.tipoTurno).filter(Boolean))].sort(), [todosDetalle]);
+  const opcionesPuesto = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombrePuesto).filter(Boolean))].sort(), [todosDetalle]);
+  const opcionesFecha  = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.fecha).filter(Boolean))].sort(), [todosDetalle]);
+
+  const turnosFiltrados = React.useMemo(() => {
+    if (!todosDetalle) return [];
+    return todosDetalle.filter(t => {
+      if (filtroTipo    && t.tipoTurno    !== filtroTipo)    return false;
+      if (filtroPuesto  && t.nombrePuesto !== filtroPuesto)  return false;
+      if (filtroFecha   && t.fecha        !== filtroFecha)   return false;
+      return true;
+    });
+  }, [todosDetalle, filtroTipo, filtroPuesto, filtroFecha]);
+
+  const puestosAgrupados = React.useMemo(() => {
+    if (!todosDetalle) return null;
+    const map = {};
+    todosDetalle.forEach(t => {
+      const p = t.nombrePuesto || 'Sin puesto';
+      if (!map[p]) map[p] = { nombre: p, turnos: [], total: 0, asignados: 0 };
+      map[p].turnos.push(t);
+      map[p].total++;
+      if (t.asignado) map[p].asignados++;
+    });
+    return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [todosDetalle]);
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden', position: 'relative' }}>
+
       <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
           <SGTIcon name="chevron-left" size={24} color={PA.ink} />
@@ -117,19 +225,12 @@ const AdminStats = ({ onBack }) => {
         <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Estadísticas del Servicio</div>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        {/* Selector de período */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[{ id: 'este_mes', label: 'Este mes' }, { id: 'mes_anterior', label: 'Mes anterior' }].map(p => (
-            <button key={p.id} onClick={() => setPeriodo(p.id)} style={{
-              background: periodo === p.id ? PA.primary : '#fff',
-              color: periodo === p.id ? '#fff' : PA.ink2,
-              border: `1px solid ${periodo === p.id ? PA.primary : PA.line}`,
-              borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-            }}>{p.label}</button>
-          ))}
-        </div>
+        <PeriodoSelector
+          mesOffset={mesOffset} setMesOffset={setMesOffset}
+          semanaKey={semanaKey} setSemanaKey={setSemanaKey}
+        />
 
         {loading && (
           <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
@@ -145,8 +246,10 @@ const AdminStats = ({ onBack }) => {
 
         {!loading && !error && stats && (
           <>
-            {/* Cobertura principal */}
-            <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 16 }}>
+            <div
+              onClick={handleAbrirCobertura}
+              style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 16, cursor: 'pointer' }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Cobertura de turnos</span>
                 <span style={{ fontSize: 22, fontWeight: 800, color: pct >= 80 ? PA.success : pct >= 50 ? PA.warn : PA.accent }}>
@@ -160,42 +263,52 @@ const AdminStats = ({ onBack }) => {
                   width: `${Math.min(100, pct)}%`,
                 }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                 <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
                   {stats.turnosAsignados ?? '—'} asignados de {stats.totalTurnos ?? '—'} totales
                 </span>
-                <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
-                  {cobertura.horasRealesCubiertas != null ? `${cobertura.horasRealesCubiertas}h cubiertas` : ''}
-                </span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: pct >= 80 ? PA.success : pct >= 50 ? PA.warn : PA.accent }}>Ver detalle →</span>
               </div>
             </div>
 
-            {/* Tarjetas de stats */}
-            <div style={{ display: 'flex', gap: 10 }}>
-              <StatCard icon="calendar"    label="Turnos totales"   value={stats.totalTurnos ?? '—'}     tone="primary" />
-              <StatCard icon="check-circle" label="Asignados"       value={stats.turnosAsignados ?? '—'} tone="success" />
-              <StatCard icon="alert"        label="Vacantes"        value={stats.turnosVacantes ?? '—'}  tone="accent"  />
-            </div>
-
-            {/* Horas cubiertas */}
-            {cobertura.horasRealesCubiertas != null && (
-              <div style={{
-                background: PA.primarySoft, border: `1px solid #CFDCEA`, borderRadius: 14,
-                padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
-              }}>
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: PA.primary, display: 'grid', placeItems: 'center' }}>
-                  <SGTIcon name="clock" size={20} color="#fff" />
+            {funcsStats && (
+              <div
+                onClick={handleAbrirDetalle}
+                style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 16, cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Funcionarios con turno</span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: PA.primary }}>
+                    {funcsStats.funcionariosConTurno ?? '—'} / {funcsStats.totalFuncionarios ?? '—'}
+                  </span>
                 </div>
-                <div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: PA.primary }}>
-                    {cobertura.horasRealesCubiertas}h
-                  </div>
-                  <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 700 }}>Horas reales cubiertas</div>
+                <div style={{ height: 10, background: PA.line2, borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 99, transition: 'width .5s ease',
+                    background: PA.primary,
+                    width: funcsStats.totalFuncionarios > 0
+                      ? `${Math.min(100, (funcsStats.funcionariosConTurno / funcsStats.totalFuncionarios) * 100)}%`
+                      : '0%',
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                  <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
+                    {funcsStats.totalFuncionarios > 0
+                      ? `${Math.round((funcsStats.funcionariosConTurno / funcsStats.totalFuncionarios) * 100)}% del equipo activo en este período`
+                      : 'Sin datos de equipo'}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: PA.primary }}>Ver detalle →</span>
                 </div>
               </div>
             )}
 
-            {/* Turnos libres próximos */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <StatCard icon="calendar"     label="Turnos totales" value={stats.totalTurnos ?? '—'}     tone="primary" />
+              <StatCard icon="check-circle" label="Asignados"      value={stats.turnosAsignados ?? '—'} tone="success" />
+              <StatCard icon="alert"        label="Vacantes"       value={stats.turnosVacantes ?? '—'}  tone="accent"  />
+            </div>
+
+
             {vacantes.length > 0 && (
               <div>
                 <div style={{ fontSize: 12, fontWeight: 800, color: PA.ink3, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 }}>
@@ -209,13 +322,320 @@ const AdminStats = ({ onBack }) => {
 
             {vacantes.length === 0 && (
               <div style={{ textAlign: 'center', padding: '16px 0', color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                Sin turnos vacantes actualmente.
+                Sin turnos vacantes en este período.
               </div>
             )}
           </>
         )}
       </div>
-    </div>
+
+    {/* ── Bottom sheet: Cobertura de turnos ── */}
+    {showCobertura && (() => {
+      const filtrosActivos = [filtroTipo, filtroPuesto, filtroFecha].filter(Boolean).length;
+      const asignados = turnosFiltrados.filter(t => t.asignado).length;
+      const vacantesF = turnosFiltrados.filter(t => !t.asignado).length;
+
+      const FilaFiltro = ({ id, label, opciones, valor, onSelect }) => {
+        const abierto = filtroActivo.has(id);
+        const scrollRef = React.useRef(null);
+        const [tieneOverflow, setTieneOverflow] = React.useState(false);
+
+        React.useEffect(() => {
+          if (abierto && scrollRef.current) {
+            setTieneOverflow(scrollRef.current.scrollHeight > scrollRef.current.clientHeight);
+          } else {
+            setTieneOverflow(false);
+          }
+        }, [abierto, opciones]);
+
+        const toggleFila = () => setFiltroActivo(prev => {
+          const next = new Set(prev);
+          next.has(id) ? next.delete(id) : next.add(id);
+          return next;
+        });
+        const seleccionar = (v) => {
+          onSelect(v);
+          setFiltroActivo(prev => { const next = new Set(prev); next.delete(id); return next; });
+        };
+        return (
+          <div>
+            <button
+              onClick={toggleFila}
+              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', gap: 8 }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 700, color: PA.ink }}>{label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '2px 10px',
+                  color: valor ? PA.primary : PA.ink3,
+                  background: valor ? PA.primarySoft : PA.line2,
+                }}>
+                  {id === 'fecha' && valor ? dayjs(valor).format('ddd D MMM') : (valor || 'Todos')}
+                </span>
+                <SGTIcon name={abierto ? 'chevron-up' : 'chevron-down'} size={13} color={PA.ink3} />
+              </div>
+            </button>
+            {abierto && (
+              <div style={{ position: 'relative' }}>
+                <div ref={scrollRef} className="sgt-scroll-clean" style={{ paddingBottom: 6, maxHeight: 180, overflowY: 'auto' }}>
+                  {[{ v: null, label: 'Todos' }, ...opciones.map(o => ({ v: o, label: id === 'fecha' ? dayjs(o).format('ddd D MMM') : o }))].map(({ v, label: lbl }) => (
+                    <button
+                      key={v ?? '__todos__'}
+                      onClick={() => seleccionar(v)}
+                      style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderRadius: 8 }}
+                    >
+                      <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${valor === v ? PA.primary : PA.line}`, background: valor === v ? PA.primary : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {valor === v && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: valor === v ? 700 : 500, color: valor === v ? PA.primary : PA.ink }}>{lbl}</span>
+                    </button>
+                  ))}
+                </div>
+                {tieneOverflow && (
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 32, background: 'linear-gradient(to bottom, transparent, #F7F9FC)', pointerEvents: 'none', borderRadius: '0 0 8px 8px' }} />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      return (
+        <div onClick={() => setShowCobertura(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 200, animation: 'sgtFade .2s ease' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px 20px 0 0', width: '100%', maxHeight: '78%', display: 'flex', flexDirection: 'column', boxShadow: '0 -12px 40px rgba(15,23,42,0.16)', animation: 'sgtSlideUp .28s cubic-bezier(.2,.9,.2,1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 2, flexShrink: 0 }}>
+              <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 16px 12px', flexShrink: 0 }}>
+              <div style={{ width: 28, flexShrink: 0 }} />
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: PA.ink }}>Cobertura de turnos</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: PA.ink3, marginTop: 2, textTransform: 'capitalize' }}>{periodoLabel}</div>
+              </div>
+              <button onClick={() => setShowCobertura(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', flexShrink: 0 }}>
+                <SGTIcon name="close" size={20} color={PA.ink3} />
+              </button>
+            </div>
+
+            <div className="sgt-scroll-clean" style={{ flex: 1, overflowY: 'auto' }}>
+
+              {/* Resumen dinámico */}
+              {!loadingTodos && todosDetalle && (
+                <div style={{ margin: '0 16px', padding: '8px 12px', background: PA.primarySoft, borderRadius: 10, fontSize: 12, fontWeight: 700, color: PA.primary }}>
+                  {asignados} asignados · {vacantesF} vacantes · {turnosFiltrados.length} totales
+                </div>
+              )}
+
+              {/* Filtros */}
+              {!loadingTodos && todosDetalle && (
+                <div style={{ margin: '8px 16px 0', background: PA.primarySoft, borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 10px rgba(23,65,108,0.13)' }}>
+                  <button
+                    onClick={() => { setFiltroOpen(o => !o); setFiltroActivo(new Set()); }}
+                    style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px' }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: PA.primary }}>
+                      Filtrar por{filtrosActivos > 0 ? ` · ${filtrosActivos} activo${filtrosActivos > 1 ? 's' : ''}` : ''}
+                    </span>
+                    <SGTIcon name={filtroOpen ? 'chevron-up' : 'chevron-down'} size={13} color={PA.primary} />
+                  </button>
+                  {filtroOpen && (
+                    <div style={{ background: '#fff', borderTop: `1px solid ${PA.line}`, padding: '4px 12px 8px' }}>
+                      <FilaFiltro id="tipo"   label="Tipo de turno" opciones={opcionesTipo}   valor={filtroTipo}   onSelect={setFiltroTipo} />
+                      <div style={{ height: 1, background: PA.line2 }} />
+                      <FilaFiltro id="puesto" label="Puesto"         opciones={opcionesPuesto} valor={filtroPuesto} onSelect={setFiltroPuesto} />
+                      <div style={{ height: 1, background: PA.line2 }} />
+                      <FilaFiltro id="fecha"  label="Fecha"          opciones={opcionesFecha}  valor={filtroFecha}  onSelect={setFiltroFecha} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ height: 1, background: PA.line2, marginTop: 10 }} />
+
+              {loadingTodos && <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Cargando...</div>}
+              {!loadingTodos && turnosFiltrados.length === 0 && (
+                <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Sin turnos para este filtro.</div>
+              )}
+              {!loadingTodos && turnosFiltrados.map((t, idx) => (
+                <div key={t.idTurno ?? idx} style={{ display: 'flex', alignItems: 'center', padding: '11px 16px', gap: 12, borderBottom: `1px solid ${PA.line2}` }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: t.asignado ? PA.successSoft : PA.accentSoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <SGTIcon name="calendar" size={16} color={t.asignado ? PA.success : '#B85A60'} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: PA.ink }}>{t.tipoTurno ?? '—'}</div>
+                    <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 1 }}>
+                      {t.nombrePuesto ?? '—'} · {t.fecha ? dayjs(t.fecha).format('ddd D MMM') : '—'}
+                    </div>
+                    {t.asignado && t.nombreFuncionario && (
+                      <div style={{ fontSize: 11, color: PA.success, fontWeight: 700, marginTop: 2 }}>{t.nombreFuncionario}</div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 20, padding: '3px 10px', flexShrink: 0, color: t.asignado ? PA.success : '#B85A60', background: t.asignado ? PA.successSoft : PA.accentSoft }}>
+                    {t.asignado ? 'Asignado' : 'Vacante'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+
+    {showDetalle && (
+      <div
+        onClick={() => setShowDetalle(false)}
+        style={{
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'flex-end',
+          zIndex: 200, animation: 'sgtFade .2s ease',
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: '#fff', borderRadius: '20px 20px 0 0',
+            width: '100%', maxHeight: '78%',
+            display: 'flex', flexDirection: 'column',
+            boxShadow: '0 -12px 40px rgba(15,23,42,0.16)',
+            animation: 'sgtSlideUp .28s cubic-bezier(.2,.9,.2,1)',
+          }}
+        >
+          {/* Pastilla de arrastre */}
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 2, flexShrink: 0 }}>
+            <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
+          </div>
+
+          {/* Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            padding: '10px 16px 12px', flexShrink: 0,
+          }}>
+            <div style={{ width: 28, flexShrink: 0 }} />
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: PA.ink }}>Funcionarios con turno</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: PA.ink3, marginTop: 2, textTransform: 'capitalize' }}>
+                {periodoLabel}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowDetalle(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', flexShrink: 0 }}
+            >
+              <SGTIcon name="close" size={20} color={PA.ink3} />
+            </button>
+          </div>
+
+          {/* Resumen */}
+          {!loadingDetalle && detalle && (
+            <div style={{
+              margin: '0 16px 10px', padding: '8px 12px',
+              background: PA.primarySoft, borderRadius: 10,
+              fontSize: 12, fontWeight: 700, color: PA.primary, flexShrink: 0,
+            }}>
+              {detalle.filter(f => f.cantidadTurnos > 0).length} de {detalle.length} funcionarios con turno en este período
+            </div>
+          )}
+
+          <div style={{ height: 1, background: PA.line2, flexShrink: 0 }} />
+
+          {/* Body */}
+          <div className="sgt-scroll-clean" style={{ flex: 1, overflowY: 'auto' }}>
+            {loadingDetalle && (
+              <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
+                Cargando...
+              </div>
+            )}
+            {!loadingDetalle && (!detalle || detalle.length === 0) && (
+              <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
+                Sin funcionarios en este servicio.
+              </div>
+            )}
+            {!loadingDetalle && detalle?.map((func, idx) => {
+              const abierto = expandedIds.has(func.idFuncionario);
+              const tieneTurnos = func.cantidadTurnos > 0;
+              const avatarColor = getAvatarColor(idx);
+              const toggleFuncionario = (id) => setExpandedIds(prev => {
+                const next = new Set(prev);
+                next.has(id) ? next.delete(id) : next.add(id);
+                return next;
+              });
+              return (
+                <div key={func.idFuncionario} style={{ borderBottom: `1px solid ${PA.line2}` }}>
+                  <button
+                    onClick={() => toggleFuncionario(func.idFuncionario)}
+                    style={{
+                      width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center',
+                      padding: '11px 16px', gap: 12,
+                    }}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                      background: tieneTurnos ? avatarColor : PA.line2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: tieneTurnos ? '#fff' : PA.ink3 }}>
+                        {getInitials(func.nombre)}
+                      </span>
+                    </div>
+
+                    {/* Nombre */}
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: PA.ink, textAlign: 'left' }}>
+                      {func.nombre}
+                    </span>
+
+                    {/* Badge turnos */}
+                    <span style={{
+                      fontSize: 11, fontWeight: 800, borderRadius: 20, padding: '3px 10px', flexShrink: 0,
+                      color: tieneTurnos ? avatarColor : PA.ink3,
+                      background: tieneTurnos ? `${avatarColor}18` : PA.line2,
+                    }}>
+                      {func.cantidadTurnos} {func.cantidadTurnos === 1 ? 'turno' : 'turnos'}
+                    </span>
+
+                    <SGTIcon name={abierto ? 'chevron-up' : 'chevron-down'} size={15} color={PA.ink3} />
+                  </button>
+
+                  {/* Accordion */}
+                  {abierto && (
+                    <div style={{ background: PA.surface2, paddingBottom: 4 }}>
+                      {func.turnos.length === 0 ? (
+                        <div style={{ padding: '10px 16px 10px 64px', fontSize: 12, color: PA.ink3, fontWeight: 600 }}>
+                          Sin turnos en este período
+                        </div>
+                      ) : func.turnos.map((t, i) => (
+                        <div key={i} style={{
+                          display: 'flex', alignItems: 'center',
+                          padding: '8px 16px 8px 64px',
+                          borderTop: `1px solid ${PA.line2}`,
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: PA.ink }}>
+                              {t.tipoTurno ?? '—'}
+                            </div>
+                            <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 1 }}>
+                              {t.nombrePuesto ?? '—'}
+                            </div>
+                          </div>
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, color: PA.ink2, flexShrink: 0,
+                            background: PA.line2, borderRadius: 8, padding: '2px 8px',
+                          }}>
+                            {t.fecha ? dayjs(t.fecha).format('ddd D MMM') : '—'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
   );
 };
 

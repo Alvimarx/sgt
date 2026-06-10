@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
@@ -720,6 +720,8 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const canDecide = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
 
   const [tab, setTab]           = useState(isMedico ? 'mis' : 'pendientes');
+  const tabsScrollRef           = useRef(null);
+  const [tabsOverflow, setTabsOverflow] = useState(false);
   const [solicitudes, setSolicitudes] = useState([]);
   const [recibidas, setRecibidas]     = useState([]);
   const [ofertas, setOfertas]         = useState([]);
@@ -782,6 +784,15 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   }, [user, isMedico]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    const check = () => setTabsOverflow(el.scrollWidth > el.clientWidth && el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+    check();
+    el.addEventListener('scroll', check);
+    return () => el.removeEventListener('scroll', check);
+  }, [isMedico]);
 
   const handleAprobar = async (id) => {
     try {
@@ -885,31 +896,34 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
           </button>
         }
         rightSlot={
-          isMedico && (
-            <button onClick={() => setShowCrear(true)} style={{ background: PA.primary, color: '#fff', border: 'none', borderRadius: 10, width: 36, height: 36, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
-              <SGTIcon name="plus" size={18} color="#fff" />
-            </button>
-          )
+          <button onClick={() => setShowCrear(true)} style={{ background: PA.primary, color: '#fff', border: 'none', borderRadius: 10, width: 36, height: 36, display: 'grid', placeItems: 'center', cursor: 'pointer' }}>
+            <SGTIcon name="plus" size={18} color="#fff" />
+          </button>
         }
       />
 
       {/* Tabs + botón orden */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px 8px', background: '#fff', borderBottom: `1px solid ${PA.line2}` }}>
-        <div className="sgt-no-scrollbar" style={{ display: 'flex', gap: 6, flex: 1, overflowX: 'auto' }}>
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              background: tab === t.id ? PA.primary : 'transparent',
-              color: tab === t.id ? '#fff' : PA.ink2,
-              border: `1px solid ${tab === t.id ? PA.primary : PA.line}`,
-              borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 800,
-              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
-            }}>
-              {t.label}
-              {t.badge != null && t.badge > 0 && (
-                <span style={{ background: tab === t.id ? 'rgba(255,255,255,0.25)' : PA.line2, color: tab === t.id ? '#fff' : PA.ink3, padding: '1px 6px', borderRadius: 99, fontSize: 10.5, fontWeight: 800 }}>{t.badge}</span>
-              )}
-            </button>
-          ))}
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          <div ref={tabsScrollRef} className="sgt-no-scrollbar" style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                background: tab === t.id ? PA.primary : 'transparent',
+                color: tab === t.id ? '#fff' : PA.ink2,
+                border: `1px solid ${tab === t.id ? PA.primary : PA.line}`,
+                borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 800,
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0,
+              }}>
+                {t.label}
+                {t.badge != null && t.badge > 0 && (
+                  <span style={{ background: tab === t.id ? 'rgba(255,255,255,0.25)' : PA.line2, color: tab === t.id ? '#fff' : PA.ink3, padding: '1px 6px', borderRadius: 99, fontSize: 10.5, fontWeight: 800 }}>{t.badge}</span>
+                )}
+              </button>
+            ))}
+          </div>
+          {tabsOverflow && (
+            <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 32, background: 'linear-gradient(to right, transparent, #fff)', pointerEvents: 'none' }} />
+          )}
         </div>
         <button
           onClick={() => setShowSort(true)}

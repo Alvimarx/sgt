@@ -60,6 +60,35 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("servicioId") Long servicioId
     );
 
+    @Query("""
+           SELECT t
+           FROM TurnoEntity t
+           WHERE t.funcionario IS NULL
+           AND t.servicio.idServicio = :servicioId
+           AND t.diaFinalTurno >= :fechaInicio
+           AND t.diaInicioTurno <= :fechaFin
+           ORDER BY t.diaInicioTurno ASC
+           """)
+    List<TurnoEntity> findUnassignedTurnosByServicioAndDateRange(
+            @Param("servicioId") Long servicioId,
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin
+    );
+
+    @Query("""
+           SELECT COUNT(DISTINCT t.funcionario.idFuncionario)
+           FROM TurnoEntity t
+           WHERE t.funcionario IS NOT NULL
+           AND t.servicio.idServicio = :servicioId
+           AND t.diaFinalTurno >= :fechaInicio
+           AND t.diaInicioTurno <= :fechaFin
+           """)
+    Long countDistinctFuncionariosByServicioAndDateRange(
+            @Param("servicioId") Long servicioId,
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin
+    );
+
     // ====================================================================
     // VISTAS DE CALENDARIO Y RANGOS DE FECHAS
     // ====================================================================

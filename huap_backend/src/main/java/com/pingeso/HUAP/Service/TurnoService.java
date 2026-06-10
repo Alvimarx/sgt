@@ -355,11 +355,70 @@ public class TurnoService {
     public List<Map<String, Object>> getUnassignedTurnosByServicio(Long servicioId) {
         // 1. Llamamos al método que ya tienes en tu nuevo Repository
         List<TurnoEntity> turnosVacantes = turnoRepository.findUnassignedTurnosByServicio(servicioId);
-        
+
         // 2. Lo convertimos al formato limpio para el Frontend usando nuestro mapeador
         return turnosVacantes.stream()
                 .map(this::convertirTurnoAMap)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Obtiene los turnos sin asignar (vacantes) de un Servicio en un rango de fechas,
+     * ordenados por fecha de inicio ascendente.
+     */
+    public List<Map<String, Object>> getUnassignedTurnosByServicioAndPeriodo(Long servicioId, LocalDate inicio, LocalDate fin) {
+        List<TurnoEntity> turnosVacantes = turnoRepository.findUnassignedTurnosByServicioAndDateRange(servicioId, inicio, fin);
+        return turnosVacantes.stream()
+                .map(this::convertirTurnoAMap)
+                .collect(Collectors.toList());
+    }
+
+    public List<Map<String, Object>> getFuncionariosConTurnosServicio(Long servicioId, LocalDate inicio, LocalDate fin) {
+        List<TurnoEntity> turnos = turnoRepository.findByServicioIdAndDateRange(servicioId, inicio, fin);
+
+        Map<Long, List<TurnoEntity>> porFuncionario = turnos.stream()
+                .filter(t -> t.getFuncionario() != null)
+                .collect(Collectors.groupingBy(t -> t.getFuncionario().getIdFuncionario()));
+
+        List<com.pingeso.HUAP.Entity.FuncionarioEntity> todosFuncionarios =
+                funcionarioRepository.findAllByServicioId(servicioId);
+
+        return todosFuncionarios.stream()
+                .map(func -> {
+                    String nombre = ((func.getNombre() != null ? func.getNombre() : "") + " " +
+                                    (func.getApelPat() != null ? func.getApelPat() : "")).trim();
+
+                    List<TurnoEntity> turnosFuncionario = porFuncionario.getOrDefault(func.getIdFuncionario(), List.of());
+
+                    List<Map<String, Object>> turnosDetalle = turnosFuncionario.stream()
+                            .sorted(Comparator.comparing(TurnoEntity::getDiaInicioTurno))
+                            .map(t -> {
+                                Map<String, Object> tm = new HashMap<>();
+                                tm.put("tipoTurno",    t.getTipoTurno() != null ? t.getTipoTurno().getNombre() : null);
+                                tm.put("nombrePuesto", t.getPuesto()    != null ? t.getPuesto().getNombre()    : null);
+                                tm.put("fecha",        t.getDiaInicioTurno() != null ? t.getDiaInicioTurno().toString() : null);
+                                return tm;
+                            })
+                            .collect(Collectors.toList());
+
+                    Map<String, Object> funcMap = new HashMap<>();
+                    funcMap.put("idFuncionario",  func.getIdFuncionario());
+                    funcMap.put("nombre",         nombre);
+                    funcMap.put("cantidadTurnos", turnosFuncionario.size());
+                    funcMap.put("turnos",         turnosDetalle);
+                    return funcMap;
+                })
+                .sorted(Comparator.comparing(m -> m.get("nombre").toString()))
+                .collect(Collectors.toList());
+    }
+
+    public Map<String, Object> getFuncionariosStatsServicio(Long servicioId, LocalDate inicio, LocalDate fin) {
+        long conTurno = turnoRepository.countDistinctFuncionariosByServicioAndDateRange(servicioId, inicio, fin);
+        long total = funcionarioRepository.contarFuncionariosPorServicio(servicioId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("funcionariosConTurno", conTurno);
+        result.put("totalFuncionarios", total);
+        return result;
     }
 
     /**
@@ -492,6 +551,31 @@ public class TurnoService {
     // ====================================================================
     // BLOQUE 5: MÉTRICAS, ESTADÍSTICAS Y COBERTURA (DASHBOARDS)
     // ====================================================================
+
+    public List<Map<String, Object>> getTurnosDetalleServicio(Long servicioId, LocalDate inicio, LocalDate fin) {
+        List<TurnoEntity> turnos = turnoRepository.findByServicioIdAndDateRange(servicioId, inicio, fin);
+        return turnos.stream()
+                .sorted(Comparator.comparing(TurnoEntity::getDiaInicioTurno))
+                .map(t -> {
+                    boolean asignado = t.getFuncionario() != null;
+                    String nombreFuncionario = null;
+                    if (asignado) {
+                        nombreFuncionario = ((t.getFuncionario().getNombre() != null ? t.getFuncionario().getNombre() : "") + " " +
+                                            (t.getFuncionario().getApelPat() != null ? t.getFuncionario().getApelPat() : "")).trim();
+                    }
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("idTurno",          t.getIdTurno());
+                    m.put("tipoTurno",        t.getTipoTurno() != null ? t.getTipoTurno().getNombre() : null);
+                    m.put("nombrePuesto",     t.getPuesto()    != null ? t.getPuesto().getNombre()    : null);
+                    m.put("fecha",            t.getDiaInicioTurno() != null ? t.getDiaInicioTurno().toString() : null);
+                    m.put("horaInicio",       t.getHoraInicio() != null ? t.getHoraInicio().toString() : null);
+                    m.put("horaFin",          t.getHoraFin()    != null ? t.getHoraFin().toString()    : null);
+                    m.put("asignado",         asignado);
+                    m.put("nombreFuncionario", nombreFuncionario);
+                    return m;
+                })
+                .collect(Collectors.toList());
+    }
 
     /**
      * Calcula las estadísticas generales de un servicio en un rango de fechas.

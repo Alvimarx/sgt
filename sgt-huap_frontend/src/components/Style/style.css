@@ -23,6 +23,10 @@
 @keyframes sgtFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sgtSlideUp { from { transform: translateY(40px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
 
+/* Scrollbar invisible pero funcional */
+.sgt-scroll-clean { scrollbar-width: none; -ms-overflow-style: none; }
+.sgt-scroll-clean::-webkit-scrollbar { display: none; }
+
 /* Contenedores Principales */
 .phone-shell {
   width: 390px;

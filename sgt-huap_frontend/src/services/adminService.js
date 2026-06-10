@@ -121,6 +121,18 @@ export const turnosService = {
         return response.data;
     },
 
+    // GET /turnos/servicio/{id}/sin-asignar/periodo?fechaInicio=&fechaFin=
+    getSinAsignarPorPeriodo: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const params = [];
+        if (fechaInicio) params.push(`fechaInicio=${fechaInicio}`);
+        if (fechaFin)    params.push(`fechaFin=${fechaFin}`);
+        const qs = params.length ? `?${params.join('&')}` : '';
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/sin-asignar/periodo${qs}`);
+        return response.data;
+    },
+
     // GET /turnos/servicio/{id}/stats?fechaInicio=&fechaFin=
     getStats: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
         const sId = servicioId || getServicioId();
@@ -130,6 +142,42 @@ export const turnosService = {
         if (fechaFin)    params.push(`fechaFin=${fechaFin}`);
         const qs = params.length ? `?${params.join('&')}` : '';
         const response = await axiosInstance.get(`/turnos/servicio/${sId}/stats${qs}`);
+        return response.data;
+    },
+
+    // GET /turnos/servicio/{id}/todos-detalle?fechaInicio=&fechaFin=
+    getTodosDetalle: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const params = [];
+        if (fechaInicio) params.push(`fechaInicio=${fechaInicio}`);
+        if (fechaFin)    params.push(`fechaFin=${fechaFin}`);
+        const qs = params.length ? `?${params.join('&')}` : '';
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/todos-detalle${qs}`);
+        return response.data;
+    },
+
+    // GET /turnos/servicio/{id}/funcionarios-detalle?fechaInicio=&fechaFin=
+    getFuncionariosDetalle: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const params = [];
+        if (fechaInicio) params.push(`fechaInicio=${fechaInicio}`);
+        if (fechaFin)    params.push(`fechaFin=${fechaFin}`);
+        const qs = params.length ? `?${params.join('&')}` : '';
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/funcionarios-detalle${qs}`);
+        return response.data;
+    },
+
+    // GET /turnos/servicio/{id}/funcionarios-stats?fechaInicio=&fechaFin=
+    getFuncionariosStats: async (servicioId = null, fechaInicio = null, fechaFin = null) => {
+        const sId = servicioId || getServicioId();
+        if (!sId) throw new Error('servicioId es requerido');
+        const params = [];
+        if (fechaInicio) params.push(`fechaInicio=${fechaInicio}`);
+        if (fechaFin)    params.push(`fechaFin=${fechaFin}`);
+        const qs = params.length ? `?${params.join('&')}` : '';
+        const response = await axiosInstance.get(`/turnos/servicio/${sId}/funcionarios-stats${qs}`);
         return response.data;
     },
 

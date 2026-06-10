@@ -3,7 +3,8 @@ import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
 import { SGT_DATA } from '../Admin2/data';
-import { SGTBadge, SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -17,33 +18,6 @@ function calcHoras(t) {
   return diff > 0 ? diff : 0;
 }
 
-function semanaActual() {
-  const hoy = dayjs();
-  const dow  = hoy.day(); // 0=Dom
-  const lunes = hoy.subtract(dow === 0 ? 6 : dow - 1, 'day').startOf('day');
-  return { inicio: lunes, fin: lunes.add(6, 'day').endOf('day') };
-}
-
-function mesActual() {
-  const hoy = dayjs();
-  return { inicio: hoy.startOf('month'), fin: hoy.endOf('month') };
-}
-
-function filtrarPorPeriodo(turnos, periodo) {
-  const { inicio, fin } = periodo === 'semana' ? semanaActual() : mesActual();
-  return turnos.filter(t => {
-    if (!t.diaInicioTurno) return false;
-    const d = dayjs(t.diaInicioTurno);
-    return (d.isAfter(inicio) || d.isSame(inicio, 'day')) &&
-           (d.isBefore(fin)   || d.isSame(fin, 'day'));
-  });
-}
-
-function diasEnPeriodo(periodo) {
-  if (periodo === 'semana') return 7;
-  return dayjs().daysInMonth();
-}
-
 // ──────────────────────────────────────────────
 // Subcomponentes
 // ──────────────────────────────────────────────
@@ -55,7 +29,7 @@ const KPICard = ({ icon, label, value, sub, color }) => {
       background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14,
       padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6,
     }}>
-      <div style={{ width: 34, height: 34, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center' }}>
+      <div style={{ width: 34, height: 34, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center', alignSelf: 'center' }}>
         <SGTIcon name={icon} size={18} color={color || PA.primary} />
       </div>
       <div style={{ fontSize: 24, fontWeight: 800, color: PA.ink, lineHeight: 1 }}>{value}</div>
@@ -67,9 +41,8 @@ const KPICard = ({ icon, label, value, sub, color }) => {
 
 const TurnoProximoItem = ({ turno }) => {
   const PA = SGT_DATA.PALETTE;
-  const fecha  = turno.diaInicioTurno ? dayjs(turno.diaInicioTurno).format('ddd D MMM') : '—';
   const horas  = `${turno.horaInicio || '?'} – ${turno.horaFin || '?'}`;
-  const puesto   = turno.nombrePuesto || 'Sin puesto';
+  const puesto = turno.nombrePuesto || 'Sin puesto';
   const esHoy  = turno.diaInicioTurno && dayjs(turno.diaInicioTurno).isSame(dayjs(), 'day');
 
   return (
@@ -102,20 +75,25 @@ const PersonalDashboard = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const { user } = useAuth();
 
-  const [periodo, setPeriodo]     = useState('semana');
+  const [mesOffset, setMesOffset] = useState(0);
+  const [semanaKey, setSemanaKey] = useState(null);
   const [turnos, setTurnos]       = useState([]);
   const [futuros, setFuturos]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
+
+  const mesActual = dayjs().subtract(mesOffset, 'month');
+  const semanas   = buildSemanasDelMes(mesActual.year(), mesActual.month() + 1);
+  const { inicio, fin } = rangoPeriodo(mesOffset, semanaKey, semanas);
+  const fmt = d => d.format('YYYY-MM-DD');
 
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
     setError(null);
 
-    const hoy = dayjs();
     Promise.all([
-      turnosService.getByMedico(user.id, hoy.year(), hoy.month() + 1),
+      turnosService.getByMedico(user.id, mesActual.year(), mesActual.month() + 1),
       turnosService.getFuturos(user.id),
     ])
       .then(([mes, fut]) => {
@@ -124,23 +102,30 @@ const PersonalDashboard = ({ onBack }) => {
       })
       .catch(() => setError('No se pudieron cargar los turnos.'))
       .finally(() => setLoading(false));
-  }, [user?.id]);
+  }, [user?.id, mesOffset]);
 
-  const turnosFiltrados = useMemo(() => filtrarPorPeriodo(turnos, periodo), [turnos, periodo]);
+  const turnosFiltrados = useMemo(() => {
+    return turnos.filter(t => {
+      if (!t.diaInicioTurno) return false;
+      const d = dayjs(t.diaInicioTurno);
+      return (d.isAfter(inicio, 'day') || d.isSame(inicio, 'day')) &&
+             (d.isBefore(fin, 'day')   || d.isSame(fin, 'day'));
+    });
+  }, [turnos, inicio, fin]);
 
   const horasTrabajadas = useMemo(
-    () => turnosFiltrados.reduce((acc, t) => acc + calcHoras(t), 0),
+    () => Math.round(turnosFiltrados.reduce((acc, t) => acc + calcHoras(t), 0)),
     [turnosFiltrados],
   );
 
   const diasConTurno = useMemo(() => {
-    const dias = new Set(turnosFiltrados.map(t => t.diaInicioTurno));
-    return dias.size;
+    return new Set(turnosFiltrados.map(t => t.diaInicioTurno)).size;
   }, [turnosFiltrados]);
 
-  const diasLibres = diasEnPeriodo(periodo) - diasConTurno;
-
-  const limiteHoras = periodo === 'semana' ? 40 : 160;
+  const esSemana    = semanaKey !== null;
+  const diasPeriodo = esSemana ? fin.diff(inicio, 'day') + 1 : mesActual.daysInMonth();
+  const diasLibres  = Math.max(0, diasPeriodo - diasConTurno);
+  const limiteHoras = esSemana ? 40 : 160;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
@@ -153,17 +138,10 @@ const PersonalDashboard = ({ onBack }) => {
 
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Selector de período */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[{ id: 'semana', label: 'Esta semana' }, { id: 'mes', label: 'Este mes' }].map(p => (
-            <button key={p.id} onClick={() => setPeriodo(p.id)} style={{
-              background: periodo === p.id ? PA.primary : '#fff',
-              color: periodo === p.id ? '#fff' : PA.ink2,
-              border: `1px solid ${periodo === p.id ? PA.primary : PA.line}`,
-              borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-            }}>{p.label}</button>
-          ))}
-        </div>
+        <PeriodoSelector
+          mesOffset={mesOffset} setMesOffset={setMesOffset}
+          semanaKey={semanaKey} setSemanaKey={setSemanaKey}
+        />
 
         {loading && (
           <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
@@ -185,7 +163,7 @@ const PersonalDashboard = ({ onBack }) => {
                 icon="calendar"
                 label="Turnos"
                 value={turnosFiltrados.length}
-                sub={periodo === 'semana' ? 'esta semana' : 'este mes'}
+                sub={esSemana ? `semana ${semanaKey}` : mesActual.format('MMMM')}
               />
               <KPICard
                 icon="clock"
@@ -197,8 +175,8 @@ const PersonalDashboard = ({ onBack }) => {
               <KPICard
                 icon="sun"
                 label="Días sin turno"
-                value={diasLibres < 0 ? 0 : diasLibres}
-                sub={periodo === 'semana' ? 'de 7 días' : `de ${diasEnPeriodo('mes')} días`}
+                value={diasLibres}
+                sub={`de ${diasPeriodo} días`}
               />
               <KPICard
                 icon="check-circle"
@@ -208,30 +186,30 @@ const PersonalDashboard = ({ onBack }) => {
               />
             </div>
 
-            {/* Barra de carga semanal */}
-            {periodo === 'semana' && (
-              <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 14 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>Carga horaria semanal</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: horasTrabajadas > 40 ? PA.accent : PA.primary }}>
-                    {horasTrabajadas}h / 40h
-                  </span>
-                </div>
-                <div style={{ height: 8, background: PA.line2, borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 99,
-                    background: horasTrabajadas > 40 ? PA.accent : PA.primary,
-                    width: `${Math.min(100, (horasTrabajadas / 40) * 100)}%`,
-                    transition: 'width .4s ease',
-                  }} />
-                </div>
-                {horasTrabajadas > 40 && (
-                  <div style={{ fontSize: 11, color: PA.accent, fontWeight: 700, marginTop: 6 }}>
-                    Superaste el límite semanal de 40 horas
-                  </div>
-                )}
+            {/* Barra de carga horaria */}
+            <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>
+                  {esSemana ? 'Carga horaria semanal' : 'Carga horaria mensual'}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: horasTrabajadas > limiteHoras ? PA.accent : PA.primary }}>
+                  {horasTrabajadas}h / {limiteHoras}h
+                </span>
               </div>
-            )}
+              <div style={{ height: 8, background: PA.line2, borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 99,
+                  background: horasTrabajadas > limiteHoras ? PA.accent : PA.primary,
+                  width: `${Math.min(100, (horasTrabajadas / limiteHoras) * 100)}%`,
+                  transition: 'width .4s ease',
+                }} />
+              </div>
+              {horasTrabajadas > limiteHoras && (
+                <div style={{ fontSize: 11, color: PA.accent, fontWeight: 700, marginTop: 6 }}>
+                  Superaste el límite de {limiteHoras}h
+                </div>
+              )}
+            </div>
 
             {/* Próximos turnos */}
             {futuros.length > 0 && (
