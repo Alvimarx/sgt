@@ -2,6 +2,7 @@ package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.PuestoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Repository.PlanificacionAsignacionRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
@@ -17,15 +18,18 @@ public class PuestoService {
     private final PuestoRepository puestoRepository;
     private final ServicioRepository servicioRepository;
     private final TurnoRepository turnoRepository;
+    private final PlanificacionAsignacionRepository planificacionAsignacionRepository;
 
     public PuestoService(
             PuestoRepository puestoRepository,
             ServicioRepository servicioRepository,
-            TurnoRepository turnoRepository
+            TurnoRepository turnoRepository,
+            PlanificacionAsignacionRepository planificacionAsignacionRepository
     ) {
         this.puestoRepository = puestoRepository;
         this.servicioRepository = servicioRepository;
         this.turnoRepository = turnoRepository;
+        this.planificacionAsignacionRepository = planificacionAsignacionRepository;
     }
 
     // Crear puesto
@@ -59,14 +63,14 @@ public class PuestoService {
                 );
     }
 
-    // Obtener todos los puestos
+    // Obtener todos los puestos (no eliminados)
     public List<PuestoEntity> obtenerTodosPuestos() {
-        return puestoRepository.findAll();
+        return puestoRepository.findByEliminadoFalse();
     }
 
-    // Obtener puestos por servicio
+    // Obtener puestos por servicio (no eliminados)
     public List<PuestoEntity> obtenerPuestosPorServicio(Long idServicio) {
-        return puestoRepository.findByServicio_IdServicio(idServicio);
+        return puestoRepository.findByServicio_IdServicioAndEliminadoFalse(idServicio);
     }
 
     // Actualizar puesto
@@ -92,26 +96,21 @@ public class PuestoService {
         return turnoRepository.countByPuesto_IdPuesto(idPuesto);
     }
 
-    // Eliminar puesto. Se bloquea si el puesto tiene turnos asociados.
     public void eliminarPuesto(Long idPuesto) {
 
         PuestoEntity puesto = obtenerPuesto(idPuesto);
 
-        long turnos = turnoRepository.countByPuesto_IdPuesto(idPuesto);
-        if (turnos > 0) {
-            throw new RuntimeException(
-                    "No se puede eliminar: el puesto está asociado a "
-                    + turnos + " turno(s). Reasigna esos turnos a otro puesto antes de eliminarlo."
-            );
-        }
+        // Quita el puesto de cualquier planificación que lo referencie.
+        planificacionAsignacionRepository.deleteByPuesto(idPuesto);
 
-        puestoRepository.delete(puesto);
+        puesto.setEliminado(true);
+        puestoRepository.save(puesto);
     }
 
-    // Obtener puesto por nombre
+    // Obtener puesto por nombre (no eliminado)
     public PuestoEntity obtenerPuestosPorNombre(String nombre) {
 
-        return puestoRepository.findByNombre(nombre)
+        return puestoRepository.findByNombreAndEliminadoFalse(nombre)
                 .orElseThrow(() ->
                         new RuntimeException("Puesto no encontrado")
                 );

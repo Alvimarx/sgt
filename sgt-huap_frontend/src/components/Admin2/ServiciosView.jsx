@@ -291,7 +291,7 @@ const ServiciosView = ({ onBack }) => {
 
 // ─── Bottom-sheet de confirmación ───────────────────────────────────────────
 function ConfirmDeleteServicio({ PA, nombre, dependencias, loadingImpacto, eliminando, onConfirm, onCancel }) {
-    const bloqueado = dependencias > 0;
+    const tieneDependencias = dependencias > 0;
     const warn = PA.warn || '#DC2626';
     const warnSoft = PA.warnSoft || '#FEF2F2';
 
@@ -320,37 +320,35 @@ function ConfirmDeleteServicio({ PA, nombre, dependencias, loadingImpacto, elimi
                     <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
                         Verificando registros asociados…
                     </p>
-                ) : bloqueado ? (
+                ) : tieneDependencias ? (
                     <div style={{ background: warnSoft, borderRadius: 12, padding: '12px 14px', margin: '4px 0 22px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                         <AlertCircle size={16} color={warn} style={{ flexShrink: 0, marginTop: 1 }} />
                         <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>
-                            No se puede eliminar: el servicio tiene{' '}
+                            El servicio tiene{' '}
                             <strong style={{ color: PA.ink }}>{dependencias} registro(s) (funcionarios o turnos)</strong> asociados.
-                            Reasigna o elimina estos datos antes de proceder.
+                            Se ocultará de la gestión, pero los datos históricos se conservan.
                         </div>
                     </div>
                 ) : (
                     <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
-                        No tiene registros asociados. Esta acción no se puede deshacer.
+                        No tiene registros asociados. Dejará de aparecer en la gestión.
                     </p>
                 )}
 
                 <div style={{ display: 'flex', gap: 10 }}>
-                    <button 
-                      onClick={onCancel} 
+                    <button
+                      onClick={onCancel}
                       style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: `1.5px solid ${PA.line}`, background: 'none', color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
                     >
-                        {bloqueado ? 'Entendido' : 'Cancelar'}
+                        Cancelar
                     </button>
-                    {!bloqueado && (
-                        <button 
-                          onClick={onConfirm} 
-                          disabled={eliminando || loadingImpacto} 
-                          style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: 'none', background: warn, color: '#fff', fontSize: 15, fontWeight: 700, cursor: (eliminando || loadingImpacto) ? 'not-allowed' : 'pointer', opacity: (eliminando || loadingImpacto) ? 0.7 : 1 }}
-                        >
-                            {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
-                        </button>
-                    )}
+                    <button
+                      onClick={onConfirm}
+                      disabled={eliminando || loadingImpacto}
+                      style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: 'none', background: warn, color: '#fff', fontSize: 15, fontWeight: 700, cursor: (eliminando || loadingImpacto) ? 'not-allowed' : 'pointer', opacity: (eliminando || loadingImpacto) ? 0.7 : 1 }}
+                    >
+                        {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+                    </button>
                 </div>
             </div>
         </div>

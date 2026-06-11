@@ -53,10 +53,14 @@ public class    FuncionarioEntity {
     @Column(name = "Estado", nullable = false)
     private int estado;
 
+    @Builder.Default
+    @Column(name = "eliminado", nullable = false)
+    private boolean eliminado = false;
+
     @Column(name = "Profesion")
     private String profesion;
 
-    // --- Relaciones --- MANTENERLOS
+    // --- Relaciones --- 
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_ROL_SISTEMA", nullable = false)

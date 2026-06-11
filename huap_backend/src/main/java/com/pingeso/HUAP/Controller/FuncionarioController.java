@@ -79,7 +79,7 @@ public class FuncionarioController {
 
         // 2. Mapear los servicios a los que tiene acceso el funcionario
         List<ServicioDisponibleDTO> opciones = usuario.getServiciosFuncionario().stream()
-                .filter(sf -> sf.getServicio() != null)
+                .filter(sf -> sf.getServicio() != null && !sf.getServicio().isEliminado())
                 .map(sf -> new ServicioDisponibleDTO(
                         sf.getServicio().getIdServicio(),
                         sf.getServicio().getNombre(),
@@ -98,8 +98,6 @@ public class FuncionarioController {
 
         return ResponseEntity.ok(new LoginResponse(preAuthToken, true, opciones));
     }
-
-    
 
     // --- Gestión de funcionarios ---
 
@@ -173,6 +171,7 @@ public class FuncionarioController {
         
         ServiciosFuncionarioEntity relacion = usuario.getServiciosFuncionario().stream()
                 .filter(sf -> sf.getServicio() != null
+                        && !sf.getServicio().isEliminado()
                         && sf.getServicio().getIdServicio().equals(idServicioElegido))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Acceso denegado al servicio indicado"));
@@ -216,6 +215,7 @@ public class FuncionarioController {
 
         ServiciosFuncionarioEntity relacion = usuario.getServiciosFuncionario().stream()
                 .filter(sf -> sf.getServicio() != null
+                        && !sf.getServicio().isEliminado()
                         && sf.getServicio().getIdServicio().equals(request.getServicioId()))
                 .findFirst()
                 .orElse(null);

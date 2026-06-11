@@ -18,5 +18,14 @@ public interface ServicioRepository extends JpaRepository<ServicioEntity, Long> 
 
     Page<ServicioEntity> findByNombreContainingIgnoreCase(String nombre, Pageable pageable);
 
+    List<ServicioEntity> findByEliminadoFalse();
+
+    Page<ServicioEntity> findByEliminadoFalse(Pageable pageable);
+
+    Optional<ServicioEntity> findByNombreAndEliminadoFalse(String nombre);
+
+    boolean existsByNombreIgnoreCaseAndEliminadoFalse(String nombre);
+
+    Page<ServicioEntity> findByNombreContainingIgnoreCaseAndEliminadoFalse(String nombre, Pageable pageable);
 
 }

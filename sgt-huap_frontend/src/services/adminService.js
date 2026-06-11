@@ -226,18 +226,6 @@ export const turnosService = {
         return response.data;
     },
 
-    // PUT /turnos/asignacion-masiva
-    asignacionMasiva: async (payload) => {
-        const response = await axiosInstance.put('/turnos/asignacion-masiva', payload);
-        return response.data;
-    },
-
-    // POST /turnos/check-conflicts
-    checkConflicts: async (payload) => {
-        const response = await axiosInstance.post('/turnos/check-conflicts', payload);
-        return response.data;
-    },
-
     // POST /gestion-turnos/alterar  (movido de /turnos/alterar en v2)
     alterar: async (alterarRequest) => {
         const response = await axiosInstance.post('/gestion-turnos/alterar', alterarRequest);

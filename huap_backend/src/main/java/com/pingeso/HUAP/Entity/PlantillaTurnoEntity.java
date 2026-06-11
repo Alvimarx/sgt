@@ -32,6 +32,9 @@ public class PlantillaTurnoEntity {
     @JoinColumn(name = "id_servicio", nullable = false)
     private ServicioEntity servicio;
 
+    @Column(name = "eliminado", nullable = false)
+    private boolean eliminado = false;
+
     public PlantillaTurnoEntity(String nombre, ServicioEntity servicio, LocalTime horaInicio, LocalTime horaTermino) {
         this.nombre = nombre;
         this.servicio = servicio;

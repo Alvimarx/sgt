@@ -21,6 +21,10 @@ public class PuestoEntity {
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
+    @Builder.Default
+    @Column(name = "eliminado", nullable = false)
+    private boolean eliminado = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_servicio", nullable = false)
     private ServicioEntity servicio;

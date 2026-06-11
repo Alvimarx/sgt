@@ -112,15 +112,15 @@ public class PlanificacionController {
         PlanificacionAsignacionDTO dto = new PlanificacionAsignacionDTO();
         dto.setIdAsignacion(entidad.getIdAsignacion());
 
-        if (entidad.getPlantilla() != null) {
+        if (entidad.getPlantilla() != null && !entidad.getPlantilla().isEliminado()) {
             dto.setIdPlantilla(entidad.getPlantilla().getIdPlantilla());
             dto.setNombrePlantilla(entidad.getPlantilla().getNombre());
         }
-        if (entidad.getFuncionario() != null) {
+        if (entidad.getFuncionario() != null && !entidad.getFuncionario().isEliminado()) {
             dto.setIdFuncionario(entidad.getFuncionario().getIdFuncionario());
             dto.setNombreFuncionario(entidad.getFuncionario().getNombre());
         }
-        if (entidad.getPuesto() != null) {
+        if (entidad.getPuesto() != null && !entidad.getPuesto().isEliminado()) {
             dto.setIdPuesto(entidad.getPuesto().getIdPuesto());
             dto.setNombrePuesto(entidad.getPuesto().getNombre());
         }

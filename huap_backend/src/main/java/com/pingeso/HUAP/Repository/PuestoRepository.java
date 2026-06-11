@@ -13,4 +13,10 @@ public interface PuestoRepository extends JpaRepository<PuestoEntity, Long> {
     Optional<PuestoEntity> findByNombre(String nombre);
 
     List<PuestoEntity> findByServicio_IdServicio(Long idServicio);
+
+    List<PuestoEntity> findByEliminadoFalse();
+
+    List<PuestoEntity> findByServicio_IdServicioAndEliminadoFalse(Long idServicio);
+
+    Optional<PuestoEntity> findByNombreAndEliminadoFalse(String nombre);
 }

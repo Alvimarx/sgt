@@ -24,11 +24,11 @@ const PuestosView = ({ onBack }) => {
     const [nuevoPuesto, setNuevoPuesto] = useState('');
     const [creando, setCreando] = useState(false);
 
-    const [editId, setEditId] = useState(null);     // idPuesto en edición
+    const [editId, setEditId] = useState(null);    
     const [editNombre, setEditNombre] = useState('');
     const [guardando, setGuardando] = useState(false);
 
-    const [confirmDel, setConfirmDel] = useState(null);   // puesto a eliminar
+    const [confirmDel, setConfirmDel] = useState(null);
     const [turnosAsociados, setTurnosAsociados] = useState(0);
     const [loadingImpacto, setLoadingImpacto] = useState(false);
     const [eliminando, setEliminando] = useState(false);
@@ -297,7 +297,7 @@ const PuestosView = ({ onBack }) => {
 
 // ─── Bottom-sheet de confirmación de eliminación ────────────────────────────
 function ConfirmDeletePuesto({ PA, nombre, turnos, loadingImpacto, eliminando, onConfirm, onCancel }) {
-    const bloqueado = turnos > 0;
+    const tieneTurnos = turnos > 0;
     const warn = PA.warn || '#DC2626';
     const warnSoft = PA.warnSoft || '#FEF2F2';
 
@@ -339,18 +339,18 @@ function ConfirmDeletePuesto({ PA, nombre, turnos, loadingImpacto, eliminando, o
                     <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
                         Verificando turnos asociados…
                     </p>
-                ) : bloqueado ? (
+                ) : tieneTurnos ? (
                     <div style={{ background: warnSoft, borderRadius: 12, padding: '12px 14px', margin: '4px 0 22px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                         <AlertCircle size={16} color={warn} style={{ flexShrink: 0, marginTop: 1 }} />
                         <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>
-                            No se puede eliminar: el puesto está asociado a{' '}
+                            Este puesto está asociado a{' '}
                             <strong style={{ color: PA.ink }}>{turnos} turno{turnos === 1 ? '' : 's'}</strong>.
-                            Reasigna esos turnos a otro puesto antes de eliminarlo.
+                            Se ocultará de la gestión, pero los turnos históricos se conservan.
                         </div>
                     </div>
                 ) : (
                     <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
-                        No tiene turnos asociados. Esta acción no se puede deshacer.
+                        No tiene turnos asociados. Dejará de aparecer en la gestión.
                     </p>
                 )}
 
@@ -363,23 +363,21 @@ function ConfirmDeletePuesto({ PA, nombre, turnos, loadingImpacto, eliminando, o
                             color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: 'pointer',
                         }}
                     >
-                        {bloqueado ? 'Entendido' : 'Cancelar'}
+                        Cancelar
                     </button>
-                    {!bloqueado && (
-                        <button
-                            onClick={onConfirm}
-                            disabled={eliminando || loadingImpacto}
-                            style={{
-                                flex: 1, padding: '13px 0', borderRadius: 12,
-                                border: 'none', background: warn, color: '#fff',
-                                fontSize: 15, fontWeight: 700,
-                                cursor: (eliminando || loadingImpacto) ? 'not-allowed' : 'pointer',
-                                opacity: (eliminando || loadingImpacto) ? 0.7 : 1,
-                            }}
-                        >
-                            {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
-                        </button>
-                    )}
+                    <button
+                        onClick={onConfirm}
+                        disabled={eliminando || loadingImpacto}
+                        style={{
+                            flex: 1, padding: '13px 0', borderRadius: 12,
+                            border: 'none', background: warn, color: '#fff',
+                            fontSize: 15, fontWeight: 700,
+                            cursor: (eliminando || loadingImpacto) ? 'not-allowed' : 'pointer',
+                            opacity: (eliminando || loadingImpacto) ? 0.7 : 1,
+                        }}
+                    >
+                        {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+                    </button>
                 </div>
             </div>
         </div>

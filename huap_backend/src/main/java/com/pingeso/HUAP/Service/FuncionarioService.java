@@ -121,7 +121,7 @@ public class FuncionarioService {
         
     public List<FuncionarioEntity> getAllUsersByServicio(Long servicioId) {
         if (servicioId == null) {
-            return funcionarioRepository.findAll();
+            return funcionarioRepository.findByEliminadoFalse();
         }
         return funcionarioRepository.findAllByServicioId(servicioId);
     }
@@ -151,14 +151,17 @@ public class FuncionarioService {
 
         // Mapeo de la lista de servicios
         if (f.getServiciosFuncionario() != null) {
+            // Excluye los servicios eliminados (soft-delete) para que no aparezcan en la
+            // selección/cambio de servicio del frontend.
             List<RolServicioDTO> serviciosList = f.getServiciosFuncionario().stream()
+                .filter(sf -> sf.getServicio() != null && !sf.getServicio().isEliminado())
                 .map(sf -> new RolServicioDTO(
-                    (sf.getServicio() != null) ? sf.getServicio().getIdServicio() : null,
-                    (sf.getServicio() != null) ? sf.getServicio().getNombre() : null,
+                    sf.getServicio().getIdServicio(),
+                    sf.getServicio().getNombre(),
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getIdRolServicio() : null,
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getNombreRol() : null
                 )).collect(Collectors.toList());
-            
+
             dto.setServicios(serviciosList);
         }
 
