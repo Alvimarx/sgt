@@ -743,26 +743,6 @@ const JefaturaCalendarOverview = ({
     return (
         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-            {/* Resumen mensual */}
-            <div style={{
-                background: '#fff',
-                border: `1px solid ${PA.line2}`,
-                borderRadius: 18,
-                padding: 14,
-                boxShadow: '0 2px 10px rgba(15,23,42,0.04)',
-            }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: PA.ink, marginBottom: 10 }}>
-                    Cobertura del mes
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                    <SummaryTile label="Cobertura" value={`${monthSummary.cobertura}%`} PA={PA} />
-                    <SummaryTile label="Vacantes" value={monthSummary.vacantes} PA={PA} danger={monthSummary.vacantes > 0} />
-                    <SummaryTile label="Asignados" value={`${monthSummary.asignados}/${monthSummary.total}`} PA={PA} />
-                    <SummaryTile label="Días críticos" value={monthSummary.diasConVacantes} PA={PA} danger={monthSummary.diasConVacantes > 0} />
-                </div>
-            </div>
-
             {/* Filtros */}
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
                 {filters.map(item => {
