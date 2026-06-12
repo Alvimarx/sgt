@@ -5,7 +5,7 @@ import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
 import ShiftDetail, { getTeamColor, formatShiftLabel } from '../Comun/ShiftDetail';
-
+import { exportarTurnosCsv } from '../../services/exportacionService';
 // ---------------------------------------------------------------------------
 // HELPERS DE PRESENTACIÓN
 // ---------------------------------------------------------------------------
@@ -68,6 +68,17 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
     const [error, setError] = useState('');
     const [selectedDay, setSelectedDay] = useState(null);
     const [detailShift, setDetailShift] = useState(null);
+    
+    //relacionado a exportacion
+    const [exportSheetOpen, setExportSheetOpen] = useState(false);
+    const [exportMonthValue, setExportMonthValue] = useState(
+        `${viewYear}-${String(viewMonth).padStart(2, '0')}`
+    );
+    const [exportScope, setExportScope] = useState('mios');
+    const [exporting, setExporting] = useState(false);
+    const [exportError, setExportError] = useState('');
+    const esAdmin = user?.rolSistema === 'ADMIN' || user?.rolSistema === 'ADMINISTRADOR';
+    const puedeExportarServicioCompleto = esJefatura || esAdmin;
 
     // Carga al cambiar mes
     useEffect(() => {
@@ -108,6 +119,54 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         while (arr.length % 7 !== 0) arr.push(null);
         return arr;
     }, [viewYear, viewMonth]);
+
+    const openExportSheet = () => {
+        setExportMonthValue(`${viewYear}-${String(viewMonth).padStart(2, '0')}`);
+        setExportScope('mios');
+        setExportError('');
+        setExportSheetOpen(true);
+    };
+
+    const handleExportCsv = async () => {
+        setExportError('');
+
+        if (!user?.servicioId) {
+            setExportError('No hay servicio seleccionado para exportar.');
+            return;
+        }
+
+        if (!exportMonthValue) {
+            setExportError('Debes seleccionar un mes.');
+            return;
+        }
+
+        const [anioStr, mesStr] = exportMonthValue.split('-');
+        const anio = Number(anioStr);
+        const mes = Number(mesStr);
+
+        const funcionarioId = Number(user?.id ?? user?.userId);
+
+        const exportarSoloMisTurnos =
+            !puedeExportarServicioCompleto || exportScope === 'mios';
+
+        setExporting(true);
+
+        const result = await exportarTurnosCsv({
+            anio,
+            mes,
+            idServicio: user.servicioId,
+            idFuncionario: exportarSoloMisTurnos ? funcionarioId : null,
+        });
+
+        setExporting(false);
+
+        if (!result.success) {
+            setExportError(result.error);
+            return;
+        }
+
+        setExportSheetOpen(false);
+    };
 
     const today = todayKey();
 
@@ -238,6 +297,32 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                     )}
                 </div>
 
+                {/* Exportación CSV */}
+                <div style={{ padding: '14px 18px 4px' }}>
+                    <button
+                        onClick={openExportSheet}
+                        style={{
+                            width: '100%',
+                            border: `1px solid ${PA.line2}`,
+                            background: '#fff',
+                            color: PA.ink,
+                            borderRadius: 14,
+                            padding: '11px 14px',
+                            fontSize: 13,
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+                        }}
+                    >
+                        <SGTIcon name="download" size={16} color={PA.ink} />
+                        Exportar turnos CSV
+                    </button>
+                </div>
+
                 {/* Leyenda */}
                 <div style={{ display: 'flex', gap: 14, padding: '10px 18px', borderTop: `1px solid ${PA.line2}`, marginTop: 10, flexWrap: 'wrap' }}>
                     <LegendDot color={PA.primary} label="Mi turno" />
@@ -301,6 +386,157 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                         }}
                     />
                 )}
+            </Sheet>
+
+            {/* Sheet de exportación CSV */}
+            <Sheet
+                open={exportSheetOpen}
+                onClose={() => !exporting && setExportSheetOpen(false)}
+                title="Exportar turnos CSV"
+                maxHeight="60%"
+            >
+                <div style={{ padding: '8px 16px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                    <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: PA.ink2, marginBottom: 6 }}>
+                            Mes a exportar
+                        </label>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button
+                                onClick={() => {
+                                    const [year, month] = exportMonthValue.split('-').map(Number);
+                                    let newMonth = month - 1;
+                                    let newYear = year;
+                                    if (newMonth < 1) {
+                                        newMonth = 12;
+                                        newYear -= 1;
+                                    }
+                                    setExportMonthValue(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+                                }}
+                                disabled={exporting}
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    border: `1px solid ${PA.line2}`,
+                                    background: '#fff',
+                                    borderRadius: 10,
+                                    cursor: exporting ? 'default' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: exporting ? 0.5 : 1,
+                                }}
+                            >
+                                <SGTIcon name="chevron-left" size={18} color={PA.ink} />
+                            </button>
+
+                            <div style={{
+                                flex: 1,
+                                border: `1px solid ${PA.line2}`,
+                                borderRadius: 12,
+                                padding: '10px 12px',
+                                textAlign: 'center',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: PA.ink,
+                                background: '#fff',
+                            }}>
+                                {MONTH_NAMES[Number(exportMonthValue.split('-')[1]) - 1]} {exportMonthValue.split('-')[0]}
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    const [year, month] = exportMonthValue.split('-').map(Number);
+                                    let newMonth = month + 1;
+                                    let newYear = year;
+                                    if (newMonth > 12) {
+                                        newMonth = 1;
+                                        newYear += 1;
+                                    }
+                                    setExportMonthValue(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+                                }}
+                                disabled={exporting}
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    border: `1px solid ${PA.line2}`,
+                                    background: '#fff',
+                                    borderRadius: 10,
+                                    cursor: exporting ? 'default' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: exporting ? 0.5 : 1,
+                                }}
+                            >
+                                <SGTIcon name="chevron-right" size={18} color={PA.ink} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {puedeExportarServicioCompleto && (
+                        <div>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: PA.ink2, marginBottom: 8 }}>
+                                ¿Qué turnos quieres exportar?
+                            </div>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13, fontWeight: 700, color: PA.ink }}>
+                                <input
+                                    type="radio"
+                                    name="exportScope"
+                                    value="mios"
+                                    checked={exportScope === 'mios'}
+                                    onChange={() => setExportScope('mios')}
+                                    disabled={exporting}
+                                />
+                                Solo mis turnos
+                            </label>
+
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: PA.ink }}>
+                                <input
+                                    type="radio"
+                                    name="exportScope"
+                                    value="servicio"
+                                    checked={exportScope === 'servicio'}
+                                    onChange={() => setExportScope('servicio')}
+                                    disabled={exporting}
+                                />
+                                Todos los turnos del servicio actual
+                            </label>
+                        </div>
+                    )}
+
+                    {!puedeExportarServicioCompleto && (
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: PA.ink3, background: '#fff', border: `1px solid ${PA.line2}`, borderRadius: 12, padding: 10 }}>
+                            Se exportarán solo tus turnos del servicio actual.
+                        </div>
+                    )}
+
+                    {exportError && (
+                        <div style={{ padding: '10px 12px', borderRadius: 12, background: '#FFF4F5', color: '#8C3F44', border: '1px solid #F3D2D5', fontSize: 12.5, fontWeight: 700 }}>
+                            {exportError}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleExportCsv}
+                        disabled={exporting}
+                        style={{
+                            width: '100%',
+                            border: 'none',
+                            background: exporting ? PA.ink3 : PA.primary,
+                            color: '#fff',
+                            borderRadius: 14,
+                            padding: '12px 14px',
+                            fontSize: 13.5,
+                            fontWeight: 900,
+                            cursor: exporting ? 'default' : 'pointer',
+                        }}
+                    >
+                        {exporting ? 'Exportando…' : 'Descargar CSV'}
+                    </button>
+                </div>
             </Sheet>
         </div>
     );

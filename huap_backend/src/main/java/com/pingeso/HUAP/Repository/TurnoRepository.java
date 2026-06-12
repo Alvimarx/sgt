@@ -171,4 +171,28 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
+    //Prueba de exportación de turnos a CSV
+    @Query("""
+        SELECT t
+        FROM TurnoEntity t
+        LEFT JOIN FETCH t.funcionario f
+        LEFT JOIN FETCH t.servicio s
+        LEFT JOIN FETCH t.puesto p
+        LEFT JOIN FETCH t.tipoTurno tt
+        WHERE t.eliminado = false
+          AND t.diaInicioTurno < :fechaFin
+          AND t.diaFinalTurno >= :fechaInicio
+          AND (:idFuncionario IS NULL OR f.idFuncionario = :idFuncionario)
+          AND (:idServicio IS NULL OR s.idServicio = :idServicio)
+          AND (f IS NULL OR f.eliminado = false)
+          AND (s IS NULL OR s.eliminado = false)
+        ORDER BY t.diaInicioTurno ASC, t.horaInicio ASC
+    """)
+    List<TurnoEntity> buscarTurnosParaExportacion(
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin,
+            @Param("idFuncionario") Long idFuncionario,
+            @Param("idServicio") Long idServicio
+    );
+
 }
