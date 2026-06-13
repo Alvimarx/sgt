@@ -393,7 +393,6 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
 
   const buildDTO = () => {
     const base = { idFuncionario: Number(userId), idTipoSolicitud: tipoSel, motivo: form.motivo };
-    if (!base.motivo?.trim()) return null;
     if (tipoSel === 1) {
       if (!form.fechaInicio || !form.fechaFin) return null;
       return { ...base, fechaInicioPermiso: form.fechaInicio + 'T00:00:00', fechaTerminoPermiso: form.fechaFin + 'T00:00:00' };
@@ -415,7 +414,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     setLoading(true); setError(null);
     try {
       if (tipoSel === 6) {
-        if (!form.idTurno || !form.motivo?.trim()) { setError('Rellena todos los campos requeridos.'); setLoading(false); return; }
+        if (!form.idTurno) { setError('Rellena todos los campos requeridos.'); setLoading(false); return; }
         await ofertasGeneralesService.crear({ idFuncionario: Number(userId), idTurno: Number(form.idTurno), motivo: form.motivo });
       } else {
         const dto = buildDTO();
@@ -490,7 +489,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   ];
   const lbl = { fontSize: 12, fontWeight: 800, color: PA.ink3, display: 'block', marginBottom: 4 };
   const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1px solid ${PA.line}`, fontSize: 14, color: PA.ink, fontWeight: 600, background: '#fff', outline: 'none', boxSizing: 'border-box' };
-  const canSubmit = !!form.motivo?.trim() && !loading;
+  const canSubmit = !loading;
 
   return (
     <Sheet open={open} onClose={handleClose} title={sheetTitle} maxHeight="90%">
@@ -524,37 +523,37 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
             {loadingData && <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600 }}>Cargando opciones...</div>}
 
             {tipoSel === 1 && (<>
-              <div><label style={lbl}>Fecha inicio</label><PickerBtn label="Seleccionar fecha" value={form.fechaInicio ? fmtFecha(form.fechaInicio) : null} pkey="fechaInicio" /></div>
-              <div><label style={lbl}>Fecha término</label><PickerBtn label="Seleccionar fecha" value={form.fechaFin ? fmtFecha(form.fechaFin) : null} pkey="fechaFin" /></div>
+              <div><label style={lbl}>Fecha inicio *</label><PickerBtn label="Seleccionar fecha" value={form.fechaInicio ? fmtFecha(form.fechaInicio) : null} pkey="fechaInicio" /></div>
+              <div><label style={lbl}>Fecha término *</label><PickerBtn label="Seleccionar fecha" value={form.fechaFin ? fmtFecha(form.fechaFin) : null} pkey="fechaFin" /></div>
             </>)}
 
             {tipoSel === 2 && (
-              <div><label style={lbl}>Turno a liberar</label><PickerBtn label="Seleccionar turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoBotar" /></div>
+              <div><label style={lbl}>Turno a liberar *</label><PickerBtn label="Seleccionar turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoBotar" /></div>
             )}
 
             {tipoSel === 3 && (
-              <div><label style={lbl}>Turno a cubrir</label><PickerBtn label="Seleccionar turno disponible" value={turnoLabel(turnosLibres, form.idTurno, form.turnoLabel)} pkey="turnoCobertura" /></div>
+              <div><label style={lbl}>Turno a cubrir *</label><PickerBtn label="Seleccionar turno disponible" value={turnoLabel(turnosLibres, form.idTurno, form.turnoLabel)} pkey="turnoCobertura" /></div>
             )}
 
             {tipoSel === 4 && (<>
-              <div><label style={lbl}>Tu turno a entregar</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurnoPropio, form.turnoPropioLabel)} pkey="turnoPropio" /></div>
-              <div><label style={lbl}>Con quién intercambiar</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptor" /></div>
+              <div><label style={lbl}>Tu turno a entregar *</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurnoPropio, form.turnoPropioLabel)} pkey="turnoPropio" /></div>
+              <div><label style={lbl}>Con quién intercambiar *</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptor" /></div>
               {form.idReceptor && (
-                <div><label style={lbl}>Turno del receptor que quieres</label><PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" /></div>
+                <div><label style={lbl}>Turno del receptor que quieres *</label><PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" /></div>
               )}
             </>)}
 
             {tipoSel === 5 && (<>
-              <div><label style={lbl}>Tu turno a ofrecer</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoOferta" /></div>
-              <div><label style={lbl}>Ofrecer a</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptorOferta" /></div>
+              <div><label style={lbl}>Tu turno a ofrecer *</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoOferta" /></div>
+              <div><label style={lbl}>Ofrecer a *</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptorOferta" /></div>
             </>)}
 
             {tipoSel === 6 && (
-              <div><label style={lbl}>Tu turno a ofrecer</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoOfertaGeneral" /></div>
+              <div><label style={lbl}>Tu turno a ofrecer *</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurno, form.turnoLabel)} pkey="turnoOfertaGeneral" /></div>
             )}
 
             <div>
-              <label style={lbl}>Motivo *</label>
+              <label style={lbl}>Motivo</label>
               <textarea rows={3} value={form.motivo || ''} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Describí el motivo..." style={{ ...inp, resize: 'vertical' }} />
             </div>
             {error && <div style={{ background: PA.accentSoft, color: '#B85A60', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>{error}</div>}
