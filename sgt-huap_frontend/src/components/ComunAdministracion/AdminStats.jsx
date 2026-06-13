@@ -86,11 +86,12 @@ const AdminStats = ({ onBack }) => {
   const [loadingTodos, setLoadingTodos]             = useState(false);
   const [expandedPuestosIds, setExpandedPuestosIds] = useState(new Set());
 
-  const [filtroOpen, setFiltroOpen]     = useState(false);
-  const [filtroActivo, setFiltroActivo] = useState(new Set());
-  const [filtroTipo, setFiltroTipo]     = useState(null);
-  const [filtroPuesto, setFiltroPuesto] = useState(null);
-  const [filtroFecha, setFiltroFecha]   = useState(null);
+  const [filtroOpen, setFiltroOpen]           = useState(false);
+  const [filtroActivo, setFiltroActivo]       = useState(new Set());
+  const [filtroTipo, setFiltroTipo]           = useState(null);
+  const [filtroPuesto, setFiltroPuesto]       = useState(null);
+  const [filtroFecha, setFiltroFecha]         = useState(null);
+  const [filtroPlantilla, setFiltroPlantilla] = useState(null);
 
   const servicioId = user?.servicioId;
 
@@ -103,6 +104,7 @@ const AdminStats = ({ onBack }) => {
     setFiltroTipo(null);
     setFiltroPuesto(null);
     setFiltroFecha(null);
+    setFiltroPlantilla(null);
     setFiltroOpen(false);
     setFiltroActivo(new Set());
 
@@ -188,19 +190,21 @@ const AdminStats = ({ onBack }) => {
     return next;
   });
 
-  const opcionesTipo   = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.tipoTurno).filter(Boolean))].sort(), [todosDetalle]);
-  const opcionesPuesto = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombrePuesto).filter(Boolean))].sort(), [todosDetalle]);
-  const opcionesFecha  = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.fecha).filter(Boolean))].sort(), [todosDetalle]);
+  const opcionesTipo      = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.tipoTurno).filter(Boolean))].sort(), [todosDetalle]);
+  const opcionesPuesto    = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombrePuesto).filter(Boolean))].sort(), [todosDetalle]);
+  const opcionesFecha     = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.fecha).filter(Boolean))].sort(), [todosDetalle]);
+  const opcionesPlantilla = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombrePlantilla).filter(Boolean))].sort(), [todosDetalle]);
 
   const turnosFiltrados = React.useMemo(() => {
     if (!todosDetalle) return [];
     return todosDetalle.filter(t => {
-      if (filtroTipo    && t.tipoTurno    !== filtroTipo)    return false;
-      if (filtroPuesto  && t.nombrePuesto !== filtroPuesto)  return false;
-      if (filtroFecha   && t.fecha        !== filtroFecha)   return false;
+      if (filtroTipo      && t.tipoTurno      !== filtroTipo)      return false;
+      if (filtroPuesto    && t.nombrePuesto   !== filtroPuesto)    return false;
+      if (filtroFecha     && t.fecha          !== filtroFecha)     return false;
+      if (filtroPlantilla && t.nombrePlantilla !== filtroPlantilla) return false;
       return true;
     });
-  }, [todosDetalle, filtroTipo, filtroPuesto, filtroFecha]);
+  }, [todosDetalle, filtroTipo, filtroPuesto, filtroFecha, filtroPlantilla]);
 
   const puestosAgrupados = React.useMemo(() => {
     if (!todosDetalle) return null;
@@ -331,7 +335,7 @@ const AdminStats = ({ onBack }) => {
 
     {/* ── Bottom sheet: Cobertura de turnos ── */}
     {showCobertura && (() => {
-      const filtrosActivos = [filtroTipo, filtroPuesto, filtroFecha].filter(Boolean).length;
+      const filtrosActivos = [filtroTipo, filtroPuesto, filtroFecha, filtroPlantilla].filter(Boolean).length;
       const asignados = turnosFiltrados.filter(t => t.asignado).length;
       const vacantesF = turnosFiltrados.filter(t => !t.asignado).length;
 
@@ -440,11 +444,13 @@ const AdminStats = ({ onBack }) => {
                   </button>
                   {filtroOpen && (
                     <div style={{ background: '#fff', borderTop: `1px solid ${PA.line}`, padding: '4px 12px 8px' }}>
-                      <FilaFiltro id="tipo"   label="Tipo de turno" opciones={opcionesTipo}   valor={filtroTipo}   onSelect={setFiltroTipo} />
+                      <FilaFiltro id="tipo"      label="Tipo de turno" opciones={opcionesTipo}      valor={filtroTipo}      onSelect={setFiltroTipo} />
                       <div style={{ height: 1, background: PA.line2 }} />
-                      <FilaFiltro id="puesto" label="Puesto"         opciones={opcionesPuesto} valor={filtroPuesto} onSelect={setFiltroPuesto} />
+                      <FilaFiltro id="puesto"    label="Puesto"        opciones={opcionesPuesto}    valor={filtroPuesto}    onSelect={setFiltroPuesto} />
                       <div style={{ height: 1, background: PA.line2 }} />
-                      <FilaFiltro id="fecha"  label="Fecha"          opciones={opcionesFecha}  valor={filtroFecha}  onSelect={setFiltroFecha} />
+                      <FilaFiltro id="fecha"     label="Fecha"         opciones={opcionesFecha}     valor={filtroFecha}     onSelect={setFiltroFecha} />
+                      <div style={{ height: 1, background: PA.line2 }} />
+                      <FilaFiltro id="plantilla" label="Rotativa"      opciones={opcionesPlantilla} valor={filtroPlantilla} onSelect={setFiltroPlantilla} />
                     </div>
                   )}
                 </div>

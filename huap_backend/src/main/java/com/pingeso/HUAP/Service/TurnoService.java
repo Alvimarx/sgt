@@ -475,8 +475,9 @@ public class TurnoService {
                     m.put("fecha",            t.getDiaInicioTurno() != null ? t.getDiaInicioTurno().toString() : null);
                     m.put("horaInicio",       t.getHoraInicio() != null ? t.getHoraInicio().toString() : null);
                     m.put("horaFin",          t.getHoraFin()    != null ? t.getHoraFin().toString()    : null);
-                    m.put("asignado",         asignado);
+                    m.put("asignado",          asignado);
                     m.put("nombreFuncionario", nombreFuncionario);
+                    m.put("nombrePlantilla",   t.getPlantilla() != null ? t.getPlantilla().getNombre() : null);
                     return m;
                 })
                 .collect(Collectors.toList());
