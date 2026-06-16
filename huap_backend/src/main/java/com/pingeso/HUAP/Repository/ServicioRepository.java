@@ -20,6 +20,7 @@ public interface ServicioRepository extends JpaRepository<ServicioEntity, Long> 
 
     List<ServicioEntity> findByEliminadoFalse();
 
+    List<ServicioEntity> findByEliminadoTrue();
     Page<ServicioEntity> findByEliminadoFalse(Pageable pageable);
 
     Optional<ServicioEntity> findByNombreAndEliminadoFalse(String nombre);

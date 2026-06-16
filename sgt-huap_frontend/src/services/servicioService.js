@@ -4,7 +4,7 @@ import axiosInstance from '../utils/axiosConfig';
 const API_BASE = '/servicios';
 
 /**
- * Obtiene la lista de todos los servicios
+ * Obtiene la lista de todos los servicios no Inactivos
  */
 export const getServicios = async () => {
     try {
@@ -12,6 +12,19 @@ export const getServicios = async () => {
         return { success: true, data: response.data };
     } catch (error) {
         const mensaje = error.response?.data?.error || 'Error al obtener los servicios';
+        return { success: false, error: mensaje };
+    }
+};
+
+/**
+ * Obtiene la lista de todos los servicios Inactivos 
+ */
+export const getServiciosInactivos = async () => {
+    try {
+        const response = await axiosInstance.get(`${API_BASE}/inactivos`);
+        return { success: true, data: response.data };
+    } catch (error) {
+        const mensaje = error.response?.data?.error || 'Error al obtener los servicios inactivos';
         return { success: false, error: mensaje };
     }
 };
@@ -30,6 +43,8 @@ export const createServicio = async (nombre) => {
         return { success: false, error: mensaje };
     }
 };
+
+
 
 /**
  * Actualiza el nombre de un servicio existente

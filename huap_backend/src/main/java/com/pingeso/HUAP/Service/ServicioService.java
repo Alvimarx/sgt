@@ -40,8 +40,8 @@ public class ServicioService {
         return m;
     }
 
-    public List<ServicioEntity> getAllServicios() {
-        return servicioRepository.findByEliminadoFalse();
+    public List<ServicioEntity> getAllServiciosInactivos() {
+        return servicioRepository.findByEliminadoTrue();
     }
 
     public List<Map<String, Object>> getAllServiciosSummary() {

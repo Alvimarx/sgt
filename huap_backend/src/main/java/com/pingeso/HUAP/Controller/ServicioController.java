@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -26,6 +27,13 @@ public class ServicioController {
     @GetMapping("")
     public ResponseEntity<?> listServicios() {
         return ResponseEntity.ok().body(servicioService.getAllServiciosSummary());
+    }
+
+    // Obtener todos los servicios inactivos
+    @GetMapping("/inactivos")
+    public ResponseEntity<List<ServicioEntity>> getServiciosInactivos() {
+        List<ServicioEntity> inactivos = servicioService.getAllServiciosInactivos();
+        return ResponseEntity.ok(inactivos);
     }
 
     // Obtener un servicio por ID

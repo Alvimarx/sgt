@@ -5,11 +5,14 @@ import { SGT_DATA } from './data';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { 
     getServicios, 
+    getServiciosInactivos,
     createServicio, 
     updateServicio, 
     eliminarServicio,
-    getDependenciasServicio // <-- Función que verifica turnos y funcionarios
+    getDependenciasServicio 
 } from '../../services/servicioService'; 
+
+const ITEMS_PER_PAGE = 3;
 
 const ServiciosView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
@@ -27,13 +30,17 @@ const ServiciosView = ({ onBack }) => {
   const [editNombre, setEditNombre] = useState('');
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
-  // Estado para eliminación con validación de dependencias
+  // Estado para eliminación
   const [confirmDel, setConfirmDel] = useState(null);
   const [dependencias, setDependencias] = useState(0); 
   const [loadingImpacto, setLoadingImpacto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
-  // Funciones auxiliares para ID y Nombre
+  // Estado para Paginación
+  const [pageActivos, setPageActivos] = useState(1);
+  const [pageInactivos, setPageInactivos] = useState(1);
+
+  // Funciones auxiliares
   const srvId = (srv) => srv.idServicio || srv.id;
   const srvNombre = (srv) => srv.nombreServicio || srv.nombre;
 
@@ -44,12 +51,24 @@ const ServiciosView = ({ onBack }) => {
   const cargarServicios = async () => {
     setLoading(true);
     setError('');
-    const result = await getServicios();
-    if (result.success) {
-      setServicios(result.data);
+    
+    // Ejecutamos ambas peticiones en paralelo
+    const [resultActivos, resultInactivos] = await Promise.all([
+      getServicios(),
+      getServiciosInactivos()
+    ]);
+
+    if (resultActivos.success && resultInactivos.success) {
+      // CORRECCIÓN: Forzamos el flag `eliminado` según el endpoint de origen.
+      // Así evitamos cualquier problema de serialización JSON desde el backend.
+      const activosMapeados = resultActivos.data.map(srv => ({ ...srv, eliminado: false }));
+      const inactivosMapeados = resultInactivos.data.map(srv => ({ ...srv, eliminado: true }));
+
+      setServicios([...activosMapeados, ...inactivosMapeados]);
     } else {
-      setError(result.error);
+      setError(resultActivos.error || resultInactivos.error || 'Error al cargar los servicios');
     }
+    
     setLoading(false);
   };
 
@@ -61,8 +80,10 @@ const ServiciosView = ({ onBack }) => {
     setError('');
     const result = await createServicio(nuevoServicio.trim());
     if (result.success) {
-      setServicios([...servicios, result.data]);
+      // Al crear, forzamos que venga con eliminado en false
+      setServicios([...servicios, { ...result.data, eliminado: false }]);
       setNuevoServicio('');
+      setPageActivos(1); // Volver a la primera página al crear
     } else { 
       setError(result.error); 
     }
@@ -86,7 +107,8 @@ const ServiciosView = ({ onBack }) => {
     setError('');
     const result = await updateServicio(id, editNombre.trim());
     if (result.success) {
-      setServicios(servicios.map(srv => srvId(srv) === id ? result.data : srv));
+      // Actualizamos manteniendo el estado `eliminado` que ya tenía en el frontend
+      setServicios(servicios.map(srv => srvId(srv) === id ? { ...result.data, eliminado: srv.eliminado } : srv));
       cancelarEdicion();
     } else { 
       setError(result.error); 
@@ -101,7 +123,6 @@ const ServiciosView = ({ onBack }) => {
       setLoadingImpacto(true);
       const id = srvId(srv);
       
-      // Llamada al backend para verificar la cantidad de registros asociados (funcionarios o turnos)
       const result = await getDependenciasServicio(id);
       setDependencias(result.success ? result.data : 0);
       setLoadingImpacto(false);
@@ -116,13 +137,70 @@ const ServiciosView = ({ onBack }) => {
       const result = await eliminarServicio(id);
       
       if (result.success) {
-          setServicios((prev) => prev.filter((srv) => srvId(srv) !== id));
+          // Marcamos como eliminado localmente para que se mueva a la lista inactiva
+          setServicios((prev) => prev.map((srv) => 
+            srvId(srv) === id ? { ...srv, eliminado: true } : srv
+          ));
           setConfirmDel(null);
       } else {
           setError(result.error);
           setConfirmDel(null);
       }
       setEliminando(false);
+  };
+
+  // ─── Lógica de Paginación y Filtrado ─────────────────────────────────────
+  // Ahora el filtro es simple y exacto porque nosotros mismos seteamos el booleano
+  const activos = servicios.filter(s => s.eliminado === false);
+  const inactivos = servicios.filter(s => s.eliminado === true);
+
+  const totalPagesActivos = Math.max(1, Math.ceil(activos.length / ITEMS_PER_PAGE));
+  const totalPagesInactivos = Math.max(1, Math.ceil(inactivos.length / ITEMS_PER_PAGE));
+
+  // Ajustar la página si el elemento actual desaparece
+  useEffect(() => {
+    if (pageActivos > totalPagesActivos) setPageActivos(totalPagesActivos);
+  }, [totalPagesActivos, pageActivos]);
+
+  useEffect(() => {
+    if (pageInactivos > totalPagesInactivos) setPageInactivos(totalPagesInactivos);
+  }, [totalPagesInactivos, pageInactivos]);
+
+  const paginatedActivos = activos.slice((pageActivos - 1) * ITEMS_PER_PAGE, pageActivos * ITEMS_PER_PAGE);
+  const paginatedInactivos = inactivos.slice((pageInactivos - 1) * ITEMS_PER_PAGE, pageInactivos * ITEMS_PER_PAGE);
+
+  // Componente interno para controles de paginación
+  const PaginationControls = ({ page, totalPages, setPage }) => {
+    if (totalPages <= 1) return null;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+        <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{ 
+              background: '#fff', border: `1px solid ${PA.line2}`, padding: '6px 12px', 
+              borderRadius: 8, color: page === 1 ? PA.ink3 : PA.ink, 
+              cursor: page === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12 
+            }}
+        >
+            Anterior
+        </button>
+        <span style={{ fontSize: 12, fontWeight: 700, color: PA.ink3 }}>
+            Página {page} de {totalPages}
+        </span>
+        <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            style={{ 
+              background: '#fff', border: `1px solid ${PA.line2}`, padding: '6px 12px', 
+              borderRadius: 8, color: page === totalPages ? PA.ink3 : PA.ink, 
+              cursor: page === totalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12 
+            }}
+        >
+            Siguiente
+        </button>
+      </div>
+    );
   };
 
   const inputStyle = {
@@ -189,88 +267,101 @@ const ServiciosView = ({ onBack }) => {
             </form>
         </div>
 
-        {/* Lista de Servicios */}
-        <div>
+        {/* ─── LISTA DE SERVICIOS ACTIVOS ─── */}
+        <div style={{ marginBottom: 24 }}>
           <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, marginBottom: 8, display: 'block' }}>
-            Servicios Activos
+            Servicios Activos ({activos.length})
           </label>
           {loading ? (
              <div style={{ padding: '16px', textAlign: 'center', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
                Cargando datos…
              </div>
-          ) : servicios.length === 0 ? (
+          ) : activos.length === 0 ? (
              <div style={{ padding: '16px', textAlign: 'center', background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12, color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
-               No hay servicios registrados.
+               No hay servicios activos.
              </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {servicios.map((srv) => {
-                const id = srvId(srv);
-                const isEditing = editingId === id;
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {paginatedActivos.map((srv) => {
+                  const id = srvId(srv);
+                  const isEditing = editingId === id;
 
-                return (
-                  <div key={id} style={{ padding: '12px 14px', background: '#fff', borderRadius: 12, border: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: PA.surface2, display: 'grid', placeItems: 'center' }}>
-                        <Building2 size={18} color={PA.primary} />
+                  return (
+                    <div key={id} style={{ padding: '12px 14px', background: '#fff', borderRadius: 12, border: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: PA.surface2, display: 'grid', placeItems: 'center' }}>
+                          <Building2 size={18} color={PA.primary} />
+                      </div>
+
+                      {isEditing ? (
+                        <>
+                          <input 
+                            value={editNombre} 
+                            onChange={(e) => setEditNombre(e.target.value)} 
+                            onKeyDown={(e) => { 
+                              if (e.key === 'Enter') guardarEdicion(id); 
+                              if (e.key === 'Escape') cancelarEdicion(); 
+                            }} 
+                            autoFocus 
+                            disabled={guardandoEdicion} 
+                            style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, border: `1px solid ${PA.primary}`, fontSize: 15, fontWeight: 700, color: PA.ink, outline: 'none', boxSizing: 'border-box' }} 
+                          />
+                          <button onClick={() => guardarEdicion(id)} disabled={guardandoEdicion || !editNombre.trim()} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.primary, opacity: (!editNombre.trim() || guardandoEdicion) ? 0.4 : 1 }} title="Guardar">
+                            <Check size={20} />
+                          </button>
+                          <button onClick={cancelarEdicion} disabled={guardandoEdicion} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.ink3 }} title="Cancelar">
+                            <X size={20} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: PA.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {srvNombre(srv)}
+                          </div>
+                          <button onClick={() => iniciarEdicion(srv)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.ink3 }} title="Editar">
+                            <Pencil size={17} />
+                          </button>
+                          <button onClick={() => abrirConfirmEliminar(srv)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.warn || '#DC2626' }} title="Eliminar">
+                            <Trash2 size={17} />
+                          </button>
+                        </>
+                      )}
                     </div>
+                  );
+                })}
+              </div>
+              <PaginationControls page={pageActivos} totalPages={totalPagesActivos} setPage={setPageActivos} />
+            </>
+          )}
+        </div>
 
-                    {isEditing ? (
-                      <>
-                        <input 
-                          value={editNombre} 
-                          onChange={(e) => setEditNombre(e.target.value)} 
-                          onKeyDown={(e) => { 
-                            if (e.key === 'Enter') guardarEdicion(id); 
-                            if (e.key === 'Escape') cancelarEdicion(); 
-                          }} 
-                          autoFocus 
-                          disabled={guardandoEdicion} 
-                          style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, border: `1px solid ${PA.primary}`, fontSize: 15, fontWeight: 700, color: PA.ink, outline: 'none', boxSizing: 'border-box' }} 
-                        />
-                        <button 
-                          onClick={() => guardarEdicion(id)} 
-                          disabled={guardandoEdicion || !editNombre.trim()} 
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.primary, opacity: (!editNombre.trim() || guardandoEdicion) ? 0.4 : 1 }} 
-                          title="Guardar"
-                        >
-                          <Check size={20} />
-                        </button>
-                        <button 
-                          onClick={cancelarEdicion} 
-                          disabled={guardandoEdicion} 
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.ink3 }} 
-                          title="Cancelar"
-                        >
-                          <X size={20} />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: PA.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {srvNombre(srv)}
-                        </div>
-                        <button 
-                          onClick={() => iniciarEdicion(srv)} 
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.ink3 }} 
-                          title="Editar"
-                        >
-                          <Pencil size={17} />
-                        </button>
-                        <button 
-                          onClick={() => abrirConfirmEliminar(srv)} 
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', padding: 6, color: PA.warn || '#DC2626' }} 
-                          title="Eliminar"
-                        >
-                          <Trash2 size={17} />
-                        </button>
-                      </>
-                    )}
+        {/* ─── LISTA DE SERVICIOS INACTIVOS ─── */}
+        {!loading && inactivos.length > 0 && (
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, marginBottom: 8, display: 'block' }}>
+              Servicios Inactivos ({inactivos.length})
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {paginatedInactivos.map((srv) => {
+                const id = srvId(srv);
+                return (
+                  <div key={id} style={{ padding: '12px 14px', background: 'transparent', borderRadius: 12, border: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 10, opacity: 0.7 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: PA.line, display: 'grid', placeItems: 'center' }}>
+                        <Building2 size={18} color={PA.ink3} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: PA.ink3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {srvNombre(srv)}
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, background: PA.line, padding: '4px 8px', borderRadius: 6 }}>
+                      Inactivo
+                    </div>
                   </div>
                 );
               })}
             </div>
-          )}
-        </div>
+            <PaginationControls page={pageInactivos} totalPages={totalPagesInactivos} setPage={setPageInactivos} />
+          </div>
+        )}
       </div>
 
       {/* Renderizado condicional del modal de confirmación */}
@@ -278,7 +369,7 @@ const ServiciosView = ({ onBack }) => {
           <ConfirmDeleteServicio
               PA={PA}
               nombre={srvNombre(confirmDel)}
-              dependencias={dependencias} // Pasamos la cantidad de registros bloqueantes
+              dependencias={dependencias} 
               loadingImpacto={loadingImpacto}
               eliminando={eliminando}
               onConfirm={handleEliminar}
@@ -331,7 +422,7 @@ function ConfirmDeleteServicio({ PA, nombre, dependencias, loadingImpacto, elimi
                     </div>
                 ) : (
                     <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>
-                        No tiene registros asociados. Dejará de aparecer en la gestión.
+                        No tiene registros asociados. Dejará de aparecer en la gestión activa.
                     </p>
                 )}
 
