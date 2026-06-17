@@ -3,10 +3,12 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.DTO.BitacoraResponseDTO;
 import com.pingeso.HUAP.Entity.BitacoraEntity;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
+import com.pingeso.HUAP.Entity.OfertaGeneralEntity;
 import com.pingeso.HUAP.Entity.Solicitud2Entity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.BitacoraRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
+import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.Solicitud2Repository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class BitacoraService {
     private final BitacoraRepository bitacoraRepository;
     private final Solicitud2Repository solicitud2Repository;
     private final FuncionarioRepository funcionarioRepository;
+    private final OfertaGeneralRepository ofertaGeneralRepository;
 
     public List<BitacoraEntity> findAll() {
         return bitacoraRepository.findAll();
@@ -90,6 +93,39 @@ public class BitacoraService {
         TurnoEntity       tSol      = s != null ? s.getTurno()               : null;
         TurnoEntity       tReceptor = s != null ? s.getTurnoReceptor()       : null;
 
+        // Enriquecimiento para oferta general (motivo = "idOferta=X", sin solicitud)
+        String nombreOferente          = null;
+        String diaInicioTurnoOferta    = null;
+        String horaInicioTurnoOferta   = null;
+        String horaFinTurnoOferta      = null;
+        String nombrePuestoTurnoOferta = null;
+        String nombreAsignado          = null;
+
+        if (s == null && e.getMotivo() != null && e.getMotivo().startsWith("idOferta=")) {
+            try {
+                Long idOferta = Long.parseLong(e.getMotivo().substring("idOferta=".length()));
+                Optional<OfertaGeneralEntity> optOferta = ofertaGeneralRepository.findById(idOferta);
+                if (optOferta.isPresent()) {
+                    OfertaGeneralEntity oferta = optOferta.get();
+                    nombreOferente = nombreCompleto(oferta.getOfertor());
+                    TurnoEntity tOferta = oferta.getTurno();
+                    if (tOferta != null) {
+                        diaInicioTurnoOferta    = tOferta.getDiaInicioTurno()  != null ? tOferta.getDiaInicioTurno().toString()  : null;
+                        horaInicioTurnoOferta   = tOferta.getHoraInicio()      != null ? tOferta.getHoraInicio().toString()       : null;
+                        horaFinTurnoOferta      = tOferta.getHoraFin()         != null ? tOferta.getHoraFin().toString()          : null;
+                        nombrePuestoTurnoOferta = tOferta.getPuesto()          != null ? tOferta.getPuesto().getNombre()           : null;
+                    }
+                    if ("OFERTA_GENERAL_CERRADA".equals(e.getTipoEvento())) {
+                        nombreAsignado = oferta.getPostulaciones().stream()
+                                .filter(p -> Boolean.TRUE.equals(p.getSeleccionado()))
+                                .findFirst()
+                                .map(p -> nombreCompleto(p.getPostulante()))
+                                .orElse(null);
+                    }
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
         return BitacoraResponseDTO.builder()
                 .idEvento(e.getIdEvento())
                 .tipoEvento(e.getTipoEvento())
@@ -139,6 +175,13 @@ public class BitacoraService {
                 .horaInicioTurnoReceptor(tReceptor != null && tReceptor.getHoraInicio() != null ? tReceptor.getHoraInicio().toString() : null)
                 .horaFinTurnoReceptor(tReceptor != null && tReceptor.getHoraFin() != null ? tReceptor.getHoraFin().toString() : null)
                 .nombrePuestoReceptor(tReceptor != null && tReceptor.getPuesto() != null ? tReceptor.getPuesto().getNombre() : null)
+                // oferta general
+                .nombreOferente(nombreOferente)
+                .diaInicioTurnoOferta(diaInicioTurnoOferta)
+                .horaInicioTurnoOferta(horaInicioTurnoOferta)
+                .horaFinTurnoOferta(horaFinTurnoOferta)
+                .nombrePuestoTurnoOferta(nombrePuestoTurnoOferta)
+                .nombreAsignado(nombreAsignado)
                 .build();
     }
 
@@ -178,6 +221,7 @@ public class BitacoraService {
             case 2 -> "Botar turno";
             case 3 -> "Cobertura";
             case 4 -> "Intercambio";
+            case 5 -> "Oferta particular";
             default -> "Tipo " + tipo;
         };
     }

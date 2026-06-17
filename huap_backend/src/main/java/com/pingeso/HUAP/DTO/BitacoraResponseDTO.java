@@ -66,4 +66,12 @@ public class BitacoraResponseDTO {
     private String horaInicioTurnoReceptor;
     private String horaFinTurnoReceptor;
     private String nombrePuestoReceptor;
+
+    // Oferta general (enriquecido desde motivo = "idOferta=X")
+    private String nombreOferente;
+    private String diaInicioTurnoOferta;
+    private String horaInicioTurnoOferta;
+    private String horaFinTurnoOferta;
+    private String nombrePuestoTurnoOferta;
+    private String nombreAsignado;
 }
