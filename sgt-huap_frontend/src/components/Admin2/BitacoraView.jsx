@@ -52,9 +52,12 @@ function estadoTone(estado) {
   return 'warn';
 }
 
+const esGeneracionTurno = (ev) => ev.tipoEvento === 'GENERACION_TURNO';
+
 // Label legible para el header del item colapsado
 function labelEvento(ev) {
   if (ev.tipoSolicitud) return ev.tipoSolicitud;
+  if (esGeneracionTurno(ev)) return 'Creación de turno';
   if (!ev.idSolicitud) return 'Turno';
   return labelParaTipo(ev.tipoEvento);
 }
@@ -193,6 +196,16 @@ const BloqueGenerico = ({ ev }) => {
   );
 };
 
+const BloqueGeneracionTurno = ({ ev }) => (
+  <>
+    <Row label="Asignado a"     value={ev.nombreFuncionarioTurno || 'Libre'} />
+    <Row label="Turno"          value={fmtTurno(ev.diaInicioTurno, ev.horaInicioTurno, ev.horaFinTurno, ev.nombrePuesto)} />
+    <Row label="Rango afectado" value={fmtRango(ev.fechaInicioAfectada, ev.fechaFinAfectada)} />
+    <Row label="Planificación"  value={ev.motivo} />
+    <Row label="Generado por"   value={ev.nombreFuncionario} />
+  </>
+);
+
 function bloqueParaTipo(tipoSolicitud, ev) {
   switch (tipoSolicitud) {
     case 'Permiso':      return <BloquePermiso ev={ev} />;
@@ -286,6 +299,11 @@ const EventoItem = ({ evento }) => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <SGTBadge tone={tone} size="xs">{label}</SGTBadge>
+          {esGeneracionTurno(evento) && (
+            <SGTBadge tone={evento.nombreFuncionarioTurno ? 'success' : 'neutral'} size="xs">
+              {evento.nombreFuncionarioTurno || 'Libre'}
+            </SGTBadge>
+          )}
           {evento.estadoSolicitud && (
             <SGTBadge tone={estadoTone(evento.estadoSolicitud)} size="xs">{evento.estadoSolicitud}</SGTBadge>
           )}
@@ -309,7 +327,9 @@ const EventoItem = ({ evento }) => {
             display: 'flex', flexDirection: 'column', gap: 4,
           }}
         >
-          {bloqueParaTipo(evento.tipoSolicitud, evento)}
+          {esGeneracionTurno(evento)
+            ? <BloqueGeneracionTurno ev={evento} />
+            : bloqueParaTipo(evento.tipoSolicitud, evento)}
         </div>
       )}
     </div>
@@ -430,7 +450,7 @@ const BitacoraView = ({ onBack }) => {
                 label="Categoría"
                 opciones={[
                   { value: 'SOLICITUDES', label: 'Solicitudes' },
-                  { value: 'TURNOS',      label: 'Turnos (próximamente)' },
+                  { value: 'TURNOS',      label: 'Turnos' },
                 ]}
                 valor={filtroCategoria}
                 onSelect={setFiltroCategoria}

@@ -45,6 +45,7 @@ public class PlanificacionService {
     private final PuestoRepository puestoRepository;
     private final PlantillaDiaRepository plantillaDiaRepository;
     private final TurnoRepository turnoRepository;
+    private final BitacoraService bitacoraService;
 
     public PlanificacionService(
             PlanificacionRepository planificacionRepository,
@@ -53,7 +54,8 @@ public class PlanificacionService {
             FuncionarioRepository funcionarioRepository,
             PuestoRepository puestoRepository,
             PlantillaDiaRepository plantillaDiaRepository,
-            TurnoRepository turnoRepository
+            TurnoRepository turnoRepository,
+            BitacoraService bitacoraService
     ) {
         this.planificacionRepository = planificacionRepository;
         this.servicioRepository = servicioRepository;
@@ -62,6 +64,7 @@ public class PlanificacionService {
         this.puestoRepository = puestoRepository;
         this.plantillaDiaRepository = plantillaDiaRepository;
         this.turnoRepository = turnoRepository;
+        this.bitacoraService = bitacoraService;
     }
 
     // =========================================================
@@ -140,10 +143,14 @@ public class PlanificacionService {
      * crea igual pero VACANTE (funcionario null) para que otra persona pueda tomarlo.
      * Devuelve {generados, vacantesPorConflicto}.
      */
-    public Map<String, Object> generarTurnos(Long idPlanificacion, LocalDate fechaInicio) {
+    public Map<String, Object> generarTurnos(Long idPlanificacion, LocalDate fechaInicio, Long actorId) {
         validarLunes(fechaInicio);
         PlanificacionEntity plan = obtenerPlanificacion(idPlanificacion);
         ServicioEntity servicio = plan.getServicio();
+
+        // Actor que ejecuta la generación (para registrar en bitácora cada turno creado).
+        FuncionarioEntity actor = (actorId != null)
+                ? funcionarioRepository.findById(actorId).orElse(null) : null;
 
         int generados = 0, vacantesPorConflicto = 0;
         // Turnos ya creados en este lote, por funcionario (para el chequeo intra-lote).
@@ -191,6 +198,10 @@ public class PlanificacionService {
 
                 turnoRepository.save(turno);
                 turnoRepository.flush(); // visible para el filtro grueso por BD del próximo chequeo
+
+                // Registro en bitácora del turno recién creado.
+                bitacoraService.registrarTurnoGenerado(turno, actor, plan.getNombre());
+
                 if (funcAsignado != null) {
                     creadosPorFuncionario.computeIfAbsent(funcAsignado.getIdFuncionario(), k -> new ArrayList<>()).add(turno);
                 }

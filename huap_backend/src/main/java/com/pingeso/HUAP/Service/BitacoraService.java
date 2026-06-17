@@ -110,6 +110,8 @@ public class BitacoraService {
                 .horaInicioTurno(turno != null && turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null)
                 .horaFinTurno(turno != null && turno.getHoraFin() != null ? turno.getHoraFin().toString() : null)
                 .nombrePuesto(turno != null && turno.getPuesto() != null ? turno.getPuesto().getNombre() : null)
+                .idFuncionarioTurno(turno != null && turno.getFuncionario() != null ? turno.getFuncionario().getIdFuncionario() : null)
+                .nombreFuncionarioTurno(turno != null ? nombreCompleto(turno.getFuncionario()) : null)
                 // solicitud base
                 .idSolicitud(s != null ? s.getIdSolicitud() : null)
                 .tipoSolicitud(s != null && s.getTipoSolicitud() != null ? tipoSolicitudLabel(s.getTipoSolicitud().getTipo()) : null)
@@ -143,6 +145,30 @@ public class BitacoraService {
     private String nombreCompleto(FuncionarioEntity f) {
         if (f == null) return null;
         return (f.getNombre() + (f.getApelPat() != null ? " " + f.getApelPat() : "")).trim();
+    }
+
+    /**
+     * Registra en la bitácora un turno recién generado desde una planificación.
+     */
+    @Transactional
+    public void registrarTurnoGenerado(TurnoEntity turno, FuncionarioEntity actor, String planificacionNombre) {
+        String asignado = (turno.getFuncionario() != null)
+                ? nombreCompleto(turno.getFuncionario()) : "Vacante";
+
+        BitacoraEntity log = BitacoraEntity.builder()
+                .tipoEvento("GENERACION_TURNO")
+                .turno(turno)
+                .funcionario(actor) // quién generó (jefatura/admin)
+                .motivo(planificacionNombre != null ? "Planificación: " + planificacionNombre : null)
+                .observaciones("Turno generado — " + asignado)
+                .fechaInicioAfectada(turno.getDiaInicioTurno() != null && turno.getHoraInicio() != null
+                        ? turno.getDiaInicioTurno().atTime(turno.getHoraInicio()) : null)
+                .fechaFinAfectada(turno.getDiaFinalTurno() != null && turno.getHoraFin() != null
+                        ? turno.getDiaFinalTurno().atTime(turno.getHoraFin()) : null)
+                .fechaModificacion(LocalDateTime.now())
+                .activo(true)
+                .build();
+        bitacoraRepository.save(log);
     }
 
     private String tipoSolicitudLabel(Integer tipo) {

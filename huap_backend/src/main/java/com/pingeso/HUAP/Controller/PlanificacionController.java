@@ -6,6 +6,8 @@ import com.pingeso.HUAP.Entity.PlanificacionAsignacionEntity;
 import com.pingeso.HUAP.Entity.PlanificacionEntity;
 import com.pingeso.HUAP.Service.PlanificacionService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -66,7 +68,10 @@ public class PlanificacionController {
     public ResponseEntity<?> generar(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
         try {
             LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
-            return ResponseEntity.ok(planificacionService.generarTurnos(id, fechaInicio));
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long actorId = (auth != null && auth.getPrincipal() instanceof Long)
+                    ? (Long) auth.getPrincipal() : null;
+            return ResponseEntity.ok(planificacionService.generarTurnos(id, fechaInicio, actorId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
