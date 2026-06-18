@@ -51,7 +51,7 @@ public class    FuncionarioEntity {
     private int estado;
 
     @Builder.Default
-    @Column(name = "eliminado", nullable = false)
+    @Column(name = "eliminado", nullable = false, columnDefinition = "bit(1) default 0")
     private boolean eliminado = false;
 
     @Column(name = "Profesion")

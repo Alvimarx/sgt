@@ -32,7 +32,7 @@ public class PlantillaTurnoEntity {
     @JoinColumn(name = "id_servicio", nullable = false)
     private ServicioEntity servicio;
 
-    @Column(name = "eliminado", nullable = false)
+    @Column(name = "eliminado", nullable = false, columnDefinition = "bit(1) default 0")
     private boolean eliminado = false;
 
     public PlantillaTurnoEntity(String nombre, ServicioEntity servicio, LocalTime horaInicio, LocalTime horaTermino) {

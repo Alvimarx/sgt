@@ -28,7 +28,7 @@ public class PlantillaEntity {
     @Column(name = "semanas", nullable = false)
     private Byte semanas;
 
-    @Column(name = "eliminado", nullable = false)
+    @Column(name = "eliminado", nullable = false, columnDefinition = "bit(1) default 0")
     private boolean eliminado = false;
 
     @JsonIgnore

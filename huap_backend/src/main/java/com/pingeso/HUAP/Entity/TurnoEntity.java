@@ -35,7 +35,7 @@ public class TurnoEntity {
     private LocalTime horaFin;
 
     @Builder.Default
-    @Column(name = "eliminado", nullable = false)
+    @Column(name = "eliminado", nullable = false, columnDefinition = "bit(1) default 0")
     private boolean eliminado = false;
 
     // --- Relaciones ---

@@ -81,57 +81,57 @@ INSERT INTO servicios (id_servicio, nombre) VALUES
 -- ==============================================================
 -- 4. FUNCIONARIO  →  tabla: Funcionario
 -- Columnas: ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat,
---           Rut, DV, Clave, Estado, Profesion, ID_ROL_SISTEMA
+--           Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA
 -- ID_ROL_SISTEMA: 1=ADMINISTRADOR (jefes/subrogantes)  2=USUARIO (médicos/enfermeros)
 -- ==============================================================
 -- Contraseña "huap2025" hasheada en SHA-512 (inlinea para compatibilidad con DBeaver)
-INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, Profesion, ID_ROL_SISTEMA) VALUES
+INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA) VALUES
 -- === Medicina Interna ===
 -- Jefatura → ADMINISTRADOR (1)
-(1,  'Álvaro',     'López',       '',           '22222222', '2', 1, 'Médico Urgenciólogo',  1),
+(1,  'Álvaro',     'López',       '',           '22222222', '2', 1, 0, 'Médico Urgenciólogo',  1),
 -- Médicos → USUARIO (2)
-(2,  'Fernando',   'Roman',       '',           '22222223', '3', 1, 'Médico Internista',    2),
-(3,  'Sergio',     'González',    '',           '22222224', '4', 1, 'Médico Internista',    2),
-(4,  'Andrés',     'Tigre',       '',           '18155637', '4', 1, 'Médico Internista',    2),
-(5,  'Francisca',  'Álvarez',     '',           '19091609', 'k', 1, 'Médico Internista',    2),
-(6,  'Tania',      'Bustos',      'Jorge',      '19178519', '3', 1, 'Médico Internista',    2),
-(7,  'Fabián',     'Díaz',        'Terrazas',   '21554320', 'k', 1, 'Médico Internista',    2),
-(8,  'María José', 'Espinoza',    'Tilleria',   '19184336', '3', 1, 'Médico Internista',    2),
-(9,  'Javier',     'González',    'Lucero',     '19127805', '4', 1, 'Médico Internista',    2),
-(10, 'Karla',      'Rojas',       'Toledo',     '19036885', '8', 1, 'Médico Internista',    2),
-(11, 'Javiera',    'Steenbecker', 'Jara',       '18211062', '0', 1, 'Médico Internista',    2),
-(12, 'Juan',       'Fuentes',     'Haddad',     '18461922', '9', 1, 'Médico Internista',    2),
-(13, 'Gonzalo',    'Hinojosa',    'Cerda',      '16875278', '4', 1, 'Médico Internista',    2),
-(14, 'Carlos',     'Saa',         'Chong',      '16864458', '2', 1, 'Médico Internista',    2),
-(15, 'Consuelo',   'Vilches',     'Alvarado',   '19646316', 'K', 1, 'Médico Internista',    2),
-(16, 'Constanza',  'Peña',        'Pozo',       '19644996', '5', 1, 'Médico Internista',    2),
-(17, 'Tomás',      'Ide',         'Guiñez',     '19594566', '7', 1, 'Médico Internista',    2),
-(18, 'Rocío',      'López',       'Núñez',      '19639491', '5', 1, 'Médico Internista',    2),
-(19, 'Antonia',    'Alliende',    'Page',       '19079052', '5', 1, 'Médico Internista',    2),
-(20, 'Flavia',     'Paratori',    'Slinger',    '19687654', '5', 1, 'Médico Internista',    2),
+(2,  'Fernando',   'Roman',       '',           '22222223', '3', 1, 0, 'Médico Internista',    2),
+(3,  'Sergio',     'González',    '',           '22222224', '4', 1, 0, 'Médico Internista',    2),
+(4,  'Andrés',     'Tigre',       '',           '18155637', '4', 1, 0, 'Médico Internista',    2),
+(5,  'Francisca',  'Álvarez',     '',           '19091609', 'k', 1, 0, 'Médico Internista',    2),
+(6,  'Tania',      'Bustos',      'Jorge',      '19178519', '3', 1, 0, 'Médico Internista',    2),
+(7,  'Fabián',     'Díaz',        'Terrazas',   '21554320', 'k', 1, 0, 'Médico Internista',    2),
+(8,  'María José', 'Espinoza',    'Tilleria',   '19184336', '3', 1, 0, 'Médico Internista',    2),
+(9,  'Javier',     'González',    'Lucero',     '19127805', '4', 1, 0, 'Médico Internista',    2),
+(10, 'Karla',      'Rojas',       'Toledo',     '19036885', '8', 1, 0, 'Médico Internista',    2),
+(11, 'Javiera',    'Steenbecker', 'Jara',       '18211062', '0', 1, 0, 'Médico Internista',    2),
+(12, 'Juan',       'Fuentes',     'Haddad',     '18461922', '9', 1, 0, 'Médico Internista',    2),
+(13, 'Gonzalo',    'Hinojosa',    'Cerda',      '16875278', '4', 1, 0, 'Médico Internista',    2),
+(14, 'Carlos',     'Saa',         'Chong',      '16864458', '2', 1, 0, 'Médico Internista',    2),
+(15, 'Consuelo',   'Vilches',     'Alvarado',   '19646316', 'K', 1, 0, 'Médico Internista',    2),
+(16, 'Constanza',  'Peña',        'Pozo',       '19644996', '5', 1, 0, 'Médico Internista',    2),
+(17, 'Tomás',      'Ide',         'Guiñez',     '19594566', '7', 1, 0, 'Médico Internista',    2),
+(18, 'Rocío',      'López',       'Núñez',      '19639491', '5', 1, 0, 'Médico Internista',    2),
+(19, 'Antonia',    'Alliende',    'Page',       '19079052', '5', 1, 0, 'Médico Internista',    2),
+(20, 'Flavia',     'Paratori',    'Slinger',    '19687654', '5', 1, 0, 'Médico Internista',    2),
 -- === Enfermería ===
 -- Jefatura → ADMINISTRADOR (1)
-(100, 'María Elena', 'Torres',   'Pérez',     '99999999', '9', 1, 'Enfermera Supervisora',  2),
+(100, 'María Elena', 'Torres',   'Pérez',     '99999999', '9', 1, 0, 'Enfermera Supervisora',  2),
 -- Subrogante → ADMINISTRADOR (1)
-(101, 'Ana María',   'González', 'Rojas',     '12345678', '9', 1, 'Enfermera Coordinadora', 2),
+(101, 'Ana María',   'González', 'Rojas',     '12345678', '9', 1, 0, 'Enfermera Coordinadora', 2),
 -- Enfermeros/as → USUARIO (2)
-(102, 'Carlos',      'Silva',    'Mendoza',   '10000001', '1', 1, 'Enfermera(o)',            2),
-(103, 'Patricia',    'Vargas',   'Ríos',      '10000002', '2', 1, 'Enfermera(o)',            2),
-(104, 'Roberto',     'Herrera',  'Díaz',      '10000003', '3', 1, 'Enfermera(o)',            2),
-(105, 'Fernanda',    'Castillo', 'Muñoz',     '10000004', '4', 1, 'Enfermera(o)',            2),
-(106, 'Miguel',      'Soto',     'Contreras', '10000005', '5', 1, 'Enfermera(o)',            2),
-(107, 'Cristina',    'Flores',   'Navarrete', '10000006', '6', 1, 'Enfermera(o)',            2),
+(102, 'Carlos',      'Silva',    'Mendoza',   '10000001', '1', 1, 0, 'Enfermera(o)',            2),
+(103, 'Patricia',    'Vargas',   'Ríos',      '10000002', '2', 1, 0, 'Enfermera(o)',            2),
+(104, 'Roberto',     'Herrera',  'Díaz',      '10000003', '3', 1, 0, 'Enfermera(o)',            2),
+(105, 'Fernanda',    'Castillo', 'Muñoz',     '10000004', '4', 1, 0, 'Enfermera(o)',            2),
+(106, 'Miguel',      'Soto',     'Contreras', '10000005', '5', 1, 0, 'Enfermera(o)',            2),
+(107, 'Cristina',    'Flores',   'Navarrete', '10000006', '6', 1, 0, 'Enfermera(o)',            2),
 -- === Cirugía ===
 -- Jefatura → ADMINISTRADOR (1)
-(200, 'Ricardo',     'Morales',  'Vega',      '11111111', '1', 1, 'Médico Cirujano',         2),
+(200, 'Ricardo',     'Morales',  'Vega',      '11111111', '1', 1, 0, 'Médico Cirujano',         2),
 -- Subrogante → ADMINISTRADOR (1)
-(201, 'Isabel',      'Parra',    'Cáceres',   '11111112', '2', 1, 'Médico Cirujano',         2),
+(201, 'Isabel',      'Parra',    'Cáceres',   '11111112', '2', 1, 0, 'Médico Cirujano',         2),
 -- Médicos → USUARIO (2)
-(202, 'Felipe',      'Castillo', 'Arenas',    '11111113', '3', 1, 'Médico Cirujano',         2),
-(203, 'Valentina',   'Ríos',     'Fuentes',   '11111114', '4', 1, 'Médico Cirujano',         2),
-(204, 'Sebastián',   'Muñoz',    'Lagos',     '11111115', '5', 1, 'Médico Cirujano',         2),
-(205, 'Camila',      'Vega',     'Soto',      '11111116', '6', 1, 'Médico Cirujano',         2),
-(206, 'Diego',       'Rojas',    'Mora',      '11111117', '7', 1, 'Médico Cirujano',         2);
+(202, 'Felipe',      'Castillo', 'Arenas',    '11111113', '3', 1, 0, 'Médico Cirujano',         2),
+(203, 'Valentina',   'Ríos',     'Fuentes',   '11111114', '4', 1, 0, 'Médico Cirujano',         2),
+(204, 'Sebastián',   'Muñoz',    'Lagos',     '11111115', '5', 1, 0, 'Médico Cirujano',         2),
+(205, 'Camila',      'Vega',     'Soto',      '11111116', '6', 1, 0, 'Médico Cirujano',         2),
+(206, 'Diego',       'Rojas',    'Mora',      '11111117', '7', 1, 0, 'Médico Cirujano',         2);
 
 -- ==============================================================
 -- 5. SERVICIOS_FUNCIONARIO  →  tabla: Servicios_Funcionario
