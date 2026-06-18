@@ -28,6 +28,9 @@ public class PlantillaEntity {
     @Column(name = "semanas", nullable = false)
     private Byte semanas;
 
+    @Column(name = "eliminado", nullable = false)
+    private boolean eliminado = false;
+
     @JsonIgnore
     @OneToMany(mappedBy = "plantilla", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("diaIndex ASC")

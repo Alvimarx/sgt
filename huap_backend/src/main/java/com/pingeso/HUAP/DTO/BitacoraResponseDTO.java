@@ -30,6 +30,9 @@ public class BitacoraResponseDTO {
     private String horaInicioTurno;
     private String horaFinTurno;
     private String nombrePuesto;
+    // Funcionario asignado al turno directo (null = turno libre/vacante)
+    private Long idFuncionarioTurno;
+    private String nombreFuncionarioTurno;
 
     // Solicitud — datos base
     private Long idSolicitud;
@@ -63,4 +66,12 @@ public class BitacoraResponseDTO {
     private String horaInicioTurnoReceptor;
     private String horaFinTurnoReceptor;
     private String nombrePuestoReceptor;
+
+    // Oferta general (enriquecido desde motivo = "idOferta=X")
+    private String nombreOferente;
+    private String diaInicioTurnoOferta;
+    private String horaInicioTurnoOferta;
+    private String horaFinTurnoOferta;
+    private String nombrePuestoTurnoOferta;
+    private String nombreAsignado;
 }

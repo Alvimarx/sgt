@@ -6,6 +6,8 @@ import com.pingeso.HUAP.Entity.PlanificacionAsignacionEntity;
 import com.pingeso.HUAP.Entity.PlanificacionEntity;
 import com.pingeso.HUAP.Service.PlanificacionService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -66,7 +68,10 @@ public class PlanificacionController {
     public ResponseEntity<?> generar(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
         try {
             LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
-            return ResponseEntity.ok(planificacionService.generarTurnos(id, fechaInicio));
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long actorId = (auth != null && auth.getPrincipal() instanceof Long)
+                    ? (Long) auth.getPrincipal() : null;
+            return ResponseEntity.ok(planificacionService.generarTurnos(id, fechaInicio, actorId));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -112,15 +117,15 @@ public class PlanificacionController {
         PlanificacionAsignacionDTO dto = new PlanificacionAsignacionDTO();
         dto.setIdAsignacion(entidad.getIdAsignacion());
 
-        if (entidad.getPlantilla() != null) {
+        if (entidad.getPlantilla() != null && !entidad.getPlantilla().isEliminado()) {
             dto.setIdPlantilla(entidad.getPlantilla().getIdPlantilla());
             dto.setNombrePlantilla(entidad.getPlantilla().getNombre());
         }
-        if (entidad.getFuncionario() != null) {
+        if (entidad.getFuncionario() != null && !entidad.getFuncionario().isEliminado()) {
             dto.setIdFuncionario(entidad.getFuncionario().getIdFuncionario());
             dto.setNombreFuncionario(entidad.getFuncionario().getNombre());
         }
-        if (entidad.getPuesto() != null) {
+        if (entidad.getPuesto() != null && !entidad.getPuesto().isEliminado()) {
             dto.setIdPuesto(entidad.getPuesto().getIdPuesto());
             dto.setNombrePuesto(entidad.getPuesto().getNombre());
         }

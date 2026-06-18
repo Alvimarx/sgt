@@ -151,10 +151,10 @@ public class TurnoService {
     // ====================================================================
 
     /**
-     * Obtiene todos los turnos del sistema.
+     * Obtiene todos los turnos vigentes del sistema (excluye eliminados).
      */
     public List<TurnoEntity> getAllTurnos() {
-        return turnoRepository.findAll();
+        return turnoRepository.findByEliminadoFalse();
     }
 
     /**
@@ -169,25 +169,8 @@ public class TurnoService {
      */
     @Transactional
     public TurnoEntity saveTurno(TurnoEntity turno) throws Exception {
-        
-        // 1. Validar conflictos de Puesto/Plantilla (evitar duplicar vacantes)
-        if (turno.getPlantilla() != null && turno.getServicio() != null) {
-            List<TurnoEntity> conflictosPlantilla = turnoRepository.findConflictsByPlantilla(
-                    turno.getPlantilla().getIdPlantilla(),
-                    turno.getServicio().getIdServicio(), 
-                    turno.getDiaInicioTurno(), 
-                    turno.getDiaFinalTurno());
-            
-            // Excluimos el turno actual (útil para cuando saveTurno se usa desde updateTurno)
-            boolean hayConflicto = conflictosPlantilla.stream()
-                    .anyMatch(t -> turno.getIdTurno() == null || !t.getIdTurno().equals(turno.getIdTurno()));
-            
-            if (hayConflicto) {
-                throw new Exception("Conflicto: El puesto (Plantilla) ya tiene un turno generado en estas fechas para este servicio.");
-            }
-        }
 
-        // 2. Validar conflictos de Funcionario (evitar que un médico esté en dos lugares a la vez)
+        // 1. Validar conflictos de Funcionario (evitar que un médico esté en dos lugares a la vez)
         if (turno.getFuncionario() != null) {
             List<TurnoEntity> conflictosFuncionario = turnoRepository.findConflictosByFuncionario(
                     turno.getFuncionario().getIdFuncionario(),
@@ -218,31 +201,18 @@ public class TurnoService {
         return turnoRepository.save(turno);
     }
 
-    //Necesita revision
     /**
+     * Soft-delete de un turno: lo marca como eliminado para que desaparezca de la agenda
+     * vigente. No se borra físicamente, conservando las referencias históricas
+     * (solicitudes, bitácora) que lo apuntan.
+     */
     @Transactional
-    public void deleteTurno(Long id) throws Exception {
-        turnoRepository.findById(id)
+    public void eliminarTurno(Long id) throws Exception {
+        TurnoEntity turno = turnoRepository.findById(id)
                 .orElseThrow(() -> new Exception("No se encontró el turno a eliminar con ID: " + id));
-
-        // 1. Limpiar join table: remover el turno de turnosAfectados en cada solicitud
-        List<com.pingeso.HUAP.Entity.Solicitud2Entity> conTurnoAfectado =
-                solicitud2Repository.findByTurnosAfectados_Id(id);
-        for (com.pingeso.HUAP.Entity.Solicitud2Entity s : conTurnoAfectado) {
-            s.getTurnosAfectados().removeIf(t -> t.getId().equals(id));
-        }
-        solicitud2Repository.saveAll(conTurnoAfectado);
-
-        // 2. Eliminar solicitudes cuyo turno objetivo es este turno
-        solicitud2Repository.deleteAll(solicitud2Repository.findAllByTurno_Id(id));
-
-        // 3. Eliminar solicitudes de intercambio donde este turno era el ofrecido
-        solicitud2Repository.deleteAll(solicitud2Repository.findAllByTurnoDeSolicitanteId(id));
-
-        // 4. Eliminar el turno
-        turnoRepository.deleteById(id);
+        turno.setEliminado(true);
+        turnoRepository.save(turno);
     }
-    **/
 
     // ====================================================================
     // BLOQUE 3: TRANSFORMACIÓN DE DATOS 
@@ -295,7 +265,7 @@ public class TurnoService {
             m.put("rutFuncionario", null);
         }
 
-        // Plantilla
+        // Plantilla (rotativa con la que fue designado el turno)
         if (t.getPlantilla() != null) {
             m.put("idPlantilla", t.getPlantilla().getIdPlantilla());
             m.put("nombrePlantilla", t.getPlantilla().getNombre());
@@ -468,27 +438,6 @@ public class TurnoService {
     // BLOQUE 4: ASIGNACIONES MASIVAS Y PLANIFICACIÓN
     // ====================================================================
 
-
-    /**
-     * Elimina todos los turnos dentro de un rango de fechas para un piso específico.
-     * Reutiliza la lógica segura de deleteTurno() para no romper llaves foráneas.
-     */
-    //Necesita revision
-    /**
-    @Transactional
-    public void deleteTurnosByRange(LocalDate fechaInicio, LocalDate fechaFin, Long pisoId) {
-        List<TurnoEntity> turnosAEliminar = turnoRepository.findByPisoIdAndDateRange(pisoId, fechaInicio, fechaFin);
-        
-        for (TurnoEntity t : turnosAEliminar) {
-            try {
-                deleteTurno(t.getId()); 
-            } catch (Exception e) {
-                logger.error("Error al eliminar el turno masivo con ID: " + t.getId(), e);
-            }
-        }
-    }
-    **/
-
     /**
      * Obtiene los turnos "vacantes" (sin asignar) para un puesto y rango de fechas.
      * Reutiliza nuestra poderosa función de mapeo del Bloque 3.
@@ -502,50 +451,6 @@ public class TurnoService {
                 .filter(t -> t.getFuncionario() == null)
                 .map(this::convertirTurnoAMap)           
                 .collect(Collectors.toList());
-    }
-
-    /**
-     * Asignación Masiva Inteligente.
-     * Busca todos los turnos vacantes generados a partir de una Plantilla (ej. "Volante 1")
-     * en un servicio y rango de fechas, y le asigna el funcionario de una sola vez.
-     * asignarMasivoPorRotativa
-     */
-    @Transactional
-    public int asignarMasivoPorPlantilla(Long idFuncionario, Long idPlantilla, Long idServicio, LocalDate inicio, LocalDate fin) throws Exception {
-        
-        // 1. Validar que el funcionario existe
-        Optional<com.pingeso.HUAP.Entity.FuncionarioEntity> optFuncionario = funcionarioRepository.findById(idFuncionario);
-        if (optFuncionario.isEmpty()) {
-            throw new Exception("El funcionario seleccionado no existe.");
-        }
-        com.pingeso.HUAP.Entity.FuncionarioEntity funcionario = optFuncionario.get();
-
-        // 2. Buscar TODOS los turnos que pertenecen a esta plantilla en ese servicio y fechas
-        // ¡Usamos el método que creamos en el Repositorio!
-        List<TurnoEntity> turnosDeLaPlantilla = turnoRepository.findConflictsByPlantilla(idPlantilla, idServicio, inicio, fin);
-
-        int turnosAsignados = 0;
-
-        for (TurnoEntity turno : turnosDeLaPlantilla) {
-            // 3. Validar que el turno esté vacante
-            if (turno.getFuncionario() == null) {
-                
-                // 4. Validar que este funcionario no choque con OTRO turno que ya tenga asignado
-                List<TurnoEntity> conflictosFunc = turnoRepository.findConflictosByFuncionario(
-                        funcionario.getIdFuncionario(), turno.getDiaInicioTurno(), turno.getDiaFinalTurno());
-                
-                if (conflictosFunc.isEmpty()) {
-                    turno.setFuncionario(funcionario);
-                    turnoRepository.save(turno);
-                    turnosAsignados++;
-                } else {
-                    logger.warn("Se omitió asignación masiva para el turno {} porque el funcionario {} tiene tope de horario.", 
-                                turno.getIdTurno(), funcionario.getNombre());
-                }
-            }
-        }
-        
-        return turnosAsignados; // Devuelve cuántos turnos logró asignar exitosamente
     }
 
     // ====================================================================
@@ -570,8 +475,9 @@ public class TurnoService {
                     m.put("fecha",            t.getDiaInicioTurno() != null ? t.getDiaInicioTurno().toString() : null);
                     m.put("horaInicio",       t.getHoraInicio() != null ? t.getHoraInicio().toString() : null);
                     m.put("horaFin",          t.getHoraFin()    != null ? t.getHoraFin().toString()    : null);
-                    m.put("asignado",         asignado);
+                    m.put("asignado",          asignado);
                     m.put("nombreFuncionario", nombreFuncionario);
+                    m.put("nombrePlantilla",   t.getPlantilla() != null ? t.getPlantilla().getNombre() : null);
                     return m;
                 })
                 .collect(Collectors.toList());
@@ -717,24 +623,6 @@ public class TurnoService {
         cobertura.put("horasRealesCubiertas", horasReales);
         
         return cobertura;
-    }
-
-    /**
-     * Detecta turnos existentes que colisionan con un rango de fechas,
-     * revisando tanto conflictos por funcionario como por plantilla.
-     */
-    public List<TurnoEntity> checkConflicts(LocalDate fechaInicio, LocalDate fechaFin,
-                                             Long funcionarioId, Long plantillaId, Long servicioId) {
-        List<TurnoEntity> conflictos = new ArrayList<>();
-
-        if (funcionarioId != null) {
-            conflictos.addAll(turnoRepository.findConflictosByFuncionario(funcionarioId, fechaInicio, fechaFin));
-        }
-        if (plantillaId != null && servicioId != null) {
-            conflictos.addAll(turnoRepository.findConflictsByPlantilla(plantillaId, servicioId, fechaInicio, fechaFin));
-        }
-
-        return conflictos.stream().distinct().collect(Collectors.toList());
     }
 
     /**

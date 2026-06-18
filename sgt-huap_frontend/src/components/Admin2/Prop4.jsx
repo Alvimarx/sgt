@@ -20,10 +20,13 @@ import PuestosView from "../ComunAdministracion/PuestosView";
 import AdminStats from "../ComunAdministracion/AdminStats";
 
 //Importaciones Administrador
+import FuncionariosSistemaView from "./FuncionariosSistemaView";
 
 //Importaciones Jefatura
 import JefaturaDashboard from "../Jefatura/JefaturaDashboardView";
 import JerarquiaJefaturaView from "../Jefatura/JerarquiaJefaturaView";
+import JerarquiaAsignacionView from "../Jefatura/AsignacionJefaturaView";
+import FuncinariosServicioJefaturaView from "../Jefatura/FuncionariosServicioJetaturaView";
 
 //Importaciones Subrogante
 import SubroganteDashboard from "../Subrogante/SubroganteDashboardView";
@@ -210,6 +213,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoServicios={() => setCurrentView("servicios")}
           onGoAsignacion={() => setCurrentView("asignacion")}
           onGoFuncionarios={() => setCurrentView("jerarquia")}
+          onGoFuncionariosSistema={() => setCurrentView("funcionarios_sistema")}
           onGoPuestos={() => { setPuestosReturn("admin"); setCurrentView("puestos"); }}
           onGoSolitudes={() => { setSolicitudesReturn("admin"); setCurrentView("solicitudes"); }}
           onGoStats={() => { setStatsReturn("admin"); setCurrentView("admin_stats"); }}
@@ -226,12 +230,16 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoFuncionariosJefatura={() => setCurrentView("jerarquiaJefatura")}
           onGoPuestos={() => { setPuestosReturn("jefatura"); setCurrentView("puestos"); }}
           onGoStats={() => { setStatsReturn("jefatura"); setCurrentView("admin_stats"); }}
+          onGoFuncionariosServicioJefatura={() => setCurrentView("funcionarios_servicio_jefatura")}
+          onGoAsignacionJefatura={() => setCurrentView("asignacionJefatura")}
           onGoSolitudes={() => { setSolicitudesReturn("jefatura"); setCurrentView("solicitudes"); }}
           onGoBitacora={() => { setBitacoraReturn("jefatura"); setCurrentView("bitacora"); }}
           onGoAuditoria={() => { setAuditoriaReturn("jefatura"); setCurrentView("auditoria"); }}
           />
       )}
 
+      {currentView === "funcionarios_servicio_jefatura" && <FuncinariosServicioJefaturaView onBack={() => setCurrentView("jefatura")} />}
+      {currentView === "asignacionJefatura" && <JerarquiaAsignacionView onBack={() => setCurrentView("jefatura")} />}
       {currentView === "jerarquiaJefatura" && <JerarquiaJefaturaView onBack={() => setCurrentView("jefatura")} />}
       {currentView === "admin_stats" && <AdminStats onBack={() => setCurrentView(statsReturn)} />}
       {currentView === "puestos" && <PuestosView onBack={() => setCurrentView(puestosReturn)} />}
@@ -248,7 +256,7 @@ const Prop4 = ({ tweaks = {} }) => {
       )}
 
 
-
+      {currentView === "funcionarios_sistema" && <FuncionariosSistemaView onBack={() => setCurrentView("admin")} />}
       {currentView === "planificacion" && <PlanificacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "rotativa_wizard" && <RotativaWizard onExit={() => setCurrentView("admin")} />}
       {currentView === "servicios" && <ServiciosView onBack={() => setCurrentView("admin")} />}

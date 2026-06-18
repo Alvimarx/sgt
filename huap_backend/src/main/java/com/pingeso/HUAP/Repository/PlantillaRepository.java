@@ -15,4 +15,10 @@ public interface PlantillaRepository extends JpaRepository<PlantillaEntity, Long
             Long idServicio,
             String nombre
     );
+
+    List<PlantillaEntity> findByEliminadoFalse();
+
+    List<PlantillaEntity> findByServicio_IdServicioAndEliminadoFalse(Long idServicio);
+
+    boolean existsByServicio_IdServicioAndNombreAndEliminadoFalse(Long idServicio, String nombre);
 }

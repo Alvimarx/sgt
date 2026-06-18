@@ -48,7 +48,7 @@ public class PlantillaTurnoService {
         ServicioEntity servicio = servicioRepository.findById(idServicio)
                 .orElseThrow(() -> new RuntimeException("Servicio no encontrado"));
 
-        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombre(idServicio, nombre)) {
+        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombreAndEliminadoFalse(idServicio, nombre)) {
             throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
         }
 
@@ -70,14 +70,14 @@ public class PlantillaTurnoService {
     }
 
     public List<PlantillaTurnoEntity> obtenerCatalogo() {
-        return plantillaTurnoRepository.findAll();
+        return plantillaTurnoRepository.findByEliminadoFalse();
     }
 
     /**
-     * Devuelve todos los tipos de turno que pertenecen a un servicio específico.
+     * Devuelve todos los tipos de turno (no eliminados) que pertenecen a un servicio específico.
      */
     public List<PlantillaTurnoEntity> obtenerTiposDeTurnoPorServicio(Long idServicio) {
-        return plantillaTurnoRepository.findByServicio_IdServicio(idServicio);
+        return plantillaTurnoRepository.findByServicio_IdServicioAndEliminadoFalse(idServicio);
     }
 
     public PlantillaTurnoEntity actualizarTipoDeTurno(
@@ -90,7 +90,7 @@ public class PlantillaTurnoService {
         PlantillaTurnoEntity tipo = obtenerTipoDeTurno(idPlantillaTurno);
 
         Long idServicio = tipo.getServicio().getIdServicio();
-        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombreAndIdPlantillaTurnoNot(idServicio, nombre, idPlantillaTurno)) {
+        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombreAndIdPlantillaTurnoNotAndEliminadoFalse(idServicio, nombre, idPlantillaTurno)) {
             throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
         }
 
@@ -104,25 +104,20 @@ public class PlantillaTurnoService {
     
 
     /**
-     * Elimina un tipo de turno del catálogo.
-     * Si el tipo está referenciado en la secuencia de alguna rotativa, primero libera
-     * esas referencias dejándolas en NULL (el día pasa a ser libre, conservando su
-     * posición en el patrón) y luego elimina el tipo de turno. La longitud del patrón
-     * de las rotativas afectadas no cambia.
+     * Elimina un tipo de turno del catálogo (soft-delete): lo marca como eliminado y libera
+     * sus referencias en las rotativas (esos días pasan a libres). El tipo sigue existiendo
+     * por detrás: los turnos ya creados conservan su referencia y resuelven su nombre
+     * (navegación FK no filtrada). El catálogo lo oculta.
      */
     public void eliminarTipoDeTurno(Long idPlantillaTurno) {
-        obtenerTipoDeTurno(idPlantillaTurno);
+        PlantillaTurnoEntity tipo = obtenerTipoDeTurno(idPlantillaTurno);
 
-        long turnosAsociados = turnoRepository.countByTipoTurno_IdPlantillaTurno(idPlantillaTurno);
-        if (turnosAsociados > 0) {
-            throw new RuntimeException(
-                    "No se puede eliminar el tipo de turno: tiene " + turnosAsociados + " turno(s) asociado(s).");
-        }
-
-        // Libera las referencias en plantilla_secuencia_dias (id_plantilla_turno -> NULL).
+        // Libera las referencias en las rotativas (plantilla_secuencia_dias):
+        // id_plantilla_turno -> NULL, el día queda libre conservando su posición.
         plantillaDiaRepository.liberarReferenciasAlTipoTurno(idPlantillaTurno);
 
-        plantillaTurnoRepository.deleteById(idPlantillaTurno);
+        tipo.setEliminado(true);
+        plantillaTurnoRepository.save(tipo);
     }
 
     // =========================================================

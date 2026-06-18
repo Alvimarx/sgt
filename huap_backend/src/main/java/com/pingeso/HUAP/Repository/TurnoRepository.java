@@ -12,39 +12,50 @@ import java.util.List;
 @Repository
 public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
+    // Soft-delete: las consultas de agenda/vigentes/conflicto excluyen turnos con
+    // eliminado = true. La navegación @ManyToOne NO se filtra, por lo que un turno
+    // histórico (ej. en bitácora) sigue resolviendo el nombre de un puesto/tipo eliminado.
+
     // ====================================================================
-    // BÚSQUEDAS BÁSICAS POR ENTIDAD
+    // BÚSQUEDAS BÁSICAS POR ENTIDAD (vigentes)
     // ====================================================================
 
+    // Todos los turnos vigentes (no eliminados).
+    List<TurnoEntity> findByEliminadoFalse();
+
+    @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario.idFuncionario = ?1 AND t.eliminado = false")
     List<TurnoEntity> findByFuncionario_IdFuncionario(Long idFuncionario);
 
+    @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.idServicio = ?1 AND t.eliminado = false")
     List<TurnoEntity> findByServicio_IdServicio(Long idServicio);
 
+    @Query("SELECT t FROM TurnoEntity t WHERE t.puesto.idPuesto = ?1 AND t.eliminado = false")
     List<TurnoEntity> findByPuesto_IdPuesto(Long idPuesto);
 
-    // Cantidad de turnos asociados a un puesto. Si es > 0 no se permite eliminar el puesto.
+    // Conteos informativos (advisory). Incluyen histórico; no filtran eliminado.
     long countByPuesto_IdPuesto(Long idPuesto);
 
-    // Cantidad de turnos asociados a un tipo de turno. Si es > 0 no se permite eliminar el tipo.
     long countByTipoTurno_IdPlantillaTurno(Long idPlantillaTurno);
 
     long countByServicio_IdServicio(Long idServicio);
-
-    List<TurnoEntity> findByPlantilla_IdPlantilla(Long idPlantilla);
 
     // ====================================================================
     // BÚSQUEDA DE TURNOS VACANTES (SIN ASIGNAR)
     // ====================================================================
 
+    @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario IS NULL AND t.eliminado = false")
     List<TurnoEntity> findByFuncionarioIsNull();
 
+    @Query("SELECT t FROM TurnoEntity t WHERE t.diaInicioTurno = ?1 AND t.funcionario IS NULL AND t.eliminado = false")
     List<TurnoEntity> findByDiaInicioTurnoAndFuncionarioIsNull(LocalDate dia);
 
+    @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.idServicio = ?1 AND t.diaInicioTurno = ?2 AND t.funcionario IS NULL AND t.eliminado = false")
     List<TurnoEntity> findByServicio_IdServicioAndDiaInicioTurnoAndFuncionarioIsNull(
             Long servicioId,
             LocalDate dia
     );
 
+    @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.idServicio = ?1 AND t.diaInicioTurno = ?2 AND t.eliminado = false")
     List<TurnoEntity> findByServicio_IdServicioAndDiaInicioTurno(
             Long servicioId,
             LocalDate dia
@@ -55,6 +66,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
            FROM TurnoEntity t
            WHERE t.funcionario IS NULL
            AND t.servicio.idServicio = :servicioId
+           AND t.eliminado = false
            """)
     List<TurnoEntity> findUnassignedTurnosByServicio(
             @Param("servicioId") Long servicioId
@@ -67,6 +79,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
            AND t.servicio.idServicio = :servicioId
            AND t.diaFinalTurno >= :fechaInicio
            AND t.diaInicioTurno <= :fechaFin
+           AND t.eliminado = false
            ORDER BY t.diaInicioTurno ASC
            """)
     List<TurnoEntity> findUnassignedTurnosByServicioAndDateRange(
@@ -82,6 +95,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
            AND t.servicio.idServicio = :servicioId
            AND t.diaFinalTurno >= :fechaInicio
            AND t.diaInicioTurno <= :fechaFin
+           AND t.eliminado = false
            """)
     Long countDistinctFuncionariosByServicioAndDateRange(
             @Param("servicioId") Long servicioId,
@@ -100,6 +114,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
            WHERE t.servicio.idServicio = :servicioId
            AND t.diaFinalTurno >= :fechaInicio
            AND t.diaInicioTurno <= :fechaFin
+           AND t.eliminado = false
            """)
     List<TurnoEntity> findByServicioIdAndDateRange(
             @Param("servicioId") Long servicioId,
@@ -114,6 +129,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
            WHERE t.funcionario.idFuncionario = :funcionarioId
            AND t.diaFinalTurno >= :fechaInicio
            AND t.diaInicioTurno <= :fechaFin
+           AND t.eliminado = false
            """)
     List<TurnoEntity> findByFuncionarioIdAndDateRange(
             @Param("funcionarioId") Long funcionarioId,
@@ -125,13 +141,14 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
     // RESOLUCIÓN DE CONFLICTOS Y VALIDACIONES
     // ====================================================================
 
-    // Conflicto de Funcionario
+    // Conflicto de Funcionario (un turno eliminado no genera conflicto)
     @Query("""
            SELECT t
            FROM TurnoEntity t
            WHERE t.funcionario.idFuncionario = :funcionarioId
            AND t.diaFinalTurno >= :fechaInicio
            AND t.diaInicioTurno <= :fechaFin
+           AND t.eliminado = false
            """)
     List<TurnoEntity> findConflictosByFuncionario(
             @Param("funcionarioId") Long funcionarioId,
@@ -146,6 +163,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
            WHERE t.puesto.idPuesto = :puestoId
            AND t.diaFinalTurno >= :fechaInicio
            AND t.diaInicioTurno <= :fechaFin
+           AND t.eliminado = false
            """)
     List<TurnoEntity> findByPuestoIdAndDateRange(
             @Param("puestoId") Long puestoId,
@@ -153,19 +171,28 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
-    // Conflictos en Asignación Masiva por Plantilla
+    //Prueba de exportación de turnos a CSV
     @Query("""
-           SELECT t
-           FROM TurnoEntity t
-           WHERE t.plantilla.idPlantilla = :plantillaId
-           AND t.servicio.idServicio = :servicioId
-           AND t.diaFinalTurno >= :fechaInicio
-           AND t.diaInicioTurno <= :fechaFin
-           """)
-    List<TurnoEntity> findConflictsByPlantilla(
-            @Param("plantillaId") Long plantillaId,
-            @Param("servicioId") Long servicioId,
+        SELECT t
+        FROM TurnoEntity t
+        LEFT JOIN FETCH t.funcionario f
+        LEFT JOIN FETCH t.servicio s
+        LEFT JOIN FETCH t.puesto p
+        LEFT JOIN FETCH t.tipoTurno tt
+        WHERE t.eliminado = false
+          AND t.diaInicioTurno < :fechaFin
+          AND t.diaFinalTurno >= :fechaInicio
+          AND (:idFuncionario IS NULL OR f.idFuncionario = :idFuncionario)
+          AND (:idServicio IS NULL OR s.idServicio = :idServicio)
+          AND (f IS NULL OR f.eliminado = false)
+          AND (s IS NULL OR s.eliminado = false)
+        ORDER BY t.diaInicioTurno ASC, t.horaInicio ASC
+    """)
+    List<TurnoEntity> buscarTurnosParaExportacion(
             @Param("fechaInicio") LocalDate fechaInicio,
-            @Param("fechaFin") LocalDate fechaFin
+            @Param("fechaFin") LocalDate fechaFin,
+            @Param("idFuncionario") Long idFuncionario,
+            @Param("idServicio") Long idServicio
     );
+
 }

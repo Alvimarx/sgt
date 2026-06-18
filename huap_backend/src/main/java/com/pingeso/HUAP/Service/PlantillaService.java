@@ -4,6 +4,7 @@ import com.pingeso.HUAP.Entity.PlantillaDiaEntity;
 import com.pingeso.HUAP.Entity.PlantillaEntity;
 import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Repository.PlanificacionAsignacionRepository;
 import com.pingeso.HUAP.Repository.PlantillaDiaRepository;
 import com.pingeso.HUAP.Repository.PlantillaRepository;
 import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
@@ -21,17 +22,20 @@ public class PlantillaService {
     private final ServicioRepository servicioRepository;
     private final PlantillaTurnoRepository plantillaTurnoRepository;
     private final PlantillaDiaRepository plantillaDiaRepository;
+    private final PlanificacionAsignacionRepository planificacionAsignacionRepository;
 
     public PlantillaService(
             PlantillaRepository plantillaRepository,
             ServicioRepository servicioRepository,
             PlantillaTurnoRepository plantillaTurnoRepository,
-            PlantillaDiaRepository plantillaDiaRepository
+            PlantillaDiaRepository plantillaDiaRepository,
+            PlanificacionAsignacionRepository planificacionAsignacionRepository
     ) {
         this.plantillaRepository = plantillaRepository;
         this.servicioRepository = servicioRepository;
         this.plantillaTurnoRepository = plantillaTurnoRepository;
         this.plantillaDiaRepository = plantillaDiaRepository;
+        this.planificacionAsignacionRepository = planificacionAsignacionRepository;
     }
 
     // =========================================================
@@ -42,7 +46,7 @@ public class PlantillaService {
         ServicioEntity servicio = servicioRepository.findById(idServicio)
                 .orElseThrow(() -> new RuntimeException("Servicio no encontrado con ID: " + idServicio));
 
-        if (plantillaRepository.existsByServicio_IdServicioAndNombre(idServicio, nombre)) {
+        if (plantillaRepository.existsByServicio_IdServicioAndNombreAndEliminadoFalse(idServicio, nombre)) {
             throw new RuntimeException("Ya existe una plantilla con el nombre '" + nombre + "' en este servicio");
         }
 
@@ -58,6 +62,9 @@ public class PlantillaService {
                 if (idTurno != null) {
                     turno = plantillaTurnoRepository.findById(idTurno)
                             .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado: ID " + idTurno));
+                    if (turno.isEliminado()) {
+                        throw new RuntimeException("El tipo de turno seleccionado fue eliminado y no puede usarse.");
+                    }
                     if (!turno.getServicio().getIdServicio().equals(idServicio)) {
                         throw new RuntimeException("El turno '" + turno.getNombre() + "' no pertenece a este servicio.");
                     }
@@ -83,11 +90,11 @@ public class PlantillaService {
     }
 
     public List<PlantillaEntity> obtenerPlantillas() {
-        return plantillaRepository.findAll();
+        return plantillaRepository.findByEliminadoFalse();
     }
 
     public List<PlantillaEntity> obtenerPlantillasPorServicio(Long idServicio) {
-        return plantillaRepository.findByServicio_IdServicio(idServicio);
+        return plantillaRepository.findByServicio_IdServicioAndEliminadoFalse(idServicio);
     }
 
     public PlantillaEntity actualizarPlantilla(Long idPlantilla, String nombre, Byte semanas) {
@@ -103,7 +110,13 @@ public class PlantillaService {
     }
 
     public void eliminarPlantilla(Long idPlantilla) {
-        plantillaRepository.delete(obtenerPlantilla(idPlantilla));
+        PlantillaEntity plantilla = obtenerPlantilla(idPlantilla);
+
+        // Quita la rotativa de cualquier planificación que la referencie.
+        planificacionAsignacionRepository.deleteByPlantilla(idPlantilla);
+
+        plantilla.setEliminado(true);
+        plantillaRepository.save(plantilla);
     }
 
     // =========================================================
@@ -138,6 +151,9 @@ public class PlantillaService {
                 if (idTipo == null) continue;
                 PlantillaTurnoEntity tipo = plantillaTurnoRepository.findById(idTipo)
                         .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado: ID " + idTipo));
+                if (tipo.isEliminado()) {
+                    throw new RuntimeException("El tipo de turno seleccionado fue eliminado y no puede usarse.");
+                }
                 if (!tipo.getServicio().getIdServicio().equals(idServicio)) {
                     throw new RuntimeException("Seguridad: El turno '" + tipo.getNombre() +
                             "' no pertenece al servicio (" + plantilla.getServicio().getNombre() + ") de esta plantilla.");

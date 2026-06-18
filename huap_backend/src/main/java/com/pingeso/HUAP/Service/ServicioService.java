@@ -19,9 +19,9 @@ import java.util.stream.Collectors;
 public class ServicioService {
 
     private static final Logger logger = LoggerFactory.getLogger(ServicioService.class);
-
     private final ServicioRepository servicioRepository;
     private final TurnoRepository turnoRepository;
+
     @Autowired
     private FuncionarioRepository funcionarioRepository;
 
@@ -40,12 +40,12 @@ public class ServicioService {
         return m;
     }
 
-    public List<ServicioEntity> getAllServicios() {
-        return servicioRepository.findAll();
+    public List<ServicioEntity> getAllServiciosInactivos() {
+        return servicioRepository.findByEliminadoTrue();
     }
 
     public List<Map<String, Object>> getAllServiciosSummary() {
-        return servicioRepository.findAll().stream()
+        return servicioRepository.findByEliminadoFalse().stream()
                 .map(this::convertirServicioAMap)
                 .collect(Collectors.toList());
     }
@@ -64,7 +64,7 @@ public class ServicioService {
 
     public ServicioEntity getServicioByNombre(String nombre) {
         if (nombre == null) return null;
-        return servicioRepository.findByNombre(nombre).orElse(null);
+        return servicioRepository.findByNombreAndEliminadoFalse(nombre).orElse(null);
     }
 
     public ServicioEntity createServicio(Map<String, Object> payload) {
@@ -121,25 +121,22 @@ public class ServicioService {
             logger.warn("Se intentó eliminar un servicio con ID nulo");
             return false;
         }
-        
-        if (!servicioRepository.existsById(id)) {
+
+        ServicioEntity servicio = servicioRepository.findById(id).orElse(null);
+        if (servicio == null) {
             logger.warn("Se intentó eliminar el servicio ID {} pero no existe en la base de datos", id);
             return false;
         }
-        
-        try {
-            servicioRepository.deleteById(id);
-            logger.info("Servicio ID {} eliminado exitosamente", id);
-            return true;
-        } catch (Exception e) {
-            logger.error("Error al eliminar el servicio ID {}: {}", id, e.getMessage());
-            throw new RuntimeException("Error al eliminar servicio: " + e.getMessage());
-        }
+
+        servicio.setEliminado(true);
+        servicioRepository.save(servicio);
+        logger.info("Servicio ID {} marcado como eliminado (soft-delete)", id);
+        return true;
     }
 
 
     public Page<Map<String, Object>> getServiciosPaginados(Pageable pageable) {
-        return servicioRepository.findAll(pageable)
+        return servicioRepository.findByEliminadoFalse(pageable)
                 .map(this::convertirServicioAMap);
     }
 
@@ -148,10 +145,7 @@ public class ServicioService {
             return getServiciosPaginados(pageable);
         }
 
-        return servicioRepository.findByNombreContainingIgnoreCase(nombre.trim(), pageable)
+        return servicioRepository.findByNombreContainingIgnoreCaseAndEliminadoFalse(nombre.trim(), pageable)
                 .map(this::convertirServicioAMap);
     }
-    // FALTA AGREGAR MÉTODO DE ELIMINACIÓN CON CASCADA MANUAL SI ES NECESARIO PARA LIMPIAR EL SERVICIO
-
-    
 }

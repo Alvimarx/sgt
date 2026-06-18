@@ -16,17 +16,21 @@ public interface FuncionarioRepository extends JpaRepository<FuncionarioEntity, 
     // Repository para encontrar el usuario por id
     FuncionarioEntity findByIdFuncionario(Long idFuncionario);
 
-    // Repository para encontrar al usuario por el rut
-    @Query ("SELECT f FROM FuncionarioEntity f WHERE f.rut = :rut")
-    FuncionarioEntity findByRut(@Param ("rut") String rut); 
+    // Repository para encontrar al usuario por el rut (excluye eliminados: no autentica ni lista bajas)
+    @Query ("SELECT f FROM FuncionarioEntity f WHERE f.rut = :rut AND f.eliminado = false")
+    FuncionarioEntity findByRut(@Param ("rut") String rut);
+
+    // Funcionarios no eliminados (para listado global cuando no se filtra por servicio)
+    List<FuncionarioEntity> findByEliminadoFalse();
 
     /**
-     * Obtiene todos los funcionarios de un servicio específico.
-     * 
+     * Obtiene todos los funcionarios (no eliminados) de un servicio específico.
+     *
      */
     @Query ("SELECT f FROM FuncionarioEntity f " +
             "JOIN f.serviciosFuncionario sf " +
-            "WHERE sf.servicio.idServicio = :idServicio")
+            "WHERE sf.servicio.idServicio = :idServicio " +
+            "AND f.eliminado = false")
     List<FuncionarioEntity> findAllByServicioId(@Param ("idServicio") Long idServicio);
 
     //Query para contar usuarios activos

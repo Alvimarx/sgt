@@ -34,6 +34,10 @@ public class TurnoEntity {
     @Column(name = "hora_fin", nullable = false)
     private LocalTime horaFin;
 
+    @Builder.Default
+    @Column(name = "eliminado", nullable = false)
+    private boolean eliminado = false;
+
     // --- Relaciones ---
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -51,7 +55,7 @@ public class TurnoEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_plantilla")
     private PlantillaEntity plantilla;
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_tipo_turno")
     private PlantillaTurnoEntity tipoTurno;

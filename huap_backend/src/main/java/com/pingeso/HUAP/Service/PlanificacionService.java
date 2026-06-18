@@ -45,6 +45,7 @@ public class PlanificacionService {
     private final PuestoRepository puestoRepository;
     private final PlantillaDiaRepository plantillaDiaRepository;
     private final TurnoRepository turnoRepository;
+    private final BitacoraService bitacoraService;
 
     public PlanificacionService(
             PlanificacionRepository planificacionRepository,
@@ -53,7 +54,8 @@ public class PlanificacionService {
             FuncionarioRepository funcionarioRepository,
             PuestoRepository puestoRepository,
             PlantillaDiaRepository plantillaDiaRepository,
-            TurnoRepository turnoRepository
+            TurnoRepository turnoRepository,
+            BitacoraService bitacoraService
     ) {
         this.planificacionRepository = planificacionRepository;
         this.servicioRepository = servicioRepository;
@@ -62,6 +64,7 @@ public class PlanificacionService {
         this.puestoRepository = puestoRepository;
         this.plantillaDiaRepository = plantillaDiaRepository;
         this.turnoRepository = turnoRepository;
+        this.bitacoraService = bitacoraService;
     }
 
     // =========================================================
@@ -123,9 +126,9 @@ public class PlanificacionService {
         return planificacionRepository.save(plan);
     }
 
+    // Hard-delete: las asignaciones se borran en cascada. Los turnos generados no
+    // referencian la planificación, así que no hay conflicto de FK.
     public void eliminarPlanificacion(Long idPlanificacion) {
-        // Las asignaciones se borran en cascada. Los turnos generados no referencian
-        // la planificación, así que no hay conflicto de FK.
         planificacionRepository.delete(obtenerPlanificacion(idPlanificacion));
     }
 
@@ -140,29 +143,39 @@ public class PlanificacionService {
      * crea igual pero VACANTE (funcionario null) para que otra persona pueda tomarlo.
      * Devuelve {generados, vacantesPorConflicto}.
      */
-    public Map<String, Object> generarTurnos(Long idPlanificacion, LocalDate fechaInicio) {
+    public Map<String, Object> generarTurnos(Long idPlanificacion, LocalDate fechaInicio, Long actorId) {
         validarLunes(fechaInicio);
         PlanificacionEntity plan = obtenerPlanificacion(idPlanificacion);
         ServicioEntity servicio = plan.getServicio();
+
+        // Actor que ejecuta la generación (para registrar en bitácora cada turno creado).
+        FuncionarioEntity actor = (actorId != null)
+                ? funcionarioRepository.findById(actorId).orElse(null) : null;
 
         int generados = 0, vacantesPorConflicto = 0;
         // Turnos ya creados en este lote, por funcionario (para el chequeo intra-lote).
         Map<Long, List<TurnoEntity>> creadosPorFuncionario = new HashMap<>();
 
         for (PlanificacionAsignacionEntity asignacion : plan.getAsignaciones()) {
+           //  filtrado por si pasan alguna entidad eliminada
+            if (asignacion.getPlantilla() == null || asignacion.getPlantilla().isEliminado()) continue;
+            if (asignacion.getPuesto() != null && asignacion.getPuesto().isEliminado()) continue;
+
             List<PlantillaDiaEntity> secuencia = plantillaDiaRepository
                     .findByPlantilla_IdPlantillaOrderByDiaIndexAsc(asignacion.getPlantilla().getIdPlantilla());
 
             for (PlantillaDiaEntity dia : secuencia) {
                 PlantillaTurnoEntity tipo = dia.getPlantillaTurno();
-                if (tipo == null) continue; // día libre
+                if (tipo == null || tipo.isEliminado()) continue; // día libre o tipo eliminado
 
                 LocalDate fechaDia = fechaInicio.plusDays(dia.getDiaIndex());
                 LocalTime hi = tipo.getHoraInicio();
                 LocalTime hf = tipo.getHoraTermino();
                 LocalDate diaFinal = !hf.isAfter(hi) ? fechaDia.plusDays(1) : fechaDia;
 
+                // Si el funcionario asignado fue eliminado, el turno se genera VACANTE.
                 FuncionarioEntity func = asignacion.getFuncionario();
+                if (func != null && func.isEliminado()) func = null;
 
                 // El turno se crea siempre. Si el funcionario choca en horario, se deja
                 // VACANTE (funcionario null) para que otra persona pueda tomarlo.
@@ -185,6 +198,10 @@ public class PlanificacionService {
 
                 turnoRepository.save(turno);
                 turnoRepository.flush(); // visible para el filtro grueso por BD del próximo chequeo
+
+                // Registro en bitácora del turno recién creado.
+                bitacoraService.registrarTurnoGenerado(turno, actor, plan.getNombre());
+
                 if (funcAsignado != null) {
                     creadosPorFuncionario.computeIfAbsent(funcAsignado.getIdFuncionario(), k -> new ArrayList<>()).add(turno);
                 }
@@ -209,15 +226,19 @@ public class PlanificacionService {
         List<Map<String, Object>> conflictos = new ArrayList<>();
 
         for (PlanificacionAsignacionEntity asignacion : plan.getAsignaciones()) {
+            //  filtrado por si pasan alguna entidad eliminada
+            if (asignacion.getPlantilla() == null || asignacion.getPlantilla().isEliminado()) continue;
+            if (asignacion.getPuesto() != null && asignacion.getPuesto().isEliminado()) continue;
+
             FuncionarioEntity func = asignacion.getFuncionario();
-            if (func == null) continue; // sin funcionario no hay choque posible
+            if (func == null || func.isEliminado()) continue; // sin funcionario (o eliminado) no hay choque posible
 
             List<PlantillaDiaEntity> secuencia = plantillaDiaRepository
                     .findByPlantilla_IdPlantillaOrderByDiaIndexAsc(asignacion.getPlantilla().getIdPlantilla());
 
             for (PlantillaDiaEntity dia : secuencia) {
                 PlantillaTurnoEntity tipo = dia.getPlantillaTurno();
-                if (tipo == null) continue;
+                if (tipo == null || tipo.isEliminado()) continue;
 
                 LocalDate fechaDia = fechaInicio.plusDays(dia.getDiaIndex());
                 LocalTime hi = tipo.getHoraInicio();
@@ -293,6 +314,9 @@ public class PlanificacionService {
 
         PlantillaEntity plantilla = plantillaRepository.findById(dto.getIdPlantilla())
                 .orElseThrow(() -> new RuntimeException("Rotativa no encontrada: ID " + dto.getIdPlantilla()));
+        if (plantilla.isEliminado()) {
+            throw new RuntimeException("La rotativa seleccionada fue eliminada y no puede usarse.");
+        }
         if (!plantilla.getServicio().getIdServicio().equals(idServicio)) {
             throw new RuntimeException("La rotativa '" + plantilla.getNombre() + "' no pertenece a este servicio.");
         }
@@ -301,12 +325,18 @@ public class PlanificacionService {
         if (dto.getIdFuncionario() != null) {
             funcionario = funcionarioRepository.findById(dto.getIdFuncionario())
                     .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: ID " + dto.getIdFuncionario()));
+            if (funcionario.isEliminado()) {
+                throw new RuntimeException("El funcionario seleccionado fue eliminado y no puede asignarse.");
+            }
         }
 
         PuestoEntity puesto = null;
         if (dto.getIdPuesto() != null) {
             puesto = puestoRepository.findById(dto.getIdPuesto())
                     .orElseThrow(() -> new RuntimeException("Puesto no encontrado: ID " + dto.getIdPuesto()));
+            if (puesto.isEliminado()) {
+                throw new RuntimeException("El puesto seleccionado fue eliminado y no puede usarse.");
+            }
             if (!puesto.getServicio().getIdServicio().equals(idServicio)) {
                 throw new RuntimeException("El puesto '" + puesto.getNombre() + "' no pertenece a este servicio.");
             }

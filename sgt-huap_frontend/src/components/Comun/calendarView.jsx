@@ -5,6 +5,7 @@ import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
 import ShiftDetail, { getTeamColor, formatShiftLabel } from '../Comun/ShiftDetail';
+import { exportarTurnosCsv } from '../../services/exportacionService';
 
 // ---------------------------------------------------------------------------
 // HELPERS DE PRESENTACIÓN
@@ -15,24 +16,6 @@ const MONTH_NAMES = [
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-const TEAM_COLORS = [
-    { bg: '#b0baee', soft: '#D7E2FF', ink: '#183b6b' },
-    { bg: 'rgb(166,231,180)', soft: '#D2E9D6', ink: '#24513A' },
-    { bg: 'rgb(245,223,188)', soft: '#F5E0B7', ink: '#6B4D15' },
-    { bg: 'rgb(225,188,245)', soft: '#E3D1F3', ink: '#5A3A72' },
-    { bg: 'rgb(248,208,223)', soft: '#F2D1D5', ink: '#8C3F44' },
-    { bg: 'rgb(173,224,231)', soft: '#CFE9F0', ink: '#2C6270' },
-];
-
-const hashStr = (value = '') => {
-    let h = 0;
-    const s = String(value);
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    return h;
-};
-
-// getTeamColor importado desde ShiftDetail — color determinista por tipo+puesto
 
 const formatTime = (v) => (v ? String(v).slice(0, 5) : null);
 
@@ -49,25 +32,108 @@ const dateKey = (year, month, day) =>
     `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
 // ---------------------------------------------------------------------------
-// CALENDARVIEW
+// LOGICA DE AGRUPACIÓN
+// ---------------------------------------------------------------------------
+
+const getShiftName = (shift) =>
+    shift?.nombreTipoTurno ||
+    shift?.nombreTipo ||
+    shift?.nombre ||
+    (shift?.tipo === 'noche' ? 'Turno noche' : 'Turno día');
+
+const buildDayGroups = (shifts = []) => {
+    const map = new Map();
+
+    shifts.forEach((shift) => {
+        const key =
+            shift.teamKey ||
+            `${shift.idTipoTurno ?? getShiftName(shift)}-${shift.inicio ?? ''}-${shift.fin ?? ''}`;
+
+        if (!map.has(key)) {
+            map.set(key, {
+                key,
+                sample: shift,
+                turnos: [],
+            });
+        }
+
+        map.get(key).turnos.push(shift);
+    });
+
+    return Array.from(map.values()).map((group) => {
+        const sample = group.sample;
+        const total = group.turnos.length;
+        const asignados = group.turnos.filter(t => t.idFuncionario != null && !t.turnoLibre).length;
+        const vacantes = Math.max(total - asignados, 0);
+
+        return {
+            key: group.key,
+            sample,
+            turnos: group.turnos,
+            nombre: getShiftName(sample),
+            tipo: sample.tipo,
+            inicio: sample.inicio,
+            fin: sample.fin,
+            total,
+            asignados,
+            vacantes,
+            completo: total > 0 && vacantes === 0,
+            hasMy: group.turnos.some(t => t.miTurno),
+        };
+    });
+};
+
+const getCoverageStats = (shifts = []) => {
+    const groups = buildDayGroups(shifts);
+
+    const total = groups.reduce((acc, g) => acc + g.total, 0);
+    const asignados = groups.reduce((acc, g) => acc + g.asignados, 0);
+    const vacantes = groups.reduce((acc, g) => acc + g.vacantes, 0);
+
+    return {
+        groups,
+        total,
+        asignados,
+        vacantes,
+        cobertura: total > 0 ? Math.round((asignados / total) * 100) : 0,
+        hasTurns: total > 0,
+        hasMy: shifts.some(s => s.miTurno),
+        completos: groups.filter(g => g.completo).length,
+        conVacantes: groups.filter(g => g.vacantes > 0).length,
+    };
+};
+
+// ---------------------------------------------------------------------------
+// COMPONENTE PRINCIPAL: CALENDARVIEW
 // ---------------------------------------------------------------------------
 
 const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
     const { user } = useAuth();
     const PA = SGT_DATA.PALETTE;
 
+    // Control de permisos de exportación
     const esJefatura = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
+    const rolSistema = String(user?.rolSistema || '').toUpperCase();
+    const esAdmin = rolSistema === 'ADMIN' || rolSistema === 'ADMINISTRADOR';
+    const puedeExportarServicioCompleto = esJefatura || esAdmin;
 
     // Mes visible — arranca en el mes actual
     const now = new Date();
     const [viewYear, setViewYear] = useState(now.getFullYear());
-    const [viewMonth, setViewMonth] = useState(now.getMonth() + 1); // 1-12
+    const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
 
     const [shiftsByDay, setShiftsByDay] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedDay, setSelectedDay] = useState(null);
     const [detailShift, setDetailShift] = useState(null);
+    
+    // Exportación
+    const [exportSheetOpen, setExportSheetOpen] = useState(false);
+    const [exportMonthValue, setExportMonthValue] = useState(`${viewYear}-${String(viewMonth).padStart(2, '0')}`);
+    const [exportScope, setExportScope] = useState('mios');
+    const [exporting, setExporting] = useState(false);
+    const [exportError, setExportError] = useState('');
 
     // Carga al cambiar mes
     useEffect(() => {
@@ -77,18 +143,28 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         setSelectedDay(null);
 
         const servicioId = user?.servicioId || localStorage.getItem('servicioId');
-        const funcionarioId = Number(user?.id ?? user?.userId);
+        const myUserId = Number(user?.id ?? user?.userId);
 
         getTurnosCalendario({
             servicioId,
-            funcionarioId,
+            funcionarioId: myUserId,
             year: viewYear,
             month: viewMonth,
-            esJefatura,
+            esJefatura: true, // Forzamos esto para que el backend traiga todos los turnos del servicio
         }).then((result) => {
             if (!mounted) return;
             if (result.success) {
-                setShiftsByDay(result.data.shiftsByDay);
+                const rawShifts = result.data.shiftsByDay || {};
+                
+                // Mapeamos dinámicamente qué turnos son "míos" según el ID del usuario
+                Object.keys(rawShifts).forEach(dateKey => {
+                    rawShifts[dateKey] = rawShifts[dateKey].map(shift => ({
+                        ...shift,
+                        miTurno: Number(shift.idFuncionario) === myUserId || shift.miTurno
+                    }));
+                });
+
+                setShiftsByDay(rawShifts);
             } else {
                 setError(result.error);
                 setShiftsByDay({});
@@ -97,7 +173,7 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         });
 
         return () => { mounted = false; };
-    }, [viewYear, viewMonth, user?.id, user?.servicioId]);
+    }, [viewYear, viewMonth, user?.id, user?.userId, user?.servicioId]);
 
     // Grilla de celdas del mes
     const cells = useMemo(() => {
@@ -109,20 +185,48 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         return arr;
     }, [viewYear, viewMonth]);
 
-    const today = todayKey();
+    const openExportSheet = () => {
+        setExportMonthValue(`${viewYear}-${String(viewMonth).padStart(2, '0')}`);
+        setExportScope('mios');
+        setExportError('');
+        setExportSheetOpen(true);
+    };
 
-    const goToPrevMonth = () => {
-        if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); }
-        else setViewMonth(m => m - 1);
+    const handleExportCsv = async () => {
+        setExportError('');
+        if (!user?.servicioId) return setExportError('No hay servicio seleccionado para exportar.');
+        if (!exportMonthValue) return setExportError('Debes seleccionar un mes.');
+
+        const [anioStr, mesStr] = exportMonthValue.split('-');
+        const anio = Number(anioStr);
+        const mes = Number(mesStr);
+        const funcionarioId = Number(user?.id ?? user?.userId);
+        const exportarSoloMisTurnos = !puedeExportarServicioCompleto || exportScope === 'mios';
+
+        setExporting(true);
+        const result = await exportarTurnosCsv({
+            anio,
+            mes,
+            idServicio: user.servicioId,
+            idFuncionario: exportarSoloMisTurnos ? funcionarioId : null,
+        });
+        setExporting(false);
+
+        if (!result.success) {
+            setExportError(result.error);
+            return;
+        }
+        setExportSheetOpen(false);
     };
-    const goToNextMonth = () => {
-        if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); }
-        else setViewMonth(m => m + 1);
-    };
+
+    const today = todayKey();
+    const goToPrevMonth = () => { if (viewMonth === 1) { setViewYear(y => y - 1); setViewMonth(12); } else setViewMonth(m => m - 1); };
+    const goToNextMonth = () => { if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); } else setViewMonth(m => m + 1); };
 
     const selectedKey = selectedDay ? dateKey(viewYear, viewMonth, selectedDay) : null;
     const selectedShifts = selectedKey ? (shiftsByDay[selectedKey] || []) : [];
-
+    const selectedStats = useMemo(() => getCoverageStats(selectedShifts), [selectedShifts]);
+    
     const sheetTitle = selectedDay
         ? `${DAY_LABELS[(new Date(viewYear, viewMonth - 1, selectedDay).getDay() + 6) % 7]} ${selectedDay} ${MONTH_NAMES[viewMonth - 1].slice(0, 3)}`
         : '';
@@ -136,7 +240,6 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                     <SGTIcon name="chevron-left" size={24} color={PA.ink} />
                 </button>
 
-                {/* Navegación de mes */}
                 <button onClick={goToPrevMonth} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
                     <SGTIcon name="chevron-left" size={18} color={PA.ink2} />
                 </button>
@@ -149,8 +252,6 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
             </div>
 
             <div style={{ flex: 1, overflow: 'auto' }}>
-
-                {/* Error */}
                 {error && !loading && (
                     <div style={{ margin: '10px 14px 0', padding: '10px 12px', borderRadius: 12, background: '#FFF4F5', color: '#8C3F44', border: '1px solid #F3D2D5', fontSize: 12.5, fontWeight: 700 }}>
                         {error}
@@ -159,7 +260,6 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
 
                 {/* Grilla del calendario */}
                 <div style={{ padding: '14px 14px 0' }}>
-                    {/* Cabecera de días */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 6 }}>
                         {DAY_LABELS.map((l, i) => (
                             <div key={l} style={{ textAlign: 'center', fontSize: 11, fontWeight: 800, color: i >= 5 ? PA.ink3 : PA.ink2 }}>
@@ -179,8 +279,11 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
 
                                 const key = dateKey(viewYear, viewMonth, day);
                                 const shifts = shiftsByDay[key] || [];
+                                
                                 const miShift = shifts.find(s => s.miTurno);
-                                const hasLibre = shifts.some(s => s.turnoLibre);
+                                const hasLibre = shifts.some(s => s.turnoLibre || !s.idFuncionario);
+                                const hasAjeno = shifts.some(s => !s.turnoLibre && s.idFuncionario && !s.miTurno);
+                                
                                 const isToday = key === today;
                                 const isSel = selectedDay === day;
                                 const isWknd = idx % 7 >= 5;
@@ -223,8 +326,7 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                                                     background: isToday ? 'rgba(255,255,255,0.6)' : PA.accent,
                                                 }} />
                                             )}
-                                            {/* Jefatura: punto gris por cada turno ajeno */}
-                                            {esJefatura && !miShift && shifts.filter(s => !s.turnoLibre).length > 0 && (
+                                            {hasAjeno && (
                                                 <div style={{
                                                     width: 5, height: 5, borderRadius: 99,
                                                     background: isToday ? 'rgba(255,255,255,0.5)' : 'rgba(240, 178, 43, 0.85)',
@@ -236,13 +338,39 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                             })}
                         </div>
                     )}
+                </div>              
+
+                {/* Exportación CSV */}
+                <div style={{ padding: '14px 18px 4px' }}>
+                    <button
+                        onClick={openExportSheet}
+                        style={{
+                            width: '100%',
+                            border: `1px solid ${PA.line2}`,
+                            background: '#fff',
+                            color: PA.ink,
+                            borderRadius: 14,
+                            padding: '11px 14px',
+                            fontSize: 13,
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+                        }}
+                    >
+                        <SGTIcon name="download" size={16} color={PA.ink} />
+                        Exportar turnos CSV
+                    </button>
                 </div>
 
-                {/* Leyenda */}
+                {/* Leyenda unificada para todos */}
                 <div style={{ display: 'flex', gap: 14, padding: '10px 18px', borderTop: `1px solid ${PA.line2}`, marginTop: 10, flexWrap: 'wrap' }}>
                     <LegendDot color={PA.primary} label="Mi turno" />
                     <LegendDot color={PA.accent} label="Cupo libre" />
-                    {esJefatura && <LegendDot color='rgba(240, 178, 43, 0.85)' label="Turno del servicio" />}
+                    <LegendDot color='rgba(240, 178, 43, 0.85)' label="Turno del servicio" />
                 </div>
 
                 {!selectedDay && !loading && (
@@ -267,19 +395,16 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                             Sin turnos para mostrar.
                         </p>
                     ) : (
-                        selectedShifts.map(s => (
-                            <ShiftCard
-                                key={s.id}
-                                shift={s}
-                                esJefatura={esJefatura}
-                                onOpen={(shift) => setDetailShift(shift)}
-                            />
-                        ))
+                        <DayDetailOverview
+                            PA={PA}
+                            stats={selectedStats}
+                            onOpen={(shift) => setDetailShift(shift)}
+                        />
                     )}
                 </div>
             </Sheet>
 
-            {/* Sheet de detalle completo del turno — igual que en AgendaView */}
+            {/* Sheet de detalle completo del turno */}
             <Sheet
                 open={!!detailShift}
                 onClose={() => setDetailShift(null)}
@@ -302,71 +427,292 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                     />
                 )}
             </Sheet>
+
+            {/* Sheet de exportación CSV */}
+            <Sheet
+                open={exportSheetOpen}
+                onClose={() => !exporting && setExportSheetOpen(false)}
+                title="Exportar turnos CSV"
+                maxHeight="60%"
+            >
+                <div style={{ padding: '8px 16px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: PA.ink2, marginBottom: 6 }}>
+                            Mes a exportar
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button
+                                onClick={() => {
+                                    const [year, month] = exportMonthValue.split('-').map(Number);
+                                    let newMonth = month - 1; let newYear = year;
+                                    if (newMonth < 1) { newMonth = 12; newYear -= 1; }
+                                    setExportMonthValue(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+                                }}
+                                disabled={exporting}
+                                style={{ width: 36, height: 36, border: `1px solid ${PA.line2}`, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exporting ? 0.5 : 1 }}
+                            >
+                                <SGTIcon name="chevron-left" size={18} color={PA.ink} />
+                            </button>
+
+                            <div style={{ flex: 1, border: `1px solid ${PA.line2}`, borderRadius: 12, padding: '10px 12px', textAlign: 'center', fontSize: 14, fontWeight: 700, color: PA.ink, background: '#fff' }}>
+                                {MONTH_NAMES[Number(exportMonthValue.split('-')[1]) - 1]} {exportMonthValue.split('-')[0]}
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    const [year, month] = exportMonthValue.split('-').map(Number);
+                                    let newMonth = month + 1; let newYear = year;
+                                    if (newMonth > 12) { newMonth = 1; newYear += 1; }
+                                    setExportMonthValue(`${newYear}-${String(newMonth).padStart(2, '0')}`);
+                                }}
+                                disabled={exporting}
+                                style={{ width: 36, height: 36, border: `1px solid ${PA.line2}`, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exporting ? 0.5 : 1 }}
+                            >
+                                <SGTIcon name="chevron-right" size={18} color={PA.ink} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {puedeExportarServicioCompleto && (
+                        <div>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: PA.ink2, marginBottom: 8 }}>
+                                ¿Qué turnos quieres exportar?
+                            </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13, fontWeight: 700, color: PA.ink }}>
+                                <input type="radio" name="exportScope" value="mios" checked={exportScope === 'mios'} onChange={() => setExportScope('mios')} disabled={exporting} />
+                                Solo mis turnos
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: PA.ink }}>
+                                <input type="radio" name="exportScope" value="servicio" checked={exportScope === 'servicio'} onChange={() => setExportScope('servicio')} disabled={exporting} />
+                                Todos los turnos del servicio actual
+                            </label>
+                        </div>
+                    )}
+
+                    {!puedeExportarServicioCompleto && (
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: PA.ink3, background: '#fff', border: `1px solid ${PA.line2}`, borderRadius: 12, padding: 10 }}>
+                            Se exportarán solo tus turnos del servicio actual.
+                        </div>
+                    )}
+
+                    {exportError && (
+                        <div style={{ padding: '10px 12px', borderRadius: 12, background: '#FFF4F5', color: '#8C3F44', border: '1px solid #F3D2D5', fontSize: 12.5, fontWeight: 700 }}>
+                            {exportError}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleExportCsv}
+                        disabled={exporting}
+                        style={{ width: '100%', border: 'none', background: exporting ? PA.ink3 : PA.primary, color: '#fff', borderRadius: 14, padding: '12px 14px', fontSize: 13.5, fontWeight: 900, cursor: exporting ? 'default' : 'pointer' }}
+                    >
+                        {exporting ? 'Exportando…' : 'Descargar CSV'}
+                    </button>
+                </div>
+            </Sheet>
         </div>
     );
 };
 
+
 // ---------------------------------------------------------------------------
-// SHIFTCARD — card de turno dentro del Sheet del día
+// DAY DETAIL OVERVIEW — Muestra el resumen de todos los turnos del día
 // ---------------------------------------------------------------------------
 
-const ShiftCard = ({ shift, esJefatura, onOpen }) => {
-    const PA = SGT_DATA.PALETTE;
-    const color = getTeamColor(shift);
-
+const DayDetailOverview = ({ PA, stats, onOpen }) => {
     return (
-        <div
-            onClick={() => onOpen?.(shift)}
-            style={{
-                background: color.bg,
-                border: `1px solid ${color.soft}`,
-                borderRadius: 12,
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{
+                background: '#fff',
+                border: `1px solid ${PA.line2}`,
+                borderRadius: 16,
                 padding: 12,
-                cursor: 'pointer',
-            }}
-        >
-            {/* Fila principal: icono + tipo + horario + badge */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: shift.nombreFuncionario || shift.nombrePuesto ? 8 : 0 }}>
-                <SGTIcon
-                    name={shift.tipo === 'dia' ? 'sun' : 'moon'}
-                    size={15}
-                    color={color.ink}
-                />
-                <span style={{ fontSize: 13.5, fontWeight: 800, color: color.ink, flex: 1 }}>
-                    {shift.nombreTipo || (shift.tipo === 'dia' ? 'Turno día' : 'Turno noche')}
-                    {shift.inicio && shift.fin ? ` · ${shift.inicio}–${shift.fin}` : ''}
-                </span>
-                {shift.miTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
-                {shift.turnoLibre && <SGTBadge tone="accent" size="xs">Cupo libre</SGTBadge>}
+            }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: PA.ink2, marginBottom: 6 }}>
+                    Resumen del día
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    <MiniStat label="Asignados" value={stats.asignados} PA={PA} />
+                    <MiniStat label="Total" value={stats.total} PA={PA} />
+                    <MiniStat label="Vacantes" value={stats.vacantes} PA={PA} danger={stats.vacantes > 0} />
+                </div>
             </div>
 
-            {/* Fila secundaria: puesto + funcionario (jefatura ve quién está asignado) */}
-            {(shift.nombrePuesto || (esJefatura && shift.nombreFuncionario)) && (
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    background: 'rgba(255,255,255,0.72)',
-                    padding: '6px 10px',
-                    borderRadius: 8,
-                }}>
-                    {shift.nombrePuesto && (
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: color.ink, flex: 1 }}>
-                            {shift.nombrePuesto}
-                        </span>
-                    )}
-                    {esJefatura && shift.nombreFuncionario && (
-                        <span style={{ fontSize: 11.5, fontWeight: shift.miTurno ? 800 : 600, color: PA.ink }}>
-                            {shift.nombreFuncionario}
-                            {shift.miTurno ? ' (tú)' : ''}
-                        </span>
-                    )}
-                    <SGTIcon name="chevron-right" size={13} color={PA.ink3} />
-                </div>
-            )}
+            {stats.groups.map(group => {
+                const color = getTeamColor(group.sample);
+                const asignados = group.turnos.filter(t => t.idFuncionario != null && !t.turnoLibre);
+                const vacantes = group.turnos.filter(t => t.idFuncionario == null || t.turnoLibre);
+
+                return (
+                    <div
+                        key={group.key}
+                        style={{
+                            background: color.bg,
+                            border: `1px solid ${color.soft}`,
+                            borderRadius: 16,
+                            padding: 12,
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                            <SGTIcon
+                                name={group.tipo === 'noche' ? 'moon' : 'sun'}
+                                size={15}
+                                color={color.ink}
+                            />
+
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13.5, fontWeight: 950, color: color.ink }}>
+                                    {group.nombre}
+                                </div>
+                                <div style={{ fontSize: 11.5, fontWeight: 700, color: color.ink }}>
+                                    {group.inicio && group.fin ? `${group.inicio}–${group.fin}` : 'Horario no definido'}
+                                </div>
+                            </div>
+
+                            <span style={{
+                                background: 'rgba(255,255,255,0.75)',
+                                borderRadius: 999,
+                                padding: '5px 8px',
+                                fontSize: 11,
+                                fontWeight: 950,
+                                color: group.vacantes > 0 ? '#9A3412' : '#166534',
+                            }}>
+                                {group.asignados}/{group.total}
+                            </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {asignados.length > 0 && (
+                                <div style={{
+                                    background: 'rgba(255,255,255,0.72)',
+                                    borderRadius: 12,
+                                    padding: 10,
+                                }}>
+                                    <div style={{ fontSize: 11, fontWeight: 950, color: PA.ink2, marginBottom: 7 }}>
+                                        Asignados
+                                    </div>
+
+                                    {asignados.map(turno => (
+                                        <button
+                                            key={turno.id}
+                                            onClick={() => onOpen?.(turno)}
+                                            style={{
+                                                width: '100%',
+                                                border: 'none',
+                                                background: 'transparent',
+                                                padding: '7px 0',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: 28,
+                                                height: 28,
+                                                borderRadius: 99,
+                                                background: PA.surface2,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: 11,
+                                                fontWeight: 950,
+                                                color: PA.ink,
+                                            }}>
+                                                {(turno.nombreFuncionario || '?')
+                                                    .split(/\s+/)
+                                                    .filter(Boolean)
+                                                    .slice(0, 2)
+                                                    .map(p => p[0])
+                                                    .join('')
+                                                    .toUpperCase()}
+                                            </div>
+
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: 12.5, fontWeight: turno.miTurno ? 850 : 700, color: PA.ink }}>
+                                                    {turno.nombreFuncionario}
+                                                    {turno.miTurno ? ' (tú)' : ''}
+                                                </div>
+                                                <div style={{ fontSize: 11, fontWeight: 650, color: PA.ink3 }}>
+                                                    Posición: {turno.nombrePuesto || 'Sin posición'}
+                                                </div>
+                                            </div>
+
+                                            <SGTIcon name="chevron-right" size={13} color={PA.ink3} />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {vacantes.length > 0 && (
+                                <div style={{
+                                    background: '#FFF7ED',
+                                    border: '1px solid #FDBA74',
+                                    borderRadius: 12,
+                                    padding: 10,
+                                }}>
+                                    <div style={{ fontSize: 11, fontWeight: 950, color: '#9A3412', marginBottom: 7 }}>
+                                        Vacantes por cubrir
+                                    </div>
+
+                                    {vacantes.map(turno => (
+                                        <button
+                                            key={turno.id}
+                                            onClick={() => onOpen?.(turno)}
+                                            style={{
+                                                width: '100%',
+                                                border: 'none',
+                                                background: 'transparent',
+                                                padding: '6px 0',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                            }}
+                                        >
+                                            <SGTIcon name="alert-circle" size={14} color="#9A3412" />
+
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: 12.5, fontWeight: 850, color: '#9A3412' }}>
+                                                    {turno.nombrePuesto || 'Posición sin asignar'}
+                                                </div>
+                                                <div style={{ fontSize: 11, fontWeight: 650, color: '#9A3412' }}>
+                                                    Cupo libre disponible
+                                                </div>
+                                            </div>
+
+                                            <SGTIcon name="chevron-right" size={13} color="#9A3412" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
         </div>
     );
 };
+
+const MiniStat = ({ label, value, PA, danger = false }) => (
+    <div style={{
+        background: danger ? '#FFF7ED' : PA.surface2,
+        border: `1px solid ${danger ? '#FDBA74' : PA.line2}`,
+        borderRadius: 12,
+        padding: 8,
+        textAlign: 'center',
+    }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, marginBottom: 3 }}>
+            {label}
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 950, color: danger ? '#9A3412' : PA.ink }}>
+            {value}
+        </div>
+    </div>
+);
 
 // ---------------------------------------------------------------------------
 // LEGENDDOT — item de leyenda

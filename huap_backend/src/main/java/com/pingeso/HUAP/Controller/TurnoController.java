@@ -78,18 +78,15 @@ public class TurnoController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-    //Necesita revision
-    /**
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteTurno(@PathVariable Long id) {
         try {
-            turnoService.deleteTurno(id);
+            turnoService.eliminarTurno(id);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         }
     }
-    **/
 
     // ====================================================================
     // CONSULTAS POR SERVICIO
@@ -253,87 +250,9 @@ public class TurnoController {
         }
     }
 
-    @PutMapping("/asignacion-masiva")
-    public ResponseEntity<?> asignarMasivo(@RequestBody Map<String, Object> payload) {
-        try {
-            Long idFuncionario = Long.parseLong(payload.get("idFuncionario").toString());
-            Long idPlantilla = Long.parseLong(payload.get("idPlantilla").toString());
-            Long idServicio = Long.parseLong(payload.get("idServicio").toString());
-            LocalDate inicio = LocalDate.parse(payload.get("fechaInicio").toString());
-            LocalDate fin = LocalDate.parse(payload.get("fechaFin").toString());
-
-            int asignados = turnoService.asignarMasivoPorPlantilla(idFuncionario, idPlantilla, idServicio, inicio, fin);
-            return ResponseEntity.ok(Map.of("message", "Turnos asignados correctamente", "cantidad", asignados));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    // ====================================================================
-    // DETECCIÓN DE CONFLICTOS
-    // ====================================================================
-
-    @PostMapping("/check-conflicts")
-    public ResponseEntity<?> checkConflicts(@RequestBody Map<String, Object> payload) {
-        try {
-            LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
-            LocalDate fechaFin = LocalDate.parse(payload.get("fechaFin").toString());
-            Long funcionarioId = payload.get("funcionarioId") != null
-                    ? Long.parseLong(payload.get("funcionarioId").toString()) : null;
-            Long plantillaId = payload.get("plantillaId") != null
-                    ? Long.parseLong(payload.get("plantillaId").toString()) : null;
-            Long servicioId = payload.get("servicioId") != null
-                    ? Long.parseLong(payload.get("servicioId").toString()) : null;
-
-            List<TurnoEntity> conflicting = turnoService.checkConflicts(fechaInicio, fechaFin,
-                    funcionarioId, plantillaId, servicioId);
-
-            List<String> conflictingDates = conflicting.stream()
-                    .map(t -> t.getDiaInicioTurno().toString())
-                    .distinct()
-                    .sorted()
-                    .toList();
-
-            return ResponseEntity.ok(Map.of(
-                    "hasConflicts", !conflicting.isEmpty(),
-                    "count", conflicting.size(),
-                    "conflictingDates", conflictingDates));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-
     // ====================================================================
     // ALTERAR TURNO (DESASIGNAR / REASIGNAR / ASIGNAR / CAMBIAR_HORAS)
     // ====================================================================
-    //Necesita revision
-    /**
-    @PostMapping("/alterar")
-    public ResponseEntity<?> alterarTurno(@RequestBody AlterarTurnoRequest request) {
-        try {
-            Map<String, Object> result = alterarTurnoService.alterarTurno(request);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-    **/
-
-    //Necesita revision
-    /**
-    @PostMapping("/delete-range")
-    public ResponseEntity<?> deleteRange(@RequestBody Map<String, Object> payload) {
-        try {
-            LocalDate inicio = LocalDate.parse(payload.get("fechaInicio").toString());
-            LocalDate fin = LocalDate.parse(payload.get("fechaFin").toString());
-            Long pisoId = Long.parseLong(payload.get("pisoId").toString());
-            turnoService.deleteTurnosByRange(inicio, fin, pisoId);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-    **/
 
     private TurnoEntity buildTurnoFromPayload(Map<String, Object> payload) {
         TurnoEntity turno = new TurnoEntity();
@@ -354,7 +273,10 @@ public class TurnoController {
 
         if (payload.get("idPuesto") != null) {
             Long idPuesto = Long.parseLong(payload.get("idPuesto").toString());
-            puestoRepository.findById(idPuesto).ifPresent(turno::setPuesto);
+            puestoRepository.findById(idPuesto).ifPresent(p -> {
+                if (p.isEliminado()) throw new RuntimeException("El puesto seleccionado fue eliminado y no puede usarse.");
+                turno.setPuesto(p);
+            });
         }
 
         if (payload.get("idFuncionario") != null) {
@@ -369,7 +291,10 @@ public class TurnoController {
 
         if (payload.get("idTipoTurno") != null) {
             Long idTipoTurno = Long.parseLong(payload.get("idTipoTurno").toString());
-            plantillaTurnoRepository.findById(idTipoTurno).ifPresent(turno::setTipoTurno);
+            plantillaTurnoRepository.findById(idTipoTurno).ifPresent(tt -> {
+                if (tt.isEliminado()) throw new RuntimeException("El tipo de turno seleccionado fue eliminado y no puede usarse.");
+                turno.setTipoTurno(tt);
+            });
         }
 
         return turno;
