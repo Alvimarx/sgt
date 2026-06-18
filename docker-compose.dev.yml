@@ -50,26 +50,37 @@ services:
       start_period: 90s
 
   db-init:
-    image: mysql:8.0
-    container_name: huap-dev-db-init
-    restart: "no"
-    volumes:
-      - ./BaseDatosMySQL:/scripts:ro
-    command:
-      - sh
-      - -c
-      - |
-        echo "Creando tablas auxiliares y vista antes de iniciar el backend...";
-        until mysql -h db -uroot -phuap1234 innhosp2 -e "SELECT 1" >/dev/null 2>&1; do
-          echo "Esperando a que MySQL acepte conexiones...";
-          sleep 2;
-        done;
-        mysql -h db -uroot -phuap1234 innhosp2 < /scripts/setup_personal_aux.sql;
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - huap-dev-network
+      image: mysql:8.0
+      container_name: huap-dev-db-init
+      restart: "no"
+      volumes:
+        - ./BaseDatosMySQL:/scripts:ro
+      command:
+        - sh
+        - -c
+        - | 
+          echo "1. Esperando a que MySQL acepte conexiones en la red de Docker...";
+          until mysql -h db -uroot -phuap1234 innhosp2 -e "SELECT 1" >/dev/null 2>&1; do
+            sleep 2;
+          done;
+
+          echo "2. Validando si la tabla viewpersonal ya existe y tiene registros...";
+          # Verificamos si la tabla existe y cuántas filas tiene de forma segura
+          COUNT=$$(mysql -h db -uroot -phuap1234 innhosp2 -se "SELECT COUNT(*) FROM viewpersonal" 2>/dev/null || echo 0);
+          
+          if [ "$$COUNT" = "0" ]; then
+            echo "3. La tabla no existe o está vacía. Ejecutando script de poblado...";
+            mysql -h db -uroot -phuap1234 innhosp2 < /scripts/setup_personal_aux.sql &&
+            mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_personal_aux_dev.sql;
+            echo "¡Poblado finalizado con éxito!";
+          else
+            echo "3. Omitiendo seed: La base de datos ya contiene datos ($$COUNT funcionarios).";
+          fi
+      depends_on:
+        db:
+          condition: service_healthy
+      networks:
+        - huap-dev-network
 
   db-seeder:
     image: mysql:8.0
@@ -84,8 +95,7 @@ services:
         COUNT=$$(mysql -h db -uroot -phuap1234 innhosp2 -se 'SELECT COUNT(*) FROM Funcionario' 2>/dev/null || echo 0);
         if [ "$$COUNT" = "0" ]; then
           echo "BD vacia, ejecutando seed...";
-          mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_innhosp2.sql &&
-          mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_personal_aux_dev.sql;
+          mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_innhosp2.sql 
         else
           echo "BD ya tiene datos ($$COUNT funcionarios), omitiendo seed.";
         fi
