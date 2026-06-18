@@ -22,10 +22,15 @@ import com.pingeso.HUAP.Service.FuncionarioService;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 @RestController
 @RequestMapping("/api/v2/funcionarios")
 public class FuncionarioController {
+
+        private static final Logger logger = LoggerFactory.getLogger(FuncionarioController.class);
     
     @Autowired
     private FuncionarioService funcionarioService;
@@ -38,8 +43,12 @@ public class FuncionarioController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+                logger.info("[LOGIN] Request recibido. rut={}, passwordPresente={}",
+                                loginRequest.getRut(), loginRequest.getPassword() != null && !loginRequest.getPassword().isBlank());
+
         // Validaciones básicas
         if (loginRequest.getRut() == null || loginRequest.getPassword() == null) {
+                        logger.warn("[LOGIN] Credenciales incompletas: rut o password null.");
             return ResponseEntity.badRequest().body(Map.of("error", "Credenciales incompletas"));
         }
 
@@ -48,6 +57,7 @@ public class FuncionarioController {
         // Bloqueo por fuerza bruta: demasiados intentos fallidos para este RUT.
         if (loginAttemptService.isBlocked(rut)) {
             long segundos = loginAttemptService.getSecondsToUnlock(rut);
+                        logger.warn("[LOGIN] RUT bloqueado por intentos fallidos. rut={}, segundosRestantes={}", rut, segundos);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", "Cuenta bloqueada por demasiados intentos fallidos. "
                             + "Intenta nuevamente en " + segundos + " segundos."));
@@ -55,14 +65,17 @@ public class FuncionarioController {
 
         FuncionarioEntity usuario;
         try {
+                        logger.info("[LOGIN] Autenticando RUT {}", rut);
             usuario = funcionarioService.authenticateWithPassword(
                     rut, loginRequest.getPassword());
         } catch (RuntimeException e) {
+                        logger.warn("[LOGIN] Fallo de autenticación para rut={}: {}", rut, e.getMessage());
             loginAttemptService.loginFailed(rut);
 
             // Si este fallo gatilló el bloqueo, avisamos del bloqueo y el tiempo de espera.
             if (loginAttemptService.isBlocked(rut)) {
                 long segundos = loginAttemptService.getSecondsToUnlock(rut);
+                                logger.warn("[LOGIN] RUT bloqueado después del fallo. rut={}, segundosRestantes={}", rut, segundos);
                 return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                         .body(Map.of("error", "Has superado el número de intentos permitidos. "
                                 + "Acceso bloqueado por " + segundos + " segundos."));
@@ -76,7 +89,17 @@ public class FuncionarioController {
                     .body(Map.of("error", msg));
         }
         loginAttemptService.loginSucceeded(rut);
-
+        if (usuario == null){
+            logger.warn("[LOGIN] Usuario autenticado sin registro local en sistema. rut={}", rut);
+            return ResponseEntity.ok(new LoginResponse(
+                    null,
+                    false,
+                    List.of(),
+                    false,
+                    "Tu cuenta aún no ha sido registrada en el sistema"
+            ));
+        }
+                logger.info("[LOGIN] Autenticación exitosa para rut={}, idFuncionario={}", rut, usuario.getIdFuncionario());
         // 2. Mapear los servicios a los que tiene acceso el funcionario
         List<ServicioDisponibleDTO> opciones = usuario.getServiciosFuncionario().stream()
                 .filter(sf -> sf.getServicio() != null)
@@ -88,6 +111,7 @@ public class FuncionarioController {
                 .toList();
 
         if (opciones.isEmpty()) {
+                        logger.warn("[LOGIN] Usuario autenticado sin servicios asignados. rut={}, idFuncionario={}", rut, usuario.getIdFuncionario());
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "El usuario no tiene servicios asignados"));
         }
@@ -96,7 +120,13 @@ public class FuncionarioController {
         // Este token solo contiene el ID del usuario, nada más.
         String preAuthToken = jwtTokenProvider.generatePreAuthToken(usuario.getIdFuncionario());
 
-        return ResponseEntity.ok(new LoginResponse(preAuthToken, true, opciones));
+        return ResponseEntity.ok(new LoginResponse(
+                preAuthToken,
+                true,
+                opciones,
+                true,
+                null
+        ));
     }
 
     

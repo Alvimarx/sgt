@@ -13,4 +13,6 @@ public class LoginResponse {
     private String preAuthToken;
     private boolean requireServiceSelection;
     private List<ServicioDisponibleDTO> servicios;
+    private boolean registeredInSystem;
+    private String message;
 }

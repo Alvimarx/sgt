@@ -29,7 +29,7 @@ function buildRutParam(clean) {
   return `${nums}-${dv}`;
 }
 
-// onLoginSuccess({ preAuthToken, servicios }) — Prop4 lo captura y pasa a SelectServiceView
+// onLoginSuccess(response) — Prop4 decide si pasa a SelectServiceView o a la vista de aviso
 const LoginView = ({ onLoginSuccess }) => {
   const PA = SGT_DATA.PALETTE;
 
@@ -81,8 +81,8 @@ const LoginView = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Paso 1 exitoso: sube preAuthToken y lista de servicios al padre (Prop4)
-    onLoginSuccess({ preAuthToken: result.preAuthToken, servicios: result.servicios });
+    // Paso 1 exitoso: sube toda la respuesta al padre (Prop4)
+    onLoginSuccess(result);
   };
 
   return (

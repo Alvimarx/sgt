@@ -38,6 +38,7 @@ import BitacoraView from "./BitacoraView";
 
 import JerarquiaView from "./JerarquiaView";
 import LoginView from "../Login/LoginView";
+import PendingRegistrationView from "../Login/PendingRegistrationView";
 
 
 import PlantillasView from "./PlantillasView";
@@ -57,6 +58,7 @@ const Prop4 = ({ tweaks = {} }) => {
 
   const [preAuthToken, setPreAuthToken] = useState(null);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
+  const [pendingRegistrationMessage, setPendingRegistrationMessage] = useState('');
   const [solicitudesReturn, setSolicitudesReturn] = useState("agenda");
   const [solicitudesCreatePreset, setSolicitudesCreatePreset] = useState(null);
 
@@ -85,7 +87,16 @@ const Prop4 = ({ tweaks = {} }) => {
     setCurrentView("solicitudes");
   };
 
-  const handleLoginSuccess = ({ preAuthToken, servicios }) => {
+  const handleLoginSuccess = ({ preAuthToken, servicios = [], registeredInSystem, message }) => {
+    if (!registeredInSystem) {
+      setPreAuthToken(null);
+      setServiciosDisponibles([]);
+      setPendingRegistrationMessage(message || 'Tu cuenta aún no ha sido registrada en el sistema.');
+      setCurrentView('pending_registration');
+      return;
+    }
+
+    setPendingRegistrationMessage('');
     setPreAuthToken(preAuthToken);
     setServiciosDisponibles(servicios);
     setCurrentView("select_service");
@@ -123,6 +134,7 @@ const Prop4 = ({ tweaks = {} }) => {
     localStorage.removeItem("sgt_servicio_activo_nombre");
     setPreAuthToken(null);
     setServiciosDisponibles([]);
+    setPendingRegistrationMessage('');
     setSolicitudesReturn("agenda");
     setActiveTab("home");
     setCurrentView("login");
@@ -149,6 +161,12 @@ const Prop4 = ({ tweaks = {} }) => {
           servicios={serviciosDisponibles}
           onServiceSelected={handleServiceSelected}
           onLogout={handleLogout}
+        />
+      )}
+      {currentView === "pending_registration" && (
+        <PendingRegistrationView
+          message={pendingRegistrationMessage}
+          onBackToLogin={handleLogout}
         />
       )}
       {currentView === "agenda" && (

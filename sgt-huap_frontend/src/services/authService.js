@@ -19,15 +19,15 @@ import {
  * NO guarda nada en storage — el token definitivo se obtiene en selectService().
  * @param {string} rut
  * @param {string} password
- * @returns {Promise<{ success, preAuthToken, servicios }>}
+ * @returns {Promise<{ success, preAuthToken, servicios, registeredInSystem, message }>}
  *   servicios: Array<{ servicioId, nombre, rol }>
  */
 export const login = async (rut, password) => {
     try {
         const response = await axiosInstance.post('/funcionarios/login', { rut, password });
-        const { preAuthToken, servicios } = response.data;
+        const { preAuthToken, servicios, registeredInSystem, message } = response.data;
 
-        return { success: true, preAuthToken, servicios };
+        return { success: true, preAuthToken, servicios, registeredInSystem, message };
     } catch (error) {
         const mensaje = error.response?.data?.error || error.message || 'Error al iniciar sesión';
         return { success: false, error: mensaje };

@@ -46,9 +46,6 @@ public class    FuncionarioEntity {
     @Column(name = "DV", nullable = false, length = 1)
     private String dv;
 
-    @JsonIgnore
-    @Column(name = "Clave", nullable = false)
-    private String clave;
 
     @Column(name = "Estado", nullable = false)
     private int estado;
@@ -90,7 +87,6 @@ public class    FuncionarioEntity {
             String apelMat,
             String rut,
             String dv,
-            String clave,
             int estado,
             String profesion,
             RolSistemaEntity rolSistema
@@ -100,7 +96,6 @@ public class    FuncionarioEntity {
         this.apelMat = apelMat;
         this.rut = rut;
         this.dv = dv;
-        this.clave = clave;
         this.estado = estado;
         this.profesion = profesion;
         this.rolSistema = rolSistema;

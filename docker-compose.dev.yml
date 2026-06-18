@@ -38,6 +38,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     networks:
       - huap-dev-network
     healthcheck:
@@ -46,6 +48,28 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
+
+  db-init:
+    image: mysql:8.0
+    container_name: huap-dev-db-init
+    restart: "no"
+    volumes:
+      - ./BaseDatosMySQL:/scripts:ro
+    command:
+      - sh
+      - -c
+      - |
+        echo "Creando tablas auxiliares y vista antes de iniciar el backend...";
+        until mysql -h db -uroot -phuap1234 innhosp2 -e "SELECT 1" >/dev/null 2>&1; do
+          echo "Esperando a que MySQL acepte conexiones...";
+          sleep 2;
+        done;
+        mysql -h db -uroot -phuap1234 innhosp2 < /scripts/setup_personal_aux.sql;
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - huap-dev-network
 
   db-seeder:
     image: mysql:8.0
@@ -61,7 +85,7 @@ services:
         if [ "$$COUNT" = "0" ]; then
           echo "BD vacia, ejecutando seed...";
           mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_innhosp2.sql &&
-          mysql -h db -uroot -phuap1234 innhosp2 < /scripts/setup_personal_aux.sql;
+          mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_personal_aux_dev.sql;
         else
           echo "BD ya tiene datos ($$COUNT funcionarios), omitiendo seed.";
         fi

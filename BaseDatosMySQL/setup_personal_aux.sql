@@ -363,32 +363,28 @@ INSERT INTO `servicio` VALUES
 -- ==============================================================
 DROP TABLE IF EXISTS `personalAux`;
 CREATE TABLE `personalAux` (
-  `id_personal`     int          NOT NULL DEFAULT 0 AUTO_INCREMENT,
+  `id_personal`     int          NOT NULL AUTO_INCREMENT,
   `rol`             varchar(100) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
   `rut`             varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
-  `dv`              varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
-  `nombre`          varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
-  `apel_pat`        varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
-  `apel_mat`        varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
-  `rrhh`            tinyint(1)   NULL DEFAULT 0,
-  `jefatura`        int          NULL DEFAULT NULL,
-  `id_servicio`     int          NULL DEFAULT NULL,
-  `id_tipocargo`    int          NULL DEFAULT NULL,
-  `id_tipocontrato` int          NULL DEFAULT NULL,
+  `dv`              varchar(1)   CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
+  `nombre`          varchar(100) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
+  `apel_pat`        varchar(100) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
+  `apel_mat`        varchar(100) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
+  `rrhh`            tinyint(1)   NOT NULL DEFAULT 0,
+  `telefono`        varchar(20)  CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
+  `emailProfesional` varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
+  `emailPersonal`   varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
   `profesion`       int          NULL DEFAULT NULL,
-  `clave`           varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
-  `estado`          int          NULL DEFAULT 1,
+  `id_estamento`    int          NULL DEFAULT NULL,
+  `estamento`       varchar(255) CHARACTER SET latin1 COLLATE latin1_swedish_ci NULL DEFAULT NULL,
+  `clave`           varbinary(255) NULL DEFAULT NULL,
+  `estado`          int          NULL DEFAULT NULL,
   `date_added`      datetime     NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_personal`) USING BTREE,
-  INDEX `personalFk1`   (`id_servicio`     ASC) USING BTREE,
+ 
   INDEX `personalFk2`   (`estado`          ASC) USING BTREE,
-  INDEX `personalFk3`   (`id_tipocargo`    ASC) USING BTREE,
-  INDEX `perdonalFk4`   (`id_tipocontrato` ASC) USING BTREE,
-  CONSTRAINT `personalAux_fk_servicio`     FOREIGN KEY (`id_servicio`)     REFERENCES `servicio`         (`id_servicio`)     ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `personalAux_fk_estado`       FOREIGN KEY (`estado`)          REFERENCES `conf_estados`     (`id_estado`)       ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `personalAux_fk_tipocargo`    FOREIGN KEY (`id_tipocargo`)    REFERENCES `conf_tipocargo`   (`id_tipocargo`)    ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `personalAux_fk_tipocontrato` FOREIGN KEY (`id_tipocontrato`) REFERENCES `conf_tipocontrato`(`id_tipocontrato`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1
+  CONSTRAINT `personalAux_fk_estado`       FOREIGN KEY (`estado`)          REFERENCES `conf_estados`     (`id_estado`)       ON DELETE RESTRICT ON UPDATE RESTRICT
+ ) ENGINE = InnoDB AUTO_INCREMENT = 1
   CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ==============================================================
@@ -397,6 +393,8 @@ CREATE TABLE `personalAux` (
 -- Apunta a personalAux dentro de innhosp2.
 -- Para producción: reemplazar por Opción A que apunta a innhosp.personal
 -- ==============================================================
+DROP VIEW IF EXISTS viewPersonal;
+DROP TABLE IF EXISTS viewPersonal;
 CREATE OR REPLACE VIEW viewPersonal AS
 SELECT
     p.id_personal,
@@ -407,11 +405,12 @@ SELECT
     p.apel_pat,
     p.apel_mat,
     p.rrhh,
-    p.jefatura,
-    p.id_servicio,
-    p.id_tipocargo,
-    p.id_tipocontrato,
+    p.telefono,
+    p.emailProfesional,
+    p.emailPersonal,
     p.profesion,
+    p.id_estamento,
+    p.estamento,
     p.clave,
     p.estado,
     p.date_added

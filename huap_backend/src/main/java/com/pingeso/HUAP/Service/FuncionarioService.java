@@ -1,34 +1,30 @@
 package com.pingeso.HUAP.Service;
 
+import com.pingeso.HUAP.Entity.*;
+import com.pingeso.HUAP.Repository.ViewPersonalRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.pingeso.HUAP.DTO.FuncionarioSummaryDTO;
 import com.pingeso.HUAP.DTO.ResumenMesDTO;
 import com.pingeso.HUAP.DTO.RolServicioDTO;
-import com.pingeso.HUAP.Entity.FuncionarioEntity;
-import com.pingeso.HUAP.Entity.RolServicioEntity;
-import com.pingeso.HUAP.Entity.ServicioEntity;
-import com.pingeso.HUAP.Entity.ServiciosFuncionarioEntity;
-import com.pingeso.HUAP.Entity.Solicitud2Entity;
-import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.RolServicioRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 
 import jakarta.transaction.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.HexFormat;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,6 +37,7 @@ public class FuncionarioService {
     private final PasswordEncoder passwordEncoder;
 
     private final FuncionarioRepository funcionarioRepository;
+    private final ViewPersonalRepository viewPersonalRepository;
     private final RolServicioRepository rolServicioRepository;
     private final ServicioRepository servicioRepository;
 
@@ -49,40 +46,83 @@ public class FuncionarioService {
         if (rut == null || rut.isBlank()) throw new IllegalArgumentException("El argumento rut es obligatorio");
 
         if (password == null || password.isBlank()) throw new IllegalArgumentException("El argumento password es obligatorio");
-        
+
+        logger.info("[AUTH] Inicio de autenticación. rutOriginal={}", rut);
+
+        FuncionarioEntity funcionarioRetornado;
+
         // 1. Limpiar el RUT
         String cleanRut = rut.replaceAll("[^0-9Kk]", "").toUpperCase();
         String rutSinDv = cleanRut.length() > 1 ? cleanRut.substring(0, cleanRut.length() - 1) : cleanRut;
+        logger.info("[AUTH] RUT normalizado. cleanRut={}, rutSinDv={}", cleanRut, rutSinDv);
+
 
         // Buscar al usuario con el rut
-        FuncionarioEntity usuario = funcionarioRepository.findByRut(rutSinDv);
+        Optional<ViewPersonalEntity> usuario = viewPersonalRepository.findByRut(rutSinDv);
+        logger.info("[AUTH] Resultado búsqueda viewPersonal por rutSinDv. encontrado={}", usuario.isPresent());
 
         // Esto es traido directo de la version legacy, evaluar si se mantiene
-        if (usuario == null){
-            usuario = funcionarioRepository.findByRut(rut);
+        if (usuario.isEmpty()){
+            usuario = viewPersonalRepository.findByRut(rut);
+            funcionarioRetornado = funcionarioRepository.findByRut(rut);
+            logger.info("[AUTH] Búsqueda alternativa por rut completo. encontrado={}, funcionarioEncontrado={}", usuario.isPresent(), funcionarioRetornado != null);
+        } else {
+            funcionarioRetornado = funcionarioRepository.findByRut(rutSinDv);
+            logger.info("[AUTH] Funcionario asociado al rutSinDv encontrado={}", funcionarioRetornado != null);
         }
         
-        if (usuario == null){
+        if (usuario.isEmpty()){
             logger.warn("Intento de login fallido: No se encontró registro para el RUT: {}", rut);
             throw new RuntimeException("Credenciales incorrectas");
         }
-
+        ViewPersonalEntity user = usuario.get();
 
         //Logica de AUTENTICACIÓN
 
-        if (usuario.getEstado() != 1){ // 1 = Activo
+        if (!Integer.valueOf(1).equals(user.getEstado())){ // 1 = Activo
             logger.warn("Intento de login fallido: Perfil inactivo para RUT: {}", rut);
             throw new RuntimeException("El usuario se encuentra inactivo en el sistema");
         }
 
     
-        if (!passwordEncoder.matches(password, usuario.getClave())){
+        String encodedPassword = normalizeEncodedPassword(user.getClave());
+        logger.info("[AUTH] Hash normalizado listo. rut={}, longitudEncoded={}", rut, encodedPassword != null ? encodedPassword.length() : null);
+        boolean passwordMatches = passwordEncoder.matches(password, encodedPassword);
+        logger.info("[AUTH] Resultado de passwordEncoder.matches para rut={}: {}", rut, passwordMatches);
+        if (!passwordMatches){
             logger.warn("Intento de login fallido: Contraseña incorrecta para RUT: {}", rut);
             throw new RuntimeException("Credenciales incorrectas");
         }
-        
-        return usuario;
+
+        //
+        return funcionarioRetornado;
     
+    }
+
+    private String normalizeEncodedPassword(byte[] encodedPassword) {
+        // 1. Manejo de nulos o vacíos
+        if (encodedPassword == null || encodedPassword.length == 0) {
+            logger.error("Error de integridad de datos: El hash de la contraseña recuperado es nulo o vacío.");
+            // Lanzamos BadCredentialsException para que la capa superior la maneje igual que un login fallido normal
+            throw new BadCredentialsException("Credenciales incorrectas");
+        }
+
+        // 2. Escenario B (El más probable según tu ejemplo): Texto hexadecimal guardado como bytes
+        if (encodedPassword.length == 128) {
+            logger.info("[AUTH] Hash recuperado como texto hexadecimal en bytes (128 bytes). Se usa UTF-8 directo.");
+            return new String(encodedPassword, StandardCharsets.UTF_8);
+        }
+
+        // 3. Escenario A (Fallback): Hash binario real de 64 bytes
+        if (encodedPassword.length == 64) {
+            logger.info("[AUTH] Hash recuperado como binario real (64 bytes). Se convierte a hex.");
+            return HexFormat.of().formatHex(encodedPassword);
+        }
+
+        // 4. Excepción por datos corruptos
+        // Si no es ni 64 ni 128, los datos en la base de datos están mal formados.
+        logger.error("Error de integridad de datos: Longitud de hash inesperada ({} bytes). Se esperaba 64 o 128.", encodedPassword.length);
+        throw new BadCredentialsException("Error interno al validar las credenciales");
     }
 
 
