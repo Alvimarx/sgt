@@ -55,10 +55,11 @@ export const planificacionService = {
 
     /**
      * POST /planificaciones/{id}/generar — expande el molde a turnos desde fechaInicio (lunes).
-     * Omite los turnos en conflicto de horario. @returns {{ generados, omitidos }}
+     * Omite los turnos en conflicto de horario. Aplica solo las reglas de ajuste cuyos ids se
+     * pasen en idsReglas (vacío = sin ajuste de horario). @returns {{ generados, vacantesPorConflicto }}
      */
-    generar: async (id, fechaInicio) => {
-        const res = await axiosInstance.post(`${API_BASE}/${id}/generar`, { fechaInicio });
+    generar: async (id, fechaInicio, idsReglas = []) => {
+        const res = await axiosInstance.post(`${API_BASE}/${id}/generar`, { fechaInicio, idsReglas });
         return res.data;
     },
 };

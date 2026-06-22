@@ -63,7 +63,8 @@ public class PlanificacionController {
         return ResponseEntity.noContent().build();
     }
 
-    // Genera los turnos del molde desde un lunes. Body: { "fechaInicio": "YYYY-MM-DD" }
+    // Genera los turnos del molde desde un lunes.
+    // Body: { "fechaInicio": "YYYY-MM-DD", "idsReglas": [..] (opcional) }
     @PostMapping("/{id}/generar")
     public ResponseEntity<?> generar(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
         try {
@@ -71,10 +72,22 @@ public class PlanificacionController {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             Long actorId = (auth != null && auth.getPrincipal() instanceof Long)
                     ? (Long) auth.getPrincipal() : null;
-            return ResponseEntity.ok(planificacionService.generarTurnos(id, fechaInicio, actorId));
+            List<Long> idsReglas = parseIdsReglas(payload.get("idsReglas"));
+            return ResponseEntity.ok(planificacionService.generarTurnos(id, fechaInicio, actorId, idsReglas));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /** Convierte el campo idsReglas del body (lista JSON) a List<Long>; ausente/null → vacía. */
+    private List<Long> parseIdsReglas(Object raw) {
+        List<Long> ids = new java.util.ArrayList<>();
+        if (raw instanceof List<?> lista) {
+            for (Object o : lista) {
+                if (o != null) ids.add(Long.valueOf(o.toString()));
+            }
+        }
+        return ids;
     }
 
     // Pre-chequeo de choques de horario (no crea turnos). Body: { "fechaInicio": "YYYY-MM-DD" }

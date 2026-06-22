@@ -5,31 +5,19 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.web.client.RestTemplate;
 
 /**
- * Configuración de cache, scheduling y beans comunes para la aplicación
+ * Configuración de cache para la aplicación.
  */
 @Configuration
 @EnableCaching
-@EnableScheduling
 public class CacheConfig {
 
     /**
-     * Configura el administrador de cache usando ConcurrentMapCacheManager
-     * que es simple y efectivo para aplicaciones pequeñas/medias
+     * Administrador de cache simple en memoria (ConcurrentMapCacheManager).
      */
     @Bean
     public CacheManager cacheManager() {
-        return new ConcurrentMapCacheManager("holidays");
-    }
-
-    /**
-     * Configura RestTemplate para llamadas HTTP a APIs externas
-     */
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
+        return new ConcurrentMapCacheManager();
     }
 }

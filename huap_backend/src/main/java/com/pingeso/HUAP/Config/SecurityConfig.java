@@ -46,7 +46,8 @@ public class SecurityConfig {
     private static final String[] SERVICE_ADMIN_PATHS = {
             "/api/v2/puestos/**",
             "/api/v2/gestion-turnos/**",
-            "/api/v2/turnos/**"
+            "/api/v2/turnos/**",
+            "/api/v2/reglas-servicio/**"
     };
 
     /**

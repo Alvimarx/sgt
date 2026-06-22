@@ -25,6 +25,20 @@ export const formatHora = (hora) => {
 /** Convierte "HH:MM" (input type=time) a "HH:MM:00" para enviar al backend. */
 export const toLocalTime = (timeStr) => (timeStr ? `${timeStr}:00` : null);
 
+/**
+ * Desplaza una hora ([H,M] | "HH:MM[:SS]") N minutos y devuelve "HH:MM" (envuelve en 24h).
+ * Útil para mostrar el "después" de una regla de ajuste de horario.
+ */
+export const shiftHora = (hora, minutos) => {
+    const base = formatHora(hora); // "HH:MM" o ""
+    if (!base) return '';
+    const [h, m] = base.split(':').map(Number);
+    const total = ((h * 60 + m + (Number(minutos) || 0)) % 1440 + 1440) % 1440;
+    const hh = Math.floor(total / 60);
+    const mm = total % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS DE TURNO  →  /api/v2/tipos-turno
 // ─────────────────────────────────────────────────────────────────────────────

@@ -33,6 +33,7 @@ import SubroganteDashboard from "../Subrogante/SubroganteDashboardView";
 
 
 import AdminDashboard from "./AdminDashboard";
+import ReglasServicioView from "./ReglasServicioView";
 
 
 import AsignacionView from "./AsignacionView";
@@ -70,6 +71,7 @@ const Prop4 = ({ tweaks = {} }) => {
   const[puestosReturn, setPuestosReturn] = useState("admin");
   const [bitacoraReturn, setBitacoraReturn] = useState("admin");
   const [auditoriaReturn, setAuditoriaReturn] = useState("admin");
+  const [reglasReturn, setReglasReturn] = useState("admin");
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -222,6 +224,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoTiposTurno={() => setCurrentView("tipos_turno")}
           onGoPlantillas={() => setCurrentView("plantillas")}
           onGoPlanificacion={() => setCurrentView("planificacion")}
+          onGoReglas={() => { setReglasReturn("admin"); setCurrentView("reglas"); }}
         />
       )}
       {currentView === "jefatura" && (
@@ -274,6 +277,7 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "auditoria" && <AuditoriaView onBack={() => setCurrentView(auditoriaReturn)} />}
       {currentView === "tipos_turno" && <TiposTurnoView onBack={() => setCurrentView("admin")} />}
       {currentView === "plantillas" && <PlantillasView onBack={() => setCurrentView("admin")} />}
+      {currentView === "reglas" && <ReglasServicioView onBack={() => setCurrentView(reglasReturn)} />}
 
       {["agenda", "perfil", "calendar_view", "solicitudes"].includes(currentView) && (
         <TabBar active={activeTab} onChange={handleTabChange} />

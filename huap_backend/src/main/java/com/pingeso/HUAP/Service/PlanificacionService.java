@@ -46,6 +46,7 @@ public class PlanificacionService {
     private final PlantillaDiaRepository plantillaDiaRepository;
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
+    private final ReglaServicioService reglaServicioService;
 
     public PlanificacionService(
             PlanificacionRepository planificacionRepository,
@@ -55,7 +56,8 @@ public class PlanificacionService {
             PuestoRepository puestoRepository,
             PlantillaDiaRepository plantillaDiaRepository,
             TurnoRepository turnoRepository,
-            BitacoraService bitacoraService
+            BitacoraService bitacoraService,
+            ReglaServicioService reglaServicioService
     ) {
         this.planificacionRepository = planificacionRepository;
         this.servicioRepository = servicioRepository;
@@ -65,6 +67,7 @@ public class PlanificacionService {
         this.plantillaDiaRepository = plantillaDiaRepository;
         this.turnoRepository = turnoRepository;
         this.bitacoraService = bitacoraService;
+        this.reglaServicioService = reglaServicioService;
     }
 
     // =========================================================
@@ -143,10 +146,13 @@ public class PlanificacionService {
      * crea igual pero VACANTE (funcionario null) para que otra persona pueda tomarlo.
      * Devuelve {generados, vacantesPorConflicto}.
      */
-    public Map<String, Object> generarTurnos(Long idPlanificacion, LocalDate fechaInicio, Long actorId) {
+    public Map<String, Object> generarTurnos(Long idPlanificacion, LocalDate fechaInicio, Long actorId, List<Long> idsReglas) {
         validarLunes(fechaInicio);
         PlanificacionEntity plan = obtenerPlanificacion(idPlanificacion);
         ServicioEntity servicio = plan.getServicio();
+
+        // Reglas de ajuste seleccionadas para esta generación (vacío = no se ajusta nada).
+        var reglasSel = reglaServicioService.cargarReglasSeleccionadas(servicio.getIdServicio(), idsReglas);
 
         // Actor que ejecuta la generación (para registrar en bitácora cada turno creado).
         FuncionarioEntity actor = (actorId != null)
@@ -169,9 +175,26 @@ public class PlanificacionService {
                 if (tipo == null || tipo.isEliminado()) continue; // día libre o tipo eliminado
 
                 LocalDate fechaDia = fechaInicio.plusDays(dia.getDiaIndex());
-                LocalTime hi = tipo.getHoraInicio();
-                LocalTime hf = tipo.getHoraTermino();
+
+                // Turno base con las horas del tipo. El motor de reglas ajusta finde/feriado.
+                TurnoEntity turno = TurnoEntity.builder()
+                        .tipoTurno(tipo)
+                        .diaInicioTurno(fechaDia)
+                        .diaFinalTurno(!tipo.getHoraTermino().isAfter(tipo.getHoraInicio()) ? fechaDia.plusDays(1) : fechaDia)
+                        .horaInicio(tipo.getHoraInicio())
+                        .horaFin(tipo.getHoraTermino())
+                        .servicio(servicio)
+                        .puesto(asignacion.getPuesto())
+                        .plantilla(asignacion.getPlantilla())
+                        .build();
+
+                reglaServicioService.aplicarReglas(turno, reglasSel); // ajusta horaInicio/horaFin según reglas seleccionadas
+
+                // Horas ya ajustadas; recalcular el día final con ellas.
+                LocalTime hi = turno.getHoraInicio();
+                LocalTime hf = turno.getHoraFin();
                 LocalDate diaFinal = !hf.isAfter(hi) ? fechaDia.plusDays(1) : fechaDia;
+                turno.setDiaFinalTurno(diaFinal);
 
                 // Si el funcionario asignado fue eliminado, el turno se genera VACANTE.
                 FuncionarioEntity func = asignacion.getFuncionario();
@@ -183,18 +206,7 @@ public class PlanificacionService {
                         creadosPorFuncionario.getOrDefault(func.getIdFuncionario(), List.of()));
                 FuncionarioEntity funcAsignado = enConflicto ? null : func;
                 if (enConflicto) vacantesPorConflicto++;
-
-                TurnoEntity turno = TurnoEntity.builder()
-                        .tipoTurno(tipo)
-                        .diaInicioTurno(fechaDia)
-                        .diaFinalTurno(diaFinal)
-                        .horaInicio(hi)
-                        .horaFin(hf)
-                        .funcionario(funcAsignado)
-                        .servicio(servicio)
-                        .puesto(asignacion.getPuesto())
-                        .plantilla(asignacion.getPlantilla())
-                        .build();
+                turno.setFuncionario(funcAsignado);
 
                 turnoRepository.save(turno);
                 turnoRepository.flush(); // visible para el filtro grueso por BD del próximo chequeo

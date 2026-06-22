@@ -12,9 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.LocalDateTime;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,37 +31,7 @@ public class TurnoService {
     private FuncionarioRepository funcionarioRepository;
 
     @Autowired
-    private com.pingeso.HUAP.Service.HolidayService holidayService;
-
-    @Autowired
     private Solicitud2Repository solicitud2Repository;
-
-    // ====================================================================
-    // BLOQUE 1: REGLAS DE NEGOCIO DE TIEMPOS Y FERIADOS
-    // ====================================================================
-
-    // Umbral usado para considerar un día como cubierto tras redondeo a 2 decimales (22.9 horas)
-    private static final double COVERED_THRESHOLD = 22.9;
-    // Hora normal de inicio del "día" (08:00)
-    private static final int DAY_START_HOUR = 8;
-    // Hora de inicio para fines de semana o feriados (09:00)
-    private static final int WEEKEND_START_HOUR = 9;
-
-    /*
-     * Devuelve la hora de inicio del día para una fecha dada (8 o 9 AM).
-     */
-    private int getDayStartHour(LocalDate date) {
-        return isWeekendOrHoliday(date) ? WEEKEND_START_HOUR : DAY_START_HOUR;
-    }
-
-    /*
-     * Verifica si la fecha dada es fin de semana o feriado utilizando el HolidayService.
-     */
-    private boolean isWeekendOrHoliday(LocalDate date) {
-        if (date == null) return false;
-        DayOfWeek dow = date.getDayOfWeek();
-        return dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY || holidayService.isHoliday(date);
-    }
 
     @Transactional
     public TurnoEntity updateTurno(Long id, TurnoEntity turnoActualizado) throws Exception {
@@ -86,64 +54,6 @@ public class TurnoService {
         turnoExistente.setTipoTurno(turnoActualizado.getTipoTurno());
 
         return saveTurno(turnoExistente);
-    }
-
-    /*
-     * Ajusta la hora de inicio para turnos en fines de semana y feriados.
-     * Regla: Si el turno empieza en fin de semana/feriado (o es viernes nocturno) 
-     * Y la hora está entre 07:30-08:30, se ajusta a 09:00.
-     */
-    private LocalTime ajustarHoraInicioParaFinDeSemanaOFeriado(LocalTime horaInicio, LocalDate fechaInicio, LocalDate fechaFin) {
-        if (horaInicio == null || fechaInicio == null) return horaInicio;
-
-        boolean inicioEsFinDeSemana = isWeekendOrHoliday(fechaInicio);
-        boolean esViernesQueTerminaEnSabado = (fechaFin != null && 
-                                               fechaInicio.getDayOfWeek() == DayOfWeek.FRIDAY && 
-                                               isWeekendOrHoliday(fechaFin));
-
-        if (inicioEsFinDeSemana || esViernesQueTerminaEnSabado) {
-            LocalTime limiteInferior = LocalTime.of(7, 30);
-            LocalTime limiteSuperior = LocalTime.of(8, 30);
-
-            // Si está dentro del rango, empujamos el inicio a las 09:00
-            if (!horaInicio.isBefore(limiteInferior) && !horaInicio.isAfter(limiteSuperior)) {
-                return LocalTime.of(9, 0);
-            }
-        }
-        return horaInicio;
-    }
-
-    /*
-     * Ajusta la hora de fin según si el turno ENTRA o SALE de un fin de semana/feriado.
-     * Mantiene los turnos ajustados a 23h, 24h o 25h según corresponda.
-     */
-    private LocalTime ajustarHoraFinParaDomingoOFeriado(LocalTime horaInicio, LocalTime horaFin, LocalDate fechaInicio, LocalDate fechaFin) {
-        if (horaFin == null || fechaInicio == null || fechaFin == null) return horaFin;
-
-        LocalTime limiteInferior = LocalTime.of(7, 0);
-        LocalTime limiteSuperior = LocalTime.of(9, 30);
-
-        // Si la hora de fin no está cerca de la mañana, no requiere ajuste
-        if (horaFin.isBefore(limiteInferior) || horaFin.isAfter(limiteSuperior)) {
-            return horaFin; 
-        }
-
-        boolean inicioEsFinDeSemana = isWeekendOrHoliday(fechaInicio);
-        boolean finEsFinDeSemana = isWeekendOrHoliday(fechaFin);
-
-        if (!inicioEsFinDeSemana && finEsFinDeSemana) {
-            // ENTRANDO a fin de semana: Termina a las 08:59 (día siguiente empieza a las 09:00)
-            return LocalTime.of(8, 59);
-        } else if (inicioEsFinDeSemana && !finEsFinDeSemana) {
-            // SALIENDO de fin de semana: Termina a las 07:59 (día siguiente empieza a las 08:00)
-            return LocalTime.of(7, 59);
-        } else if (finEsFinDeSemana) {
-            // Fin de semana a fin de semana: Termina a las 08:59
-            return LocalTime.of(8, 59);
-        }
-
-        // Normal: día de semana a día de semana
-        return LocalTime.of(7, 59);
     }
 
     // ====================================================================
@@ -183,19 +93,6 @@ public class TurnoService {
             if (hayConflicto) {
                 throw new Exception("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas.");
             }
-        }
-
-        // 3. Aplicar ajustes de horas (Reglas matemáticas del Bloque 1)
-        if (turno.getDiaInicioTurno() != null && turno.getHoraInicio() != null) {
-            turno.setHoraInicio(ajustarHoraInicioParaFinDeSemanaOFeriado(
-                    turno.getHoraInicio(), turno.getDiaInicioTurno(), turno.getDiaFinalTurno()));
-        }
-
-        if (turno.getDiaInicioTurno() != null && turno.getDiaFinalTurno() != null &&
-            turno.getHoraInicio() != null && turno.getHoraFin() != null) {
-            turno.setHoraFin(ajustarHoraFinParaDomingoOFeriado(
-                    turno.getHoraInicio(), turno.getHoraFin(), 
-                    turno.getDiaInicioTurno(), turno.getDiaFinalTurno()));
         }
 
         return turnoRepository.save(turno);

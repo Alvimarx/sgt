@@ -1,9 +1,11 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { plantillasService, tiposTurnoService, formatHora } from '../../services/plantillasService';
+import { plantillasService, tiposTurnoService, formatHora, shiftHora } from '../../services/plantillasService';
 import { getPuestosPorServicio } from '../../services/puestosService';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { planificacionService } from '../../services/planificacionService';
+import { feriadosService } from '../../services/feriadosService';
+import { reglasServicioService } from '../../services/reglasServicioService';
 
 /* ─── Helpers de fecha ─────────────────────────────────────────────────────── */
 const MONTHS_LONG=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -573,7 +575,7 @@ function RelativeWeekGrid({maxSemanas,daysIndex,tipoColor,onDayClick}){
 const ghostBtnGB={width:30,height:30,borderRadius:8,background:'var(--surface2)',border:'1px solid var(--line)',display:'grid',placeItems:'center',cursor:'pointer',flexShrink:0};
 
 /* ─── GenerarView (elegir lunes + previsualización) ──────────────────────────── */
-function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,onCancel,onConfirm,generando,planActualId}){
+function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId,onCancel,onConfirm,generando,planActualId}){
   const[fecha,setFecha]=useState('');
   const[pickSeed,setPickSeed]=useState(toDateStr(new Date()));
   const[confirmando,setConfirmando]=useState(false);
@@ -605,6 +607,75 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,onCancel,onConfi
 
   // Claves "fecha|HH:MM" para resaltar los bloques en conflicto del calendario.
   const conflictoKeys=useMemo(()=>{ const s=new Set(); conflictos.forEach(c=>s.add(`${c.fecha}|${formatHora(c.horaInicio)}`)); return s; },[conflictos]);
+
+  // Feriados del rango (tabla en BD) para marcarlos en la previsualización.
+  const[feriados,setFeriados]=useState(new Set());
+  useEffect(()=>{
+    let activo=true;
+    if(!start){ setFeriados(new Set()); return; }
+    const tot=Math.max(1,semanas)*7;
+    const hastaDt=new Date(start); hastaDt.setDate(start.getDate()+tot-1);
+    feriadosService.getFechas({desde:toDateStr(start),hasta:toDateStr(hastaDt)})
+      .then(set=>{ if(activo)setFeriados(set); })
+      .catch(()=>{ if(activo)setFeriados(new Set()); });
+    return()=>{ activo=false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[fecha]);
+
+  // Reglas activas del servicio (para resaltar el preview y la pestaña "Reglas").
+  const[reglas,setReglas]=useState([]);
+  const[tab,setTab]=useState('calendario');
+  useEffect(()=>{
+    let activo=true;
+    if(!servicioId){ setReglas([]); return; }
+    reglasServicioService.getByServicio(servicioId)
+      .then(list=>{ if(activo)setReglas((Array.isArray(list)?list:[]).filter(r=>r.activo)); })
+      .catch(()=>{ if(activo)setReglas([]); });
+    return()=>{ activo=false; };
+  },[servicioId]);
+
+  // Selección de reglas a aplicar (multi). Por defecto, todas las activas preseleccionadas.
+  const[seleccion,setSeleccion]=useState(new Set());
+  useEffect(()=>{ setSeleccion(new Set(reglas.map(r=>r.idRegla))); },[reglas]);
+  const reglasSel=reglas.filter(r=>seleccion.has(r.idRegla));
+  const toggleRegla=(id)=>setSeleccion(prev=>{ const n=new Set(prev); if(n.has(id))n.delete(id); else n.add(id); return n; });
+  const todasSeleccionadas=reglas.length>0&&seleccion.size===reglas.length;
+
+  const horaMin=(h)=>{ const s=formatHora(h); if(!s)return 0; const[H,M]=s.split(':').map(Number); return H*60+M; };
+  const esFinde=(dt)=>dt.getDay()===0||dt.getDay()===6;
+  const cumpleCondicion=(r,dt)=>(esFinde(dt)&&r.aplicaFinDeSemana)||(feriados.has(toDateStr(dt))&&r.aplicaFeriado);
+  // ¿Alguna regla activa cambia el horario de este tipo en esta fecha? (inicio por día de
+  // inicio; fin por día final, que es el siguiente si el turno cruza medianoche).
+  const reglaAfecta=(tipo,dt)=>{
+    if(!reglasSel.length)return false;
+    const id=tipo.idPlantillaTurno;
+    const overnight=horaMin(tipo.horaTermino)<=horaMin(tipo.horaInicio);
+    const finDt=new Date(dt); if(overnight)finDt.setDate(dt.getDate()+1);
+    return reglasSel.some(r=>
+      (r.idTipoTurnoInicio===id&&cumpleCondicion(r,dt))||
+      (r.idTipoTurnoFin===id&&cumpleCondicion(r,finDt))
+    );
+  };
+
+  // Presentación de reglas (pestaña "Reglas activas").
+  const badgeMini={fontSize:9.5,fontWeight:800,textTransform:'uppercase',letterSpacing:0.3,color:'var(--primary)',background:'var(--primary-soft)',padding:'2px 8px',borderRadius:99,whiteSpace:'nowrap'};
+  const infoTipo=(idTipo,fallback)=>{ const t=(tipos||[]).find(x=>x.idPlantillaTurno===idTipo); return t?{nombre:t.nombre,hi:t.horaInicio,hf:t.horaTermino}:{nombre:fallback||`#${idTipo}`,hi:null,hf:null}; };
+  const filaCambio=(idTipo,fallback,bound,tiempo)=>{
+    const{nombre,hi,hf}=infoTipo(idTipo,fallback); const ok=hi!=null&&hf!=null;
+    const dI=bound==='inicio'?shiftHora(hi,tiempo):formatHora(hi);
+    const dF=bound==='fin'?shiftHora(hf,tiempo):formatHora(hf);
+    return(
+      <div key={`${idTipo}-${bound}`} style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',fontSize:11.5,fontWeight:600}}>
+        <span style={{fontSize:9.5,fontWeight:800,textTransform:'uppercase',letterSpacing:0.3,color:bound==='inicio'?'var(--primary)':'var(--accent)',background:bound==='inicio'?'var(--primary-soft)':'var(--accent-soft)',padding:'2px 7px',borderRadius:99}}>{bound==='inicio'?'Entrada':'Salida'}</span>
+        <span style={{color:'var(--ink)',fontWeight:700}}>{nombre}</span>
+        {ok?(<>
+          <span style={{color:'var(--ink3)'}}>{formatHora(hi)}–{formatHora(hf)}</span>
+          <SGTIcon name="arrow-right" size={12} color="var(--ink3)"/>
+          <span><span style={{color:bound==='inicio'?'var(--primary)':'var(--ink2)',fontWeight:bound==='inicio'?800:600}}>{dI}</span><span style={{color:'var(--ink3)'}}>–</span><span style={{color:bound==='fin'?'var(--primary)':'var(--ink2)',fontWeight:bound==='fin'?800:600}}>{dF}</span></span>
+        </>):(<span style={{color:'var(--ink3)'}}>(horario no disponible)</span>)}
+      </div>
+    );
+  };
 
   return(
     <div style={{flex:1,display:'flex',flexDirection:'column',background:'var(--surface2)',animation:'sgtSlideLeft .3s ease',overflow:'hidden'}}>
@@ -642,6 +713,13 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,onCancel,onConfi
             </div>
             {minD&&<div style={{background:'#fff',border:'1px solid var(--line)',borderRadius:10,padding:'9px 12px',display:'flex',alignItems:'center',gap:8,marginBottom:10}}><SGTIcon name="calendar" size={15} color="var(--ink3)"/><span style={{fontSize:12.5,fontWeight:700,color:'var(--ink)'}}>{fmt(minD)} → {fmt(maxD)}</span></div>}
 
+            <div style={{display:'flex',gap:6,marginBottom:10,background:'var(--surface2)',borderRadius:10,padding:4}}>
+              {[['calendario','Calendario'],['reglas','Reglas activas']].map(([k,lbl])=>(
+                <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'8px 0',borderRadius:8,border:'none',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',background:tab===k?'#fff':'transparent',color:tab===k?'var(--primary)':'var(--ink3)',boxShadow:tab===k?'0 1px 3px rgba(0,0,0,0.08)':'none'}}>{lbl}{k==='reglas'&&reglas.length>0?` (${seleccion.size}/${reglas.length})`:''}</button>
+              ))}
+            </div>
+
+            {tab==='calendario'&&(<>
             {!planActualId?(
               <div style={{display:'flex',alignItems:'flex-start',gap:6,fontSize:11.5,color:'var(--ink3)',fontWeight:600,marginBottom:10,background:'var(--surface2)',borderRadius:10,padding:'10px 12px'}}><SGTIcon name="alert" size={13} color="var(--ink3)"/>Guarda el molde para detectar choques con turnos ya existentes.</div>
             ):cargandoConf?(
@@ -670,17 +748,24 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,onCancel,onConfi
               <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--success)',fontWeight:700,marginBottom:10}}><SGTIcon name="check-circle" size={14} color="var(--success)"/>Sin conflictos: todos los turnos se asignarán.</div>
             )}
 
+            {(feriados.size>0||reglasSel.length>0)&&(
+              <div style={{display:'flex',flexWrap:'wrap',gap:'4px 14px',fontSize:11,color:'var(--ink3)',fontWeight:600,marginBottom:10}}>
+                {feriados.size>0&&<span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:7,height:7,borderRadius:99,background:'var(--warn)',flexShrink:0}}/>Feriado</span>}
+                {reglasSel.length>0&&<span style={{display:'flex',alignItems:'center',gap:5}}><SGTIcon name="clock" size={11} color="var(--primary)"/>Horario ajustado por regla</span>}
+              </div>
+            )}
             {Array.from({length:semanas},(_,w)=>(
               <div key={w} style={{marginBottom:10}}>
                 <div style={{fontSize:11,fontWeight:800,color:'var(--ink3)',textTransform:'uppercase',letterSpacing:0.4,marginBottom:5}}>Semana {w+1}</div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(7, 1fr)',gap:5}}>
-                  {Array.from({length:7},(_,d)=>{ const diaIndex=w*7+d, grupos=buildDayCoverage(daysIndex[diaIndex]||[]), dt=fechaReal(diaIndex); return(
-                    <div key={diaIndex} style={{minWidth:0,minHeight:42,borderRadius:9,background:grupos.length?'#fff':'var(--surface2)',border:'1px solid var(--line2)',padding:'3px 3px 5px',display:'flex',flexDirection:'column',gap:3}}>
-                      <div style={{fontSize:10,fontWeight:800,color:d>=5?'var(--accent)':'var(--ink)',textAlign:'center'}}>{dt.getDate()}<span style={{fontSize:8,color:'var(--ink3)',fontWeight:700}}> {MONTHS_SHORT[dt.getMonth()].toLowerCase()}</span></div>
-                      {grupos.map(({tipo,asignadas,pendientes})=>{ const c=tipoColor(tipo.idPlantillaTurno); const enConf=conflictoKeys.has(`${toDateStr(dt)}|${formatHora(tipo.horaInicio)}`); return(
-                        <div key={tipo.idPlantillaTurno} style={{height:20,borderRadius:5,display:'flex',alignItems:'center',justifyContent:'center',gap:2,background:enConf?'var(--warn-soft)':c.bg,border:`1.5px solid ${enConf?'var(--warn)':c.bar}`}}>
-                          {enConf&&<SGTIcon name="alert" size={9} color="var(--warn)"/>}
-                          <span style={{fontSize:10,fontWeight:900,color:enConf?'var(--warn)':c.ink,lineHeight:1}}>{asignadas.length+pendientes.length}</span>
+                  {Array.from({length:7},(_,d)=>{ const diaIndex=w*7+d, grupos=buildDayCoverage(daysIndex[diaIndex]||[]), dt=fechaReal(diaIndex); const esFeriado=feriados.has(toDateStr(dt)); const ajustado=esFeriado||d>=5; return(
+                    <div key={diaIndex} style={{minWidth:0,minHeight:56,borderRadius:10,background:esFeriado?'var(--warn-soft)':grupos.length?'#fff':'var(--surface2)',border:`1px solid ${esFeriado?'var(--warn)':'var(--line2)'}`,padding:'5px 4px 6px',display:'flex',flexDirection:'column',gap:4}}>
+                      <div title={esFeriado?'Feriado — se ajustan los horarios':ajustado?'Fin de semana — se ajustan los horarios':undefined} style={{fontSize:12,fontWeight:800,color:esFeriado?'var(--warn)':d>=5?'var(--accent)':'var(--ink)',textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:3}}>{esFeriado&&<span style={{width:5,height:5,borderRadius:99,background:'var(--warn)',flexShrink:0}}/>}{dt.getDate()}<span style={{fontSize:8.5,color:'var(--ink3)',fontWeight:700}}> {MONTHS_SHORT[dt.getMonth()].toLowerCase()}</span></div>
+                      {grupos.map(({tipo,asignadas,pendientes})=>{ const c=tipoColor(tipo.idPlantillaTurno); const enConf=conflictoKeys.has(`${toDateStr(dt)}|${formatHora(tipo.horaInicio)}`); const afectada=!enConf&&reglaAfecta(tipo,dt); return(
+                        <div key={tipo.idPlantillaTurno} title={afectada?'Horario ajustado por una regla':undefined} style={{height:22,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',gap:2,background:enConf?'var(--warn-soft)':c.bg,border:`1.5px solid ${enConf?'var(--warn)':afectada?'var(--primary)':c.bar}`,boxShadow:afectada?'0 0 0 1px var(--primary-soft)':'none'}}>
+                          {enConf&&<SGTIcon name="alert" size={10} color="var(--warn)"/>}
+                          {afectada&&<SGTIcon name="clock" size={10} color="var(--primary)"/>}
+                          <span style={{fontSize:11,fontWeight:900,color:enConf?'var(--warn)':afectada?'var(--primary)':c.ink,lineHeight:1}}>{asignadas.length+pendientes.length}</span>
                         </div>
                       );})}
                     </div>
@@ -688,6 +773,35 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,onCancel,onConfi
                 </div>
               </div>
             ))}
+            </>)}
+
+            {tab==='reglas'&&(
+              reglas.length===0?(
+                <div style={{padding:'24px 16px',textAlign:'center',color:'var(--ink3)',fontSize:12.5,fontWeight:600}}>Sin reglas activas para este servicio.</div>
+              ):(
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,fontSize:11.5,color:'var(--ink3)',fontWeight:700}}>
+                    <span style={{flex:1}}>Marca las reglas a aplicar en esta generación.</span>
+                    <button onClick={()=>setSeleccion(todasSeleccionadas?new Set():new Set(reglas.map(r=>r.idRegla)))} style={{background:'none',border:'none',color:'var(--primary)',fontWeight:800,fontSize:11.5,cursor:'pointer',fontFamily:'inherit'}}>{todasSeleccionadas?'Quitar todas':'Seleccionar todas'}</button>
+                  </div>
+                  {reglas.map(r=>{ const sel=seleccion.has(r.idRegla); return(
+                    <div key={r.idRegla} onClick={()=>toggleRegla(r.idRegla)} style={{background:'#fff',border:`1.5px solid ${sel?'var(--primary)':'var(--line2)'}`,borderRadius:12,padding:'12px 14px',display:'flex',flexDirection:'column',gap:8,cursor:'pointer'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                        <span style={{width:20,height:20,borderRadius:6,flexShrink:0,display:'grid',placeItems:'center',border:`2px solid ${sel?'var(--primary)':'var(--line)'}`,background:sel?'var(--primary)':'#fff'}}>{sel&&<SGTIcon name="check" size={13} color="#fff"/>}</span>
+                        <span style={{fontSize:13.5,fontWeight:800,color:'var(--ink)',flex:1}}>{r.nombre}</span>
+                        {r.aplicaFinDeSemana&&<span style={badgeMini}>Fin de semana</span>}
+                        {r.aplicaFeriado&&<span style={badgeMini}>Feriado</span>}
+                        <span style={{...badgeMini,color:'var(--accent)',background:'var(--accent-soft)'}}>+{r.tiempoMinutos} min</span>
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                        {r.idTipoTurnoInicio!=null&&filaCambio(r.idTipoTurnoInicio,r.nombreTipoTurnoInicio,'inicio',r.tiempoMinutos)}
+                        {r.idTipoTurnoFin!=null&&filaCambio(r.idTipoTurnoFin,r.nombreTipoTurnoFin,'fin',r.tiempoMinutos)}
+                      </div>
+                    </div>
+                  );})}
+                </div>
+              )
+            )}
           </div>
         )}
       </div>
@@ -705,10 +819,11 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,onCancel,onConfi
             <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><div style={{width:56,height:56,borderRadius:16,background:'var(--primary-soft)',display:'grid',placeItems:'center'}}><SGTIcon name="calendar" size={26} color="var(--primary)"/></div></div>
             <div style={{fontWeight:800,fontSize:18,color:'var(--ink)',textAlign:'center',marginBottom:10}}>¿Generar la planificación?</div>
             <p style={{fontSize:14,color:'var(--ink2)',margin:'0 0 6px',lineHeight:1.5,textAlign:'center'}}>Se crearán <strong style={{color:'var(--ink)'}}>{totalTurnos} turnos</strong> desde el <strong style={{color:'var(--ink)'}}>{fmt(minD)}</strong>.</p>
-            <p style={{fontSize:12.5,color:'var(--ink3)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center'}}>{conflictos.length>0?<><strong style={{color:'var(--warn)'}}>{conflictos.length}</strong> quedará{conflictos.length===1?'':'n'} vacante{conflictos.length===1?'':'s'} por conflicto de horario.</>:'Los turnos con choque de horario se crearán sin asignar (vacantes).'}</p>
+            <p style={{fontSize:12.5,color:'var(--ink3)',margin:'0 0 8px',lineHeight:1.5,textAlign:'center'}}>{conflictos.length>0?<><strong style={{color:'var(--warn)'}}>{conflictos.length}</strong> quedará{conflictos.length===1?'':'n'} vacante{conflictos.length===1?'':'s'} por conflicto de horario.</>:'Los turnos con choque de horario se crearán sin asignar (vacantes).'}</p>
+            <p style={{fontSize:12,color:'var(--ink3)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><SGTIcon name="clock" size={12} color={reglasSel.length?'var(--primary)':'var(--ink3)'}/>{reglasSel.length>0?<>Se aplicarán <strong style={{color:'var(--primary)'}}>{reglasSel.length}</strong> regla{reglasSel.length===1?'':'s'} de horario.</>:'Sin reglas de horario (horarios base).'}</p>
             <div style={{display:'flex',gap:10}}>
               <button onClick={()=>setConfirmando(false)} disabled={generando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'1.5px solid var(--line)',background:'none',color:'var(--ink2)',fontSize:15,fontWeight:700,cursor:generando?'not-allowed':'pointer',fontFamily:'inherit'}}>Cancelar</button>
-              <button onClick={()=>onConfirm(fecha)} disabled={generando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:15,fontWeight:700,cursor:generando?'not-allowed':'pointer',opacity:generando?0.7:1,fontFamily:'inherit'}}>{generando?'Generando…':'Sí, generar'}</button>
+              <button onClick={()=>onConfirm(fecha,[...seleccion])} disabled={generando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:15,fontWeight:700,cursor:generando?'not-allowed':'pointer',opacity:generando?0.7:1,fontFamily:'inherit'}}>{generando?'Generando…':'Sí, generar'}</button>
             </div>
           </div>
         </div>
@@ -815,11 +930,11 @@ function PlanGuardarBase({onBack}){
     }catch(e){ setError(e?.response?.data?.error||e.message||'Error al eliminar el molde.'); }
   };
 
-  const onGenerar=async(fecha)=>{
+  const onGenerar=async(fecha,idsReglas=[])=>{
     if(!planActualId){ setGenerarOpen(false); flash('Guarda el molde antes de generar.'); return; }
     setGenerando(true);
     try{
-      const res=await planificacionService.generar(planActualId,fecha);
+      const res=await planificacionService.generar(planActualId,fecha,idsReglas);
       setGenerarOpen(false);
       const vac=res?.vacantesPorConflicto||0;
       flash(`${res?.generados||0} turnos generados${vac?` · ${vac} vacantes por conflicto`:''}`);
@@ -842,7 +957,7 @@ function PlanGuardarBase({onBack}){
   }
 
   if(generarOpen){
-    return <GenerarView instancias={instancias} daysIndex={daysIndex} maxSemanas={maxSemanas} tipoColor={tipoColor} generando={generando} planActualId={planActualId} onCancel={()=>setGenerarOpen(false)} onConfirm={onGenerar}/>;
+    return <GenerarView instancias={instancias} daysIndex={daysIndex} maxSemanas={maxSemanas} tipoColor={tipoColor} tipos={tipos} servicioId={servicioId} generando={generando} planActualId={planActualId} onCancel={()=>setGenerarOpen(false)} onConfirm={onGenerar}/>;
   }
 
   return(

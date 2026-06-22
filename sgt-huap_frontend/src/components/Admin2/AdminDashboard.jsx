@@ -25,7 +25,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoReglas }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -112,6 +112,13 @@ const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServ
           desc="Crea, edita y elimina puestos del sistema."
           tone="primary"
           onClick={onGoPuestos}
+        />
+        <AdminCard
+          icon="sliders"
+          title="Reglas de Servicio"
+          desc="Ajuste automático de horas en fines de semana y feriados."
+          tone="accent"
+          onClick={onGoReglas}
         />
         <AdminCard
           icon="sliders"
