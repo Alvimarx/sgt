@@ -5,6 +5,8 @@ import com.pingeso.HUAP.Entity.RolServicioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.ServiciosFuncionarioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
+import com.pingeso.HUAP.Repository.BitacoraRepository;
+import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Repository.ServiciosFuncionarioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
@@ -13,11 +15,21 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
-
 import org.springframework.stereotype.Service;
-
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import com.pingeso.HUAP.Entity.BitacoraEntity;
+import com.pingeso.HUAP.Entity.OfertaGeneralEntity;
+import com.pingeso.HUAP.Entity.Solicitud2Entity;
+import com.pingeso.HUAP.Repository.BitacoraRepository;
+import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ExportacionService {
@@ -25,15 +37,21 @@ public class ExportacionService {
     private final ServiciosFuncionarioRepository serviciosFuncionarioRepository;
     private final ServicioRepository servicioRepository;
     private final TurnoRepository turnoRepository;
+    private final BitacoraRepository bitacoraRepository;
+    private final OfertaGeneralRepository ofertaGeneralRepository;
 
     public ExportacionService(
             ServiciosFuncionarioRepository serviciosFuncionarioRepository,
             ServicioRepository servicioRepository,
-            TurnoRepository turnoRepository
+            TurnoRepository turnoRepository,
+            BitacoraRepository bitacoraRepository,
+            OfertaGeneralRepository ofertaGeneralRepository
     ) {
         this.serviciosFuncionarioRepository = serviciosFuncionarioRepository;
         this.servicioRepository = servicioRepository;
         this.turnoRepository = turnoRepository;
+        this.bitacoraRepository = bitacoraRepository;
+        this.ofertaGeneralRepository = ofertaGeneralRepository;
     }
 
     public byte[] exportarFuncionariosPorServicioCsv(Long idServicio) {
@@ -108,13 +126,21 @@ public class ExportacionService {
                 idServicio
         );
 
+        List<Long> idsTurnos = turnos.stream()
+                .map(TurnoEntity::getIdTurno)
+                .filter(Objects::nonNull)
+                .toList();
+
+        Map<Long, List<BitacoraEntity>> eventosPorTurno = cargarEventosPorTurno(idsTurnos);
+        Map<Long, List<OfertaGeneralEntity>> ofertasPorTurno = cargarOfertasPorTurno(idsTurnos);
+
         StringBuilder csv = new StringBuilder();
 
         csv.append('\uFEFF');
 
         csv.append("ID Turno;Tipo Turno;Fecha Inicio;Fecha Fin;Hora Inicio;Hora Fin;Horas;");
         csv.append("ID Funcionario;RUT;DV;Funcionario;Profesión;");
-        csv.append("ID Servicio;Servicio;Puesto\n");
+        csv.append("ID Servicio;Servicio;Puesto;Origen Turno;Detalle Origen\n");
 
         for (TurnoEntity turno : turnos) {
             String nombreCompleto = construirNombreCompleto(
@@ -154,13 +180,21 @@ public class ExportacionService {
                 csv.append(";;");
             }
 
-            csv.append(valor(
+                csv.append(valor(
                     turno.getPuesto() != null
-                            ? turno.getPuesto().getNombre()
-                            : ""
-            ));
+                        ? turno.getPuesto().getNombre()
+                        : ""
+                ));
 
-            csv.append("\n");
+                OrigenTurnoInfo origenTurno = determinarOrigenTurno(
+                    turno,
+                    eventosPorTurno,
+                    ofertasPorTurno
+                );
+
+                csv.append(";").append(valor(origenTurno.origen()));
+                csv.append(";").append(valor(origenTurno.detalle()));
+                csv.append("\n");
         }
 
         return csv.toString().getBytes(StandardCharsets.UTF_8);
@@ -187,6 +221,262 @@ public class ExportacionService {
 
         return BigDecimal.valueOf(duracion.toMinutes())
                 .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+    }
+    private record OrigenTurnoInfo(
+            String origen,
+            String detalle
+    ) {}
+
+    private Map<Long, List<BitacoraEntity>> cargarEventosPorTurno(List<Long> idsTurnos) {
+        Map<Long, List<BitacoraEntity>> eventosPorTurno = new HashMap<>();
+
+        if (idsTurnos == null || idsTurnos.isEmpty()) {
+            return eventosPorTurno;
+        }
+
+        List<BitacoraEntity> eventos = bitacoraRepository.findEventosOrigenByTurnos(idsTurnos);
+
+        for (BitacoraEntity evento : eventos) {
+            agregarEvento(eventosPorTurno, evento.getTurno(), evento);
+
+            Solicitud2Entity solicitud = evento.getSolicitud();
+            if (solicitud != null) {
+                agregarEvento(eventosPorTurno, solicitud.getTurno(), evento);
+                agregarEvento(eventosPorTurno, solicitud.getTurnoReceptor(), evento);
+            }
+        }
+
+        Comparator<BitacoraEntity> comparadorFecha = Comparator
+                .comparing(
+                        BitacoraEntity::getFechaModificacion,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                )
+                .reversed();
+
+        eventosPorTurno.values().forEach(lista -> lista.sort(comparadorFecha));
+
+        return eventosPorTurno;
+    }
+
+    private void agregarEvento(
+            Map<Long, List<BitacoraEntity>> eventosPorTurno,
+            TurnoEntity turno,
+            BitacoraEntity evento
+    ) {
+        if (turno == null || turno.getIdTurno() == null || evento == null) {
+            return;
+        }
+
+        eventosPorTurno
+                .computeIfAbsent(turno.getIdTurno(), id -> new ArrayList<>())
+                .add(evento);
+    }
+
+    private Map<Long, List<OfertaGeneralEntity>> cargarOfertasPorTurno(List<Long> idsTurnos) {
+        if (idsTurnos == null || idsTurnos.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<OfertaGeneralEntity> ofertas =
+                ofertaGeneralRepository.findByTurnoIdInWithPostulaciones(idsTurnos);
+
+        return ofertas.stream()
+                .filter(o -> o.getTurno() != null && o.getTurno().getIdTurno() != null)
+                .collect(Collectors.groupingBy(o -> o.getTurno().getIdTurno()));
+    }
+
+    private OrigenTurnoInfo determinarOrigenTurno(
+            TurnoEntity turno,
+            Map<Long, List<BitacoraEntity>> eventosPorTurno,
+            Map<Long, List<OfertaGeneralEntity>> ofertasPorTurno
+    ) {
+        if (turno == null || turno.getIdTurno() == null) {
+            return sinInformacion();
+        }
+
+        List<BitacoraEntity> eventos = eventosPorTurno.getOrDefault(
+                turno.getIdTurno(),
+                List.of()
+        );
+
+        List<OfertaGeneralEntity> ofertas = ofertasPorTurno.getOrDefault(
+                turno.getIdTurno(),
+                List.of()
+        );
+
+        // 1. Cambio / intercambio
+        Optional<BitacoraEntity> intercambio = eventos.stream()
+                .filter(this::esIntercambioAprobado)
+                .findFirst();
+
+        if (intercambio.isPresent()) {
+            return new OrigenTurnoInfo(
+                    "Cambio / intercambio",
+                    "Turno modificado por intercambio entre funcionarios"
+            );
+        }
+
+        // 2. Solicitud aprobada
+        Optional<BitacoraEntity> solicitud = eventos.stream()
+                .filter(this::esSolicitudAprobadaComun)
+                .findFirst();
+
+        if (solicitud.isPresent()) {
+            return new OrigenTurnoInfo(
+                    "Solicitud",
+                    "Turno tomado mediante solicitud aprobada"
+            );
+        }
+
+        // 3. Oferta particular
+        Optional<BitacoraEntity> ofertaParticular = eventos.stream()
+                .filter(this::esOfertaParticularAprobada)
+                .findFirst();
+
+        if (ofertaParticular.isPresent()) {
+            return new OrigenTurnoInfo(
+                    "Oferta particular",
+                    "Turno ofrecido a un funcionario específico y aceptado"
+            );
+        }
+
+        // 4. Oferta general
+        Optional<OfertaGeneralEntity> ofertaGeneralCerrada = ofertas.stream()
+                .filter(o -> o.getEstado() == OfertaGeneralEntity.EstadoOferta.CERRADA)
+                .findFirst();
+
+        if (ofertaGeneralCerrada.isPresent()) {
+            return new OrigenTurnoInfo(
+                    "Oferta general",
+                    "Turno tomado desde oferta general"
+            );
+        }
+
+        // 5. Asignación manual
+        Optional<BitacoraEntity> asignacionManual = eventos.stream()
+                .filter(this::esAsignacionManual)
+                .findFirst();
+
+        if (asignacionManual.isPresent()) {
+            return new OrigenTurnoInfo(
+                    "Asignación manual",
+                    "Asignado manualmente por jefatura"
+            );
+        }
+
+        // 6. Rotativa habitual / planificación
+        Optional<BitacoraEntity> generacion = eventos.stream()
+                .filter(this::esGeneracionPlanificacion)
+                .findFirst();
+
+        if (generacion.isPresent()) {
+            String detalle = generacion.get().getMotivo() != null
+                    ? generacion.get().getMotivo()
+                    : "Generado desde planificación mensual";
+
+            return new OrigenTurnoInfo(
+                    "Rotativa habitual",
+                    detalle
+            );
+        }
+
+        if (turno.getPlantilla() != null) {
+            return new OrigenTurnoInfo(
+                    "Rotativa habitual",
+                    "Generado desde planificación mensual"
+            );
+        }
+
+        // 7. Sin información
+        return sinInformacion();
+    }
+
+    private boolean esIntercambioAprobado(BitacoraEntity evento) {
+        Solicitud2Entity solicitud = evento.getSolicitud();
+
+        if (solicitud != null
+                && solicitud.getTipoSolicitud() != null
+                && solicitud.getTipoSolicitud().getTipo() != null
+                && solicitud.getTipoSolicitud().getTipo().equals(4)
+                && solicitud.getEstado() == Solicitud2Entity.EstadoSolicitud.APROBADA) {
+            return true;
+        }
+
+        String tipoEvento = normalizar(evento.getTipoEvento());
+
+        return tipoEvento.contains("INTERCAMBIO")
+                || tipoEvento.equals("OFERTA_ACEPTADA_POR_RECEPTOR");
+    }
+
+    private boolean esSolicitudAprobadaComun(BitacoraEntity evento) {
+        Solicitud2Entity solicitud = evento.getSolicitud();
+
+        if (solicitud == null
+                || solicitud.getTipoSolicitud() == null
+                || solicitud.getTipoSolicitud().getTipo() == null
+                || solicitud.getEstado() != Solicitud2Entity.EstadoSolicitud.APROBADA) {
+            return false;
+        }
+
+        Integer tipo = solicitud.getTipoSolicitud().getTipo();
+
+        // 1 = Permiso, 2 = Botar turno, 3 = Cobertura
+        return tipo.equals(1) || tipo.equals(2) || tipo.equals(3);
+    }
+
+    private boolean esOfertaParticularAprobada(BitacoraEntity evento) {
+        Solicitud2Entity solicitud = evento.getSolicitud();
+
+        if (solicitud != null
+                && solicitud.getTipoSolicitud() != null
+                && solicitud.getTipoSolicitud().getTipo() != null
+                && solicitud.getTipoSolicitud().getTipo().equals(5)
+                && solicitud.getEstado() == Solicitud2Entity.EstadoSolicitud.APROBADA) {
+            return true;
+        }
+
+        String tipoEvento = normalizar(evento.getTipoEvento());
+
+        return tipoEvento.contains("OFERTA_PARTICULAR")
+                && tipoEvento.contains("ACEPTADA");
+    }
+
+    private boolean esAsignacionManual(BitacoraEntity evento) {
+        String tipoEvento = normalizar(evento.getTipoEvento());
+
+        return tipoEvento.contains("ASIGNACION_MANUAL")
+                || tipoEvento.contains("TURNO_ASIGNADO_MANUALMENTE")
+                || tipoEvento.contains("MODIFICACION_MANUAL_TURNO");
+    }
+
+    private boolean esGeneracionPlanificacion(BitacoraEntity evento) {
+        String tipoEvento = normalizar(evento.getTipoEvento());
+
+        return tipoEvento.equals("GENERACION_TURNO")
+                || tipoEvento.contains("PLANIFICACION")
+                || tipoEvento.contains("ROTATIVA");
+    }
+
+    private OrigenTurnoInfo sinInformacion() {
+        return new OrigenTurnoInfo(
+                "Sin información",
+                "No existen eventos registrados para este turno"
+        );
+    }
+
+    private String normalizar(String texto) {
+        if (texto == null) {
+            return "";
+        }
+
+        return texto
+                .trim()
+                .toUpperCase()
+                .replace("Á", "A")
+                .replace("É", "E")
+                .replace("Í", "I")
+                .replace("Ó", "O")
+                .replace("Ú", "U");
     }
 
 }
