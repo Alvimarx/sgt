@@ -91,36 +91,31 @@ const buildTeamMember = (turno, funcionarioId) => {
 
 /**
  * Normaliza un turno crudo (API o mock) al formato que consume la vista de agenda.
- * - Si el turno ya trae `team` construido (formato mock), lo preserva.
  * - Si no, intenta construirlo desde los campos crudos con buildTeamFromRaw.
  * - Si no hay datos de equipo, team queda null (la vista lo maneja con &&).
  */
 const mapTurnoForAgenda = (turno, funcionarioId) => {
-    const fechaInicio = normalizeDateString(
-        turno?.diaInicio ?? turno?.diaInicioTurno ?? turno?.fecha ?? turno?.fechaInicio ?? turno?.dia
-    );
+    const fechaInicio = normalizeDateString(turno?.diaInicioTurno);
     const tipo = normalizeDateString(turno?.diaInicioTurno) === normalizeDateString(turno?.diaFinalTurno)
         ? 'dia'
         : 'noche';
     const teamKey = `${fechaInicio || 'sin-fecha'}-tipo-${turno?.idTipoTurno ?? 'sin-tipo'}`;
 
     return {
-        id: turno?.id ?? turno?.idTurno ?? null,
+        id: turno?.id ?? null,
         fecha: fechaInicio,
         tipo,
-        horaInicio: formatTime(turno?.horaInicio || turno?.hora_inicio) ?? turno?.inicio ?? null,
-        horaFin: formatTime(turno?.horaFin || turno?.hora_fin) ?? turno?.fin ?? null,
-        inicio: formatTime(turno?.horaInicio || turno?.hora_inicio) ?? turno?.inicio ?? null,
-        fin: formatTime(turno?.horaFin || turno?.hora_fin) ?? turno?.fin ?? null,
+        horaInicio: formatTime(turno?.horaInicio) ?? null,
+        horaFin: formatTime(turno?.horaFin) ?? null,
+        inicio: formatTime(turno?.diaInicioTurno) ?? null,
+        fin: formatTime(turno?.diaFinalTurno) ?? null,
         horas: getHoursFromTurno(turno),
-        equipo: turno?.equipo || turno?.codigoEquipo || turno?.idEquipo || null,
-        nombrePuesto: turno?.nombrePuesto || turno?.puesto || null,
-        idPuesto: turno?.idPuesto || turno?.puestoId || null,
+        equipo: null,
+        nombrePuesto: turno?.nombrePuesto || null,
+        idPuesto: turno?.idPuesto || null,
         idTipoTurno: turno?.idTipoTurno ?? null,
         nombreTipoTurno: turno?.nombreTipoTurno ?? null,
         miTurno: Boolean(
-            turno?.miTurno ||
-            turno?.esMiTurno ||
             (funcionarioId != null && Number(turno?.idFuncionario) === Number(funcionarioId))
         ),
         turnoLibre: turno?.idFuncionario == null,
@@ -134,6 +129,7 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         cambioAprobado: Boolean(turno?.cambioAprobado),
         cambioAprobadoCon: turno?.cambioAprobadoCon ?? null,
         cruzaMedianoche: Boolean(turno?.cruzaMedianoche),
+        idPlantilla: turno?.idPlantilla ?? null,
         teamKey,
         raw: turno,
     };
@@ -401,4 +397,17 @@ export const asignarRolJerarquia = async (funcionarioId, idServicio, idRol) => {
     }
 };
 
+
+/**
+ * Obtener al personal del hospital
+ */
+export const getPersonal = async () => {
+    try {
+        const response = await axiosInstance.get(`Personal/summary`);
+        return { success: true, data: response.data };
+    } catch (error) {
+        const mensaje = error.response?.data?.error || 'Error al obtener los funcionarios';
+        return { success: false, error: mensaje };
+    }
+};
 

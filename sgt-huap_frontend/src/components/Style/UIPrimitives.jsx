@@ -141,14 +141,14 @@ export const AlertBanner = ({ pendientes, collapsed, onToggle }) => {
   if (!pendientes || pendientes.length === 0) return null;
   const critical = pendientes.filter(p => p.urgencia === 'alta' || p.urgencia === 'media').length;
   return (
-    <div style={{ margin: '10px 14px 0', background: critical > 0 ? P().accentSoft : P().primarySoft, border: `1px solid ${critical > 0 ? '#F3D2D5' : '#CFDCEA'}`, borderRadius: 14, overflow: 'hidden' }}>
+    <div style={{ margin: '10px 14px 0', background: critical > 0 ? P().accentSoft : P().primarySoft, border: `1px solid ${'#906767'}`, borderRadius: 14, overflow: 'hidden' }}>
       <button onClick={onToggle} style={{ width: '100%', background: 'transparent', border: 'none', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
-        <div style={{ width: 28, height: 28, borderRadius: 999, background: critical > 0 ? P().accent : P().primary, color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}><SGTIcon name="bell" size={14} color="#fff"/></div>
+        <div style={{ width: 28, height: 28, borderRadius: 999, background: '#b41313' , color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}><SGTIcon name="bell" size={14} color="#fff"/></div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: critical > 0 ? '#8C3F44' : P().primary }}>{pendientes.length} novedades en tu agenda</div>
-          {collapsed && <div style={{ fontSize: 11, color: P().ink3, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pendientes.map(p => p.titulo).join(' · ')}</div>}
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#481111' }}>{pendientes.length} novedades en tu agenda</div>
+          {collapsed && <div style={{ fontSize: 12, color: '#321618', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pendientes.map(p => p.titulo).join(' · ')}</div>}
         </div>
-        <SGTIcon name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={critical > 0 ? '#8C3F44' : P().primary}/>
+        <SGTIcon name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={'#8C3F44'}/>
       </button>
     </div>
   );

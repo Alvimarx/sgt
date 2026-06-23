@@ -46,11 +46,7 @@ const parseDateKey = (value) => {
 };
 
 const inferirTipo = (nombre, horaInicio) => {
-    if (nombre) {
-        const n = nombre.toLowerCase();
-        if (n.includes('noc') || n.includes('night')) return 'noche';
-        if (n.includes('diu') || n.includes('day') || n.includes('maña')) return 'dia';
-    }
+    
     const hora = formatTime(horaInicio);
     if (!hora) return 'dia';
     const h = parseInt(hora.split(':')[0], 10);
@@ -62,7 +58,7 @@ const buildTeamMember = (turno, funcionarioId) => {
     if (!nombre) return null;
 
     return {
-        id: turno?.idFuncionario ?? turno?.raw?.idFuncionario ?? turno?.id ?? 'sin-asignar',
+        id: turno?.idFuncionario ?? turno?.raw?.idFuncionario ?? 'sin-asignar',
         nombre,
         rol: 'MEDICO',
         iniciales: nombre
@@ -72,8 +68,6 @@ const buildTeamMember = (turno, funcionarioId) => {
             .map((part) => part[0]?.toUpperCase() || '')
             .join('') || '?',
         esYo: Boolean(
-            turno?.miTurno ||
-            turno?.esMiTurno ||
             (funcionarioId != null && Number(turno?.idFuncionario) === Number(funcionarioId))
         ),
     };

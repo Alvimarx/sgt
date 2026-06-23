@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Controller;
 
+import com.pingeso.HUAP.DTO.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,12 +8,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import com.pingeso.HUAP.DTO.FuncionarioSummaryDTO;
-import com.pingeso.HUAP.DTO.LoginRequest;
-import com.pingeso.HUAP.DTO.LoginResponse;
-import com.pingeso.HUAP.DTO.SelectServiceRequest;
-import com.pingeso.HUAP.DTO.SesionDTO;
-import com.pingeso.HUAP.DTO.ServicioDisponibleDTO;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.ServiciosFuncionarioEntity;
 import com.pingeso.HUAP.Security.JwtTokenProvider;
@@ -136,6 +131,8 @@ public class FuncionarioController {
             @RequestParam(required = false) Long servicioId) {
         return ResponseEntity.ok(funcionarioService.getAllUserSummaryByServicio(servicioId));
     }
+
+
 
     @GetMapping("/{id}/summary")
     public ResponseEntity<FuncionarioSummaryDTO> getSummary(@PathVariable Long id) {

@@ -9,7 +9,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.pingeso.HUAP.DTO.FuncionarioSummaryDTO;
-import com.pingeso.HUAP.DTO.ResumenMesDTO;
 import com.pingeso.HUAP.DTO.RolServicioDTO;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.RolServicioRepository;
@@ -18,10 +17,6 @@ import com.pingeso.HUAP.Repository.ServicioRepository;
 import jakarta.transaction.Transactional;
 
 import java.nio.charset.StandardCharsets;
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.HexFormat;
@@ -125,7 +120,8 @@ public class FuncionarioService {
         throw new BadCredentialsException("Error interno al validar las credenciales");
     }
 
-
+    /*
+    Actualmente no se esta utilizando
     public List<java.util.Map<String, Object>> getServiciosYRolesPorRut(String rut) {
         // Verificacion de entrada
         if (rut == null || rut.isBlank()) throw new IllegalArgumentException("El argumento rut es obligatorio");
@@ -158,7 +154,7 @@ public class FuncionarioService {
         
 
     }
-        
+     */
     public List<FuncionarioEntity> getAllUsersByServicio(Long servicioId) {
         if (servicioId == null) {
             return funcionarioRepository.findByEliminadoFalse();
@@ -214,7 +210,7 @@ public class FuncionarioService {
      * y 'rolServicioNombre' devolverán una LISTA para soportar la nueva lógica 
      * de múltiples servicios por funcionario. La Vista de Administrador debe 
      * estar preparada para iterar estos arreglos.
-     * @param servicioId
+     * @param servicioId Id del servicio que se quiere obtener los funcionarios
      * @return FuncionarioSummaryDTO
      * 
      */
@@ -314,8 +310,7 @@ public class FuncionarioService {
 
             if (relacion != null) {
                 // Caso Actualizar: Solo cambiamos el objeto Rol dentro de la relación
-                RolServicioEntity nuevoRol = rolServicioRepository.findById(rId).orElse(null);
-                if (nuevoRol != null) relacion.setRolServicio(nuevoRol);
+                rolServicioRepository.findById(rId).ifPresent(relacion::setRolServicio);
             } else {
                 // Caso Insertar: Creamos el objeto y lo añadimos a la lista
                 ServicioEntity servicioDb = servicioRepository.findById(sId).orElse(null);
@@ -344,191 +339,5 @@ public class FuncionarioService {
         return funcionarioRepository.findByIdFuncionario(idFuncionario);
     }
     
-    /**
-     * @deprecated TODO: CÓDIGO MUERTO. No tiene controlador asociado. 
-     * Se recomienda ELIMINAR en lugar de refactorizar la query para la V2.
-     * Antipatrón: Este método debe moverse a SolicitudService.
-     * ALERTA V2: La query automática 'findAllByMedicoSolicitanteServicioId' 
-     * FALLARÁ porque FuncionarioEntity ya no tiene el atributo 'servicioId' directo.
-     
-    @Deprecated
-    public List<Solicitud2Entity> getAllSolicitudesByServicioId(Long servicioId) {
-        if (servicioId == null)
-            return java.util.Collections.emptyList();
-        try {
-            return solicitudRepository.findAllByMedicoSolicitanteServicioId(servicioId);
-        } catch (Exception e) {
-            logger.error("Error al obtener solicitudes por servicioId={}: {}", servicioId, e.getMessage(), e);
-            return java.util.Collections.emptyList();
-        }
-    }
 
-    */
-
-
-    /**
-     * @deprecated 
-     * MOTIVO: Violación de SRP (Single Responsibility Principle). Este método pertenece 
-     * al dominio de 'Solicitudes' y debe ser trasladado a SolicitudService.
-     * * RIESGO V2: Este método utiliza 'solicitudRepository.findSolicitudCountsByServicioGroupedByDate'. 
-     * Dicha consulta en el repositorio lanzará una excepción en la V2 porque intenta 
-     * acceder a un 'servicioId' directo en el Funcionario, campo que ha sido 
-     * reemplazado por la relación @OneToMany 'serviciosFuncionario'.
-     * * TODO: 
-     * 1. Mover lógica a SolicitudService.
-     * 2. Actualizar la Query en SolicitudRepository para realizar un JOIN con la 
-     * nueva tabla intermedia de servicios.
-     * 3. Refactorizar el Controlador correspondiente para que inyecte SolicitudService.
-     *
-    public java.util.List<ResumenMesDTO> getSolicitudCountsByServicioGroupedByDate(Long servicioId) {
-        java.util.List<ResumenMesDTO> out = new java.util.ArrayList<>();
-        if (servicioId == null)
-            return out;
-        try {
-            java.util.List<Object[]> rows = solicitudRepository.findSolicitudCountsByServicioGroupedByDate(servicioId);
-            for (Object[] row : rows) {
-                if (row == null || row.length < 2)
-                    continue;
-                String dia = row[0] == null ? null : row[0].toString();
-                Long total = 0L;
-                try {
-                    total = row[1] == null ? 0L : ((Number) row[1]).longValue();
-                } catch (Exception ex) {
-                    total = Long.valueOf(String.valueOf(row[1]));
-                }
-                out.add(new ResumenMesDTO(dia, total));
-            }
-        } catch (Exception e) {
-            logger.error("Error al obtener conteos de solicitudes por servicioId={}: {}", servicioId, e.getMessage(),
-                    e);
-        }
-        return out;
-    }
-    
-    */
-    /**
-     * Codigo no estudiado, falta analizar la logica general y de otras entidades para evaluar como 
-     * realizarlo bien. Optimizar
-     * Quizas ocupar otra logica para estos calculos
-     * 
-    
-    public Map<String, Object> getHorasStatsByServicio(Long servicioId, int page, int size) {
-        Map<String, Object> stats = new HashMap<>();
-        try {
-            // V2: Usamos el método que ya refactorizamos antes para obtener FuncionarioEntity
-            List<FuncionarioEntity> usuarios = getAllUsersByServicio(servicioId);
-
-            if (usuarios == null || usuarios.isEmpty()) {
-                stats.put("total", 0);
-                stats.put("promedio", 0.0);
-                stats.put("medicos", new ArrayList<>());
-                return stats;
-            }
-
-            LocalDate today = LocalDate.now();
-            LocalDate semanaInicio = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-            LocalDate mesInicio = today.with(TemporalAdjusters.firstDayOfMonth());
-
-            List<Map<String, Object>> medicosConHoras = new ArrayList<>();
-
-            for (FuncionarioEntity u : usuarios) {
-                double horasTrabajadas = 0.0;
-                double horasSemanales = 0.0;
-                double horasMensuales = 0.0;
-
-                try {
-                    // V2: getIdFuncionario en lugar de getIdPersonal
-                    if (u.getIdFuncionario() != null) { 
-                        // TODO: TurnoRepository debe estar preparado para recibir el ID del Funcionario
-                        java.util.List<TurnoEntity> turnos = turnoRepository.findByIdMedico(u.getIdFuncionario());
-                        
-                        for (TurnoEntity t : turnos) {
-                            try {
-                                LocalDateTime inicio = LocalDateTime.of(t.getDiaInicioTurno(), t.getHoraInicio());
-                                LocalDateTime fin = LocalDateTime.of(t.getDiaFinalTurno(), t.getHoraFin());
-                                long minutos = Duration.between(inicio, fin).toMinutes();
-
-                                if (minutos > 0) {
-                                    double horasTurno = (double) minutos / 60.0;
-                                    horasTrabajadas += horasTurno;
-
-                                    if (!t.getDiaInicioTurno().isBefore(semanaInicio)) {
-                                        horasSemanales += horasTurno;
-                                    }
-
-                                    if (!t.getDiaInicioTurno().isBefore(mesInicio)) {
-                                        horasMensuales += horasTurno;
-                                    }
-                                }
-                            } catch (Exception exInner) {
-                                logger.warn("No se pudo calcular duración de turno id={} para medicoId={}: {}",
-                                        t.getId(), u.getIdFuncionario(), exInner.getMessage());
-                            }
-                        }
-                    }
-                } catch (Exception ex) {
-                    logger.warn("Error al obtener turnos para medico id={}: {}", u.getIdFuncionario(), ex.getMessage());
-                }
-
-                if (horasTrabajadas > 0) {
-                    Map<String, Object> medicoInfo = new HashMap<>();
-                    medicoInfo.put("id", u.getIdFuncionario()); // V2
-                    
-                    String nombreCompleto = (u.getNombre() == null ? "" : u.getNombre());
-                    // V2: getApelPat en lugar de getApellidoPaterno
-                    if (u.getApelPat() != null) {
-                        nombreCompleto += " " + u.getApelPat(); 
-                    }
-                    
-                    medicoInfo.put("nombre", nombreCompleto.trim());
-                    medicoInfo.put("horas_trabajadas", Math.round(horasTrabajadas * 10) / 10.0);
-                    medicoInfo.put("horas_semanales", Math.round(horasSemanales * 10) / 10.0);
-                    medicoInfo.put("horas_mensuales", Math.round(horasMensuales * 10) / 10.0);
-                    medicoInfo.put("horas_contratadas", 160); // TODO: ¿Debería venir de un campo de la BD?
-                    
-                    String rutCompleto2 = u.getRut();
-                    if (u.getDv() != null)
-                        rutCompleto2 = rutCompleto2 + "-" + u.getDv();
-                    medicoInfo.put("rut", rutCompleto2);
-                    
-                    double utilization = (horasTrabajadas * 100.0) / 160.0;
-                    medicoInfo.put("utilization", Math.round(utilization * 10) / 10.0);
-                    medicosConHoras.add(medicoInfo);
-                }
-            }
-
-            stats.put("total", usuarios.size());
-            stats.put("promedio", 0.0);
-
-            // Ordenar médicos por horas trabajadas
-            medicosConHoras.sort((a, b) -> {
-                Double horasA = (Double) a.get("horas_trabajadas");
-                Double horasB = (Double) b.get("horas_trabajadas");
-                return horasB.compareTo(horasA);
-            });
-
-            // Paginación en memoria
-            int totalElements = medicosConHoras.size();
-            int totalPages = (int) Math.ceil((double) totalElements / size);
-            int start = page * size;
-            // Evitar excepciones si la página pedida está fuera de rango
-            if (start > totalElements) start = totalElements; 
-            int end = Math.min(start + size, totalElements);
-            
-            List<Map<String, Object>> paginatedMedicos = medicosConHoras.subList(start, end);
-
-            stats.put("medicos", paginatedMedicos);
-            stats.put("currentPage", page);
-            stats.put("totalPages", totalPages);
-            stats.put("totalElements", totalElements);
-            stats.put("size", size);
-
-        } catch (Exception e) {
-            logger.error("Error al obtener estadísticas de horas por servicioId={}: {}", servicioId, e.getMessage(), e);
-            stats.put("error", e.getMessage());
-        }
-        return stats;
-    }
-
-    */
 }

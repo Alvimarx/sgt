@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { SGT_DATA } from './data';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
-import { getFuncionariosSummary, asignarServicio } from '../../services/funcionarioService';
+import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 
 const AsignacionView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
@@ -33,7 +33,7 @@ const AsignacionView = ({ onBack }) => {
       // Ejecutamos ambas peticiones en paralelo
       const [resServ, resFunc] = await Promise.all([
         getServicios(),
-        getFuncionariosSummary() // Lo llamamos sin parámetros para traer a TODOS los usuarios al buscador
+        getPersonal() // Lo llamamos sin parámetros para traer a TODOS los usuarios al buscador
       ]);
       
       // Manejo de la respuesta de Servicios

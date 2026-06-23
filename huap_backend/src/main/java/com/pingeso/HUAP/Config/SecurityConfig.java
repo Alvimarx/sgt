@@ -47,7 +47,8 @@ public class SecurityConfig {
             "/api/v2/puestos/**",
             "/api/v2/gestion-turnos/**",
             "/api/v2/turnos/**",
-            "/api/v2/reglas-servicio/**"
+            "/api/v2/reglas-servicio/**",
+            "/api/v2/Personal/**"
     };
 
     /**

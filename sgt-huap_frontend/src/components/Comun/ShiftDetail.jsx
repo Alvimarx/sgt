@@ -28,10 +28,7 @@ const hashStr = (value = "") => {
 
 export const getTeamColor = (shift) => {
     const seed =
-        shift?.idTipoTurno ??
-        shift?.teamGroup?.idTipoTurno ??
-        shift?.teamGroup?.key ??
-        shift?.teamKey ??
+        shift?.idPlantilla ??
         `tipo-${shift?.tipo || "sin-tipo"}`;
     return TEAM_COLORS[hashStr(String(seed)) % TEAM_COLORS.length];
 };
