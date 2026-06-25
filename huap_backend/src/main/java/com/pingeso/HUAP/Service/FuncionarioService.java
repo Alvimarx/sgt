@@ -344,7 +344,7 @@ public class FuncionarioService {
      * @param rut Rut del funcionario a consultar
      * @return boolean Indicando si es verdad que esta registrado el usuario
      */
-    public boolean isPresent(String rut) {
+    public Long isPresent(String rut) {
         if (rut == null || rut.isBlank()) {
             throw new IllegalArgumentException("El rut es un campo obligatorio");
         }
@@ -358,7 +358,11 @@ public class FuncionarioService {
 
         String rutSinDv = cleanRut.substring(0, cleanRut.length() - 1);
 
-        return funcionarioRepository.existsByRut(rutSinDv);
+        if (funcionarioRepository.existsByRut(rutSinDv)) {
+            return funcionarioRepository.findByRut(rutSinDv).getIdFuncionario();
+        }
+
+        return -1L;
     }
 
     /**

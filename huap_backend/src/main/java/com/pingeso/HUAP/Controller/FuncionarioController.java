@@ -136,12 +136,14 @@ public class FuncionarioController {
      * @return ResponseEntity sin cuerpo con el estado de la verificación.
      */
     @GetMapping("/status/{rut}")
-    public ResponseEntity<Void> checkFuncionario(@PathVariable String rut){
+    public ResponseEntity<Long> checkFuncionario(@PathVariable String rut){
         try {
-            if (funcionarioService.isPresent(rut)) {
-                return ResponseEntity.ok().build(); // 200 OK
+            Long funcionarioId = funcionarioService.isPresent(rut);
+            if (funcionarioId == -1L) {
+                return ResponseEntity.notFound().build(); // 404 Not Found
             }
-            return ResponseEntity.notFound().build(); // 404 Not Found
+            return ResponseEntity.ok(funcionarioId); // 200 OK
+
         } catch (RuntimeException e) {
             // Tip de Senior: Al menos registra el error en un log antes de mutearlo con el HTTP Status
             logger.error("Error al verificar funcionario con RUT: {}", rut, e);

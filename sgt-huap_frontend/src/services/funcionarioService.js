@@ -368,13 +368,21 @@ export const getFuncionariosSummary = async (servicioId = null) => {
 /**
  * Asigna un servicio a un funcionario con rol Médico (ID 3) por defecto.
  */
-export const asignarServicio = async (funcionarioId, idServicio) => {
+export const asignarServicio = async (idServicio, rut) => {
     try {
-        const response = await axiosInstance.put(`${API_BASE}/${funcionarioId}`, {
-            servicioId: Number(idServicio),
-            rol: 3,
-        });
-        return { success: true, data: response.data };
+        const exist = await axiosInstance.get(`${API_BASE}/status/${rut}`);
+        if (exist.data != -1){
+            console.log(exist.data);
+            const response = await axiosInstance.put(`${API_BASE}/${exist.data}`, {
+                servicioId: Number(idServicio),
+                rol: 3,
+            });
+            return { success: true, data: response.data };
+        } else {
+            const mensaje = 'Usuario no registrado';
+            return { success: false, error: mensaje };
+        }
+
     } catch (error) {
         const mensaje = error.response?.data?.error || 'Error al asignar el servicio';
         return { success: false, error: mensaje };

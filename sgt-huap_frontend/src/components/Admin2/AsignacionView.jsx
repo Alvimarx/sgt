@@ -80,8 +80,8 @@ const AsignacionView = ({ onBack }) => {
     setGuardando(true);
     setMensaje({ tipo: '', texto: '' });
 
-    const idFunc = selectedUser.idFuncionario || selectedUser.id;
-    const result = await asignarServicio(idFunc, selectedServicio);
+    const rutSelected = selectedUser.rutCompleto;
+    const result = await asignarServicio(selectedServicio, rutSelected);
 
     if (result.success) {
       setMensaje({ tipo: 'success', texto: 'Asignación guardada con éxito.' });
