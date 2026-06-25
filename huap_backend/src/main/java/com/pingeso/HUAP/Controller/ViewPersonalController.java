@@ -18,7 +18,7 @@ public class ViewPersonalController {
 
     @Autowired
     public ViewPersonalController(ViewPersonalService viewPersonalService){this.viewPersonalService = viewPersonalService;}
-    
+
     @GetMapping("/summary")
     public ResponseEntity<List<ViewPersonalSummaryDTO>> getAllPersonal(){
         return ResponseEntity.ok(viewPersonalService.getAllPersonal());

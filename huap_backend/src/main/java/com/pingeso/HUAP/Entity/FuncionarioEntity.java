@@ -104,4 +104,23 @@ public class    FuncionarioEntity {
         this.profesion = profesion;
         this.rolSistema = rolSistema;
     }
+
+    // Constructor sin ID y ni profesión
+    public FuncionarioEntity(
+            String nombre,
+            String apelPat,
+            String apelMat,
+            String rut,
+            String dv,
+            int estado,
+            RolSistemaEntity rolSistema
+    ) {
+        this.nombre = nombre;
+        this.apelPat = apelPat;
+        this.apelMat = apelMat;
+        this.rut = rut;
+        this.dv = dv;
+        this.estado = estado;
+        this.rolSistema = rolSistema;
+    }
 }

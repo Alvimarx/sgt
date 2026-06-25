@@ -1,9 +1,12 @@
 package com.pingeso.HUAP.Controller;
 
 import com.pingeso.HUAP.DTO.*;
+import jakarta.persistence.EntityExistsException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -125,8 +128,29 @@ public class FuncionarioController {
     }
 
     // --- Gestión de funcionarios ---
+    /**
+     * Controlador para verificar si existe un funcionario registrado en el sistema de turnos.
+     * Devuelve 200 OK si existe, 404 NOT FOUND si no, o 401 si ocurre un error controlado.
+     *
+     * @param rut RUT del funcionario a consultar.
+     * @return ResponseEntity sin cuerpo con el estado de la verificación.
+     */
+    @GetMapping("/status/{rut}")
+    public ResponseEntity<Void> checkFuncionario(@PathVariable String rut){
+        try {
+            if (funcionarioService.isPresent(rut)) {
+                return ResponseEntity.ok().build(); // 200 OK
+            }
+            return ResponseEntity.notFound().build(); // 404 Not Found
+        } catch (RuntimeException e) {
+            // Tip de Senior: Al menos registra el error en un log antes de mutearlo con el HTTP Status
+            logger.error("Error al verificar funcionario con RUT: {}", rut, e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+    }
 
-    @GetMapping("/summary")
+
+        @GetMapping("/summary")
     public ResponseEntity<List<FuncionarioSummaryDTO>> getAllSummary(
             @RequestParam(required = false) Long servicioId) {
         return ResponseEntity.ok(funcionarioService.getAllUserSummaryByServicio(servicioId));
@@ -275,4 +299,34 @@ public class FuncionarioController {
                 rolFinal,
                 perfil));
     }
+
+    /**
+     * Controlador para registrar personal como funcionario en el sistema de turnos
+     *
+     * @Param rut Rut del funcionario a consultar
+     * @Return
+     */
+    @PostMapping("/register/{rut}")
+    @PreAuthorize("hasRole('ROLE_JEFATURA')") // 👈 Spring se encarga del 403/401 automáticamente si no tiene el rol
+    public ResponseEntity<Long> registerPersonal(@PathVariable String rut) {
+        try {
+            Long newId = funcionarioService.registerPersonal(rut);
+
+            // Retornamos 201 Created pasando el ID en el cuerpo
+            return ResponseEntity.status(HttpStatus.CREATED).body(newId);
+
+        } catch (IllegalArgumentException e) {
+            // Si el servicio dice que el RUT es inválido o faltan datos
+            return ResponseEntity.badRequest().build(); // 400 Bad Request
+
+        } catch (EntityExistsException e) {
+            // Si el usuario ya estaba registrado en el sistema
+            return ResponseEntity.status(HttpStatus.CONFLICT).build(); // 409 Conflict
+
+        } catch (Exception e) {
+            // Cualquier otra cosa (ej: base de datos caída) es un error del servidor, no de credenciales
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build(); // 500
+        }
+    }
+
 }

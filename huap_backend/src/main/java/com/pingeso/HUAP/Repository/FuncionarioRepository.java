@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface FuncionarioRepository extends JpaRepository<FuncionarioEntity, Long> {
@@ -19,6 +18,8 @@ public interface FuncionarioRepository extends JpaRepository<FuncionarioEntity, 
     // Repository para encontrar al usuario por el rut (excluye eliminados: no autentica ni lista bajas)
     @Query ("SELECT f FROM FuncionarioEntity f WHERE f.rut = :rut AND f.eliminado = false")
     FuncionarioEntity findByRut(@Param ("rut") String rut);
+
+    boolean existsByRut(String rut);
 
     // Funcionarios no eliminados (para listado global cuando no se filtra por servicio)
     List<FuncionarioEntity> findByEliminadoFalse();

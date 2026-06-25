@@ -25,7 +25,7 @@ public class RolSistemaEntity {
 
     // --- Constructores ---
 
-    public RolSistemaEntity() {
+    public RolSistemaEntity() { this.idRolSistema = 2L;
     }
 
     public RolSistemaEntity(String nombreRol) {

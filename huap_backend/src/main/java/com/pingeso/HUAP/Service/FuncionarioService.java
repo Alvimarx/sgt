@@ -1,7 +1,9 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.*;
-import com.pingeso.HUAP.Repository.ViewPersonalRepository;
+import com.pingeso.HUAP.Repository.*;
+import jakarta.persistence.EntityExistsException;
+import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -10,9 +12,6 @@ import org.springframework.stereotype.Service;
 
 import com.pingeso.HUAP.DTO.FuncionarioSummaryDTO;
 import com.pingeso.HUAP.DTO.RolServicioDTO;
-import com.pingeso.HUAP.Repository.FuncionarioRepository;
-import com.pingeso.HUAP.Repository.RolServicioRepository;
-import com.pingeso.HUAP.Repository.ServicioRepository;
 
 import jakarta.transaction.Transactional;
 
@@ -35,6 +34,7 @@ public class FuncionarioService {
     private final ViewPersonalRepository viewPersonalRepository;
     private final RolServicioRepository rolServicioRepository;
     private final ServicioRepository servicioRepository;
+    private final RolSistemaRepository rolSistemaRepository;
 
     public FuncionarioEntity authenticateWithPassword(String rut, String password){
 
@@ -338,6 +338,72 @@ public class FuncionarioService {
 
         return funcionarioRepository.findByIdFuncionario(idFuncionario);
     }
-    
 
+    /**
+     * Servicio que verifica si un usuario esta registrado en el sistema de turnos
+     * @param rut Rut del funcionario a consultar
+     * @return boolean Indicando si es verdad que esta registrado el usuario
+     */
+    public boolean isPresent(String rut) {
+        if (rut == null || rut.isBlank()) {
+            throw new IllegalArgumentException("El rut es un campo obligatorio");
+        }
+
+
+        String cleanRut = rut.replaceAll("[^0-9Kk]", "").toUpperCase();
+
+        if (cleanRut.length() <= 1) {
+            throw new IllegalArgumentException("El rut no tiene un largo correcto");
+        }
+
+        String rutSinDv = cleanRut.substring(0, cleanRut.length() - 1);
+
+        return funcionarioRepository.existsByRut(rutSinDv);
+    }
+
+    /**
+     * Servicio encargado de registrar a un usuario del sistema del hospital en el sistema
+     * de turnos
+     * @param rut
+     * @return Long id del nuevo funcionario registrado
+     */
+    @Transactional
+    public Long registerPersonal(String rut) {
+        if (rut == null || rut.isBlank()) {
+            throw new IllegalArgumentException("El rut es un campo obligatorio");
+        }
+
+        String cleanRut = rut.replaceAll("[^0-9Kk]", "").toUpperCase();
+
+        if (cleanRut.length() <= 1) {
+            throw new IllegalArgumentException("El rut no tiene un largo correcto");
+        }
+
+        String rutSinDv = cleanRut.substring(0, cleanRut.length() - 1);
+
+        // Control de Duplicados: Evita registrar dos veces al mismo funcionario en turnos
+        if (funcionarioRepository.existsByRut(rutSinDv)) {
+            throw new EntityExistsException("El funcionario ya se encuentra registrado en el sistema de turnos");
+        }
+
+        // Buscamos en la vista usando el 'rutSinDv' para que haga match
+        ViewPersonalEntity p = viewPersonalRepository.findByRut(rutSinDv)
+                .orElseThrow(() -> new EntityNotFoundException("Personal no encontrado"));
+
+        RolSistemaEntity rolSistema = rolSistemaRepository.getReferenceById(2L);
+
+        // Mantiene getEstado() y va sin profesión por ahora
+        FuncionarioEntity funcionario = new FuncionarioEntity(
+                p.getNombre(),
+                p.getApel_pat(),
+                p.getApel_mat(),
+                p.getRut(),
+                p.getDv(),
+                p.getEstado(),
+                rolSistema
+        );
+
+        FuncionarioEntity f = funcionarioRepository.save(funcionario);
+        return f.getIdFuncionario();
+    }
 }
