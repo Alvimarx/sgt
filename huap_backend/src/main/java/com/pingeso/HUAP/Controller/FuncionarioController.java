@@ -309,7 +309,7 @@ public class FuncionarioController {
      * @Return
      */
     @PostMapping("/register/{rut}")
-    @PreAuthorize("hasRole('ROLE_JEFATURA')") // 👈 Spring se encarga del 403/401 automáticamente si no tiene el rol
+    @PreAuthorize("hasRole('ROLE_JEFATURA')") // Spring se encarga del 403/401 automáticamente si no tiene el rol
     public ResponseEntity<Long> registerPersonal(@PathVariable String rut) {
         try {
             Long newId = funcionarioService.registerPersonal(rut);

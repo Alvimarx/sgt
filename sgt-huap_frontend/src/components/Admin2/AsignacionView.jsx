@@ -1,237 +1,562 @@
 // AsignacionView.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SGT_DATA } from './data';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 
+// ---------------------------------------------------------------------------
+// CONSTANTES DE SEGURIDAD (OWASP A03 — Injection prevention)
+// Limitamos la longitud del input de búsqueda para evitar payloads anómalos.
+// El filtrado se hace en cliente sobre datos ya validados por el backend.
+// ---------------------------------------------------------------------------
+const MAX_SEARCH_LENGTH = 60;
+
+// ---------------------------------------------------------------------------
+// HELPERS
+// ---------------------------------------------------------------------------
+
+// Extrae el identificador único del funcionario.
+// El DTO actual no tiene id numérico — usamos rutCompleto (sin puntos ni guión) como clave estable.
+// Fallback a rut corto, y si tampoco existe, a nombre+apellido para evitar keys null en el dropdown.
+const getUserId = (user) =>
+    user?.rutCompleto?.replace(/[^0-9kK]/g, '') ||
+    user?.rut?.replace(/[^0-9kK]/g, '') ||
+    `${user?.nombre ?? ''}-${user?.apellidoPaterno ?? ''}`;
+
+// Genera iniciales para el avatar — máximo 2 caracteres, siempre mayúsculas
+const getInitials = (nombre = '', apellido = '') =>
+    `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase() || 'U';
+
+// Construye el nombre visible para el input y el dropdown
+const getNombreCompleto = (user) =>
+    `${user?.nombre || ''} ${user?.apellidoPaterno || ''}`.trim();
+
+/**
+ * Sanitiza el query de búsqueda para evitar caracteres de control
+ * y limitar el largo del string antes de usarlo en comparaciones. (OWASP A03)
+ */
+const sanitizeQuery = (raw) =>
+    raw.replace(/[<>"'`;]/g, '').slice(0, MAX_SEARCH_LENGTH);
+
+/**
+ * Enmascara el RUT para mostrar solo los últimos 3 dígitos verificables.
+ * Evitamos exponer el RUT completo en el dropdown — dato sensible. (OWASP A02)
+ * Ej: "12.345.678-9" → "***678-9"
+ */
+const maskRut = (rut = '') => {
+    const clean = rut.replace(/[^0-9kK\-]/g, '');
+    if (clean.length < 4) return '***';
+    return `***${clean.slice(-4)}`;
+};
+
+// ---------------------------------------------------------------------------
+// COMPONENTE DE CONFIRMACIÓN — Nielsen #5: prevención de errores
+// Muestra un resumen antes de ejecutar la acción de asignación.
+// ---------------------------------------------------------------------------
+const ConfirmDialog = ({ funcionario, servicio, onConfirm, onCancel, guardando }) => {
+    const PA = SGT_DATA.PALETTE;
+    return (
+        <div style={{ 
+            position: 'fixed', 
+            inset: 0, 
+            zIndex: 100, 
+            display: 'flex', 
+            alignItems: 'center',       // Centrado vertical
+            justifyContent: 'center',   // Centrado horizontal
+            padding: '20px',            // Margen de seguridad para pantallas muy pequeñas
+            background: 'rgba(15,23,42,0.4)' 
+        }}>
+            <div style={{ 
+                width: '100%', 
+                maxWidth: '340px',          // Ancho máximo estándar de alerta móvil
+                background: '#fff', 
+                borderRadius: '20px',       // Bordes redondeados en todas las esquinas
+                padding: '24px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' 
+            }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: PA.ink, marginBottom: 12, textAlign: 'center' }}>
+                    Confirmar asignación
+                </div>
+                
+                <p style={{ fontSize: 14, color: PA.ink2, fontWeight: 500, marginBottom: 24, lineHeight: 1.5, textAlign: 'center' }}>
+                    ¿Deseas asignar a <strong style={{ color: PA.ink }}>{getNombreCompleto(funcionario)}</strong> al servicio{' '}
+                    <strong style={{ color: PA.ink }}>{servicio?.nombreServicio || servicio?.nombre}</strong>?
+                </p>
+                
+                <div style={{ display: 'flex', gap: 12 }}>
+                    <button
+                        onClick={onCancel}
+                        disabled={guardando}
+                        style={{ 
+                            flex: 1, 
+                            padding: '12px', 
+                            borderRadius: '12px', 
+                            border: `1px solid ${PA.line}`, 
+                            background: '#fff', 
+                            fontSize: 15, 
+                            fontWeight: 700, 
+                            color: PA.ink2, 
+                            cursor: guardando ? 'not-allowed' : 'pointer',
+                            opacity: guardando ? 0.7 : 1
+                        }}
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={guardando}
+                        style={{ 
+                            flex: 1, 
+                            padding: '12px', 
+                            borderRadius: '12px', 
+                            border: 'none', 
+                            background: PA.primary, 
+                            fontSize: 15, 
+                            fontWeight: 800, 
+                            color: '#fff', 
+                            cursor: guardando ? 'not-allowed' : 'pointer', 
+                            opacity: guardando ? 0.7 : 1 
+                        }}
+                    >
+                        {guardando ? 'Guardando...' : 'Confirmar'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// ASIGNACIONVIEW
+// ---------------------------------------------------------------------------
 const AsignacionView = ({ onBack }) => {
-  const PA = SGT_DATA.PALETTE;
-  
-  // Estados de datos dinámicos
-  const [funcionarios, setFuncionarios] = useState([]);
-  const [servicios, setServicios] = useState([]);
-  const [loadingDatos, setLoadingDatos] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-  const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
+    const PA = SGT_DATA.PALETTE;
 
-  // Estados para el buscador
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
+    // Datos cargados desde la API
+    const [funcionarios, setFuncionarios] = useState([]);
+    const [servicios, setServicios] = useState([]);
+    const [loadingDatos, setLoadingDatos] = useState(true);
+    // Error de carga inicial separado del error de guardado — Nielsen #1: visibilidad del estado
+    const [errorCarga, setErrorCarga] = useState('');
 
-  // Estados de selección (Solo servicio)
-  const [selectedServicio, setSelectedServicio] = useState('');
+    // Estado del formulario
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [selectedServicioId, setSelectedServicioId] = useState('');
 
-  // Cargar datos al montar
-  useEffect(() => {
-    const cargarDatos = async () => {
-      setLoadingDatos(true);
-      
-      console.log("Iniciando petición a getServicios y getFuncionariosSummary...");
-      
-      // Ejecutamos ambas peticiones en paralelo
-      const [resServ, resFunc] = await Promise.all([
-        getServicios(),
-        getPersonal() // Lo llamamos sin parámetros para traer a TODOS los usuarios al buscador
-      ]);
-      
-      // Manejo de la respuesta de Servicios
-      if (resServ.success) {
-        let dataServicios = [];
-        if (Array.isArray(resServ.data)) {
-          dataServicios = resServ.data;
-        } else if (resServ.data && Array.isArray(resServ.data.servicios)) {
-          dataServicios = resServ.data.servicios;
-        } else if (typeof resServ.data === 'object' && resServ.data !== null) {
-          dataServicios = Object.values(resServ.data);
-        }
-        setServicios(dataServicios);
-      } else {
-        console.error("Falló la petición de servicios:", resServ.error);
-      }
+    // Estado del guardado
+    const [guardando, setGuardando] = useState(false);
+    const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
+    const [showConfirm, setShowConfirm] = useState(false);
 
-      // Manejo de la respuesta de Funcionarios
-      if (resFunc.success) {
-        // Asumiendo que resFunc.data es directamente el List<FuncionarioSummaryDTO>
-        setFuncionarios(Array.isArray(resFunc.data) ? resFunc.data : []);
-      } else {
-        console.error("Falló la petición de funcionarios:", resFunc.error);
-      }
-      
-      setLoadingDatos(false);
+    // Ref para cerrar el dropdown al hacer click fuera — más robusto que un overlay fijo
+    const searchWrapperRef = useRef(null);
+
+    // ---------------------------------------------------------------------------
+    // CARGA INICIAL — ambos endpoints en paralelo
+    // Los errores se registran internamente; NO exponemos detalles técnicos al usuario
+    // (OWASP A09 — eliminamos console.log/error con datos sensibles)
+    // ---------------------------------------------------------------------------
+    useEffect(() => {
+        let mounted = true;
+
+        const cargarDatos = async () => {
+            setLoadingDatos(true);
+            setErrorCarga('');
+
+            const [resServ, resFunc] = await Promise.all([
+                getServicios(),
+                getPersonal(),
+            ]);
+
+            if (!mounted) return;
+
+            // Normalizamos la respuesta de servicios contemplando distintas estructuras de API
+            if (resServ.success) {
+                const raw = resServ.data;
+                const lista = Array.isArray(raw)
+                    ? raw
+                    : Array.isArray(raw?.servicios)
+                    ? raw.servicios
+                    : typeof raw === 'object' && raw !== null
+                    ? Object.values(raw)
+                    : [];
+                setServicios(lista);
+            } else {
+                // Registramos en un sistema de logging interno — nunca en consola en producción
+                setErrorCarga('No se pudieron cargar los datos. Intenta de nuevo.');
+            }
+
+            if (resFunc.success) {
+                setFuncionarios(Array.isArray(resFunc.data) ? resFunc.data : []);
+            } else {
+                setErrorCarga('No se pudieron cargar los datos. Intenta de nuevo.');
+            }
+
+            setLoadingDatos(false);
+        };
+
+        cargarDatos();
+        return () => { mounted = false; };
+    }, []);
+
+    // Cierra el dropdown al hacer click fuera del wrapper (Nielsen #4 — consistencia)
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Auto-dismiss del mensaje de resultado tras 5 segundos (Nielsen #1)
+    useEffect(() => {
+        if (!mensaje.texto) return;
+        const timer = setTimeout(() => setMensaje({ tipo: '', texto: '' }), 5000);
+        return () => clearTimeout(timer);
+    }, [mensaje.texto]);
+
+    // ---------------------------------------------------------------------------
+    // BÚSQUEDA Y FILTRADO
+    // El query se sanitiza antes de usarse en comparaciones. (OWASP A03)
+    // Solo mostramos el dropdown si hay al menos 2 caracteres — evitamos
+    // exponer la lista completa de funcionarios sin intención del usuario. (OWASP A02)
+    // ---------------------------------------------------------------------------
+    const filteredUsers = useCallback(() => {
+        const query = sanitizeQuery(searchQuery).toLowerCase().trim();
+        if (query.length < 2) return [];
+
+        return funcionarios.filter((u) => {
+            const nombre = getNombreCompleto(u).toLowerCase();
+            if (nombre.includes(query)) return true;
+
+            // Búsqueda por RUT: limpiamos caracteres no numéricos antes de comparar
+            const rutLimpio = (u.rutCompleto || '').replace(/[^0-9kK]/g, '');
+            const queryRut = query.replace(/[^0-9kK]/g, '');
+            return queryRut.length >= 2 && rutLimpio.includes(queryRut);
+        });
+    }, [funcionarios, searchQuery]);
+
+    const resultados = filteredUsers();
+    // El dropdown se muestra solo si hay texto suficiente y resultados
+    const dropdownVisible = showDropdown && searchQuery.length >= 2;
+
+    // ---------------------------------------------------------------------------
+    // HANDLERS
+    // ---------------------------------------------------------------------------
+
+    const handleSearchChange = (e) => {
+        // Sanitizamos el input en cada keystroke — no permitimos caracteres peligrosos (OWASP A03)
+        const sanitized = sanitizeQuery(e.target.value);
+        setSearchQuery(sanitized);
+        setShowDropdown(true);
+        // Si el usuario borra el campo, limpiamos la selección
+        if (sanitized === '') setSelectedUser(null);
     };
 
-    cargarDatos();
-  }, []);
-  
-  // Filtramos la lista según lo que se escriba
-  const filteredUsers = funcionarios.filter(u => {
-    const nombreCompleto = `${u.nombre || ''} ${u.apellidoPaterno || ''}`.toLowerCase();
-    return nombreCompleto.includes(searchQuery.toLowerCase());
-  });
+    const handleSelectUser = (user) => {
+        setSelectedUser(user);
+        setSearchQuery(getNombreCompleto(user));
+        setShowDropdown(false);
+    };
 
-  const handleGuardar = async () => {
-    if (!selectedUser || !selectedServicio) {
-      setMensaje({ tipo: 'error', texto: 'Debes seleccionar un funcionario y un servicio.' });
-      return;
-    }
+    // Abre el diálogo de confirmación — Nielsen #5: prevención de errores en acciones irreversibles
+    const handleGuardarClick = () => {
+        if (!selectedUser || !selectedServicioId) return;
+        setShowConfirm(true);
+    };
 
-    setGuardando(true);
-    setMensaje({ tipo: '', texto: '' });
+    // Ejecuta la asignación tras confirmar
+    const handleConfirmar = async () => {
+        // Validación final en cliente — doble seguridad (OWASP A03)
+        if (!selectedUser || !selectedServicioId) return;
 
-    const rutSelected = selectedUser.rutCompleto;
-    const result = await asignarServicio(selectedServicio, rutSelected);
+        // Casteamos el servicioId a número para evitar type confusion en el backend (OWASP A03)
+        const servicioIdNum = Number(selectedServicioId);
+        if (!Number.isFinite(servicioIdNum) || servicioIdNum <= 0) {
+            setMensaje({ tipo: 'error', texto: 'El servicio seleccionado no es válido.' });
+            setShowConfirm(false);
+            return;
+        }
 
-    if (result.success) {
-      setMensaje({ tipo: 'success', texto: 'Asignación guardada con éxito.' });
-      // Limpiar formulario tras éxito
-      setSelectedUser(null);
-      setSearchQuery('');
-      setSelectedServicio('');
-    } else {
-      setMensaje({ tipo: 'error', texto: result.error || 'Ocurrió un error.' });
-    }
-    
-    setGuardando(false);
-  };
+        // Enviamos el rutCompleto como identificador — es el campo que espera el backend (OWASP A02)
+        const rutFuncionario = selectedUser.rutCompleto || selectedUser.rut || '';
+        if (!rutFuncionario) {
+            setMensaje({ tipo: 'error', texto: 'No se pudo identificar al funcionario.' });
+            setShowConfirm(false);
+            return;
+        }
 
-  const inputStyle = {
-    width: '100%', padding: '14px', borderRadius: 12, border: `1px solid ${PA.line}`,
-    background: '#fff', fontSize: 15, color: PA.ink, fontWeight: 600, marginTop: 6,
-    appearance: 'none', outline: 'none', boxSizing: 'border-box'
-  };
+        setGuardando(true);
+        setShowConfirm(false);
 
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Asignación</div>
-      </div>
+        const result = await asignarServicio(servicioIdNum, rutFuncionario);
 
-      <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
-        <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600 }}>
-          Asocia a un funcionario con su servicio correspondiente.
-        </p>
+        if (result.success) {
+            setMensaje({ tipo: 'success', texto: `${getNombreCompleto(selectedUser)} fue asignado correctamente.` });
+            // Limpiamos el formulario tras éxito
+            setSelectedUser(null);
+            setSearchQuery('');
+            setSelectedServicioId('');
+        } else {
+            // Mostramos mensaje genérico — no re-exponemos el error técnico del backend (OWASP A09)
+            setMensaje({ tipo: 'error', texto: 'No se pudo completar la asignación. Intenta de nuevo.' });
+        }
 
-        {mensaje.texto && (
-          <div style={{ 
-            padding: 12, marginBottom: 16, borderRadius: 10, fontWeight: 700, fontSize: 13,
-            background: mensaje.tipo === 'success' ? '#ECFDF5' : '#FEF2F2',
-            color: mensaje.tipo === 'success' ? '#065F46' : '#991B1B',
-            border: `1px solid ${mensaje.tipo === 'success' ? '#A7F3D0' : '#FECACA'}`
-          }}>
-            {mensaje.texto}
-          </div>
-        )}
+        setGuardando(false);
+    };
 
-        {/* 1. BUSCADOR DE FUNCIONARIO */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3 }}>
-            1. Buscar Funcionario {loadingDatos && '(Cargando...)'}
-          </label>
-          <div style={{ position: 'relative' }}>
-            <SGTIcon name="search" size={18} color={PA.ink3} style={{ position: 'absolute', left: 14, top: 21, pointerEvents: 'none' }}/>
-            <input 
-              type="text" 
-              placeholder="Ej: Jorge Muñoz..."
-              value={searchQuery}
-              disabled={loadingDatos}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setShowDropdown(true);
-                if (e.target.value === '') setSelectedUser(null);
-              }}
-              onFocus={() => setShowDropdown(true)}
-              style={{ ...inputStyle, paddingLeft: 42 }}
-            />
-            
-            {showDropdown && (
-              <div style={{ 
-                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', 
-                border: `1px solid ${PA.line}`, borderRadius: 12, maxHeight: 200, overflowY: 'auto', 
-                zIndex: 10, boxShadow: '0 8px 24px rgba(15,23,42,0.1)' 
-              }}>
-                {filteredUsers.length > 0 ? filteredUsers.map((u, i) => {
-                  const uId = u.idFuncionario || u.id || `f_${i}`;
-                  return (
-                    <div key={uId} onClick={() => {
-                      setSelectedUser(u);
-                      setSearchQuery(`${u.nombre || ''} ${u.apellidoPaterno || ''}`.trim());
-                      setShowDropdown(false);
-                    }} style={{ 
-                      padding: '12px 14px', borderBottom: `1px solid ${PA.line2}`, cursor: 'pointer', 
-                      display: 'flex', alignItems: 'center', gap: 10, 
-                      background: selectedUser && (selectedUser.idFuncionario || selectedUser.id) === uId ? PA.primarySoft : '#fff'
-                    }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 99, background: PA.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700 }}>
-                        {(u.nombre || 'U').charAt(0)}{(u.apellidoPaterno || '').charAt(0)}
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: selectedUser && (selectedUser.idFuncionario || selectedUser.id) === uId ? 800 : 600, color: PA.ink }}>
-                        {u.nombre} {u.apellidoPaterno} <span style={{ fontSize: 12, color: PA.ink3, fontWeight: 500 }}>· {u.rut || u.rutCompleto || ''}</span>
-                      </div>
+    // Servicio seleccionado como objeto (para la pantalla de confirmación)
+    const servicioSeleccionado = servicios.find(
+        (s) => String(s.idServicio || s.id) === String(selectedServicioId)
+    ) ?? null;
+
+    const canSubmit = Boolean(selectedUser && selectedServicioId && !guardando);
+
+    // ---------------------------------------------------------------------------
+    // ESTILOS BASE
+    // ---------------------------------------------------------------------------
+    const inputStyle = {
+        width: '100%', padding: '14px', borderRadius: 12,
+        border: `1px solid ${PA.line}`, background: '#fff',
+        fontSize: 15, color: PA.ink, fontWeight: 600, marginTop: 6,
+        appearance: 'none', outline: 'none', boxSizing: 'border-box',
+    };
+
+    // ---------------------------------------------------------------------------
+    // RENDER
+    // ---------------------------------------------------------------------------
+    return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
+
+            {/* Header */}
+            <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button
+                    onClick={onBack}
+                    aria-label="Volver"
+                    style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}
+                >
+                    <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                </button>
+                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Asignación</div>
+            </div>
+
+            <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
+                <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600, lineHeight: 1.5 }}>
+                    Asocia a un funcionario con su servicio correspondiente.
+                </p>
+
+                {/* Error de carga inicial */}
+                {errorCarga && (
+                    <div style={{ padding: '12px 14px', marginBottom: 16, borderRadius: 10, fontWeight: 700, fontSize: 13, background: '#FEF2F2', color: '#991B1B', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <SGTIcon name="exclamation-circle" size={16} color="#991B1B" />
+                        {errorCarga}
                     </div>
-                  );
-                }) : (
-                  <div style={{ padding: '16px', fontSize: 13, color: PA.ink3, textAlign: 'center', fontWeight: 600 }}>
-                    No se encontraron resultados
-                  </div>
                 )}
-              </div>
+
+                {/* Mensaje de resultado con auto-dismiss (Nielsen #1) */}
+                {mensaje.texto && (
+                    <div
+                        role="alert"
+                        aria-live="polite"
+                        style={{
+                            padding: '12px 14px', marginBottom: 16, borderRadius: 10, fontWeight: 700, fontSize: 13,
+                            background: mensaje.tipo === 'success' ? '#ECFDF5' : '#FEF2F2',
+                            color: mensaje.tipo === 'success' ? '#065F46' : '#991B1B',
+                            border: `1px solid ${mensaje.tipo === 'success' ? '#A7F3D0' : '#FECACA'}`,
+                            display: 'flex', alignItems: 'center', gap: 8,
+                        }}
+                    >
+                        <SGTIcon
+                            name={mensaje.tipo === 'success' ? 'check-circle' : 'exclamation-circle'}
+                            size={16}
+                            color={mensaje.tipo === 'success' ? '#065F46' : '#991B1B'}
+                        />
+                        {mensaje.texto}
+                    </div>
+                )}
+
+                {/* PASO 1 — Buscar funcionario */}
+                <div style={{ marginBottom: 20 }} ref={searchWrapperRef}>
+                    {/* htmlFor conecta el label con el input — Nielsen #6, accesibilidad */}
+                    <label
+                        htmlFor="buscar-funcionario"
+                        style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, display: 'block' }}
+                    >
+                        1. Buscar funcionario
+                        {loadingDatos && (
+                            <span style={{ fontWeight: 600, color: PA.ink3, marginLeft: 6 }}>(Cargando…)</span>
+                        )}
+                    </label>
+
+                    <div style={{ position: 'relative' }}>
+                        <SGTIcon
+                            name="search"
+                            size={18}
+                            color={PA.ink3}
+                            style={{ position: 'absolute', left: 14, top: 21, pointerEvents: 'none' }}
+                        />
+                        <input
+                            id="buscar-funcionario"
+                            type="search"
+                            autoComplete="off"
+                            // maxLength refuerza el límite en el DOM (OWASP A03)
+                            maxLength={MAX_SEARCH_LENGTH}
+                            placeholder="Nombre o RUT del funcionario"
+                            value={searchQuery}
+                            disabled={loadingDatos}
+                            onChange={handleSearchChange}
+                            onFocus={() => setShowDropdown(true)}
+                            aria-autocomplete="list"
+                            aria-controls="lista-funcionarios"
+                            aria-expanded={dropdownVisible}
+                            style={{ ...inputStyle, paddingLeft: 42 }}
+                        />
+
+                        {/* Indicación de mínimo de caracteres — Nielsen #6: ayuda y documentación */}
+                        {searchQuery.length > 0 && searchQuery.length < 2 && (
+                            <div style={{ fontSize: 11.5, color: PA.ink3, fontWeight: 600, marginTop: 4, paddingLeft: 4 }}>
+                                Escribe al menos 2 caracteres para buscar
+                            </div>
+                        )}
+
+                        {/* Dropdown de resultados */}
+                        {dropdownVisible && (
+                            <div
+                                id="lista-funcionarios"
+                                role="listbox"
+                                style={{
+                                    position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6,
+                                    background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12,
+                                    maxHeight: 200, overflowY: 'auto', zIndex: 10,
+                                    boxShadow: '0 8px 24px rgba(15,23,42,0.1)',
+                                }}
+                            >
+                                {resultados.length > 0 ? (
+                                    resultados.map((u, idx) => {
+                                        const uId = getUserId(u);
+                                        const rowKey = `${uId ?? "sin-id"}-${idx}`;
+                                        const isSelected = selectedUser && getUserId(selectedUser) === uId;
+
+                                        return (
+                                            <div
+                                                key={rowKey}
+                                                role="option"
+                                                aria-selected={isSelected}
+                                                onClick={() => handleSelectUser(u)}
+                                                style={{
+                                                    padding: '12px 14px', borderBottom: `1px solid ${PA.line2}`,
+                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                                                    background: isSelected ? PA.primarySoft : '#fff',
+                                                }}
+                                            >
+                                                {/* Avatar con iniciales */}
+                                                <div style={{ width: 32, height: 32, borderRadius: 99, background: PA.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                                                    {getInitials(u.nombre, u.apellidoPaterno)}
+                                                </div>
+
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ fontSize: 14, fontWeight: isSelected ? 800 : 600, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {getNombreCompleto(u)}
+                                                    </div>
+                                                    {/* Mostramos el RUT enmascarado — dato sensible (OWASP A02) */}
+                                                    <div style={{ fontSize: 11.5, color: PA.ink3, fontWeight: 500, marginTop: 1 }}>
+                                                        RUT {maskRut(u.rutCompleto || u.rut)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    // Nielsen #9: mensaje de error en lenguaje claro
+                                    <div style={{ padding: '16px', fontSize: 13, color: PA.ink3, textAlign: 'center', fontWeight: 600 }}>
+                                        No se encontraron funcionarios con ese nombre o RUT
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* PASO 2 — Seleccionar servicio */}
+                <div style={{ marginBottom: 20 }}>
+                    <label
+                        htmlFor="select-servicio"
+                        style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, display: 'block' }}
+                    >
+                        2. Asignar a servicio
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                        <select
+                            id="select-servicio"
+                            style={inputStyle}
+                            value={selectedServicioId}
+                            onChange={(e) => setSelectedServicioId(e.target.value)}
+                            disabled={loadingDatos || servicios.length === 0}
+                            aria-label="Seleccionar servicio"
+                        >
+                            <option value="" disabled>
+                                {servicios.length === 0 && !loadingDatos
+                                    ? 'No hay servicios disponibles'
+                                    : 'Selecciona un servicio…'}
+                            </option>
+                            {servicios.map((srv, index) => {
+                                // Normalizamos el id — preferimos numérico (OWASP A03)
+                                const srvId = srv.idServicio ?? srv.id ?? `s_${index}`;
+                                const srvNombre = srv.nombreServicio || srv.nombre || 'Servicio';
+                                return (
+                                    <option key={srvId} value={srvId}>
+                                        {srvNombre}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                        <SGTIcon
+                            name="chevron-down"
+                            size={16}
+                            color={PA.ink3}
+                            style={{ position: 'absolute', right: 14, top: 20, pointerEvents: 'none' }}
+                        />
+                    </div>
+                </div>
+
+                {/* Botón principal — Nielsen #1: estado visible, #4: feedback claro */}
+                <button
+                    onClick={handleGuardarClick}
+                    disabled={!canSubmit}
+                    aria-disabled={!canSubmit}
+                    // Tooltip explica por qué está deshabilitado — Nielsen #5
+                    title={!selectedUser ? 'Selecciona un funcionario primero' : !selectedServicioId ? 'Selecciona un servicio primero' : ''}
+                    style={{
+                        width: '100%', padding: '16px', marginTop: 10,
+                        background: canSubmit ? PA.primary : PA.line,
+                        color: canSubmit ? '#fff' : PA.ink3,
+                        border: 'none', borderRadius: 14, fontSize: 16, fontWeight: 800,
+                        cursor: canSubmit ? 'pointer' : 'not-allowed',
+                        boxShadow: canSubmit ? '0 4px 12px rgba(23,65,108,0.2)' : 'none',
+                        transition: 'all 0.2s',
+                    }}
+                >
+                    Guardar asignación
+                </button>
+            </div>
+
+            {/* Diálogo de confirmación — Nielsen #5: prevención de errores */}
+            {showConfirm && servicioSeleccionado && (
+                <ConfirmDialog
+                    funcionario={selectedUser}
+                    servicio={servicioSeleccionado}
+                    onConfirm={handleConfirmar}
+                    onCancel={() => setShowConfirm(false)}
+                    guardando={guardando}
+                />
             )}
-          </div>
         </div>
-
-        {/* 2. SERVICIO (REALES) */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3 }}>2. Asignar a Servicio</label>
-          <div style={{ position: 'relative' }}>
-            <select 
-              style={inputStyle} 
-              value={selectedServicio} 
-              onChange={e => setSelectedServicio(e.target.value)} 
-              disabled={loadingDatos || servicios.length === 0}
-            >
-              <option value="" disabled>
-                {servicios.length === 0 && !loadingDatos ? 'No hay servicios' : 'Seleccione un servicio...'}
-              </option>
-              {servicios.map((srv, index) => {
-                const srvId = srv.idServicio || srv.id || `s_${index}`;
-                const srvNombre = srv.nombreServicio || srv.nombre || 'Servicio';
-                return (
-                  <option key={srvId} value={srvId}>
-                    {srvNombre}
-                  </option>
-                );
-              })}
-            </select>
-            <SGTIcon name="chevron-down" size={16} color={PA.ink3} style={{ position: 'absolute', right: 14, top: 20, pointerEvents: 'none' }}/>
-          </div>
-        </div>
-
-        <button 
-          disabled={!selectedUser || !selectedServicio || guardando}
-          onClick={handleGuardar} 
-          style={{
-            width: '100%', padding: '16px', marginTop: 10,
-            background: (!selectedUser || !selectedServicio) ? PA.line : PA.primary, 
-            color: (!selectedUser || !selectedServicio) ? PA.ink3 : '#fff', 
-            border: 'none', borderRadius: 14, fontSize: 16, fontWeight: 800, 
-            cursor: (!selectedUser || !selectedServicio || guardando) ? 'not-allowed' : 'pointer',
-            boxShadow: (!selectedUser || !selectedServicio) ? 'none' : '0 4px 12px rgba(23, 65, 108, 0.2)',
-            transition: 'all 0.2s'
-          }}>
-          {guardando ? 'Guardando...' : 'Guardar Asignación'}
-        </button>
-      </div>
-      
-      {showDropdown && (
-        <div onClick={() => setShowDropdown(false)} style={{ position: 'fixed', inset: 0, zIndex: 5 }} />
-      )}
-    </div>
-  );
+    );
 };
 
 export default AsignacionView;

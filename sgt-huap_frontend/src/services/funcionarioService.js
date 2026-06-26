@@ -1,4 +1,5 @@
 // src/services/funcionarioService.js
+import axios from 'axios';
 import axiosInstance from '../utils/axiosConfig';
 import { getUserId as getUserIdFromToken ,
     getServicioId as getUserServiceIdFromToken
@@ -7,6 +8,8 @@ import { getUserId as getUserIdFromToken ,
 
 const API_BASE = '/funcionarios';
 const getUserId = () => getUserIdFromToken() || localStorage.getItem('userId');
+
+const Rol_Medico = 3;
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -370,22 +373,43 @@ export const getFuncionariosSummary = async (servicioId = null) => {
  */
 export const asignarServicio = async (idServicio, rut) => {
     try {
-        const exist = await axiosInstance.get(`${API_BASE}/status/${rut}`);
-        if (exist.data != -1){
-            console.log(exist.data);
-            const response = await axiosInstance.put(`${API_BASE}/${exist.data}`, {
-                servicioId: Number(idServicio),
-                rol: 3,
-            });
-            return { success: true, data: response.data };
-        } else {
-            const mensaje = 'Usuario no registrado';
-            return { success: false, error: mensaje };
+        let funcionarioId = null;
+
+        // Intentamos obtener el ID del funcionario si ya existe
+        try {
+            const exist = await axiosInstance.get(`${API_BASE}/status/${rut}`);
+            funcionarioId = exist.data; // Si es 200 OK, guardamos el ID
+            
+        } catch (statusError) {
+
+            // Si Axios lanza error, verificamos si es específicamente un 404 Not Found
+            if (statusError.response && statusError.response.status === 404) {
+                const responseRegister = await axiosInstance.post(`${API_BASE}/register/${rut}`);
+                funcionarioId = responseRegister.data;
+
+            } else {
+            // Si es un error 401, 500 u otro, lo lanzamos al catch principal 
+                throw statusError;
+            }
+        }
+        
+        // Validación previa
+        if (!funcionarioId || !Number.isFinite(Number(funcionarioId))) {
+            throw new Error('ID de funcionario inválido');
         }
 
+        // A este punto tenemos un funcionarioId válido (ya sea existente o recién creado).
+        // Procedemos con la asignación del servicio.
+        const responseAsignacion = await axiosInstance.put(`${API_BASE}/${funcionarioId}`, {
+            servicioId: Number(idServicio),
+            rol: Rol_Medico,
+        });
+
+        return { success: true, data: responseAsignacion.data };
+
     } catch (error) {
-        const mensaje = error.response?.data?.error || 'Error al asignar el servicio';
-        return { success: false, error: mensaje };
+        // 4. Catch global: Atrapa errores de asignación, de servidor caído, o de credenciales (401)
+        return { success: false, error: 'No se pudo completar la asignación. Intenta de nuevo.' };
     }
 };
 
