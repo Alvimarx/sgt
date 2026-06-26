@@ -74,10 +74,10 @@ INSERT INTO Rol_Servicio (id_rol_servicio, nombre_rol) VALUES
 -- Unidades activas del hospital en el sistema.
 -- El id_servicio se incluye en el JWT tras seleccionar servicio.
 -- ==============================================================
-INSERT INTO servicios (id_servicio, nombre) VALUES
-(1, 'Medicina Interna'),
-(2, 'Enfermería'),
-(3, 'Cirugía');
+INSERT INTO servicios (id_servicio, nombre, eliminado) VALUES
+(1, 'Medicina Interna', 0),
+(2, 'Enfermería', 0),
+(3, 'Cirugía', 0);
 
 -- ==============================================================
 -- 3b. FERIADOS  →  tabla: feriados

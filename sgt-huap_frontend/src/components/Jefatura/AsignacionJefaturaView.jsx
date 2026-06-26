@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { SGT_DATA } from '../Admin2/data'; // Asegúrate de que esta ruta sea correcta
+import { SGT_DATA } from '../Admin2/data'; 
 import { SGTIcon } from '../Style/UIPrimitives';
-// Eliminamos getServicios ya que usaremos el de la sesión
 import { getFuncionariosSummary, asignarServicio } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
 
+// ---------------------------------------------------------------------------
+// CONSTANTES Y HELPERS (Homologados de AsignacionView)
+// ---------------------------------------------------------------------------
+const MAX_SEARCH_LENGTH = 60;
+
+const sanitizeQuery = (raw) =>
+    raw.replace(/[<>"'`;]/g, '').slice(0, MAX_SEARCH_LENGTH);
+
 const AsignacionJerarquiaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
-
   const auth = useAuth();
 
   const storedUserData = localStorage.getItem('userData') || localStorage.getItem('user');
@@ -38,8 +44,6 @@ const AsignacionJerarquiaView = ({ onBack }) => {
          return;
       }
       
-      // Llamamos a getFuncionariosSummary SIN parámetro para traer a todo el personal
-      // y así poder buscar a alguien que aún no está en nuestro servicio para asignarlo.
       const resFunc = await getFuncionariosSummary();
       
       if (resFunc.success) {
@@ -54,11 +58,35 @@ const AsignacionJerarquiaView = ({ onBack }) => {
     cargarDatos();
   }, [servicioActivoId]);
   
-  // Filtramos la lista según lo que se escriba
-  const filteredUsers = funcionarios.filter(u => {
-    const nombreCompleto = `${u.nombre || ''} ${u.apellidoPaterno || ''}`.toLowerCase();
-    return nombreCompleto.includes(searchQuery.toLowerCase());
-  });
+  // ---------------------------------------------------------------------------
+  // BÚSQUEDA Y FILTRADO (Idéntico a AsignacionView)
+  // ---------------------------------------------------------------------------
+  const resultados = (() => {
+      const query = sanitizeQuery(searchQuery).toLowerCase().trim();
+      // Retornar vacío si no hay al menos 2 caracteres
+      if (query.length < 2) return [];
+
+      return funcionarios.filter((u) => {
+          // Búsqueda por Nombre
+          const nombreCompleto = `${u.nombre || ''} ${u.apellidoPaterno || ''}`.toLowerCase();
+          if (nombreCompleto.includes(query)) return true;
+
+          // Búsqueda por RUT
+          const rutLimpio = (u.rutCompleto || u.rut || '').replace(/[^0-9kK]/g, '');
+          const queryRut = query.replace(/[^0-9kK]/g, '');
+          return queryRut.length >= 2 && rutLimpio.includes(queryRut);
+      });
+  })();
+
+  // El dropdown se muestra solo si hay texto suficiente
+  const dropdownVisible = showDropdown && searchQuery.length >= 2;
+
+  const handleSearchChange = (e) => {
+      const sanitized = sanitizeQuery(e.target.value);
+      setSearchQuery(sanitized);
+      setShowDropdown(true);
+      if (sanitized === '') setSelectedUser(null);
+  };
 
   const handleGuardar = async () => {
     if (!selectedUser || !servicioActivoId) {
@@ -69,10 +97,14 @@ const AsignacionJerarquiaView = ({ onBack }) => {
     setGuardando(true);
     setMensaje({ tipo: '', texto: '' });
 
-    const idFunc = selectedUser.idFuncionario || selectedUser.id;
+    // 1. Extraemos el RUT en lugar del ID numérico (igual que en AsignacionView)
+    const rutFuncionario = selectedUser.rutCompleto || selectedUser.rut || '';
     
-    // Pasamos el servicioActivoId directamente a la función de guardado
-    const result = await asignarServicio(idFunc, servicioActivoId);
+    // 2. Nos aseguramos de que el ID del servicio sea numérico
+    const servicioIdNum = Number(servicioActivoId);
+
+    // 3. Respetamos el orden de la función: (servicioId, rut)
+    const result = await asignarServicio(servicioIdNum, rutFuncionario);
 
     if (result.success) {
       setMensaje({ tipo: 'success', texto: 'Asignación guardada con éxito.' });
@@ -126,25 +158,30 @@ const AsignacionJerarquiaView = ({ onBack }) => {
             <SGTIcon name="search" size={18} color={PA.ink3} style={{ position: 'absolute', left: 14, top: 21, pointerEvents: 'none' }}/>
             <input 
               type="text" 
-              placeholder="Ej: Jorge Muñoz..."
+              maxLength={MAX_SEARCH_LENGTH}
+              placeholder="Nombre o RUT del funcionario..."
               value={searchQuery}
               disabled={loadingDatos || !servicioActivoId}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setShowDropdown(true);
-                if (e.target.value === '') setSelectedUser(null);
-              }}
+              onChange={handleSearchChange}
               onFocus={() => setShowDropdown(true)}
               style={{ ...inputStyle, paddingLeft: 42 }}
             />
+
+            {/* Indicación de mínimo de caracteres */}
+            {searchQuery.length > 0 && searchQuery.length < 2 && (
+                <div style={{ fontSize: 11.5, color: PA.ink3, fontWeight: 600, marginTop: 4, paddingLeft: 4 }}>
+                    Escribe al menos 2 caracteres para buscar
+                </div>
+            )}
             
-            {showDropdown && (
+            {/* Dropdown de resultados controlado por dropdownVisible */}
+            {dropdownVisible && (
               <div style={{ 
                 position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', 
                 border: `1px solid ${PA.line}`, borderRadius: 12, maxHeight: 200, overflowY: 'auto', 
                 zIndex: 10, boxShadow: '0 8px 24px rgba(15,23,42,0.1)' 
               }}>
-                {filteredUsers.length > 0 ? filteredUsers.map((u, i) => {
+                {resultados.length > 0 ? resultados.map((u, i) => {
                   const uId = u.idFuncionario || u.id || `f_${i}`;
                   return (
                     <div key={uId} onClick={() => {
@@ -166,7 +203,7 @@ const AsignacionJerarquiaView = ({ onBack }) => {
                   );
                 }) : (
                   <div style={{ padding: '16px', fontSize: 13, color: PA.ink3, textAlign: 'center', fontWeight: 600 }}>
-                    No se encontraron resultados
+                    No se encontraron funcionarios con ese nombre o RUT
                   </div>
                 )}
               </div>
