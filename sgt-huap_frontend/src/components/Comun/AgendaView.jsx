@@ -140,7 +140,27 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   // Determina si el miembro seleccionado es el propio usuario (isSelf) o un compañero,
   // y actualiza el estado de selección en consecuencia.
   const handleSelectTargetFuncionario = (sourceShift, targetShift) => {
-    const isSelf = Boolean(targetShift?.esYo);
+    const isSelf = targetShift?.miTurno;
+
+    
+    // Si el usuario está intentando seleccionar el turno de un compañero
+    if (!isSelf) {
+      // 1. Obtenemos la fecha del turno seleccionado
+      const targetDate = targetShift?.fecha || sourceShift?.fecha;
+      const targetTipo = targetShift?.tipo || sourceShift?.tipo;
+      
+      // 2. Buscamos si el usuario YA tiene un turno propio en esa misma fecha
+      const yaTieneTurnoEseDia = agendaData.turnos.some(
+        (t) => t.miTurno && (t.fecha === targetDate) && (t.tipo === targetTipo) 
+      );
+
+      // 3. Si ya tiene turno, bloqueamos la selección y avisamos
+      if (yaTieneTurnoEseDia) {
+        showSelectionToast("No puedes solicitar este turno porque ya tienes uno asignado este día.");
+        return; // Abortamos la ejecución
+      }
+    }
+    // --------------------------------------------------------------
 
     const targetFuncionario = {
       id: targetShift?.idFuncionario ?? targetShift?.raw?.idFuncionario ?? targetShift?.id ?? null,
@@ -153,9 +173,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
 
     setExchangeSelection((prev) => ({
       ...prev,
-      // Si el miembro es el propio usuario, lo guardamos como el turno ofrecido
       ownTurn: isSelf ? (targetShift || sourceShift) : prev.ownTurn,
-      // Si es un compañero, lo guardamos como el objetivo del intercambio
       targetTurn: isSelf ? prev.targetTurn : targetShift,
       targetFuncionario: isSelf ? prev.targetFuncionario : targetFuncionario,
     }));

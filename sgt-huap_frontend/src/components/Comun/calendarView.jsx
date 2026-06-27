@@ -135,6 +135,131 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
     const [exporting, setExporting] = useState(false);
     const [exportError, setExportError] = useState('');
 
+    const [exchangeSelection, setExchangeSelection] = useState({
+        ownTurn: null,
+        targetTurn: null,
+        targetFuncionario: null,
+    });
+
+    
+    const [selectionToast, setSelectionToast] = useState(null);
+    
+    const showSelectionToast = (message) => {
+    setSelectionToast(message);
+        if (showSelectionToast.timer) clearTimeout(showSelectionToast.timer);
+        showSelectionToast.timer = setTimeout(() => setSelectionToast(null), 2500);
+    };
+
+    /**
+     * Maneja la seleccion de un funcionario para distintos flujos de solicitud
+     * 
+     * @param {object} sourceShift 
+     * @param {object} targetShift 
+     * @returns 
+     */
+    const handleSelectTargetFuncionario = (sourceShift, targetShift) => {
+        const isSelf = targetShift?.miTurno;
+
+        
+        if (!isSelf) {
+            
+            const targetDate = targetShift?.fecha || sourceShift?.fecha;
+            const targetTipo = targetShift?.tipo || sourceShift?.tipo;
+            
+            
+            const turnosDelDia = shiftsByDay[targetDate] || [];
+
+            
+            const yaTieneTurnoEseDia = turnosDelDia.some(
+                (t) => t.miTurno && t.tipo === targetTipo
+            );
+
+            
+            if (yaTieneTurnoEseDia) {
+                showSelectionToast("No puedes solicitar este turno porque ya tienes uno asignado este día.");
+                return;
+            }
+        }
+        // --------------------------------------------------------------
+    
+        const targetFuncionario = {
+          id: targetShift?.idFuncionario ?? targetShift?.raw?.idFuncionario ?? targetShift?.id ?? null,
+          nombre:
+            targetShift?.nombreFuncionario ||
+            targetShift?.raw?.nombreFuncionario ||
+            targetShift?.nombre ||
+            "Funcionario",
+        };
+    
+        setExchangeSelection((prev) => ({
+          ...prev,
+          ownTurn: isSelf ? (targetShift || sourceShift) : prev.ownTurn,
+          targetTurn: isSelf ? prev.targetTurn : targetShift,
+          targetFuncionario: isSelf ? prev.targetFuncionario : targetFuncionario,
+        }));
+    
+        showSelectionToast(
+          isSelf
+            ? `Seleccionaste tu turno: ${formatShiftLabel(targetShift || sourceShift)}`
+            : `Seleccionaste ${formatShiftLabel(targetShift)} de ${targetFuncionario.nombre}`
+        );
+    };
+
+    const handleOpenExchangeRequest = (currentShift) => {
+        const ownTurn = currentShift?.miTurno ? currentShift : exchangeSelection.ownTurn;
+        const targetTurn = currentShift?.miTurno ? exchangeSelection.targetTurn : currentShift;
+        const targetFuncionario = exchangeSelection.targetFuncionario;
+    
+        // Caso A: el usuario tiene un turno propio seleccionado
+        if (currentShift?.miTurno || exchangeSelection.ownTurn) {
+          const preset = {
+            tipoSolicitudId: 4,
+            idTurnoPropio: (ownTurn && ownTurn.id) || currentShift?.id,
+            turnoPropioLabel: formatShiftLabel(ownTurn || currentShift),
+          };
+    
+          // Si además ya hay un receptor seleccionado, lo incluimos en el preset
+          if (targetTurn && targetFuncionario) {
+            preset.idTurnoDeseado = targetTurn.id;
+            preset.idTurno = targetTurn.id;
+            preset.turnoDeseadoLabel = formatShiftLabel(targetTurn);
+            preset.idReceptor = targetFuncionario.id;
+            preset.receptorLabel = targetFuncionario.nombre;
+          }
+    
+          onOpenSolicitudes?.(preset);
+          return;
+        }
+    
+        // Caso B: el usuario está viendo un turno ajeno pero no ha seleccionado receptor aún
+        if (!targetTurn || !targetFuncionario) {
+          showSelectionToast(
+            !targetFuncionario
+              ? "Selecciona el funcionario antes de continuar"
+              : "Selecciona el turno objetivo para continuar"
+          );
+          return;
+        }
+    
+        // Caso B completo: tenemos turno ajeno + receptor
+        const preset = {
+          tipoSolicitudId: 4,
+          idTurnoDeseado: targetTurn.id,
+          idTurno: targetTurn.id,
+          turnoDeseadoLabel: formatShiftLabel(targetTurn),
+          idReceptor: targetFuncionario.id,
+          receptorLabel: targetFuncionario.nombre,
+        };
+    
+        // Si el usuario también seleccionó su propio turno previamente, lo adjuntamos
+        if (ownTurn) {
+          preset.idTurnoPropio = ownTurn.id;
+          preset.turnoPropioLabel = formatShiftLabel(ownTurn);
+        }
+    
+        onOpenSolicitudes?.(preset);
+    };
+
     // Carga al cambiar mes
     useEffect(() => {
         let mounted = true;
@@ -414,19 +539,38 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                 {detailShift && (
                     <ShiftDetail
                         shift={detailShift}
+                        exchangeSelection={exchangeSelection}
+                        onSelectTargetFuncionario={handleSelectTargetFuncionario}
                         onAction={(actionId, shift) => {
                             if (actionId === "historial") {
                                 onOpenBitacora?.();
                                 return;
                             }
+                            if (!onOpenSolicitudes) return;
+
+                            // "cambio" inicia el flujo de solicitud de cambio de turno
+                            if (actionId === "cambio") handleOpenExchangeRequest(shift);
+
                             if (actionId === "solicitar-turno") {
-                                onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: shift.id, turnoLabel: formatShiftLabel(shift) });
+                                onOpenSolicitudes?.({ 
+                                    tipoSolicitudId: 3, 
+                                    idTurno: shift.id, 
+                                    turnoLabel: formatShiftLabel(shift) });
                                 return;
                             }
                         }}
                     />
                 )}
             </Sheet>
+
+            {/* Toast flotante de confirmación de selección en el flujo de cambio */}
+            {selectionToast && (
+                <div style={{ position: "absolute", left: 14, right: 14, bottom: 76, zIndex: 110, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+                <div style={{ background: "rgba(23,65,108,0.96)", color: "#fff", borderRadius: 999, padding: "10px 14px", fontSize: 12.5, fontWeight: 700, boxShadow: "0 10px 24px rgba(15,23,42,0.18)", maxWidth: "100%", textAlign: "center" }}>
+                    {selectionToast}
+                </div>
+                </div>
+            )}
 
             {/* Sheet de exportación CSV */}
             <Sheet
