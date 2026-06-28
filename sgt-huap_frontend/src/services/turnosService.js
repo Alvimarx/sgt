@@ -96,6 +96,7 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         nombrePuesto: turno?.nombrePuesto ?? null,
         idPuesto: turno?.idPuesto ?? null,
         idTipoTurno: turno?.idTipoTurno ?? null,
+        idPlantilla: turno?.idPlantilla ?? 1,
         nombreTipoTurno: turno?.nombreTipoTurno ?? null,
         nombreFuncionario: turnoLibre ? null : (turno?.nombreFuncionario ?? null),
         idFuncionario: turno?.idFuncionario ?? null,
