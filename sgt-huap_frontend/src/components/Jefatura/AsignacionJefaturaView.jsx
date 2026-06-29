@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SGT_DATA } from '../Admin2/data'; 
 import { SGTIcon } from '../Style/UIPrimitives';
-import { getFuncionariosSummary, asignarServicio } from '../../services/funcionarioService';
+import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
 
 // ---------------------------------------------------------------------------
@@ -11,6 +11,104 @@ const MAX_SEARCH_LENGTH = 60;
 
 const sanitizeQuery = (raw) =>
     raw.replace(/[<>"'`;]/g, '').slice(0, MAX_SEARCH_LENGTH);
+
+const getUserId = (user) =>
+    user?.rutCompleto?.replace(/[^0-9kK]/g, '') ||
+    user?.rut?.replace(/[^0-9kK]/g, '') ||
+    `${user?.nombre ?? ''}-${user?.apellidoPaterno ?? ''}`;
+
+const getNombreCompleto = (user) =>
+    `${user?.nombre || ''} ${user?.apellidoPaterno || ''}`.trim();
+
+const getInitials = (nombre = '', apellido = '') =>
+    `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase() || 'U';
+
+const maskRut = (rut = '') => {
+    const clean = rut.replace(/[^0-9kK\-]/g, '');
+    if (clean.length < 5) return '***';
+    return `***${clean.slice(-5)}`;
+};
+
+// ---------------------------------------------------------------------------
+// COMPONENTE DE CONFIRMACIÓN 
+// Muestra un resumen antes de ejecutar la acción de asignación.
+// ---------------------------------------------------------------------------
+const ConfirmDialog = ({ funcionario, servicio, onConfirm, onCancel, guardando }) => {
+    const PA = SGT_DATA.PALETTE;
+    return (
+        <div style={{ 
+            position: 'fixed', 
+            inset: 0, 
+            zIndex: 100, 
+            display: 'flex', 
+            alignItems: 'center',       // Centrado vertical
+            justifyContent: 'center',   // Centrado horizontal
+            padding: '20px',            // Margen de seguridad para pantallas muy pequeñas
+            background: 'rgba(15,23,42,0.4)' 
+        }}>
+            <div style={{ 
+                width: '100%', 
+                maxWidth: '340px',          // Ancho máximo estándar de alerta móvil
+                background: '#fff', 
+                borderRadius: '20px',       // Bordes redondeados en todas las esquinas
+                padding: '24px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' 
+            }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: PA.ink, marginBottom: 12, textAlign: 'center' }}>
+                    Confirmar asignación
+                </div>
+                
+                <p style={{ fontSize: 14, color: PA.ink2, fontWeight: 500, marginBottom: 24, lineHeight: 1.5, textAlign: 'center' }}>
+                    ¿Deseas asignar a <strong style={{ color: PA.ink }}>{getNombreCompleto(funcionario)}</strong> al servicio{' '}
+                    <strong style={{ color: PA.ink }}>{servicio?.nombreServicio || servicio?.nombre}</strong>?
+                </p>
+                
+                <div style={{ display: 'flex', gap: 12 }}>
+                    <button
+                        onClick={onCancel}
+                        disabled={guardando}
+                        style={{ 
+                            flex: 1, 
+                            padding: '12px', 
+                            borderRadius: '12px', 
+                            border: `1px solid ${PA.line}`, 
+                            background: '#fff', 
+                            fontSize: 15, 
+                            fontWeight: 700, 
+                            color: PA.ink2, 
+                            cursor: guardando ? 'not-allowed' : 'pointer',
+                            opacity: guardando ? 0.7 : 1
+                        }}
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={guardando}
+                        style={{ 
+                            flex: 1, 
+                            padding: '12px', 
+                            borderRadius: '12px', 
+                            border: 'none', 
+                            background: PA.primary, 
+                            fontSize: 15, 
+                            fontWeight: 800, 
+                            color: '#fff', 
+                            cursor: guardando ? 'not-allowed' : 'pointer', 
+                            opacity: guardando ? 0.7 : 1 
+                        }}
+                    >
+                        {guardando ? 'Guardando...' : 'Confirmar'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// ASIGNACIONVIEW JEFATURA
+// ---------------------------------------------------------------------------
 
 const AsignacionJerarquiaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
@@ -33,18 +131,28 @@ const AsignacionJerarquiaView = ({ onBack }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
+  const [showConfirm, setShowConfirm] = useState(false);
+  
+  // Ref para cerrar el dropdown al hacer click fuera — más robusto que un overlay fijo
+  const searchWrapperRef = useRef(null);
+  
+
   // Cargar datos al montar
   useEffect(() => {
+    let mounted = true;
+
     const cargarDatos = async () => {
       setLoadingDatos(true);
       
+      if (!mounted) return;
+
       if (!servicioActivoId) {
          setMensaje({ tipo: 'error', texto: 'No se encontró un servicio activo en la sesión.' });
          setLoadingDatos(false);
          return;
       }
       
-      const resFunc = await getFuncionariosSummary();
+      const resFunc = await getPersonal();
       
       if (resFunc.success) {
         setFuncionarios(Array.isArray(resFunc.data) ? resFunc.data : []);
@@ -56,7 +164,25 @@ const AsignacionJerarquiaView = ({ onBack }) => {
     };
 
     cargarDatos();
+    return () => { mounted = false; };
   }, [servicioActivoId]);
+  
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)){
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!mensaje.texto) return;
+    const timer = setTimeout(() => setMensaje({ tipo: '', texto: '' }), 5000);
+    return () => clearTimeout(timer);
+
+  }, [mensaje.texto]);
   
   // ---------------------------------------------------------------------------
   // BÚSQUEDA Y FILTRADO (Idéntico a AsignacionView)
@@ -81,6 +207,10 @@ const AsignacionJerarquiaView = ({ onBack }) => {
   // El dropdown se muestra solo si hay texto suficiente
   const dropdownVisible = showDropdown && searchQuery.length >= 2;
 
+  // ---------------------------------------------------------------------------
+  // HANDLERS
+  // ---------------------------------------------------------------------------
+
   const handleSearchChange = (e) => {
       const sanitized = sanitizeQuery(e.target.value);
       setSearchQuery(sanitized);
@@ -88,22 +218,32 @@ const AsignacionJerarquiaView = ({ onBack }) => {
       if (sanitized === '') setSelectedUser(null);
   };
 
-  const handleGuardar = async () => {
-    if (!selectedUser || !servicioActivoId) {
-      setMensaje({ tipo: 'error', texto: 'Debes seleccionar un funcionario y tener un servicio activo.' });
+  const handleGuardarClick = () => {
+        if (!selectedUser || !servicioActivoId) return;
+        setShowConfirm(true);
+    };
+
+  const handleConfirmar = async () => {
+    if (!selectedUser || !servicioActivoId) return;
+
+    
+    setMensaje({ tipo: '', texto: '' });
+
+    // Extraemos el RUT 
+    const rutFuncionario = selectedUser.rutCompleto || selectedUser.rut || '';
+    if (!rutFuncionario) {
+      setMensaje({ tipo: 'error', texto: 'No se pudo identificar al funcionario.' });
+      setShowConfirm(false);
       return;
     }
 
-    setGuardando(true);
-    setMensaje({ tipo: '', texto: '' });
-
-    // 1. Extraemos el RUT en lugar del ID numérico (igual que en AsignacionView)
-    const rutFuncionario = selectedUser.rutCompleto || selectedUser.rut || '';
-    
-    // 2. Nos aseguramos de que el ID del servicio sea numérico
+    // aseguramos de que el ID del servicio sea numérico
     const servicioIdNum = Number(servicioActivoId);
 
-    // 3. Respetamos el orden de la función: (servicioId, rut)
+    setGuardando(true);
+    setShowConfirm(false);
+
+    // Respetamos el orden de la función: (servicioId, rut)
     const result = await asignarServicio(servicioIdNum, rutFuncionario);
 
     if (result.success) {
@@ -117,6 +257,14 @@ const AsignacionJerarquiaView = ({ onBack }) => {
     
     setGuardando(false);
   };
+
+  const handleSelectUser = (user) => {
+    setSelectedUser(user);
+    setSearchQuery(getNombreCompleto(user));
+    setShowDropdown(false);
+  };
+
+  const canSubmit = Boolean(selectedUser && servicioActivoId && !guardando);
 
   const inputStyle = {
     width: '100%', padding: '14px', borderRadius: 12, border: `1px solid ${PA.line}`,
@@ -150,20 +298,27 @@ const AsignacionJerarquiaView = ({ onBack }) => {
         )}
 
         {/* 1. BUSCADOR DE FUNCIONARIO */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3 }}>
+        <div style={{ marginBottom: 20 }} ref={searchWrapperRef}>
+          <label
+          htmlFor="buscar-funcionario" 
+          style={{ fontSize: 13, fontWeight: 800, color: PA.ink3 }}>
             1. Buscar Funcionario {loadingDatos && '(Cargando...)'}
           </label>
+
           <div style={{ position: 'relative' }}>
             <SGTIcon name="search" size={18} color={PA.ink3} style={{ position: 'absolute', left: 14, top: 21, pointerEvents: 'none' }}/>
             <input 
-              type="text" 
+              id = "buscar-funcionario"
+              type="search" 
               maxLength={MAX_SEARCH_LENGTH}
               placeholder="Nombre o RUT del funcionario..."
               value={searchQuery}
               disabled={loadingDatos || !servicioActivoId}
               onChange={handleSearchChange}
               onFocus={() => setShowDropdown(true)}
+              aria-autocomplete="list"
+              aria-controls="lista-funcionarios"
+              aria-expanded={dropdownVisible}
               style={{ ...inputStyle, paddingLeft: 42 }}
             />
 
@@ -176,40 +331,54 @@ const AsignacionJerarquiaView = ({ onBack }) => {
             
             {/* Dropdown de resultados controlado por dropdownVisible */}
             {dropdownVisible && (
-              <div style={{ 
+              <div 
+                id="lista-funcionarios"
+                role="listbox"
+                style={{ 
                 position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', 
                 border: `1px solid ${PA.line}`, borderRadius: 12, maxHeight: 200, overflowY: 'auto', 
                 zIndex: 10, boxShadow: '0 8px 24px rgba(15,23,42,0.1)' 
               }}>
-                {resultados.length > 0 ? resultados.map((u, i) => {
-                  const uId = u.idFuncionario || u.id || `f_${i}`;
+                {resultados.length > 0 ? resultados.map((u, idx) => {
+                  const uId = getUserId(u);
+                  const rowKey = `${uId ?? "sin-id"}-${idx}`;
+                  const isSelected = selectedUser && getUserId(selectedUser) === uId;
                   return (
-                    <div key={uId} onClick={() => {
-                      setSelectedUser(u);
-                      setSearchQuery(`${u.nombre || ''} ${u.apellidoPaterno || ''}`.trim());
-                      setShowDropdown(false);
-                    }} style={{ 
-                      padding: '12px 14px', borderBottom: `1px solid ${PA.line2}`, cursor: 'pointer', 
-                      display: 'flex', alignItems: 'center', gap: 10, 
-                      background: selectedUser && (selectedUser.idFuncionario || selectedUser.id) === uId ? PA.primarySoft : '#fff'
-                    }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 99, background: PA.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700 }}>
-                        {(u.nombre || 'U').charAt(0)}{(u.apellidoPaterno || '').charAt(0)}
+                    <div 
+                      key={rowKey} 
+                      onClick={() => {handleSelectUser(u)}} 
+                      aria-selected={isSelected}
+                      style={{ 
+                        padding: '12px 14px', borderBottom: `1px solid ${PA.line2}`, cursor: 'pointer', 
+                        display: 'flex', alignItems: 'center', gap: 10, 
+                        background: isSelected ? PA.primarySoft : '#fff',
+                      }}>
+
+                      <div style={{ width: 32, height: 32, borderRadius: 99, background: PA.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                        {getInitials(u.nombre, u.apellidoPaterno)}
                       </div>
-                      <div style={{ fontSize: 14, fontWeight: selectedUser && (selectedUser.idFuncionario || selectedUser.id) === uId ? 800 : 600, color: PA.ink }}>
-                        {u.nombre} {u.apellidoPaterno} <span style={{ fontSize: 12, color: PA.ink3, fontWeight: 500 }}>· {u.rut || u.rutCompleto || ''}</span>
+
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: isSelected ? 800 : 600, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {getNombreCompleto(u)}
+                        </div>
+
+                        <div style={{ fontSize: 11.5, color: PA.ink3, fontWeight: 500, marginTop: 1 }}>
+                          RUT {maskRut(u.rutCompleto || u.rut)}
+                        </div>
                       </div>
                     </div>
                   );
-                }) : (
-                  <div style={{ padding: '16px', fontSize: 13, color: PA.ink3, textAlign: 'center', fontWeight: 600 }}>
-                    No se encontraron funcionarios con ese nombre o RUT
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                }
+              ) : (
+                <div style={{ padding: '16px', fontSize: 13, color: PA.ink3, textAlign: 'center', fontWeight: 600 }}>
+                  No se encontraron funcionarios con ese nombre o RUT
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      </div>
 
         {/* 2. SERVICIO ACTUAL (Solo lectura) */}
         <div style={{ marginBottom: 20 }}>
@@ -225,21 +394,32 @@ const AsignacionJerarquiaView = ({ onBack }) => {
         </div>
 
         <button 
-          disabled={!selectedUser || !servicioActivoId || guardando}
-          onClick={handleGuardar} 
+          disabled={!canSubmit}
+          onClick={handleGuardarClick} 
+          aria-disabled={!canSubmit}
+          title={!selectedUser ? 'Selecciona un funcionario primero' : ''}
           style={{
             width: '100%', padding: '16px', marginTop: 10,
-            background: (!selectedUser || !servicioActivoId) ? PA.line : PA.primary, 
-            color: (!selectedUser || !servicioActivoId) ? PA.ink3 : '#fff', 
+            background: !canSubmit ? PA.line : PA.primary, 
+            color: !canSubmit ? PA.ink3 : '#fff', 
             border: 'none', borderRadius: 14, fontSize: 16, fontWeight: 800, 
-            cursor: (!selectedUser || !servicioActivoId || guardando) ? 'not-allowed' : 'pointer',
-            boxShadow: (!selectedUser || !servicioActivoId) ? 'none' : '0 4px 12px rgba(23, 65, 108, 0.2)',
+            cursor: !canSubmit ? 'not-allowed' : 'pointer',
+            boxShadow: !canSubmit ? 'none' : '0 4px 12px rgba(23, 65, 108, 0.2)',
             transition: 'all 0.2s'
           }}>
           {guardando ? 'Guardando...' : 'Guardar Asignación'}
         </button>
       </div>
-      
+      {/* Diálogo de confirmación */}
+      {showConfirm && servicioActivoId && (
+        <ConfirmDialog
+          funcionario={selectedUser}
+          servicio={servicioActivoId}
+          onConfirm={handleConfirmar}
+          onCancel={() => setShowConfirm(false)}
+          guardando={guardando}
+          />
+      )}
       {showDropdown && (
         <div onClick={() => setShowDropdown(false)} style={{ position: 'fixed', inset: 0, zIndex: 5 }} />
       )}

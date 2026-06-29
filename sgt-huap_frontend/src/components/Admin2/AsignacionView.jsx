@@ -6,7 +6,7 @@ import { getServicios } from '../../services/servicioService';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 
 // ---------------------------------------------------------------------------
-// CONSTANTES DE SEGURIDAD (OWASP A03 — Injection prevention)
+// CONSTANTES DE SEGURIDAD 
 // Limitamos la longitud del input de búsqueda para evitar payloads anómalos.
 // El filtrado se hace en cliente sobre datos ya validados por el backend.
 // ---------------------------------------------------------------------------
@@ -16,9 +16,7 @@ const MAX_SEARCH_LENGTH = 60;
 // HELPERS
 // ---------------------------------------------------------------------------
 
-// Extrae el identificador único del funcionario.
-// El DTO actual no tiene id numérico — usamos rutCompleto (sin puntos ni guión) como clave estable.
-// Fallback a rut corto, y si tampoco existe, a nombre+apellido para evitar keys null en el dropdown.
+
 const getUserId = (user) =>
     user?.rutCompleto?.replace(/[^0-9kK]/g, '') ||
     user?.rut?.replace(/[^0-9kK]/g, '') ||
@@ -46,12 +44,12 @@ const sanitizeQuery = (raw) =>
  */
 const maskRut = (rut = '') => {
     const clean = rut.replace(/[^0-9kK\-]/g, '');
-    if (clean.length < 4) return '***';
-    return `***${clean.slice(-4)}`;
+    if (clean.length < 5) return '***';
+    return `***${clean.slice(-5)}`;
 };
 
 // ---------------------------------------------------------------------------
-// COMPONENTE DE CONFIRMACIÓN — Nielsen #5: prevención de errores
+// COMPONENTE DE CONFIRMACIÓN
 // Muestra un resumen antes de ejecutar la acción de asignación.
 // ---------------------------------------------------------------------------
 const ConfirmDialog = ({ funcionario, servicio, onConfirm, onCancel, guardando }) => {
@@ -157,7 +155,6 @@ const AsignacionView = ({ onBack }) => {
     // ---------------------------------------------------------------------------
     // CARGA INICIAL — ambos endpoints en paralelo
     // Los errores se registran internamente; NO exponemos detalles técnicos al usuario
-    // (OWASP A09 — eliminamos console.log/error con datos sensibles)
     // ---------------------------------------------------------------------------
     useEffect(() => {
         let mounted = true;
@@ -185,7 +182,6 @@ const AsignacionView = ({ onBack }) => {
                     : [];
                 setServicios(lista);
             } else {
-                // Registramos en un sistema de logging interno — nunca en consola en producción
                 setErrorCarga('No se pudieron cargar los datos. Intenta de nuevo.');
             }
 
@@ -202,7 +198,7 @@ const AsignacionView = ({ onBack }) => {
         return () => { mounted = false; };
     }, []);
 
-    // Cierra el dropdown al hacer click fuera del wrapper (Nielsen #4 — consistencia)
+    // Cierra el dropdown al hacer click fuera del wrapper
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
@@ -213,7 +209,7 @@ const AsignacionView = ({ onBack }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Auto-dismiss del mensaje de resultado tras 5 segundos (Nielsen #1)
+    // Auto-dismiss del mensaje de resultado tras 5 segundos
     useEffect(() => {
         if (!mensaje.texto) return;
         const timer = setTimeout(() => setMensaje({ tipo: '', texto: '' }), 5000);
@@ -222,9 +218,9 @@ const AsignacionView = ({ onBack }) => {
 
     // ---------------------------------------------------------------------------
     // BÚSQUEDA Y FILTRADO
-    // El query se sanitiza antes de usarse en comparaciones. (OWASP A03)
+    // El query se sanitiza antes de usarse en comparaciones.
     // Solo mostramos el dropdown si hay al menos 2 caracteres — evitamos
-    // exponer la lista completa de funcionarios sin intención del usuario. (OWASP A02)
+    // exponer la lista completa de funcionarios sin intención del usuario.
     // ---------------------------------------------------------------------------
     const filteredUsers = useCallback(() => {
         const query = sanitizeQuery(searchQuery).toLowerCase().trim();
@@ -272,10 +268,10 @@ const AsignacionView = ({ onBack }) => {
 
     // Ejecuta la asignación tras confirmar
     const handleConfirmar = async () => {
-        // Validación final en cliente — doble seguridad (OWASP A03)
+    
         if (!selectedUser || !selectedServicioId) return;
 
-        // Casteamos el servicioId a número para evitar type confusion en el backend (OWASP A03)
+        
         const servicioIdNum = Number(selectedServicioId);
         if (!Number.isFinite(servicioIdNum) || servicioIdNum <= 0) {
             setMensaje({ tipo: 'error', texto: 'El servicio seleccionado no es válido.' });
@@ -283,7 +279,7 @@ const AsignacionView = ({ onBack }) => {
             return;
         }
 
-        // Enviamos el rutCompleto como identificador — es el campo que espera el backend (OWASP A02)
+        
         const rutFuncionario = selectedUser.rutCompleto || selectedUser.rut || '';
         if (!rutFuncionario) {
             setMensaje({ tipo: 'error', texto: 'No se pudo identificar al funcionario.' });
@@ -298,12 +294,12 @@ const AsignacionView = ({ onBack }) => {
 
         if (result.success) {
             setMensaje({ tipo: 'success', texto: `${getNombreCompleto(selectedUser)} fue asignado correctamente.` });
-            // Limpiamos el formulario tras éxito
+            
             setSelectedUser(null);
             setSearchQuery('');
             setSelectedServicioId('');
         } else {
-            // Mostramos mensaje genérico — no re-exponemos el error técnico del backend (OWASP A09)
+            
             setMensaje({ tipo: 'error', texto: 'No se pudo completar la asignación. Intenta de nuevo.' });
         }
 
@@ -358,7 +354,7 @@ const AsignacionView = ({ onBack }) => {
                     </div>
                 )}
 
-                {/* Mensaje de resultado con auto-dismiss (Nielsen #1) */}
+                {/* Mensaje de resultado con auto-dismiss */}
                 {mensaje.texto && (
                     <div
                         role="alert"
@@ -380,9 +376,9 @@ const AsignacionView = ({ onBack }) => {
                     </div>
                 )}
 
-                {/* PASO 1 — Buscar funcionario */}
+                {/* Buscar funcionario */}
                 <div style={{ marginBottom: 20 }} ref={searchWrapperRef}>
-                    {/* htmlFor conecta el label con el input — Nielsen #6, accesibilidad */}
+                    {/* htmlFor conecta el label con el input */}
                     <label
                         htmlFor="buscar-funcionario"
                         style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, display: 'block' }}
@@ -404,7 +400,7 @@ const AsignacionView = ({ onBack }) => {
                             id="buscar-funcionario"
                             type="search"
                             autoComplete="off"
-                            // maxLength refuerza el límite en el DOM (OWASP A03)
+                            
                             maxLength={MAX_SEARCH_LENGTH}
                             placeholder="Nombre o RUT del funcionario"
                             value={searchQuery}
@@ -417,7 +413,7 @@ const AsignacionView = ({ onBack }) => {
                             style={{ ...inputStyle, paddingLeft: 42 }}
                         />
 
-                        {/* Indicación de mínimo de caracteres — Nielsen #6: ayuda y documentación */}
+                        {/* Indicación de mínimo de caracteres */}
                         {searchQuery.length > 0 && searchQuery.length < 2 && (
                             <div style={{ fontSize: 11.5, color: PA.ink3, fontWeight: 600, marginTop: 4, paddingLeft: 4 }}>
                                 Escribe al menos 2 caracteres para buscar
@@ -472,7 +468,7 @@ const AsignacionView = ({ onBack }) => {
                                         );
                                     })
                                 ) : (
-                                    // Nielsen #9: mensaje de error en lenguaje claro
+                                    
                                     <div style={{ padding: '16px', fontSize: 13, color: PA.ink3, textAlign: 'center', fontWeight: 600 }}>
                                         No se encontraron funcionarios con ese nombre o RUT
                                     </div>
@@ -482,7 +478,7 @@ const AsignacionView = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* PASO 2 — Seleccionar servicio */}
+                {/* Seleccionar servicio */}
                 <div style={{ marginBottom: 20 }}>
                     <label
                         htmlFor="select-servicio"
@@ -505,7 +501,6 @@ const AsignacionView = ({ onBack }) => {
                                     : 'Selecciona un servicio…'}
                             </option>
                             {servicios.map((srv, index) => {
-                                // Normalizamos el id — preferimos numérico (OWASP A03)
                                 const srvId = srv.idServicio ?? srv.id ?? `s_${index}`;
                                 const srvNombre = srv.nombreServicio || srv.nombre || 'Servicio';
                                 return (
@@ -524,12 +519,12 @@ const AsignacionView = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* Botón principal — Nielsen #1: estado visible, #4: feedback claro */}
+                {/* Botón principal */}
                 <button
                     onClick={handleGuardarClick}
                     disabled={!canSubmit}
                     aria-disabled={!canSubmit}
-                    // Tooltip explica por qué está deshabilitado — Nielsen #5
+                    // Tooltip explica por qué está deshabilitado
                     title={!selectedUser ? 'Selecciona un funcionario primero' : !selectedServicioId ? 'Selecciona un servicio primero' : ''}
                     style={{
                         width: '100%', padding: '16px', marginTop: 10,
@@ -545,7 +540,7 @@ const AsignacionView = ({ onBack }) => {
                 </button>
             </div>
 
-            {/* Diálogo de confirmación — Nielsen #5: prevención de errores */}
+            {/* Diálogo de confirmación  */}
             {showConfirm && servicioSeleccionado && (
                 <ConfirmDialog
                     funcionario={selectedUser}
