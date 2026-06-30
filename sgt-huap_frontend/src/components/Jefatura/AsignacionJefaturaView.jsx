@@ -3,6 +3,7 @@ import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
+import { getCurrentUser } from '../../services/authService'
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS (Homologados de AsignacionView)
@@ -113,6 +114,7 @@ const ConfirmDialog = ({ funcionario, servicio, onConfirm, onCancel, guardando }
 const AsignacionJerarquiaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const auth = useAuth();
+  const currentUserRut = getCurrentUser()?.rut;
 
   const storedUserData = localStorage.getItem('userData') || localStorage.getItem('user');
   const userData = auth?.user || (storedUserData ? JSON.parse(storedUserData) : {});
@@ -193,14 +195,19 @@ const AsignacionJerarquiaView = ({ onBack }) => {
       if (query.length < 2) return [];
 
       return funcionarios.filter((u) => {
-          // Búsqueda por Nombre
-          const nombreCompleto = `${u.nombre || ''} ${u.apellidoPaterno || ''}`.toLowerCase();
-          if (nombreCompleto.includes(query)) return true;
 
-          // Búsqueda por RUT
-          const rutLimpio = (u.rutCompleto || u.rut || '').replace(/[^0-9kK]/g, '');
-          const queryRut = query.replace(/[^0-9kK]/g, '');
-          return queryRut.length >= 2 && rutLimpio.includes(queryRut);
+        if (u.rutCompleto === currentUserRut || u.rut === currentUserRut) {
+          return false;
+        }
+
+        // Búsqueda por Nombre
+        const nombreCompleto = `${u.nombre || ''} ${u.apellidoPaterno || ''}`.toLowerCase();
+        if (nombreCompleto.includes(query)) return true;
+          
+        // Búsqueda por RUT
+        const rutLimpio = (u.rutCompleto || u.rut || '').replace(/[^0-9kK]/g, '');
+        const queryRut = query.replace(/[^0-9kK]/g, '');
+        return queryRut.length >= 2 && rutLimpio.includes(queryRut);
       });
   })();
 

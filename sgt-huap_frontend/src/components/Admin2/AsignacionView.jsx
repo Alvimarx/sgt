@@ -4,6 +4,7 @@ import { SGT_DATA } from './data';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
+import { getCurrentUser } from '../../services/authService'
 
 // ---------------------------------------------------------------------------
 // CONSTANTES DE SEGURIDAD 
@@ -130,6 +131,7 @@ const ConfirmDialog = ({ funcionario, servicio, onConfirm, onCancel, guardando }
 // ---------------------------------------------------------------------------
 const AsignacionView = ({ onBack }) => {
     const PA = SGT_DATA.PALETTE;
+    const currentUserRut = getCurrentUser()?.rut;
 
     // Datos cargados desde la API
     const [funcionarios, setFuncionarios] = useState([]);
@@ -227,6 +229,11 @@ const AsignacionView = ({ onBack }) => {
         if (query.length < 2) return [];
 
         return funcionarios.filter((u) => {
+            
+            if (u.rutCompleto === currentUserRut || u.rut === currentUserRut) {
+            return false;
+            }
+
             const nombre = getNombreCompleto(u).toLowerCase();
             if (nombre.includes(query)) return true;
 
@@ -235,7 +242,7 @@ const AsignacionView = ({ onBack }) => {
             const queryRut = query.replace(/[^0-9kK]/g, '');
             return queryRut.length >= 2 && rutLimpio.includes(queryRut);
         });
-    }, [funcionarios, searchQuery]);
+    }, [funcionarios, searchQuery, currentUserRut]);
 
     const resultados = filteredUsers();
     // El dropdown se muestra solo si hay texto suficiente y resultados

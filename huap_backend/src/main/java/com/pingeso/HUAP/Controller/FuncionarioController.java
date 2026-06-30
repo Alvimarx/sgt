@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/v2/funcionarios")
+@EnableMethodSecurity
 public class FuncionarioController {
 
         private static final Logger logger = LoggerFactory.getLogger(FuncionarioController.class);
@@ -183,7 +185,7 @@ public class FuncionarioController {
         }
         Long currentUserId = (Long) auth.getPrincipal();
         boolean isJefatura = auth.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_JEFATURA".equals(a.getAuthority()));
+                .anyMatch(a -> ("ROLE_JEFATURA".equals(a.getAuthority()) || "ROLE_ADMINISTRADOR".equals(a.getAuthority())));
 
         // Ownership: quien no es JEFATURA solo puede modificar su propio registro.
         if (!isJefatura && !currentUserId.equals(id)) {
@@ -309,7 +311,7 @@ public class FuncionarioController {
      * @Return
      */
     @PostMapping("/register/{rut}")
-    @PreAuthorize("hasRole('ROLE_JEFATURA')") // Spring se encarga del 403/401 automáticamente si no tiene el rol
+    @PreAuthorize("hasAnyRole('ROLE_JEFATURA','ROLE_ADMINISTRADOR')") // Spring se encarga del 403/401 automáticamente si no tiene el rol
     public ResponseEntity<Long> registerPersonal(@PathVariable String rut) {
         try {
             Long newId = funcionarioService.registerPersonal(rut);
