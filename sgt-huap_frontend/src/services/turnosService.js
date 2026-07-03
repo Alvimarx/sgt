@@ -29,6 +29,32 @@ export const getTurnosPorServicio = async (idServicio) => {
     }
 };
 
+/**
+ * Ejecuta una alteración de turno en el backend.
+ */
+export const alterarTurno = async (payload) => {
+    try {
+        const response = await axiosInstance.post(`${API_BASE}/alterar`, payload);
+        return { success: true, data: response.data };
+    } catch (error) {
+        const mensaje = error.response?.data?.error || 'Error al alterar el turno';
+        return { success: false, error: mensaje };
+    }
+};
+
+/**
+ * Asigna un turno libre a un funcionario del servicio activo.
+ */
+export const asignarTurnoLibre = async ({ idTurno, idNuevoMedico, idAdministrador, motivo = '' }) => {
+    return alterarTurno({
+        idTurno,
+        accion: 'ASIGNAR',
+        idNuevoMedico,
+        idAdministrador,
+        motivo,
+    });
+};
+
 // ---------------------------------------------------------------------------
 // HELPERS DE MAPEO (reutiliza la misma lógica que funcionarioService)
 // ---------------------------------------------------------------------------
@@ -253,3 +279,5 @@ export const getTurnosCalendario = async ({ servicioId, funcionarioId, year, mon
         return { success: false, error: mensaje };
     }
 };
+
+

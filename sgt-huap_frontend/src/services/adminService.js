@@ -69,7 +69,7 @@ function mapRolToBackend(rol) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TURNOS  →  /api/v2/turnos  |  /api/v2/gestion-turnos
+// TURNOS  →  /api/v2/turnos
 // ─────────────────────────────────────────────────────────────────────────────
 export const turnosService = {
 
@@ -226,9 +226,9 @@ export const turnosService = {
         return response.data;
     },
 
-    // POST /gestion-turnos/alterar  (movido de /turnos/alterar en v2)
+    // POST /turnos/alterar
     alterar: async (alterarRequest) => {
-        const response = await axiosInstance.post('/gestion-turnos/alterar', alterarRequest);
+        const response = await axiosInstance.post('/turnos/alterar', alterarRequest);
         return response.data;
     }
 

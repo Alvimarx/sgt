@@ -7,6 +7,7 @@ import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.PlantillaRepository;
 import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
+import com.pingeso.HUAP.Service.GestionTurnoService;
 import com.pingeso.HUAP.Service.TurnoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,9 @@ public class TurnoController {
     @Autowired
     private PlantillaTurnoRepository plantillaTurnoRepository;
 
+    @Autowired
+    private GestionTurnoService gestionTurnoService;
+
 
     // ====================================================================
     // CRUD BASE
@@ -65,6 +69,18 @@ public class TurnoController {
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/alterar")
+    public ResponseEntity<?> alterarTurno(@RequestBody AlterarTurnoRequest request) {
+        try {
+            Map<String, Object> resultado = gestionTurnoService.alterarTurno(request);
+            return ResponseEntity.ok(resultado);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 
