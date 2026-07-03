@@ -67,12 +67,13 @@ const P2 = () => SGT_DATA.PALETTE;
  *   exchangeSelection          — { targetTurn, targetFuncionario } estado de selección de intercambio
  *   onSelectTargetFuncionario  — callback al seleccionar un integrante del equipo como receptor
  */
-const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncionario }) => {
+const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncionario, canAssignFreeTurn = false }) => {
     const teamColor = getTeamColor(shift);
     const fecha = shift.fecha || shift.raw?.diaInicioTurno || null;
 
     const groupData = shift.teamGroup ?? null;
     const legacyTeam = shift.team ? getAgendaTeam(shift) : null;
+    const groupHasVacancies = Boolean(groupData?.porPuesto?.some((puesto) => (puesto.vacantes || 0) > 0));
 
     // Cobertura del equipo (cuántos turnos del tipo tienen persona asignada).
     const totalTurnos = groupData?.totalTurnos ?? null;
@@ -208,6 +209,8 @@ const ShiftDetail = ({ shift, onAction, exchangeSelection, onSelectTargetFuncion
                 <ShiftActions
                     shift={shift}
                     canRequestExchange={canRequestExchange}
+                    canAssignFreeTurn={canAssignFreeTurn}
+                    canAssignVacancy={groupHasVacancies}
                     onAction={(actionId, currentShift) => {
                         if (actionId === "cambio") { handleExchangeAction(); return; }
                         onAction?.(actionId, currentShift);
@@ -340,11 +343,17 @@ const TeamByPuesto = ({ porPuesto = [], onSelectMember, selectedMemberId = null 
     </div>
 );
 
-const ShiftActions = ({ shift, onAction, canRequestExchange = false }) => {
+const ShiftActions = ({ shift, onAction, canRequestExchange = false, canAssignFreeTurn = false, canAssignVacancy = false }) => {
     const actions = [];
     if (shift.turnoLibre && !shift.solicitudPendiente) {
         actions.push({ id: "solicitar-turno", label: "Solicitar turno", icon: "plus", tone: "primary" });
+        if (canAssignFreeTurn) {
+            actions.push({ id: "asignar-turno-libre", label: "Asignar funcionario", icon: "user-plus", tone: "primary" });
+        }
     } else if (!shift.solicitudPendiente) {
+        if (canAssignFreeTurn && canAssignVacancy) {
+            actions.push({ id: "asignar-turno-libre", label: "Asignar cupo libre", icon: "user-plus", tone: "primary" });
+        }
         actions.push({
             id: "cambio",
             label: canRequestExchange ? "Solicitar cambio" : "Selecciona receptor y su turno",
