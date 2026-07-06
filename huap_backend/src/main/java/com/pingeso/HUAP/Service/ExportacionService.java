@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
@@ -227,6 +228,12 @@ public class ExportacionService {
             String detalle
     ) {}
 
+    private record OrigenTurnoCandidato(
+            String origen,
+            String detalle,
+            LocalDateTime fecha
+    ) {}
+
     private Map<Long, List<BitacoraEntity>> cargarEventosPorTurno(List<Long> idsTurnos) {
         Map<Long, List<BitacoraEntity>> eventosPorTurno = new HashMap<>();
 
@@ -284,7 +291,6 @@ public class ExportacionService {
                 .filter(o -> o.getTurno() != null && o.getTurno().getIdTurno() != null)
                 .collect(Collectors.groupingBy(o -> o.getTurno().getIdTurno()));
     }
-
     private OrigenTurnoInfo determinarOrigenTurno(
             TurnoEntity turno,
             Map<Long, List<BitacoraEntity>> eventosPorTurno,
@@ -294,102 +300,45 @@ public class ExportacionService {
             return sinInformacion();
         }
 
+        List<OrigenTurnoCandidato> candidatos = new ArrayList<>();
+
         List<BitacoraEntity> eventos = eventosPorTurno.getOrDefault(
                 turno.getIdTurno(),
                 List.of()
         );
+
+        for (BitacoraEntity evento : eventos) {
+            clasificarEventoComoOrigen(evento)
+                    .ifPresent(candidatos::add);
+        }
 
         List<OfertaGeneralEntity> ofertas = ofertasPorTurno.getOrDefault(
                 turno.getIdTurno(),
                 List.of()
         );
 
-        // 1. Cambio / intercambio
-        Optional<BitacoraEntity> intercambio = eventos.stream()
-                .filter(this::esIntercambioAprobado)
-                .findFirst();
-
-        if (intercambio.isPresent()) {
-            return new OrigenTurnoInfo(
-                    "Cambio / intercambio",
-                    "Turno modificado por intercambio entre funcionarios"
-            );
+        for (OfertaGeneralEntity oferta : ofertas) {
+            clasificarOfertaGeneralComoOrigen(oferta)
+                    .ifPresent(candidatos::add);
         }
 
-        // 2. Solicitud aprobada
-        Optional<BitacoraEntity> solicitud = eventos.stream()
-                .filter(this::esSolicitudAprobadaComun)
-                .findFirst();
+        return candidatos.stream()
+                .max(Comparator.comparing(c ->
+                        c.fecha() != null ? c.fecha() : LocalDateTime.MIN
+                ))
+                .map(c -> new OrigenTurnoInfo(c.origen(), c.detalle()))
+                .orElseGet(() -> {
+                    if (turno.getPlantilla() != null) {
+                        return new OrigenTurnoInfo(
+                                "Rotativa habitual",
+                                "Generado desde planificación mensual"
+                        );
+                    }
 
-        if (solicitud.isPresent()) {
-            return new OrigenTurnoInfo(
-                    "Solicitud",
-                    "Turno tomado mediante solicitud aprobada"
-            );
-        }
-
-        // 3. Oferta particular
-        Optional<BitacoraEntity> ofertaParticular = eventos.stream()
-                .filter(this::esOfertaParticularAprobada)
-                .findFirst();
-
-        if (ofertaParticular.isPresent()) {
-            return new OrigenTurnoInfo(
-                    "Oferta particular",
-                    "Turno ofrecido a un funcionario específico y aceptado"
-            );
-        }
-
-        // 4. Oferta general
-        Optional<OfertaGeneralEntity> ofertaGeneralCerrada = ofertas.stream()
-                .filter(o -> o.getEstado() == OfertaGeneralEntity.EstadoOferta.CERRADA)
-                .findFirst();
-
-        if (ofertaGeneralCerrada.isPresent()) {
-            return new OrigenTurnoInfo(
-                    "Oferta general",
-                    "Turno tomado desde oferta general"
-            );
-        }
-
-        // 5. Asignación manual
-        Optional<BitacoraEntity> asignacionManual = eventos.stream()
-                .filter(this::esAsignacionManual)
-                .findFirst();
-
-        if (asignacionManual.isPresent()) {
-            return new OrigenTurnoInfo(
-                    "Asignación manual",
-                    "Asignado manualmente por jefatura"
-            );
-        }
-
-        // 6. Rotativa habitual / planificación
-        Optional<BitacoraEntity> generacion = eventos.stream()
-                .filter(this::esGeneracionPlanificacion)
-                .findFirst();
-
-        if (generacion.isPresent()) {
-            String detalle = generacion.get().getMotivo() != null
-                    ? generacion.get().getMotivo()
-                    : "Generado desde planificación mensual";
-
-            return new OrigenTurnoInfo(
-                    "Rotativa habitual",
-                    detalle
-            );
-        }
-
-        if (turno.getPlantilla() != null) {
-            return new OrigenTurnoInfo(
-                    "Rotativa habitual",
-                    "Generado desde planificación mensual"
-            );
-        }
-
-        // 7. Sin información
-        return sinInformacion();
+                    return sinInformacion();
+                });
     }
+/* // Métodos auxiliares para clasificar eventos como origen de turno de vieja lógica, se mantienen para referencia histórica y posibles usos futuros
 
     private boolean esIntercambioAprobado(BitacoraEntity evento) {
         Solicitud2Entity solicitud = evento.getSolicitud();
@@ -441,20 +390,20 @@ public class ExportacionService {
                 && tipoEvento.contains("ACEPTADA");
     }
 
-    private boolean esAsignacionManual(BitacoraEntity evento) {
-        String tipoEvento = normalizar(evento.getTipoEvento());
-
-        return tipoEvento.contains("ASIGNACION_MANUAL")
-                || tipoEvento.contains("TURNO_ASIGNADO_MANUALMENTE")
-                || tipoEvento.contains("MODIFICACION_MANUAL_TURNO");
-    }
-
     private boolean esGeneracionPlanificacion(BitacoraEntity evento) {
         String tipoEvento = normalizar(evento.getTipoEvento());
 
         return tipoEvento.equals("GENERACION_TURNO")
                 || tipoEvento.contains("PLANIFICACION")
                 || tipoEvento.contains("ROTATIVA");
+    }
+*/
+    private boolean esAsignacionManual(BitacoraEntity evento) {
+        String tipoEvento = normalizar(evento.getTipoEvento());
+
+        return tipoEvento.contains("ASIGNACION_MANUAL")
+                || tipoEvento.contains("TURNO_ASIGNADO_MANUALMENTE")
+                || tipoEvento.contains("MODIFICACION_MANUAL_TURNO");
     }
 
     private OrigenTurnoInfo sinInformacion() {
@@ -477,6 +426,91 @@ public class ExportacionService {
                 .replace("Í", "I")
                 .replace("Ó", "O")
                 .replace("Ú", "U");
+    }
+
+    private Optional<OrigenTurnoCandidato> clasificarEventoComoOrigen(BitacoraEntity evento) {
+        if (evento == null) {
+            return Optional.empty();
+        }
+
+        String tipoEvento = normalizar(evento.getTipoEvento());
+        LocalDateTime fecha = evento.getFechaModificacion();
+
+        if (tipoEvento.equals("GENERACION_TURNO")) {
+            String detalle = evento.getMotivo() != null
+                    ? evento.getMotivo()
+                    : "Generado desde planificación mensual";
+
+            return Optional.of(new OrigenTurnoCandidato(
+                    "Rotativa habitual",
+                    detalle,
+                    fecha
+            ));
+        }
+
+        if (esAsignacionManual(evento)) {
+            return Optional.of(new OrigenTurnoCandidato(
+                    "Asignación manual",
+                    "Asignado manualmente por jefatura",
+                    fecha
+            ));
+        }
+
+        if (tipoEvento.equals("OFERTA_GENERAL_CERRADA")) {
+            return Optional.of(new OrigenTurnoCandidato(
+                    "Oferta general",
+                    "Turno tomado desde oferta general",
+                    fecha
+            ));
+        }
+
+        if (tipoEvento.equals("CAMBIO_ESTADO_APROBADA")) {
+            Solicitud2Entity solicitud = evento.getSolicitud();
+
+            if (solicitud == null
+                    || solicitud.getTipoSolicitud() == null
+                    || solicitud.getTipoSolicitud().getTipo() == null) {
+                return Optional.empty();
+            }
+
+            Integer tipoSolicitud = solicitud.getTipoSolicitud().getTipo();
+
+            return switch (tipoSolicitud) {
+                case 1, 2, 3 -> Optional.of(new OrigenTurnoCandidato(
+                        "Solicitud",
+                        "Turno tomado mediante solicitud aprobada",
+                        fecha
+                ));
+
+                case 4 -> Optional.of(new OrigenTurnoCandidato(
+                        "Cambio / intercambio",
+                        "Turno modificado por intercambio entre funcionarios",
+                        fecha
+                ));
+
+                case 5 -> Optional.of(new OrigenTurnoCandidato(
+                        "Oferta particular",
+                        "Turno ofrecido a un funcionario específico y aceptado",
+                        fecha
+                ));
+
+                default -> Optional.empty();
+            };
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<OrigenTurnoCandidato> clasificarOfertaGeneralComoOrigen(OfertaGeneralEntity oferta) {
+        if (oferta == null || oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.CERRADA) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new OrigenTurnoCandidato(
+                "Oferta general",
+                "Turno tomado desde oferta general",
+                oferta.getFechaCreacion()
+        ));
     }
 
 }
