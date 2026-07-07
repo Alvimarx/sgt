@@ -9,6 +9,7 @@ import com.pingeso.HUAP.Repository.TurnoRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.pingeso.HUAP.Repository.ServiciosFuncionarioRepository;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -22,6 +23,7 @@ public class GestionTurnoService {
     private final TurnoService turnoService;
     private final BitacoraService bitacoraService;
     private final Notificacion2Service notificacion2Service;
+    private final ServiciosFuncionarioRepository serviciosFuncionarioRepository;
 
     @Transactional
     public Map<String, Object> alterarTurno(AlterarTurnoRequest request) throws Exception {
@@ -29,17 +31,25 @@ public class GestionTurnoService {
         TurnoEntity turno = turnoRepository.findById(request.getIdTurno())
                 .orElseThrow(() -> new RuntimeException("Turno no encontrado: " + request.getIdTurno()));
 
+        if (turno.isEliminado()) {
+                throw new RuntimeException("No se puede alterar un turno eliminado.");
+        }
+
+        if (turno.getServicio() == null || turno.getServicio().getIdServicio() == null) {
+                throw new RuntimeException("El turno no tiene servicio asociado.");
+        }
+
         FuncionarioEntity admin = funcionarioRepository.findById(request.getIdAdministrador())
                 .orElseThrow(() -> new RuntimeException("Administrador no encontrado: " + request.getIdAdministrador()));
 
         FuncionarioEntity funcionarioAnterior = turno.getFuncionario();
 
         return switch (request.getAccion().toUpperCase()) {
-            case "ASIGNAR"       -> accionAsignar(request, turno, admin, funcionarioAnterior);
-            case "DESASIGNAR"    -> accionDesasignar(request, turno, admin, funcionarioAnterior);
-            case "REASIGNAR"     -> accionReasignar(request, turno, admin, funcionarioAnterior);
-            case "CAMBIAR_HORAS" -> accionCambiarHoras(request, turno, admin);
-            default -> throw new RuntimeException("Acción no válida: " + request.getAccion());
+                case "ASIGNAR"       -> accionAsignar(request, turno, admin, funcionarioAnterior);
+                case "DESASIGNAR"    -> accionDesasignar(request, turno, admin, funcionarioAnterior);
+                case "REASIGNAR"     -> accionReasignar(request, turno, admin, funcionarioAnterior);
+                case "CAMBIAR_HORAS" -> accionCambiarHoras(request, turno, admin);
+                default -> throw new RuntimeException("Acción no válida: " + request.getAccion());
         };
     }
 
@@ -58,13 +68,14 @@ public class GestionTurnoService {
         FuncionarioEntity nuevo = funcionarioRepository.findById(request.getIdNuevoMedico())
                 .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: " + request.getIdNuevoMedico()));
 
+        validarFuncionarioAsignable(nuevo, turno);
         validarConflictoFuncionario(nuevo.getIdFuncionario(), turno);
 
         turno.setFuncionario(nuevo);
         turnoRepository.save(turno);
 
-        registrarEnBitacora(admin, turno, "ASIGNACION",
-                "Turno asignado a " + nombreCompleto(nuevo), request.getMotivo());
+        registrarEnBitacora(admin, turno, "ASIGNACION_MANUAL_TURNO",
+                "Turno asignado manualmente a " + nombreCompleto(nuevo), request.getMotivo());
 
         notificacion2Service.crearNotificacionSistema(nuevo,
                 "Se te ha asignado un turno del " + turno.getDiaInicioTurno()
@@ -81,8 +92,8 @@ public class GestionTurnoService {
         turno.setFuncionario(null);
         turnoRepository.save(turno);
 
-        registrarEnBitacora(admin, turno, "DESASIGNACION",
-                "Turno desasignado de " + anteriorNombre, request.getMotivo());
+        registrarEnBitacora(admin, turno, "LIBERACION_MANUAL_TURNO",
+          "Funcionario eliminado manualmente del turno: " + anteriorNombre, request.getMotivo());
 
         if (funcionarioAnterior != null) {
             notificacion2Service.crearNotificacionSistema(funcionarioAnterior,
@@ -102,6 +113,7 @@ public class GestionTurnoService {
         FuncionarioEntity nuevo = funcionarioRepository.findById(request.getIdNuevoMedico())
                 .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: " + request.getIdNuevoMedico()));
 
+        validarFuncionarioAsignable(nuevo, turno);
         validarConflictoFuncionario(nuevo.getIdFuncionario(), turno);
 
         String anteriorNombre = funcionarioAnterior != null ? nombreCompleto(funcionarioAnterior) : "N/A";
@@ -109,8 +121,8 @@ public class GestionTurnoService {
         turno.setFuncionario(nuevo);
         turnoRepository.save(turno);
 
-        registrarEnBitacora(admin, turno, "REASIGNACION",
-                "Turno reasignado de " + anteriorNombre + " a " + nombreCompleto(nuevo),
+        registrarEnBitacora(admin, turno, "REASIGNACION_MANUAL_TURNO",
+                "Turno reasignado manualmente de " + anteriorNombre + " a " + nombreCompleto(nuevo),
                 request.getMotivo());
 
         if (funcionarioAnterior != null) {
@@ -161,15 +173,36 @@ public class GestionTurnoService {
     // ---------------------------------------------------------------
 
     private void validarConflictoFuncionario(Long idFuncionario, TurnoEntity turno) throws Exception {
-        boolean hayConflicto = turnoRepository
-                .findConflictosByFuncionario(idFuncionario,
-                        turno.getDiaInicioTurno(),
-                        turno.getDiaFinalTurno())
-                .stream()
-                .anyMatch(t -> !t.getIdTurno().equals(turno.getIdTurno()));
+        LocalDateTime inicioObjetivo = turno.getDiaInicioTurno().atTime(turno.getHoraInicio());
+        LocalDateTime finObjetivo = turno.getDiaFinalTurno().atTime(turno.getHoraFin());
 
-        if (hayConflicto)
-            throw new Exception("El funcionario ya tiene otro turno asignado en este rango de fechas.");
+        boolean hayConflicto = turnoRepository
+                .findConflictosByFuncionario(
+                        idFuncionario,
+                        turno.getDiaInicioTurno(),
+                        turno.getDiaFinalTurno()
+                )
+                .stream()
+                .filter(t -> !t.getIdTurno().equals(turno.getIdTurno()))
+                .anyMatch(t -> {
+                        LocalDateTime inicioExistente = t.getDiaInicioTurno().atTime(t.getHoraInicio());
+                        LocalDateTime finExistente = t.getDiaFinalTurno().atTime(t.getHoraFin());
+
+                        return solapan(inicioObjetivo, finObjetivo, inicioExistente, finExistente);
+                });
+
+        if (hayConflicto) {
+                throw new Exception("El funcionario ya tiene otro turno asignado en este rango horario.");
+        }
+        }
+
+        private boolean solapan(
+                LocalDateTime aInicio,
+                LocalDateTime aFin,
+                LocalDateTime bInicio,
+                LocalDateTime bFin
+        ) {
+        return aInicio.isBefore(bFin) && bInicio.isBefore(aFin);
     }
 
     private void registrarEnBitacora(FuncionarioEntity admin, TurnoEntity turno,
@@ -194,4 +227,27 @@ public class GestionTurnoService {
     private String nombreCompleto(FuncionarioEntity f) {
         return f.getNombre() + " " + f.getApelPat();
     }
+
+    private void validarFuncionarioAsignable(FuncionarioEntity funcionario, TurnoEntity turno) {
+        if (funcionario == null) {
+                throw new RuntimeException("Debe especificar un funcionario válido.");
+        }
+
+        if (funcionario.isEliminado()) {
+                throw new RuntimeException("No se puede asignar un funcionario eliminado.");
+        }
+
+        Long idServicioTurno = turno.getServicio().getIdServicio();
+
+        boolean perteneceAlServicio =
+                serviciosFuncionarioRepository
+                        .existsByServicio_IdServicioAndFuncionario_IdFuncionarioAndFuncionario_EliminadoFalse(
+                                idServicioTurno,
+                                funcionario.getIdFuncionario()
+                        );
+
+        if (!perteneceAlServicio) {
+                throw new RuntimeException("El funcionario seleccionado no pertenece al servicio del turno.");
+        }
+        }
 }

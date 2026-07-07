@@ -402,6 +402,8 @@ public class ExportacionService {
         String tipoEvento = normalizar(evento.getTipoEvento());
 
         return tipoEvento.contains("ASIGNACION_MANUAL")
+                || tipoEvento.contains("LIBERACION_MANUAL")
+                || tipoEvento.contains("REASIGNACION_MANUAL")
                 || tipoEvento.contains("TURNO_ASIGNADO_MANUALMENTE")
                 || tipoEvento.contains("MODIFICACION_MANUAL_TURNO");
     }
@@ -449,12 +451,24 @@ public class ExportacionService {
         }
 
         if (esAsignacionManual(evento)) {
-            return Optional.of(new OrigenTurnoCandidato(
-                    "Asignación manual",
-                    "Asignado manualmente por jefatura",
-                    fecha
-            ));
+        String detalle;
+
+        if (tipoEvento.contains("LIBERACION_MANUAL")) {
+            detalle = "Funcionario eliminado manualmente del turno por administración";
+        } else if (tipoEvento.contains("REASIGNACION_MANUAL")) {
+            detalle = "Funcionario reasignado manualmente por administración";
+        } else if (tipoEvento.contains("ASIGNACION_MANUAL")) {
+            detalle = "Funcionario asignado manualmente por administración";
+        } else {
+            detalle = "Turno modificado manualmente por administración";
         }
+
+        return Optional.of(new OrigenTurnoCandidato(
+                "Asignación manual",
+                detalle,
+                fecha
+        ));
+    }
 
         if (tipoEvento.equals("OFERTA_GENERAL_CERRADA")) {
             return Optional.of(new OrigenTurnoCandidato(

@@ -25,7 +25,7 @@ public class BitacoraEntity {
     @JoinColumn(name = "ID_FUNCIONARIO")
     private FuncionarioEntity funcionario;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_TURNO")
     private TurnoEntity turno;
 

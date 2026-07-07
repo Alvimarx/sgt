@@ -25,7 +25,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoReglas }) => {
+const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoReglas, onGoAsignacionTurnos }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -68,7 +68,7 @@ const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServ
           title="Asignación de turnos" 
           desc="Asigna o quita funcionarios de turnos" 
           tone="accent" 
-          onClick={onGoSolitudes} 
+          onClick={onGoAsignacionTurnos} 
         />
         <AdminCard 
           icon="user" 

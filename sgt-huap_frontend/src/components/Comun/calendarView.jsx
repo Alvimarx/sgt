@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SGT_DATA } from '../Admin2/data';
-import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from '../Style/UIPrimitives';
+import { SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
 import ShiftDetail, { getTeamColor, formatShiftLabel } from '../Comun/ShiftDetail';
@@ -86,7 +86,12 @@ const getCoverageStats = (shifts = []) => {
 // CALENDARVIEW — componente principal
 // ---------------------------------------------------------------------------
 
-const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
+const CalendarView = ({ 
+    onBack, 
+    onOpenBitacora, 
+    onOpenSolicitudes,
+    modoAsignacionAdmin = false,
+}) => {
     const { user } = useAuth();
     const PA = SGT_DATA.PALETTE;
 
@@ -96,11 +101,24 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         return !Number.isNaN(raw) && raw > 0 ? raw : null;
     })();
 
-    const esJefatura = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
-    const rolSistema = String(user?.rolSistema || '').toUpperCase();
-    const esAdmin = rolSistema === 'ADMIN' || rolSistema === 'ADMINISTRADOR';
+    const rol = String(user?.rol || user?.role || '').toUpperCase();
+    const rolSistema = String(
+        user?.rolSistema ||
+        user?.roleSistema ||
+        user?.rol_sistema ||
+        ''
+    ).toUpperCase();
+
+    const esJefatura = rol === 'JEFATURA' || rol === 'SUBROGANTE';
+    const esAdmin =
+        rolSistema === 'ADMIN' ||
+        rolSistema === 'ADMINISTRADOR' ||
+        rol === 'ADMIN' ||
+        rol === 'ADMINISTRADOR';
+
+    const servicioIdActivo = user?.servicioId || localStorage.getItem('servicioId');
     const puedeExportarServicioCompleto = esJefatura || esAdmin;
-    const canAssignFreeTurns = esJefatura || esAdmin;
+    const canManageTurnAssignments = Boolean(modoAsignacionAdmin || esAdmin);
 
     const now = new Date();
     const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -111,7 +129,7 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
     const [error, setError] = useState('');
     const [selectedDay, setSelectedDay] = useState(null);
     const [detailShift, setDetailShift] = useState(null);
-    const [assignShift, setAssignShift] = useState(null);
+    const [assignmentShift, setAssignmentShift] = useState(null);
     const [refreshTick, setRefreshTick] = useState(0);
 
     const [exportSheetOpen, setExportSheetOpen] = useState(false);
@@ -139,10 +157,8 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         setError('');
         setSelectedDay(null);
 
-        const servicioId = user?.servicioId || localStorage.getItem('servicioId');
-
         getTurnosCalendario({
-            servicioId,
+            servicioId: servicioIdActivo,
             funcionarioId: myUserId,
             year: viewYear,
             month: viewMonth,
@@ -160,7 +176,7 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         });
 
         return () => { mounted = false; };
-    }, [viewYear, viewMonth, user?.id, user?.userId, user?.servicioId, refreshTick]);
+    }, [viewYear, viewMonth, myUserId, servicioIdActivo, refreshTick]);
 
     const handleSelectTargetFuncionario = (sourceShift, targetShift) => {
         const isSelf = Boolean(targetShift?.miTurno);
@@ -222,17 +238,9 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         });
     };
 
-    const resolveAssignableShift = (shift) => {
-        if (!shift) return null;
-        if (shift.turnoLibre) return shift;
-        return shift.teamGroup?.turnos?.find((t) => t.turnoLibre) || null;
-    };
-
     const openAssignShift = (shift) => {
-        if (!canAssignFreeTurns) return;
-        const target = resolveAssignableShift(shift);
-        if (!target?.turnoLibre) return;
-        setAssignShift(target);
+        if (!canManageTurnAssignments || !shift) return;
+        setAssignmentShift(shift);
     };
 
     const cells = useMemo(() => {
@@ -246,7 +254,7 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
 
     const handleExportCsv = async () => {
         setExportError('');
-        if (!user?.servicioId) { setExportError('No hay servicio seleccionado.'); return; }
+        if (!servicioIdActivo) { setExportError('No hay servicio seleccionado.'); return; }
         if (!exportMonthValue) { setExportError('Selecciona un mes.'); return; }
         const [anioStr, mesStr] = exportMonthValue.split('-');
         const anio = Number(anioStr);
@@ -255,7 +263,7 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
         const exportarSoloMios = !puedeExportarServicioCompleto || exportScope === 'mios';
         setExporting(true);
         const result = await exportarTurnosCsv({
-            anio, mes, idServicio: user.servicioId,
+            anio, mes, idServicio: servicioIdActivo,
             idFuncionario: exportarSoloMios ? myUserId : null,
         });
         setExporting(false);
@@ -293,7 +301,7 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                     <SGTIcon name="chevron-left" size={17} color={PA.ink2} />
                 </button>
                 <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 900, color: PA.ink }}>
-                    {MONTH_NAMES[viewMonth - 1]} {viewYear}
+                    {modoAsignacionAdmin ? 'Asignación de turnos · ' : ''}{MONTH_NAMES[viewMonth - 1]} {viewYear}
                 </div>
                 <button onClick={goToNextMonth} aria-label="Mes siguiente" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
                     <SGTIcon name="chevron-right" size={17} color={PA.ink2} />
@@ -427,14 +435,31 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
                         exchangeSelection={exchangeSelection}
                         currentUserId={myUserId}
                         onSelectTargetFuncionario={handleSelectTargetFuncionario}
-                        canAssignFreeTurn={canAssignFreeTurns}
+                        canManageTurnAssignment={canManageTurnAssignments}
+                        canAssignFreeTurn={canManageTurnAssignments}
                         onAction={(actionId, shift) => {
-                            if (actionId === 'historial') { onOpenBitacora?.(); return; }
-                            if (actionId === 'asignar-turno-libre') { openAssignShift(shift); return; }
+                            if (actionId === 'historial') {
+                                onOpenBitacora?.();
+                                return;
+                            }
+
+                            if (actionId === 'editar-asignacion-turno' || actionId === 'asignar-turno-libre') {
+                                openAssignShift(shift);
+                                return;
+                            }
+
                             if (!onOpenSolicitudes) return;
-                            if (actionId === 'cambio') handleOpenExchangeRequest(shift);
+
+                            if (actionId === 'cambio') {
+                                handleOpenExchangeRequest(shift);
+                            }
+
                             if (actionId === 'solicitar-turno') {
-                                onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: shift.id, turnoLabel: formatShiftLabel(shift) });
+                                onOpenSolicitudes?.({
+                                    tipoSolicitudId: 3,
+                                    idTurno: shift.id,
+                                    turnoLabel: formatShiftLabel(shift),
+                                });
                             }
                         }}
                     />
@@ -442,13 +467,13 @@ const CalendarView = ({ onBack, onOpenBitacora, onOpenSolicitudes }) => {
             </Sheet>
 
             <AsignarTurnoLibreSheet
-                open={!!assignShift}
-                shift={assignShift}
-                servicioId={user?.servicioId || localStorage.getItem('servicioId')}
+                open={!!assignmentShift}
+                shift={assignmentShift}
+                servicioId={servicioIdActivo}
                 adminUserId={myUserId}
-                onClose={() => setAssignShift(null)}
+                onClose={() => setAssignmentShift(null)}
                 onAssigned={() => {
-                    setAssignShift(null);
+                    setAssignmentShift(null);
                     setDetailShift(null);
                     setSelectedDay(null);
                     setRefreshTick((v) => v + 1);

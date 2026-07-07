@@ -11,5 +11,9 @@ import java.util.List;
 @Repository
 public interface ServiciosFuncionarioRepository extends JpaRepository<ServiciosFuncionarioEntity, Long>{
     List<ServiciosFuncionarioEntity> findByServicio_IdServicioAndFuncionario_EliminadoFalse(Long idServicio);
+    boolean existsByServicio_IdServicioAndFuncionario_IdFuncionarioAndFuncionario_EliminadoFalse(
+            Long idServicio,
+            Long idFuncionario
+    );
     
 }

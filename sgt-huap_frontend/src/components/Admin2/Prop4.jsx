@@ -65,6 +65,7 @@ const Prop4 = ({ tweaks = {} }) => {
   const [pendingRegistrationMessage, setPendingRegistrationMessage] = useState('');
   const [solicitudesReturn, setSolicitudesReturn] = useState("agenda");
   const [solicitudesCreatePreset, setSolicitudesCreatePreset] = useState(null);
+  const [calendarReturn, setCalendarReturn] = useState("agenda");
 
   //Para Jefatura y subrogacia es lo mismo por lo cual es mejor compartir la vista
   const [statsReturn, setStatsReturn] = useState("admin");
@@ -76,7 +77,10 @@ const Prop4 = ({ tweaks = {} }) => {
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     if (tabId === "home") setCurrentView("agenda");
-    if (tabId === "calendar") setCurrentView("calendar_view");
+    if (tabId === "calendar") {
+      setCalendarReturn("agenda");
+      setCurrentView("calendar_view");
+    }
     if (tabId === "me") setCurrentView("perfil");
     if (tabId === "requests") {
       setSolicitudesReturn("agenda");
@@ -190,9 +194,23 @@ const Prop4 = ({ tweaks = {} }) => {
       )}
       {currentView === "calendar_view" && (
         <CalendarView
-          onBack={() => { setCurrentView("agenda"); setActiveTab("home"); }}
+          modoAsignacionAdmin={calendarReturn === "admin"}
+          onBack={() => {
+            setCurrentView(calendarReturn);
+
+            if (calendarReturn === "agenda") {
+              setActiveTab("home");
+            }
+
+            if (calendarReturn === "admin") {
+              setActiveTab("me");
+            }
+          }}
           onOpenSolicitudes={handleOpenSolicitudes}
-          onOpenBitacora={() => { setBitacoraReturn("calendar_view"); setCurrentView("bitacora"); }}
+          onOpenBitacora={() => {
+            setBitacoraReturn("calendar_view");
+            setCurrentView("bitacora");
+          }}
         />
       )}
       {currentView === "perfil" && (
@@ -214,6 +232,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoRotativa={() => setCurrentView("rotativa_wizard")}
           onGoServicios={() => setCurrentView("servicios")}
           onGoAsignacion={() => setCurrentView("asignacion")}
+          onGoAsignacionTurnos={() => {setCalendarReturn("admin"); setCurrentView("calendar_view"); }}
           onGoFuncionarios={() => setCurrentView("jerarquia")}
           onGoFuncionariosSistema={() => setCurrentView("funcionarios_sistema")}
           onGoPuestos={() => { setPuestosReturn("admin"); setCurrentView("puestos"); }}
@@ -279,11 +298,19 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "plantillas" && <PlantillasView onBack={() => setCurrentView("admin")} />}
       {currentView === "reglas" && <ReglasServicioView onBack={() => setCurrentView(reglasReturn)} />}
 
-      {["agenda", "perfil", "calendar_view", "solicitudes"].includes(currentView) && (
+      {[
+        "agenda",
+        "perfil",
+        "solicitudes",
+      ].includes(currentView) && (
         <TabBar active={activeTab} onChange={handleTabChange} />
       )}
-    </PhoneShell>
-  );
-};
+
+      {currentView === "calendar_view" && calendarReturn === "agenda" && (
+        <TabBar active={activeTab} onChange={handleTabChange} />
+      )}
+          </PhoneShell>
+        );
+      };
 
 export default Prop4;

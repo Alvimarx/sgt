@@ -55,6 +55,26 @@ export const asignarTurnoLibre = async ({ idTurno, idNuevoMedico, idAdministrado
     });
 };
 
+export const reasignarTurno = async ({ idTurno, idNuevoMedico, idAdministrador, motivo = '' }) => {
+    return alterarTurno({
+        idTurno,
+        accion: 'REASIGNAR',
+        idNuevoMedico,
+        idAdministrador,
+        motivo,
+    });
+};
+
+export const desasignarTurno = async ({ idTurno, idAdministrador, motivo = '' }) => {
+    return alterarTurno({
+        idTurno,
+        accion: 'DESASIGNAR',
+        idNuevoMedico: null,
+        idAdministrador,
+        motivo,
+    });
+};
+
 // ---------------------------------------------------------------------------
 // HELPERS DE MAPEO (reutiliza la misma lógica que funcionarioService)
 // ---------------------------------------------------------------------------
@@ -279,5 +299,6 @@ export const getTurnosCalendario = async ({ servicioId, funcionarioId, year, mon
         return { success: false, error: mensaje };
     }
 };
+
 
 
