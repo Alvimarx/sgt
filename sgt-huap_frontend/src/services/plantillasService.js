@@ -39,6 +39,14 @@ export const shiftHora = (hora, minutos) => {
     return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
+/** Formatea un desplazamiento en minutos (tiempoMinutos de una regla) como horas: "+1.5 h", "-2 h". */
+export const formatDesplazamientoHoras = (minutos) => {
+    const horas = (Number(minutos) || 0) / 60;
+    const signo = horas > 0 ? '+' : '';
+    const valor = Number.isInteger(horas) ? horas : horas.toFixed(1);
+    return `${signo}${valor} h`;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS DE TURNO  →  /api/v2/tipos-turno
 // ─────────────────────────────────────────────────────────────────────────────

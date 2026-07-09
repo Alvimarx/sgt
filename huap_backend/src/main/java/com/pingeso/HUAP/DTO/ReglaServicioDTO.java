@@ -14,7 +14,6 @@ public class ReglaServicioDTO {
     private Long idRegla;
     private Long idServicio;
     private String nombre;
-    private boolean activo;
     private boolean aplicaFinDeSemana;
     private boolean aplicaFeriado;
 

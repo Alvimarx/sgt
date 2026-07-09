@@ -48,8 +48,6 @@ import PendingRegistrationView from "../Login/PendingRegistrationView";
 import PlantillasView from "./PlantillasView";
 
 
-import RotativaWizard from "./Rotativa";
-
 import ServiciosView from "./ServiciosView";
 import SolicitudesView from "./SolicitudesView";
 import TiposTurnoView from "./TiposTurnoView";
@@ -229,7 +227,6 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "admin" && (
         <AdminDashboard
           onBack={() => setCurrentView("perfil")}
-          onGoRotativa={() => setCurrentView("rotativa_wizard")}
           onGoServicios={() => setCurrentView("servicios")}
           onGoAsignacion={() => setCurrentView("asignacion")}
           onGoAsignacionTurnos={() => {setCalendarReturn("admin"); setCurrentView("calendar_view"); }}
@@ -280,7 +277,6 @@ const Prop4 = ({ tweaks = {} }) => {
 
       {currentView === "funcionarios_sistema" && <FuncionariosSistemaView onBack={() => setCurrentView("admin")} />}
       {currentView === "planificacion" && <PlanificacionView onBack={() => setCurrentView("admin")} />}
-      {currentView === "rotativa_wizard" && <RotativaWizard onExit={() => setCurrentView("admin")} />}
       {currentView === "servicios" && <ServiciosView onBack={() => setCurrentView("admin")} />}
       {currentView === "asignacion" && <AsignacionView onBack={() => setCurrentView("admin")} />}
       {currentView === "jerarquia" && <JerarquiaView onBack={() => setCurrentView("admin")} />}

@@ -3,15 +3,17 @@ import { useAuth } from '../../context/AuthContext';
 import { SGT_DATA } from './data';
 import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
 import { reglasServicioService } from '../../services/reglasServicioService';
-import { tiposTurnoService, formatHora, shiftHora } from '../../services/plantillasService';
+import { tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/plantillasService';
+
+const HORAS_MIN = -5;
+const HORAS_MAX = 5;
 
 const FORM_VACIO = {
   idRegla: null,
   nombre: '',
   aplicaFinDeSemana: true,
   aplicaFeriado: true,
-  tiempoMinutos: 60,
-  activo: true,
+  horasDesplazar: '1',
   idTipoTurnoInicio: '',
   idTipoTurnoFin: '',
 };
@@ -57,8 +59,7 @@ const ReglasServicioView = ({ onBack }) => {
       nombre: r.nombre ?? '',
       aplicaFinDeSemana: !!r.aplicaFinDeSemana,
       aplicaFeriado: !!r.aplicaFeriado,
-      tiempoMinutos: r.tiempoMinutos ?? 0,
-      activo: !!r.activo,
+      horasDesplazar: String((r.tiempoMinutos ?? 0) / 60),
       idTipoTurnoInicio: r.idTipoTurnoInicio ?? '',
       idTipoTurnoFin: r.idTipoTurnoFin ?? '',
     });
@@ -66,9 +67,14 @@ const ReglasServicioView = ({ onBack }) => {
   };
   const cerrarForm = () => { setFormOpen(false); setForm(FORM_VACIO); };
 
+  const horasDesplazarNum = Number(form.horasDesplazar);
+  const horasEnRango = Number.isInteger(horasDesplazarNum)
+    && horasDesplazarNum >= HORAS_MIN && horasDesplazarNum <= HORAS_MAX;
+
   const puedeGuardar = form.nombre.trim() !== ''
     && (form.aplicaFinDeSemana || form.aplicaFeriado)
     && (form.idTipoTurnoInicio !== '' || form.idTipoTurnoFin !== '')
+    && horasEnRango
     && !guardando;
 
   const guardar = async () => {
@@ -76,10 +82,9 @@ const ReglasServicioView = ({ onBack }) => {
     const dto = {
       idServicio: Number(servicioId),
       nombre: form.nombre.trim(),
-      activo: form.activo,
       aplicaFinDeSemana: form.aplicaFinDeSemana,
       aplicaFeriado: form.aplicaFeriado,
-      tiempoMinutos: Number(form.tiempoMinutos) || 0,
+      tiempoMinutos: Math.round(horasDesplazarNum * 60),
       idTipoTurnoInicio: form.idTipoTurnoInicio !== '' ? Number(form.idTipoTurnoInicio) : null,
       idTipoTurnoFin: form.idTipoTurnoFin !== '' ? Number(form.idTipoTurnoFin) : null,
     };
@@ -185,7 +190,7 @@ const ReglasServicioView = ({ onBack }) => {
         <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
           <SGTIcon name="chevron-left" size={24} color={PA.ink} />
         </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Reglas de Servicio</div>
+        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Reglas de Horario del Servicio</div>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -230,12 +235,24 @@ const ReglasServicioView = ({ onBack }) => {
             </div>
 
             <div>
-              <label style={labelStyle}>Tiempo a desplazar (minutos)</label>
-              <input type="number" value={form.tiempoMinutos} onChange={e => setForm(f => ({ ...f, tiempoMinutos: e.target.value }))} style={inputStyle} />
+              <label style={labelStyle}>Tiempo a desplazar (horas)</label>
+              <input
+                type="number" step="1" min={HORAS_MIN} max={HORAS_MAX}
+                value={form.horasDesplazar}
+                onChange={e => setForm(f => ({ ...f, horasDesplazar: e.target.value }))}
+                style={inputStyle}
+              />
               <div style={{ fontSize: 11.5, color: PA.ink3, fontWeight: 600, marginTop: 6, lineHeight: 1.5 }}>
                 Se suma a la entrada del tipo elegido en "inicio" y a la salida del tipo elegido en "fin".
-                Ej.: +60 corre la entrada del día de 08:00 a 09:00 y la salida de la noche a 09:00.
+                Ej.: +1 h corre la entrada del día de 08:00 a 09:00 y la salida de la noche a 09:00.
+                Máximo ±{HORAS_MAX} h.
               </div>
+              {!horasEnRango && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: '#8C3F44', fontWeight: 700 }}>
+                  <SGTIcon name="alert" size={13} color="#8C3F44" />
+                  El ajuste debe ser un número entero de horas, entre {HORAS_MIN} y {HORAS_MAX}.
+                </div>
+              )}
             </div>
 
             <div>
@@ -247,8 +264,6 @@ const ReglasServicioView = ({ onBack }) => {
               <label style={labelStyle}>Tipo de turno cuya <strong>salida</strong> se ajusta</label>
               {selectTipo('idTipoTurnoFin')}
             </div>
-
-            {checkRow(form.activo, () => setForm(f => ({ ...f, activo: !f.activo })), 'Regla activa')}
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={cerrarForm} disabled={guardando} style={{
@@ -276,12 +291,11 @@ const ReglasServicioView = ({ onBack }) => {
             <div key={r.idRegla} style={{ background: '#fff', border: `1px solid ${PA.line2}`, borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink, flex: 1 }}>{r.nombre}</span>
-                <SGTBadge tone={r.activo ? 'success' : 'neutral'} size="xs">{r.activo ? 'Activa' : 'Inactiva'}</SGTBadge>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 {r.aplicaFinDeSemana && <SGTBadge tone="primary" size="xs">Fin de semana</SGTBadge>}
                 {r.aplicaFeriado && <SGTBadge tone="primary" size="xs">Feriado</SGTBadge>}
-                <SGTBadge tone="accent" size="xs">+{r.tiempoMinutos} min</SGTBadge>
+                <SGTBadge tone="accent" size="xs">{formatDesplazamientoHoras(r.tiempoMinutos)}</SGTBadge>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {r.idTipoTurnoInicio != null && filaCambio(r.idTipoTurnoInicio, r.nombreTipoTurnoInicio, 'inicio', r.tiempoMinutos)}

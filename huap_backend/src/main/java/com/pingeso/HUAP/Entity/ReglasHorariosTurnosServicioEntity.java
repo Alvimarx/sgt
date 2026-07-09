@@ -33,10 +33,6 @@ public class ReglasHorariosTurnosServicioEntity {
     private ServicioEntity servicio;
 
     @Builder.Default
-    @Column(name = "activo", nullable = false, columnDefinition = "bit(1) default 1")
-    private boolean activo = true;
-
-    @Builder.Default
     @Column(name = "eliminado", nullable = false, columnDefinition = "bit(1) default 0")
     private boolean eliminado = false;
 

@@ -1,6 +1,6 @@
 // reglasServicioService.js
 // Reglas de ajuste de horario por servicio (fin de semana / feriado).
-// DTO: { idRegla, idServicio, nombre, activo, aplicaFinDeSemana, aplicaFeriado,
+// DTO: { idRegla, idServicio, nombre, aplicaFinDeSemana, aplicaFeriado,
 //        tiempoMinutos, idTipoTurnoInicio|null, idTipoTurnoFin|null,
 //        nombreTipoTurnoInicio, nombreTipoTurnoFin }
 

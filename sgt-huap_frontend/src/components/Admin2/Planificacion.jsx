@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { plantillasService, tiposTurnoService, formatHora, shiftHora } from '../../services/plantillasService';
+import { plantillasService, tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/plantillasService';
 import { getPuestosPorServicio } from '../../services/puestosService';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { planificacionService } from '../../services/planificacionService';
@@ -276,7 +276,7 @@ function usePlanificacionState({plantillas,funcionarios,puestos}){
 }
 
 /* ─── InyectarSheet ──────────────────────────────────────────────────────────── */
-function InyectarSheet({open,onClose,onInject,plantillas,puestos,tipoColor}){
+function InyectarSheet({open,onClose,onInject,plantillas,puestos}){
   const[idPlantilla,setIdPlantilla]=useState('');
   const[idPuesto,setIdPuesto]=useState('');
   const[err,setErr]=useState('');
@@ -316,12 +316,13 @@ function InyectarSheet({open,onClose,onInject,plantillas,puestos,tipoColor}){
 
 /* ─── AsignarFuncionarioSheet ────────────────────────────────────────────────── */
 function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onRemove,instancias=[],funcionarios=[]}){
-  if(!open||!instancia)return null;
-  const[idFuncionario,setIdFuncionario]=useState(instancia.idFuncionario?String(instancia.idFuncionario):'');
+  const[idFuncionario,setIdFuncionario]=useState(instancia?.idFuncionario?String(instancia.idFuncionario):'');
   const[err,setErr]=useState('');
-  const totalTurnos=(instancia.secuencia||[]).reduce((s,d)=>s+d.length,0);
 
-  useEffect(()=>{ setIdFuncionario(instancia.idFuncionario?String(instancia.idFuncionario):''); setErr(''); },[instancia]);
+  useEffect(()=>{ setIdFuncionario(instancia?.idFuncionario?String(instancia.idFuncionario):''); setErr(''); },[instancia]);
+
+  if(!open||!instancia)return null;
+  const totalTurnos=(instancia.secuencia||[]).reduce((s,d)=>s+d.length,0);
 
   const handle=()=>{
     if(!idFuncionario)return setErr('Selecciona un funcionario.');
@@ -629,7 +630,7 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
     let activo=true;
     if(!servicioId){ setReglas([]); return; }
     reglasServicioService.getByServicio(servicioId)
-      .then(list=>{ if(activo)setReglas((Array.isArray(list)?list:[]).filter(r=>r.activo)); })
+      .then(list=>{ if(activo)setReglas(Array.isArray(list)?list:[]); })
       .catch(()=>{ if(activo)setReglas([]); });
     return()=>{ activo=false; };
   },[servicioId]);
@@ -791,7 +792,7 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
                         <span style={{fontSize:13.5,fontWeight:800,color:'var(--ink)',flex:1}}>{r.nombre}</span>
                         {r.aplicaFinDeSemana&&<span style={badgeMini}>Fin de semana</span>}
                         {r.aplicaFeriado&&<span style={badgeMini}>Feriado</span>}
-                        <span style={{...badgeMini,color:'var(--accent)',background:'var(--accent-soft)'}}>+{r.tiempoMinutos} min</span>
+                        <span style={{...badgeMini,color:'var(--accent)',background:'var(--accent-soft)'}}>{formatDesplazamientoHoras(r.tiempoMinutos)}</span>
                       </div>
                       <div style={{display:'flex',flexDirection:'column',gap:6}}>
                         {r.idTipoTurnoInicio!=null&&filaCambio(r.idTipoTurnoInicio,r.nombreTipoTurnoInicio,'inicio',r.tiempoMinutos)}
@@ -1005,7 +1006,7 @@ function PlanGuardarBase({onBack}){
         <button onClick={()=>setGenerarOpen(true)} disabled={instancias.length===0} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:12,background:instancias.length===0?'var(--line)':'var(--primary)',color:instancias.length===0?'var(--ink3)':'#fff',border:'none',fontSize:14.5,fontWeight:800,cursor:instancias.length===0?'not-allowed':'pointer',fontFamily:'inherit'}}><SGTIcon name="check" size={17} color={instancias.length===0?'var(--ink3)':'#fff'}/> Generar planificación</button>
       </div>
 
-      <InyectarSheet open={injectOpen} onClose={()=>setInjectOpen(false)} onInject={onInject} plantillas={plantillas} puestos={puestos} tipoColor={tipoColor}/>
+      <InyectarSheet open={injectOpen} onClose={()=>setInjectOpen(false)} onInject={onInject} plantillas={plantillas} puestos={puestos}/>
       <MoldesSheet open={moldesOpen} onClose={()=>setMoldesOpen(false)} onSave={onSave} onLoad={onLoad} onDelete={onDeleteMolde} instancias={instancias} moldes={moldes} loading={cargandoMoldes} nombreInicial={planNombre} planActualId={planActualId}/>
       <AsignarFuncionarioSheet open={!!assignInstance} onClose={()=>setAssignInstance(null)} instancia={assignInstance?instancias.find(i=>i.id===assignInstance.id):null} instancias={instancias} funcionarios={funcionarios} onAssign={onAssign} onUnassign={(id)=>{ unassign(id); flash('Asignación retirada'); }} onRemove={(id)=>{ removeInstancia(id); flash('Rotativa quitada'); }}/>
       <DetalleDiaSheet open={detailDia!=null} onClose={()=>setDetailDia(null)} diaIndex={detailDia} entradasDelDia={dayEntradas} tipoColor={tipoColor} onAssignInstance={(inst)=>{ setDetailDia(null); setTimeout(()=>setAssignInstance(inst),220); }}/>

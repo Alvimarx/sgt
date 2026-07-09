@@ -59,7 +59,6 @@ public class ReglaServicioService {
         ReglasHorariosTurnosServicioEntity regla = ReglasHorariosTurnosServicioEntity.builder()
                 .nombre(dto.getNombre().trim())
                 .servicio(servicio)
-                .activo(dto.isActivo())
                 .aplicaFinDeSemana(dto.isAplicaFinDeSemana())
                 .aplicaFeriado(dto.isAplicaFeriado())
                 .tiempoMinutos(dto.getTiempoMinutos())
@@ -76,7 +75,6 @@ public class ReglaServicioService {
         validarNombre(dto.getNombre());
 
         regla.setNombre(dto.getNombre().trim());
-        regla.setActivo(dto.isActivo());
         regla.setAplicaFinDeSemana(dto.isAplicaFinDeSemana());
         regla.setAplicaFeriado(dto.isAplicaFeriado());
         regla.setTiempoMinutos(dto.getTiempoMinutos());
@@ -97,12 +95,12 @@ public class ReglaServicioService {
     // =========================================================
 
     /**
-     * Carga las reglas seleccionadas (activas, no eliminadas, del servicio) para una
-     * generación. Sin ids (null o vacío) devuelve lista vacía → no se aplica ninguna.
+     * Carga las reglas seleccionadas (no eliminadas, del servicio) para una generación.
+     * Sin ids (null o vacío) devuelve lista vacía → no se aplica ninguna.
      */
     public List<ReglasHorariosTurnosServicioEntity> cargarReglasSeleccionadas(Long idServicio, List<Long> idsReglas) {
         if (idsReglas == null || idsReglas.isEmpty()) return List.of();
-        return reglaRepository.findByServicio_IdServicioAndActivoTrueAndEliminadoFalse(idServicio).stream()
+        return reglaRepository.findByServicio_IdServicioAndEliminadoFalse(idServicio).stream()
                 .filter(r -> idsReglas.contains(r.getIdRegla()))
                 .toList();
     }
@@ -193,7 +191,6 @@ public class ReglaServicioService {
                 .idRegla(r.getIdRegla())
                 .idServicio(r.getServicio() != null ? r.getServicio().getIdServicio() : null)
                 .nombre(r.getNombre())
-                .activo(r.isActivo())
                 .aplicaFinDeSemana(r.isAplicaFinDeSemana())
                 .aplicaFeriado(r.isAplicaFeriado())
                 .tiempoMinutos(r.getTiempoMinutos())

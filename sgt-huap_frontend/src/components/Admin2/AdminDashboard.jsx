@@ -25,7 +25,7 @@ const AdminCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoReglas, onGoAsignacionTurnos }) => {
+const AdminDashboard = ({ onBack, onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoReglas, onGoAsignacionTurnos }) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -115,7 +115,7 @@ const AdminDashboard = ({ onBack, onGoRotativa,onGoFuncionariosSistema, onGoServ
         />
         <AdminCard
           icon="sliders"
-          title="Reglas de Servicio"
+          title="Reglas de Horario del Servicio"
           desc="Ajuste automático de horas en fines de semana y feriados."
           tone="accent"
           onClick={onGoReglas}
