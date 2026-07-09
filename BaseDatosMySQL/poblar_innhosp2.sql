@@ -37,6 +37,9 @@ TRUNCATE TABLE Notificacion2;
 TRUNCATE TABLE Bitacora_eventos;
 TRUNCATE TABLE Solicitudes;
 TRUNCATE TABLE Turnos;
+TRUNCATE TABLE planificacion_asignacion;
+TRUNCATE TABLE planificacion;
+TRUNCATE TABLE reglas_horarios_turnos_servicio;
 TRUNCATE TABLE plantilla_secuencia_dias;
 TRUNCATE TABLE plantilla_turno;
 TRUNCATE TABLE plantilla;
@@ -78,6 +81,10 @@ INSERT INTO servicios (id_servicio, nombre, eliminado) VALUES
 (1, 'Medicina Interna', 0),
 (2, 'Enfermería', 0),
 (3, 'Cirugía', 0);
+
+-- Urgencias (MVP)
+INSERT INTO servicios (id_servicio, nombre, eliminado) VALUES
+(4, 'Urgencias', 0);
 
 -- ==============================================================
 -- 3b. FERIADOS  →  tabla: feriados
@@ -173,6 +180,91 @@ INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Es
 (205, 'Camila',      'Vega',     'Soto',      '11111116', '6', 1, 0, 'Médico Cirujano',         2),
 (206, 'Diego',       'Rojas',    'Mora',      '11111117', '7', 1, 0, 'Médico Cirujano',         2);
 
+-- Urgencias (id_servicio = 4)
+INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA) VALUES
+-- Coordinador → JEFATURA (rol_sistema=1 ADMINISTRADOR)
+(300, 'Ruben', 'Nissin', '', '30000001', '1', 1, 0, 'Médico Urgenciólogo', 1),
+(301, 'Eulin', 'Klein', '', '30000002', '2', 1, 0, 'Médico Urgenciólogo', 1),
+(302, 'Mauricio', 'Muñoz', '', '30000003', '3', 1, 0, 'Médico Urgenciólogo', 1),
+(303, 'Eugenio', 'Donaire', '', '30000004', '4', 1, 0, 'Médico Urgenciólogo', 1),
+(304, 'Mario', 'Galarce', '', '30000005', '5', 1, 0, 'Médico Urgenciólogo', 1),
+(305, 'Flavio', 'Ayala', '', '30000006', '6', 1, 0, 'Médico Urgenciólogo', 1),
+-- Urgenciólogos y Médicos Generales → USUARIO (rol_sistema=2)
+(306, 'Carolina', 'Millacura', '', '30000007', '7', 1, 0, 'Médico Urgenciólogo', 2),
+(307, 'Augusto', 'Araya', '', '30000008', '8', 1, 0, 'Médico Urgenciólogo', 2),
+(308, 'Miguel', 'Morales', '', '30000009', '9', 1, 0, 'Médico Urgenciólogo', 2),
+(309, 'Sandra', 'Flores', '', '30000010', '0', 1, 0, 'Médico Urgenciólogo', 2),
+(310, 'Macarena', 'Marín', '', '30000011', '1', 1, 0, 'Médico Urgenciólogo', 2),
+(311, 'David', 'Diaz', '', '30000012', '2', 1, 0, 'Médico Urgenciólogo', 2),
+(312, 'Camila', 'Alegria', '', '30000013', '3', 1, 0, 'Médico Urgenciólogo', 2),
+(313, 'Nicolás', 'Benedetti', '', '30000014', '4', 1, 0, 'Médico Urgenciólogo', 2),
+(314, 'Carla', 'Rey', '', '30000015', '5', 1, 0, 'Médico Urgenciólogo', 2),
+(315, 'Alvaro', 'Fredricksen', '', '30000016', '6', 1, 0, 'Médico Urgenciólogo', 2),
+(316, 'Marco', 'Montero', '', '30000017', '7', 1, 0, 'Médico Urgenciólogo', 2),
+(317, 'Gabriela', 'Toro', '', '30000018', '8', 1, 0, 'Médico Urgenciólogo', 2),
+(318, 'Catalina', 'Espinal', '', '30000019', '9', 1, 0, 'Médico Urgenciólogo', 2),
+(319, 'Ricardo', 'Rojas', '', '30000020', '0', 1, 0, 'Médico Urgenciólogo', 2),
+(320, 'Jose', 'Mayorga', '', '30000021', '1', 1, 0, 'Médico Urgenciólogo', 2),
+(321, 'Pilar', 'Farias', '', '30000022', '2', 1, 0, 'Médico Urgenciólogo', 2),
+(322, 'Antonia', 'Sanchez', '', '30000023', '3', 1, 0, 'Médico Urgenciólogo', 2),
+(323, 'Rose', 'Herrera', '', '30000024', '4', 1, 0, 'Médico Urgenciólogo', 2),
+(324, 'Joaquin', 'Collao', '', '30000025', '5', 1, 0, 'Médico Urgenciólogo', 2),
+(325, 'Claudio', 'Ojeda', '', '30000026', '6', 1, 0, 'Médico Urgenciólogo', 2),
+(326, 'Matias', 'López', '', '30000027', '7', 1, 0, 'Médico Urgenciólogo', 2),
+(327, 'Grace', 'Slater', '', '30000028', '8', 1, 0, 'Médico Urgenciólogo', 2),
+(328, 'Cristian', 'Gandara', '', '30000029', '9', 1, 0, 'Médico Urgenciólogo', 2),
+(329, 'Catalina', 'Astudillo', '', '30000030', '0', 1, 0, 'Médico General', 2),
+(330, 'Álvaro', 'Grupe', '', '30000031', '1', 1, 0, 'Médico General', 2),
+(331, 'Cristina', 'Rauchfuss', '', '30000032', '2', 1, 0, 'Médico General', 2),
+(332, 'Ambar', 'Zuñiga', '', '30000033', '3', 1, 0, 'Médico General', 2),
+(333, 'Regina', 'Piñero', '', '30000034', '4', 1, 0, 'Médico General', 2),
+(334, 'Andrés', 'Vargas', '', '30000035', '5', 1, 0, 'Médico General', 2),
+(335, 'Hernán', 'Correa', '', '30000036', '6', 1, 0, 'Médico General', 2),
+(336, 'Sindy', 'Lamothe', '', '30000037', '7', 1, 0, 'Médico General', 2),
+(337, 'Jose', 'Molero', '', '30000038', '8', 1, 0, 'Médico General', 2),
+(338, 'Ismael', 'Laing', '', '30000039', '9', 1, 0, 'Médico General', 2),
+(339, 'Pedro', 'Marín', '', '30000040', '0', 1, 0, 'Médico General', 2),
+(340, 'Claudia', 'Díaz', '', '30000041', '1', 1, 0, 'Médico General', 2),
+(341, 'Joaquin', 'Galvez', '', '30000042', '2', 1, 0, 'Médico General', 2),
+(342, 'Rolando', 'Sanchez', '', '30000043', '3', 1, 0, 'Médico General', 2),
+(343, 'Paula', 'Escobar', '', '30000044', '4', 1, 0, 'Médico General', 2),
+(344, 'Karla', 'Schweitzer', '', '30000045', '5', 1, 0, 'Médico General', 2),
+(345, 'Tomas', 'Gatica', '', '30000046', '6', 1, 0, 'Médico General', 2),
+(346, 'Andrea', 'Carroza', '', '30000047', '7', 1, 0, 'Médico General', 2),
+(347, 'Fiorella', 'Alfieri', '', '30000048', '8', 1, 0, 'Médico General', 2),
+(348, 'Victor', 'Linares', '', '30000049', '9', 1, 0, 'Médico General', 2),
+(349, 'Johnny', 'Arias', '', '30000050', '0', 1, 0, 'Médico General', 2),
+(350, 'Melanie', 'Jarpa', '', '30000051', '1', 1, 0, 'Médico General', 2),
+(351, 'Camila', 'Bozan', '', '30000052', '2', 1, 0, 'Médico General', 2),
+(352, 'Joanna', 'Vilchez', '', '30000053', '3', 1, 0, 'Médico General', 2),
+(353, 'Tania', 'Machado', '', '30000054', '4', 1, 0, 'Médico General', 2),
+(354, 'Marcela', 'Valenzuela', '', '30000055', '5', 1, 0, 'Médico General', 2),
+(355, 'Maria Jose', 'Inostroza', '', '30000056', '6', 1, 0, 'Médico General', 2),
+(356, 'Scarlet', 'Burgos', '', '30000057', '7', 1, 0, 'Médico General', 2),
+(357, 'Carolina', 'Arcoverde', '', '30000058', '8', 1, 0, 'Médico General', 2),
+(358, 'Rodrigo', 'Rios', '', '30000059', '9', 1, 0, 'Médico General', 2),
+(359, 'Montserrat', 'Cunill', '', '30000060', '0', 1, 0, 'Médico General', 2),
+(360, 'Belen', 'Jorquera', '', '30000061', '1', 1, 0, 'Médico General', 2),
+(361, 'Camila', 'Corvalán', '', '30000062', '2', 1, 0, 'Médico General', 2),
+(362, 'Domingo', 'Andreani', '', '30000063', '3', 1, 0, 'Médico General', 2),
+(363, 'Macarena', 'Hipp', '', '30000064', '4', 1, 0, 'Médico General', 2),
+(364, 'Alejandro', 'Núñez', '', '30000065', '5', 1, 0, 'Médico General', 2),
+(365, 'Maria', 'Houston', '', '30000066', '6', 1, 0, 'Médico General', 2),
+(366, 'Maria Ignacia', 'Horta', '', '30000067', '7', 1, 0, 'Médico General', 2),
+(367, 'Bruno', 'Di Cosmo', '', '30000068', '8', 1, 0, 'Médico General', 2),
+(368, 'Daniela', 'García', '', '30000069', '9', 1, 0, 'Médico General', 2),
+(369, 'Pablo', 'Garrido', '', '30000070', '0', 1, 0, 'Médico General', 2),
+(370, 'Manuel', 'Candia', '', '30000071', '1', 1, 0, 'Médico General', 2),
+(371, 'Jose', 'Castañeda', '', '30000072', '2', 1, 0, 'Médico General', 2),
+(372, 'Valery', 'Gallardo', '', '30000073', '3', 1, 0, 'Médico General', 2),
+(373, 'Macarena', 'Briones', '', '30000074', '4', 1, 0, 'Médico General', 2),
+(374, 'Diego', 'Torres', '', '30000075', '5', 1, 0, 'Médico General', 2),
+(375, 'Nicolas', 'Cid', '', '30000076', '6', 1, 0, 'Médico General', 2),
+(376, 'Francisco', 'Echeverria', '', '30000077', '7', 1, 0, 'Médico General', 2),
+(377, 'Alvaro', 'Lopez', '', '30000078', '8', 1, 0, 'Médico General', 2),
+(378, 'Alexandra', 'Metcalfe', '', '30000079', '9', 1, 0, 'Médico General', 2),
+(379, 'Pailla', 'Gatiga', '', '30000080', '0', 1, 0, 'Médico General', 2);
+
 -- ==============================================================
 -- 5. SERVICIOS_FUNCIONARIO  →  tabla: Servicios_Funcionario
 -- Columnas FK: ID_FUNCIONARIO, id_servicio, id_rol_servicio
@@ -218,6 +310,89 @@ INSERT INTO Servicios_Funcionario (ID_FUNCIONARIO, id_servicio, id_rol_servicio)
 (205, 3, 3),
 (206, 3, 3);
 
+-- Urgencias (id_servicio = 4)
+INSERT INTO Servicios_Funcionario (ID_FUNCIONARIO, id_servicio, id_rol_servicio) VALUES
+(300, 4, 1),
+(301, 4, 1),
+(302, 4, 1),
+(303, 4, 1),
+(304, 4, 1),
+(305, 4, 1),
+(306, 4, 3),
+(307, 4, 3),
+(308, 4, 3),
+(309, 4, 3),
+(310, 4, 3),
+(311, 4, 3),
+(312, 4, 3),
+(313, 4, 3),
+(314, 4, 3),
+(315, 4, 3),
+(316, 4, 3),
+(317, 4, 3),
+(318, 4, 3),
+(319, 4, 3),
+(320, 4, 3),
+(321, 4, 3),
+(322, 4, 3),
+(323, 4, 3),
+(324, 4, 3),
+(325, 4, 3),
+(326, 4, 3),
+(327, 4, 3),
+(328, 4, 3),
+(329, 4, 3),
+(330, 4, 3),
+(331, 4, 3),
+(332, 4, 3),
+(333, 4, 3),
+(334, 4, 3),
+(335, 4, 3),
+(336, 4, 3),
+(337, 4, 3),
+(338, 4, 3),
+(339, 4, 3),
+(340, 4, 3),
+(341, 4, 3),
+(342, 4, 3),
+(343, 4, 3),
+(344, 4, 3),
+(345, 4, 3),
+(346, 4, 3),
+(347, 4, 3),
+(348, 4, 3),
+(349, 4, 3),
+(350, 4, 3),
+(351, 4, 3),
+(352, 4, 3),
+(353, 4, 3),
+(354, 4, 3),
+(355, 4, 3),
+(356, 4, 3),
+(357, 4, 3),
+(358, 4, 3),
+(359, 4, 3),
+(360, 4, 3),
+(361, 4, 3),
+(362, 4, 3),
+(363, 4, 3),
+(364, 4, 3),
+(365, 4, 3),
+(366, 4, 3),
+(367, 4, 3),
+(368, 4, 3),
+(369, 4, 3),
+(370, 4, 3),
+(371, 4, 3),
+(372, 4, 3),
+(373, 4, 3),
+(374, 4, 3),
+(375, 4, 3),
+(376, 4, 3),
+(377, 4, 3),
+(378, 4, 3),
+(379, 4, 3);
+
 -- ==============================================================
 -- 6. PUESTOS  →  tabla: puestos
 -- Columnas: nombre, id_servicio
@@ -248,6 +423,24 @@ INSERT INTO puestos (nombre, id_servicio) VALUES
 ('Enfermero/a de Recuperación Post-Anestésica', 3),
 ('TENS Arsenalero/a', 3);
 
+-- Urgencias (id_servicio = 4)
+INSERT INTO puestos (nombre, id_servicio) VALUES
+('Coordinador', 4),
+('Urgenciólogo 1', 4),
+('Urgenciólogo 2', 4),
+('Urgenciólogo 3', 4),
+('Urgenciólogo 4', 4),
+('Médico General 1', 4),
+('Médico General 2', 4),
+('Médico General 3', 4),
+('Médico General 4', 4),
+('Médico General 5', 4),
+('Médico General 6', 4),
+('Médico General 7', 4),
+('Médico General 8', 4),
+('Médico General 9', 4),
+('Médico General 10', 4);
+
 -- ==============================================================
 -- 7. TIPO_SOLICITUD  →  tabla: Tipo_Solicitud
 -- Columnas: ID_TIPO_SOLICITUD, Tipo
@@ -270,6 +463,15 @@ INSERT INTO plantilla (id_servicio, nombre, semanas) VALUES
 (2, 'Plantilla Estándar - Enfermería',        4),  -- id auto = 2
 (3, 'Plantilla Estándar - Cirugía',           2);  -- id auto = 3
 
+-- Urgencias (id_servicio=4) — 6 rotativas de 6 semanas cada una
+INSERT INTO plantilla (id_servicio, nombre, semanas) VALUES
+(4, 'Miercoles Turno (T I)', 6),  -- id auto = 4
+(4, 'Martes Turno (T II)',    6),  -- id auto = 5
+(4, 'Lunes Turno (T III)',     6),  -- id auto = 6
+(4, 'Viernes Turno (T IV)',   6),  -- id auto = 7
+(4, 'Jueves Turno (T V)',    6),  -- id auto = 8
+(4, 'Volante (T VOL)',      6);  -- id auto = 9
+
 -- ==============================================================
 -- 9. PLANTILLA_TURNO  →  tabla: plantilla_turno
 -- Catálogo de tipos de turno POR SERVICIO (no por plantilla).
@@ -287,6 +489,11 @@ INSERT INTO plantilla_turno (id_servicio, hora_inicio, hora_termino, nombre) VAL
 -- Cirugía (id_servicio=3)
 (3, '08:00:00', '20:00:00', 'Diurno CIR'),    -- id auto = 5
 (3, '20:00:00', '08:00:00', 'Nocturno CIR');  -- id auto = 6
+
+-- Urgencias (id_servicio=4) — mismos rangos horarios que Diurno/Nocturno MI
+INSERT INTO plantilla_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
+(4, '08:00:00', '20:00:00', 'Dia'),     -- id auto = 7
+(4, '20:00:00', '08:00:00', 'Noche');   -- id auto = 8
 
 -- ==============================================================
 -- 10. PLANTILLA_SECUENCIA_DIAS  →  tabla: plantilla_secuencia_dias
@@ -327,6 +534,87 @@ INSERT INTO plantilla_secuencia_dias (id_plantilla, dia_index, id_plantilla_turn
 (3,  0, 5), (3,  1, 5), (3,  2, 6), (3,  3, NULL), (3,  4, NULL), (3,  5, NULL), (3,  6, NULL),
 -- Cirugía — Semana 2 (índices 7–13)
 (3,  7, 5), (3,  8, 5), (3,  9, 6), (3, 10, NULL), (3, 11, NULL), (3, 12, NULL), (3, 13, NULL);
+
+-- Urgencias — secuencias de 6 semanas (42 días) por rotativa.
+-- id_plantilla_turno: 7=Dia  8=Noche  NULL=día libre.
+INSERT INTO plantilla_secuencia_dias (id_plantilla, dia_index, id_plantilla_turno) VALUES
+-- Plantilla 4: Miercoles Turno (T1)
+(4,0,NULL),(4,1,NULL),(4,2,7),(4,3,NULL),(4,4,NULL),(4,5,8),(4,6,NULL),
+(4,7,NULL),(4,8,NULL),(4,9,7),(4,10,8),(4,11,NULL),(4,12,NULL),(4,13,NULL),
+(4,14,NULL),(4,15,NULL),(4,16,7),(4,17,8),(4,18,NULL),(4,19,NULL),(4,20,NULL),
+(4,21,NULL),(4,22,NULL),(4,23,7),(4,24,8),(4,25,NULL),(4,26,NULL),(4,27,NULL),
+(4,28,NULL),(4,29,NULL),(4,30,7),(4,31,8),(4,32,NULL),(4,33,7),(4,34,8),
+(4,35,NULL),(4,36,NULL),(4,37,NULL),(4,38,NULL),(4,39,8),(4,40,NULL),(4,41,7),
+-- Plantilla 5: Martes Turno (T2)
+(5,0,NULL),(5,1,NULL),(5,2,NULL),(5,3,NULL),(5,4,8),(5,5,NULL),(5,6,7),
+(5,7,NULL),(5,8,7),(5,9,NULL),(5,10,NULL),(5,11,NULL),(5,12,8),(5,13,NULL),
+(5,14,NULL),(5,15,7),(5,16,8),(5,17,NULL),(5,18,NULL),(5,19,NULL),(5,20,NULL),
+(5,21,NULL),(5,22,7),(5,23,8),(5,24,NULL),(5,25,NULL),(5,26,NULL),(5,27,NULL),
+(5,28,NULL),(5,29,7),(5,30,8),(5,31,NULL),(5,32,NULL),(5,33,NULL),(5,34,NULL),
+(5,35,NULL),(5,36,7),(5,37,8),(5,38,NULL),(5,39,NULL),(5,40,7),(5,41,8),
+-- Plantilla 6: Lunes Turno (T3)
+(6,0,7),(6,1,8),(6,2,NULL),(6,3,NULL),(6,4,NULL),(6,5,7),(6,6,8),
+(6,7,NULL),(6,8,NULL),(6,9,NULL),(6,10,NULL),(6,11,8),(6,12,NULL),(6,13,7),
+(6,14,7),(6,15,NULL),(6,16,NULL),(6,17,NULL),(6,18,NULL),(6,19,8),(6,20,NULL),
+(6,21,7),(6,22,8),(6,23,NULL),(6,24,NULL),(6,25,NULL),(6,26,NULL),(6,27,NULL),
+(6,28,7),(6,29,8),(6,30,NULL),(6,31,NULL),(6,32,NULL),(6,33,NULL),(6,34,NULL),
+(6,35,7),(6,36,8),(6,37,NULL),(6,38,NULL),(6,39,NULL),(6,40,NULL),(6,41,NULL),
+-- Plantilla 7: Viernes Turno (T4)
+(7,0,NULL),(7,1,NULL),(7,2,8),(7,3,NULL),(7,4,7),(7,5,NULL),(7,6,NULL),
+(7,7,NULL),(7,8,NULL),(7,9,8),(7,10,NULL),(7,11,7),(7,12,NULL),(7,13,NULL),
+(7,14,NULL),(7,15,8),(7,16,NULL),(7,17,NULL),(7,18,7),(7,19,7),(7,20,8),
+(7,21,NULL),(7,22,NULL),(7,23,NULL),(7,24,NULL),(7,25,8),(7,26,NULL),(7,27,7),
+(7,28,NULL),(7,29,NULL),(7,30,NULL),(7,31,NULL),(7,32,7),(7,33,8),(7,34,NULL),
+(7,35,8),(7,36,NULL),(7,37,NULL),(7,38,NULL),(7,39,7),(7,40,NULL),(7,41,NULL),
+-- Plantilla 8: Jueves Turno (T5)
+(8,0,8),(8,1,NULL),(8,2,NULL),(8,3,7),(8,4,NULL),(8,5,NULL),(8,6,NULL),
+(8,7,8),(8,8,NULL),(8,9,NULL),(8,10,7),(8,11,NULL),(8,12,NULL),(8,13,NULL),
+(8,14,8),(8,15,NULL),(8,16,NULL),(8,17,7),(8,18,NULL),(8,19,NULL),(8,20,NULL),
+(8,21,8),(8,22,NULL),(8,23,NULL),(8,24,7),(8,25,NULL),(8,26,7),(8,27,8),
+(8,28,NULL),(8,29,NULL),(8,30,NULL),(8,31,NULL),(8,32,8),(8,33,NULL),(8,34,7),
+(8,35,NULL),(8,36,NULL),(8,37,NULL),(8,38,7),(8,39,NULL),(8,40,8),(8,41,NULL),
+-- Plantilla 9: Volante (T VOL)
+(9,0,NULL),(9,1,7),(9,2,NULL),(9,3,8),(9,4,NULL),(9,5,NULL),(9,6,NULL),
+(9,7,7),(9,8,8),(9,9,NULL),(9,10,NULL),(9,11,NULL),(9,12,7),(9,13,8),
+(9,14,NULL),(9,15,NULL),(9,16,NULL),(9,17,NULL),(9,18,8),(9,19,NULL),(9,20,7),
+(9,21,NULL),(9,22,NULL),(9,23,NULL),(9,24,NULL),(9,25,7),(9,26,8),(9,27,NULL),
+(9,28,8),(9,29,NULL),(9,30,NULL),(9,31,7),(9,32,NULL),(9,33,NULL),(9,34,NULL),
+(9,35,NULL),(9,36,NULL),(9,37,7),(9,38,8),(9,39,NULL),(9,40,NULL),(9,41,NULL);
+
+-- ==============================================================
+-- 10b. REGLAS_HORARIOS_TURNOS_SERVICIO  →  tabla: reglas_horarios_turnos_servicio
+-- Urgencias (id_servicio = 4). id_tipo_turno_inicio=7(Dia) id_tipo_turno_fin=8(Noche).
+-- ==============================================================
+INSERT INTO reglas_horarios_turnos_servicio
+    (nombre, id_servicio, eliminado, aplica_fin_de_semana, aplica_feriado, id_tipo_turno_inicio, id_tipo_turno_fin, tiempo_minutos)
+VALUES
+    ('Regla urgencias', 4, 0, 1, 1, 7, 8, 60);
+
+-- ==============================================================
+-- 10c. PLANIFICACION  →  tabla: planificacion
+-- Molde de rotativas de Urgencias (id_servicio = 4). Sin asignaciones aún
+-- (planificacion_asignacion queda para cuando se definan los funcionarios).
+-- ==============================================================
+INSERT INTO planificacion (nombre, id_servicio) VALUES
+('Rotativa 2026', 4);
+
+-- Urgencias — asignaciones de "Rotativa 2026" (id_planificacion = 1)
+INSERT INTO planificacion_asignacion (id_planificacion, id_plantilla, id_funcionario, id_puesto) VALUES
+(1, 6, 300, 17), (1, 5, 301, 17), (1, 4, 302, 17), (1, 8, 303, 17), (1, 7, 304, 17), (1, 9, 305, 17),  -- Coordinador
+(1, 6, 306, 18), (1, 5, 307, 18), (1, 4, 308, 18), (1, 8, 309, 18), (1, 7, 310, 18), (1, 9, 311, 18),  -- Urgenciólogo 1
+(1, 6, 312, 19), (1, 5, 313, 19), (1, 4, 314, 19), (1, 8, 315, 19), (1, 7, 316, 19), (1, 9, 317, 19),  -- Urgenciólogo 2
+(1, 6, 318, 20), (1, 5, 319, 20), (1, 4, 320, 20), (1, 8, 321, 20), (1, 7, 322, 20), (1, 9, 323, 20),  -- Urgenciólogo 3
+(1, 6, 324, 21), (1, 5, 325, 21), (1, 4, NULL, 21), (1, 8, 326, 21), (1, 7, 327, 21), (1, 9, 328, 21),  -- Urgenciólogo 4
+(1, 6, 329, 22), (1, 5, 330, 22), (1, 4, 331, 22), (1, 8, 332, 22), (1, 7, 333, 22), (1, 9, 334, 22),  -- Médico General 1
+(1, 6, 335, 23), (1, 5, 336, 23), (1, 4, 337, 23), (1, 8, 338, 23), (1, 7, 339, 23), (1, 9, 340, 23),  -- Médico General 2
+(1, 6, 341, 24), (1, 5, 342, 24), (1, 4, 343, 24), (1, 8, 344, 24), (1, 7, 345, 24), (1, 9, 346, 24),  -- Médico General 3
+(1, 6, 347, 25), (1, 5, 348, 25), (1, 4, 349, 25), (1, 8, 350, 25), (1, 7, 351, 25), (1, 9, 352, 25),  -- Médico General 4
+(1, 6, 353, 26), (1, 5, 354, 26), (1, 4, 355, 26), (1, 8, 356, 26), (1, 7, 357, 26), (1, 9, 358, 26),  -- Médico General 5
+(1, 6, 359, 27), (1, 5, 360, 27), (1, 4, 361, 27), (1, 8, 362, 27), (1, 7, 363, 27), (1, 9, 364, 27),  -- Médico General 6
+(1, 6, 365, 28), (1, 5, 333, 28), (1, 4, 366, 28), (1, 8, 367, 28), (1, 7, 368, 28), (1, 9, 369, 28),  -- Médico General 7
+(1, 6, 370, 29), (1, 5, 371, 29), (1, 4, 372, 29), (1, 8, 373, 29), (1, 7, 354, 29), (1, 9, NULL, 29),  -- Médico General 8
+(1, 6, 374, 30), (1, 5, 339, 30), (1, 4, 339, 30), (1, 8, 375, 30), (1, 7, 358, 30), (1, 9, 376, 30),  -- Médico General 9
+(1, 6, 377, 31), (1, 5, 337, 31), (1, 4, NULL, 31), (1, 8, 378, 31), (1, 7, 379, 31), (1, 9, NULL, 31);  -- Médico General 10
 
 -- ==============================================================
 -- 11. TURNOS  →  tabla: Turnos

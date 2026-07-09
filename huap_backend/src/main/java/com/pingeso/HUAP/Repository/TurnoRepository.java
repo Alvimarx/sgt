@@ -156,6 +156,22 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
+    // Variante en bloque de findConflictosByFuncionario: trae los conflictos de varios
+    // funcionarios en una sola consulta (usado para precargar antes de una generación masiva).
+    @Query("""
+           SELECT t
+           FROM TurnoEntity t
+           WHERE t.funcionario.idFuncionario IN :funcionarioIds
+           AND t.diaFinalTurno >= :fechaInicio
+           AND t.diaInicioTurno <= :fechaFin
+           AND t.eliminado = false
+           """)
+    List<TurnoEntity> findConflictosByFuncionarios(
+            @Param("funcionarioIds") List<Long> funcionarioIds,
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin
+    );
+
     // Búsqueda en un Puesto específico
     @Query("""
            SELECT t

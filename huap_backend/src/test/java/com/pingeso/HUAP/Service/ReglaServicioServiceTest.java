@@ -4,7 +4,6 @@ import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Entity.ReglasHorariosTurnosServicioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
-import com.pingeso.HUAP.Repository.FeriadoRepository;
 import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
 import com.pingeso.HUAP.Repository.ReglasHorariosTurnosServicioRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
@@ -13,15 +12,15 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
  * Pruebas de la aplicación de reglas en {@link ReglaServicioService}. {@code aplicarReglas}
- * recibe las reglas ya seleccionadas; la ENTRADA se ajusta según el día de inicio y la
- * SALIDA según el día final.
+ * recibe las reglas ya seleccionadas y el set de feriados ya precargado; la ENTRADA se ajusta
+ * según el día de inicio y la SALIDA según el día final.
  *
  * Calendario real: 2026-06-05 = viernes, 06 = sábado, 07 = domingo, 08 = lunes.
  */
@@ -36,10 +35,9 @@ class ReglaServicioServiceTest {
     private final ReglasHorariosTurnosServicioRepository reglaRepo = mock(ReglasHorariosTurnosServicioRepository.class);
     private final ServicioRepository servicioRepo = mock(ServicioRepository.class);
     private final PlantillaTurnoRepository tipoRepo = mock(PlantillaTurnoRepository.class);
-    private final FeriadoRepository feriadoRepo = mock(FeriadoRepository.class);
 
     private final ReglaServicioService service =
-            new ReglaServicioService(reglaRepo, servicioRepo, tipoRepo, feriadoRepo);
+            new ReglaServicioService(reglaRepo, servicioRepo, tipoRepo);
 
     private static PlantillaTurnoEntity tipo(long id, String nombre) {
         PlantillaTurnoEntity t = new PlantillaTurnoEntity();
@@ -53,7 +51,7 @@ class ReglaServicioServiceTest {
                                                             boolean finde, boolean feriado, int tiempo) {
         return ReglasHorariosTurnosServicioEntity.builder()
                 .idRegla(idRegla).nombre("regla")
-                .activo(true).aplicaFinDeSemana(finde).aplicaFeriado(feriado)
+                .aplicaFinDeSemana(finde).aplicaFeriado(feriado)
                 .tiempoMinutos(tiempo)
                 .tipoTurnoInicio(tipoInicio).tipoTurnoFin(tipoFin)
                 .build();
@@ -71,10 +69,9 @@ class ReglaServicioServiceTest {
     @Test
     void diurno_ajustaEntrada_enSabado() {
         PlantillaTurnoEntity diurno = tipo(1, "Diurno");
-        when(feriadoRepo.existsByFecha(any())).thenReturn(false);
 
         TurnoEntity t = turno(diurno, SABADO, SABADO, LocalTime.of(8, 0), LocalTime.of(20, 0));
-        service.aplicarReglas(t, List.of(regla(1L, diurno, null, true, true, 60)));
+        service.aplicarReglas(t, List.of(regla(1L, diurno, null, true, true, 60)), Set.of());
 
         assertEquals(LocalTime.of(9, 0), t.getHoraInicio());
         assertEquals(LocalTime.of(20, 0), t.getHoraFin());
@@ -83,10 +80,9 @@ class ReglaServicioServiceTest {
     @Test
     void nocturno_ajustaSalida_cuandoTerminaEnSabado() {
         PlantillaTurnoEntity nocturno = tipo(2, "Nocturno");
-        when(feriadoRepo.existsByFecha(any())).thenReturn(false);
 
         TurnoEntity t = turno(nocturno, VIERNES, SABADO, LocalTime.of(20, 0), LocalTime.of(8, 0));
-        service.aplicarReglas(t, List.of(regla(1L, null, nocturno, true, true, 60)));
+        service.aplicarReglas(t, List.of(regla(1L, null, nocturno, true, true, 60)), Set.of());
 
         assertEquals(LocalTime.of(20, 0), t.getHoraInicio(), "entrada (viernes) no cambia");
         assertEquals(LocalTime.of(9, 0), t.getHoraFin(), "salida (sábado) +60");
@@ -95,10 +91,9 @@ class ReglaServicioServiceTest {
     @Test
     void nocturno_noAjustaSalida_cuandoTerminaEnDiaHabil() {
         PlantillaTurnoEntity nocturno = tipo(2, "Nocturno");
-        when(feriadoRepo.existsByFecha(any())).thenReturn(false);
 
         TurnoEntity t = turno(nocturno, DOMINGO, LUNES, LocalTime.of(20, 0), LocalTime.of(8, 0));
-        service.aplicarReglas(t, List.of(regla(1L, null, nocturno, true, true, 60)));
+        service.aplicarReglas(t, List.of(regla(1L, null, nocturno, true, true, 60)), Set.of());
 
         assertEquals(LocalTime.of(20, 0), t.getHoraInicio());
         assertEquals(LocalTime.of(8, 0), t.getHoraFin());
@@ -108,13 +103,12 @@ class ReglaServicioServiceTest {
     void cruce_unaReglaConAmbosTipos() {
         PlantillaTurnoEntity diurno = tipo(1, "Diurno");
         PlantillaTurnoEntity nocturno = tipo(2, "Nocturno");
-        when(feriadoRepo.existsByFecha(any())).thenReturn(false);
         var reglas = List.of(regla(1L, diurno, nocturno, true, true, 60));
 
         TurnoEntity dia = turno(diurno, SABADO, SABADO, LocalTime.of(8, 0), LocalTime.of(20, 0));
         TurnoEntity noche = turno(nocturno, VIERNES, SABADO, LocalTime.of(20, 0), LocalTime.of(8, 0));
-        service.aplicarReglas(dia, reglas);
-        service.aplicarReglas(noche, reglas);
+        service.aplicarReglas(dia, reglas, Set.of());
+        service.aplicarReglas(noche, reglas, Set.of());
 
         assertEquals(LocalTime.of(9, 0), dia.getHoraInicio());
         assertEquals(LocalTime.of(20, 0), dia.getHoraFin());
@@ -125,13 +119,12 @@ class ReglaServicioServiceTest {
     @Test
     void mismoTipo_dosReglas_ajustanInicioYFin() {
         PlantillaTurnoEntity diurno = tipo(1, "Diurno");
-        when(feriadoRepo.existsByFecha(any())).thenReturn(false);
         var reglas = List.of(
                 regla(1L, diurno, null, true, true, 30),   // inicio +30
                 regla(2L, null, diurno, true, true, 60));   // fin +60
 
         TurnoEntity t = turno(diurno, SABADO, SABADO, LocalTime.of(8, 0), LocalTime.of(20, 0));
-        service.aplicarReglas(t, reglas);
+        service.aplicarReglas(t, reglas, Set.of());
 
         assertEquals(LocalTime.of(8, 30), t.getHoraInicio());
         assertEquals(LocalTime.of(21, 0), t.getHoraFin());
@@ -140,25 +133,23 @@ class ReglaServicioServiceTest {
     @Test
     void feriadoEnDiaHabil_ajustaEntrada() {
         PlantillaTurnoEntity diurno = tipo(1, "Diurno");
-        when(feriadoRepo.existsByFecha(LUNES)).thenReturn(true); // lunes feriado
 
         TurnoEntity t = turno(diurno, LUNES, LUNES, LocalTime.of(8, 0), LocalTime.of(20, 0));
-        service.aplicarReglas(t, List.of(regla(1L, diurno, null, true, true, 60)));
+        service.aplicarReglas(t, List.of(regla(1L, diurno, null, true, true, 60)), Set.of(LUNES)); // lunes feriado
 
         assertEquals(LocalTime.of(9, 0), t.getHoraInicio());
         assertEquals(LocalTime.of(20, 0), t.getHoraFin());
     }
 
     @Test
-    void listaVacia_noModifica_niConsultaFeriados() {
+    void listaVacia_noModifica() {
         PlantillaTurnoEntity diurno = tipo(1, "Diurno");
 
         TurnoEntity t = turno(diurno, SABADO, SABADO, LocalTime.of(8, 0), LocalTime.of(20, 0));
-        service.aplicarReglas(t, List.of());
+        service.aplicarReglas(t, List.of(), Set.of());
 
         assertEquals(LocalTime.of(8, 0), t.getHoraInicio());
         assertEquals(LocalTime.of(20, 0), t.getHoraFin());
-        verify(feriadoRepo, never()).existsByFecha(any());
     }
 
     @Test
@@ -166,7 +157,7 @@ class ReglaServicioServiceTest {
         PlantillaTurnoEntity diurno = tipo(1, "Diurno");
         var r1 = regla(10L, diurno, null, true, true, 60);
         var r2 = regla(20L, diurno, null, true, true, 60);
-        when(reglaRepo.findByServicio_IdServicioAndActivoTrueAndEliminadoFalse(SERVICIO_ID))
+        when(reglaRepo.findByServicio_IdServicioAndEliminadoFalse(SERVICIO_ID))
                 .thenReturn(List.of(r1, r2));
 
         var sel = service.cargarReglasSeleccionadas(SERVICIO_ID, List.of(10L));

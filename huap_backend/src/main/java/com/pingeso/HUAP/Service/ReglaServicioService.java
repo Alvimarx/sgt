@@ -5,7 +5,6 @@ import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
 import com.pingeso.HUAP.Entity.ReglasHorariosTurnosServicioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
-import com.pingeso.HUAP.Repository.FeriadoRepository;
 import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
 import com.pingeso.HUAP.Repository.ReglasHorariosTurnosServicioRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
@@ -16,6 +15,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Gestión de las reglas de ajuste de horario por servicio: CRUD de la configuración
@@ -29,16 +29,13 @@ public class ReglaServicioService {
     private final ReglasHorariosTurnosServicioRepository reglaRepository;
     private final ServicioRepository servicioRepository;
     private final PlantillaTurnoRepository plantillaTurnoRepository;
-    private final FeriadoRepository feriadoRepository;
 
     public ReglaServicioService(ReglasHorariosTurnosServicioRepository reglaRepository,
                                 ServicioRepository servicioRepository,
-                                PlantillaTurnoRepository plantillaTurnoRepository,
-                                FeriadoRepository feriadoRepository) {
+                                PlantillaTurnoRepository plantillaTurnoRepository) {
         this.reglaRepository = reglaRepository;
         this.servicioRepository = servicioRepository;
         this.plantillaTurnoRepository = plantillaTurnoRepository;
-        this.feriadoRepository = feriadoRepository;
     }
 
     // =========================================================
@@ -109,8 +106,11 @@ public class ReglaServicioService {
      * Aplica in-place al turno la lista de reglas dada (ya filtradas). No-op si la lista
      * está vacía. La ENTRADA se ajusta según el día de inicio; la SALIDA según el día final
      * (necesario para turnos que cruzan a un finde/feriado).
+     *
+     * @param feriados fechas feriado ya precargadas por el llamador (evita una consulta a BD
+     *                 por turno en generaciones masivas).
      */
-    public void aplicarReglas(TurnoEntity turno, List<ReglasHorariosTurnosServicioEntity> reglas) {
+    public void aplicarReglas(TurnoEntity turno, List<ReglasHorariosTurnosServicioEntity> reglas, Set<LocalDate> feriados) {
         if (turno == null || reglas == null || reglas.isEmpty()
                 || turno.getTipoTurno() == null || turno.getDiaInicioTurno() == null) {
             return;
@@ -119,9 +119,9 @@ public class ReglaServicioService {
         Long tipoId = turno.getTipoTurno().getIdPlantillaTurno();
         LocalDate diaInicio = turno.getDiaInicioTurno();
         LocalDate diaFin = turno.getDiaFinalTurno();
-        boolean esFeriadoInicio = feriadoRepository.existsByFecha(diaInicio);
+        boolean esFeriadoInicio = feriados.contains(diaInicio);
         boolean esFeriadoFin = diaFin != null
-                && (diaFin.equals(diaInicio) ? esFeriadoInicio : feriadoRepository.existsByFecha(diaFin));
+                && (diaFin.equals(diaInicio) ? esFeriadoInicio : feriados.contains(diaFin));
 
         LocalTime horaInicio = turno.getHoraInicio();
         LocalTime horaFin = turno.getHoraFin();

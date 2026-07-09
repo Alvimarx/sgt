@@ -8,8 +8,10 @@ import com.pingeso.HUAP.Entity.PlanificacionEntity;
 import com.pingeso.HUAP.Entity.PlantillaDiaEntity;
 import com.pingeso.HUAP.Entity.PlantillaEntity;
 import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
+import com.pingeso.HUAP.Entity.FeriadoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
+import com.pingeso.HUAP.Repository.FeriadoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.PlanificacionRepository;
@@ -28,6 +30,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * CRUD del contenedor de planificación (molde reutilizable de rotativas + funcionarios)
@@ -47,6 +51,7 @@ public class PlanificacionService {
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
     private final ReglaServicioService reglaServicioService;
+    private final FeriadoRepository feriadoRepository;
 
     public PlanificacionService(
             PlanificacionRepository planificacionRepository,
@@ -57,7 +62,8 @@ public class PlanificacionService {
             PlantillaDiaRepository plantillaDiaRepository,
             TurnoRepository turnoRepository,
             BitacoraService bitacoraService,
-            ReglaServicioService reglaServicioService
+            ReglaServicioService reglaServicioService,
+            FeriadoRepository feriadoRepository
     ) {
         this.planificacionRepository = planificacionRepository;
         this.servicioRepository = servicioRepository;
@@ -68,6 +74,7 @@ public class PlanificacionService {
         this.turnoRepository = turnoRepository;
         this.bitacoraService = bitacoraService;
         this.reglaServicioService = reglaServicioService;
+        this.feriadoRepository = feriadoRepository;
     }
 
     // =========================================================
@@ -158,17 +165,54 @@ public class PlanificacionService {
         FuncionarioEntity actor = (actorId != null)
                 ? funcionarioRepository.findById(actorId).orElse(null) : null;
 
+        // Asignaciones vigentes (sin plantilla/puesto eliminado), filtradas una sola vez.
+        List<PlanificacionAsignacionEntity> asignacionesVigentes = plan.getAsignaciones().stream()
+                .filter(a -> a.getPlantilla() != null && !a.getPlantilla().isEliminado())
+                .filter(a -> a.getPuesto() == null || !a.getPuesto().isEliminado())
+                .toList();
+
+        // Secuencia de días por rotativa DISTINTA (varios puestos comparten la misma rotativa;
+        // antes se volvía a consultar por cada asignación aunque la plantilla ya se hubiera leído).
+        Map<Long, List<PlantillaDiaEntity>> secuenciaPorPlantilla = new HashMap<>();
+        int maxDiaIndex = 0;
+        for (PlanificacionAsignacionEntity asignacion : asignacionesVigentes) {
+            Long idPlantilla = asignacion.getPlantilla().getIdPlantilla();
+            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.computeIfAbsent(idPlantilla,
+                    id -> plantillaDiaRepository.findByPlantilla_IdPlantillaOrderByDiaIndexAsc(id));
+            for (PlantillaDiaEntity dia : secuencia) {
+                if (dia.getDiaIndex() > maxDiaIndex) maxDiaIndex = dia.getDiaIndex();
+            }
+        }
+        // +1 día extra de margen por si el último turno cruza medianoche.
+        LocalDate fechaFinGeneracion = fechaInicio.plusDays(maxDiaIndex + 1L);
+
+        // Feriados de todo el rango de la generación, precargados una sola vez (si no hay
+        // reglas seleccionadas no hace falta: aplicarReglas no los usa en ese caso).
+        Set<LocalDate> feriados = reglasSel.isEmpty()
+                ? Set.of()
+                : feriadoRepository.findByFechaBetweenOrderByFechaAsc(fechaInicio, fechaFinGeneracion).stream()
+                        .map(FeriadoEntity::getFecha)
+                        .collect(Collectors.toSet());
+
+        // Conflictos ya existentes en BD para los funcionarios involucrados, precargados en una
+        // sola consulta en bloque (antes era una consulta por turno).
+        Set<Long> idsFuncionarios = asignacionesVigentes.stream()
+                .map(PlanificacionAsignacionEntity::getFuncionario)
+                .filter(f -> f != null && !f.isEliminado())
+                .map(FuncionarioEntity::getIdFuncionario)
+                .collect(Collectors.toSet());
+        Map<Long, List<TurnoEntity>> conflictosExistentes = idsFuncionarios.isEmpty()
+                ? Map.of()
+                : turnoRepository.findConflictosByFuncionarios(new ArrayList<>(idsFuncionarios), fechaInicio, fechaFinGeneracion)
+                        .stream()
+                        .collect(Collectors.groupingBy(t -> t.getFuncionario().getIdFuncionario()));
+
         int generados = 0, vacantesPorConflicto = 0;
         // Turnos ya creados en este lote, por funcionario (para el chequeo intra-lote).
         Map<Long, List<TurnoEntity>> creadosPorFuncionario = new HashMap<>();
 
-        for (PlanificacionAsignacionEntity asignacion : plan.getAsignaciones()) {
-           //  filtrado por si pasan alguna entidad eliminada
-            if (asignacion.getPlantilla() == null || asignacion.getPlantilla().isEliminado()) continue;
-            if (asignacion.getPuesto() != null && asignacion.getPuesto().isEliminado()) continue;
-
-            List<PlantillaDiaEntity> secuencia = plantillaDiaRepository
-                    .findByPlantilla_IdPlantillaOrderByDiaIndexAsc(asignacion.getPlantilla().getIdPlantilla());
+        for (PlanificacionAsignacionEntity asignacion : asignacionesVigentes) {
+            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.get(asignacion.getPlantilla().getIdPlantilla());
 
             for (PlantillaDiaEntity dia : secuencia) {
                 PlantillaTurnoEntity tipo = dia.getPlantillaTurno();
@@ -188,7 +232,7 @@ public class PlanificacionService {
                         .plantilla(asignacion.getPlantilla())
                         .build();
 
-                reglaServicioService.aplicarReglas(turno, reglasSel); // ajusta horaInicio/horaFin según reglas seleccionadas
+                reglaServicioService.aplicarReglas(turno, reglasSel, feriados); // ajusta horaInicio/horaFin según reglas seleccionadas
 
                 // Horas ya ajustadas; recalcular el día final con ellas.
                 LocalTime hi = turno.getHoraInicio();
@@ -202,14 +246,14 @@ public class PlanificacionService {
 
                 // El turno se crea siempre. Si el funcionario choca en horario, se deja
                 // VACANTE (funcionario null) para que otra persona pueda tomarlo.
-                boolean enConflicto = func != null && hayChoqueHorario(func.getIdFuncionario(), fechaDia, diaFinal, hi, hf,
+                boolean enConflicto = func != null && hayChoqueHorario(fechaDia, diaFinal, hi, hf,
+                        conflictosExistentes.getOrDefault(func.getIdFuncionario(), List.of()),
                         creadosPorFuncionario.getOrDefault(func.getIdFuncionario(), List.of()));
                 FuncionarioEntity funcAsignado = enConflicto ? null : func;
                 if (enConflicto) vacantesPorConflicto++;
                 turno.setFuncionario(funcAsignado);
 
                 turnoRepository.save(turno);
-                turnoRepository.flush(); // visible para el filtro grueso por BD del próximo chequeo
 
                 // Registro en bitácora del turno recién creado.
                 bitacoraService.registrarTurnoGenerado(turno, actor, plan.getNombre());
@@ -235,18 +279,41 @@ public class PlanificacionService {
         validarLunes(fechaInicio);
         PlanificacionEntity plan = obtenerPlanificacion(idPlanificacion);
 
+        // Asignaciones vigentes con funcionario asignado (sin funcionario no hay choque posible).
+        List<PlanificacionAsignacionEntity> asignacionesConFuncionario = plan.getAsignaciones().stream()
+                .filter(a -> a.getPlantilla() != null && !a.getPlantilla().isEliminado())
+                .filter(a -> a.getPuesto() == null || !a.getPuesto().isEliminado())
+                .filter(a -> a.getFuncionario() != null && !a.getFuncionario().isEliminado())
+                .toList();
+
+        // Secuencia de días por rotativa DISTINTA + rango de fechas total del pre-chequeo.
+        Map<Long, List<PlantillaDiaEntity>> secuenciaPorPlantilla = new HashMap<>();
+        int maxDiaIndex = 0;
+        for (PlanificacionAsignacionEntity asignacion : asignacionesConFuncionario) {
+            Long idPlantilla = asignacion.getPlantilla().getIdPlantilla();
+            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.computeIfAbsent(idPlantilla,
+                    id -> plantillaDiaRepository.findByPlantilla_IdPlantillaOrderByDiaIndexAsc(id));
+            for (PlantillaDiaEntity dia : secuencia) {
+                if (dia.getDiaIndex() > maxDiaIndex) maxDiaIndex = dia.getDiaIndex();
+            }
+        }
+        LocalDate fechaFinChequeo = fechaInicio.plusDays(maxDiaIndex + 1L);
+
+        // Conflictos existentes de los funcionarios involucrados, precargados en una sola consulta.
+        Set<Long> idsFuncionarios = asignacionesConFuncionario.stream()
+                .map(a -> a.getFuncionario().getIdFuncionario())
+                .collect(Collectors.toSet());
+        Map<Long, List<TurnoEntity>> conflictosExistentes = idsFuncionarios.isEmpty()
+                ? Map.of()
+                : turnoRepository.findConflictosByFuncionarios(new ArrayList<>(idsFuncionarios), fechaInicio, fechaFinChequeo)
+                        .stream()
+                        .collect(Collectors.groupingBy(t -> t.getFuncionario().getIdFuncionario()));
+
         List<Map<String, Object>> conflictos = new ArrayList<>();
 
-        for (PlanificacionAsignacionEntity asignacion : plan.getAsignaciones()) {
-            //  filtrado por si pasan alguna entidad eliminada
-            if (asignacion.getPlantilla() == null || asignacion.getPlantilla().isEliminado()) continue;
-            if (asignacion.getPuesto() != null && asignacion.getPuesto().isEliminado()) continue;
-
+        for (PlanificacionAsignacionEntity asignacion : asignacionesConFuncionario) {
             FuncionarioEntity func = asignacion.getFuncionario();
-            if (func == null || func.isEliminado()) continue; // sin funcionario (o eliminado) no hay choque posible
-
-            List<PlantillaDiaEntity> secuencia = plantillaDiaRepository
-                    .findByPlantilla_IdPlantillaOrderByDiaIndexAsc(asignacion.getPlantilla().getIdPlantilla());
+            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.get(asignacion.getPlantilla().getIdPlantilla());
 
             for (PlantillaDiaEntity dia : secuencia) {
                 PlantillaTurnoEntity tipo = dia.getPlantillaTurno();
@@ -257,7 +324,8 @@ public class PlanificacionService {
                 LocalTime hf = tipo.getHoraTermino();
                 LocalDate diaFinal = !hf.isAfter(hi) ? fechaDia.plusDays(1) : fechaDia;
 
-                TurnoEntity existente = primerTurnoQueSolapa(func.getIdFuncionario(), fechaDia, diaFinal, hi, hf);
+                TurnoEntity existente = primerTurnoQueSolapa(
+                        conflictosExistentes.getOrDefault(func.getIdFuncionario(), List.of()), fechaDia, diaFinal, hi, hf);
                 if (existente != null) {
                     Map<String, Object> c = new HashMap<>();
                     c.put("idFuncionario", func.getIdFuncionario());
@@ -289,11 +357,19 @@ public class PlanificacionService {
         }
     }
 
-    /** ¿El candidato choca en horario con un turno existente del funcionario (BD) o del lote? */
-    private boolean hayChoqueHorario(Long idFuncionario, LocalDate ini, LocalDate fin, LocalTime hi, LocalTime hf,
-                                     List<TurnoEntity> delLote) {
-        if (primerTurnoQueSolapa(idFuncionario, ini, fin, hi, hf) != null) return true;
+    /**
+     * ¿El candidato choca en horario con un turno existente del funcionario (precargado antes
+     * del loop de generación) o con uno ya creado en este mismo lote?
+     */
+    private boolean hayChoqueHorario(LocalDate ini, LocalDate fin, LocalTime hi, LocalTime hf,
+                                     List<TurnoEntity> existentes, List<TurnoEntity> delLote) {
         LocalDateTime cIni = ini.atTime(hi), cFin = fin.atTime(hf);
+        for (TurnoEntity t : existentes) {
+            if (solapan(cIni, cFin, t.getDiaInicioTurno().atTime(t.getHoraInicio()),
+                    t.getDiaFinalTurno().atTime(t.getHoraFin()))) {
+                return true;
+            }
+        }
         for (TurnoEntity t : delLote) {
             if (solapan(cIni, cFin, t.getDiaInicioTurno().atTime(t.getHoraInicio()),
                     t.getDiaFinalTurno().atTime(t.getHoraFin()))) {
@@ -303,10 +379,10 @@ public class PlanificacionService {
         return false;
     }
 
-    /** Filtro grueso por fechas (cross-servicio) + afinado por horas; primer turno que solapa o null. */
-    private TurnoEntity primerTurnoQueSolapa(Long idFuncionario, LocalDate ini, LocalDate fin, LocalTime hi, LocalTime hf) {
+    /** Primer turno de la lista de candidatos (ya precargada) que solapa con el intervalo dado, o null. */
+    private TurnoEntity primerTurnoQueSolapa(List<TurnoEntity> candidatos, LocalDate ini, LocalDate fin, LocalTime hi, LocalTime hf) {
         LocalDateTime cIni = ini.atTime(hi), cFin = fin.atTime(hf);
-        for (TurnoEntity t : turnoRepository.findConflictosByFuncionario(idFuncionario, ini, fin)) {
+        for (TurnoEntity t : candidatos) {
             LocalDateTime tIni = t.getDiaInicioTurno().atTime(t.getHoraInicio());
             LocalDateTime tFin = t.getDiaFinalTurno().atTime(t.getHoraFin());
             if (solapan(cIni, cFin, tIni, tFin)) return t;
