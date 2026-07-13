@@ -33,6 +33,8 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- LIMPIEZA: TRUNCATE resetea datos y auto-increment en una sola sentencia por tabla.
 -- Orden: hijos antes que padres (aunque FK_CHECKS=0 lo permite en cualquier orden).
+TRUNCATE TABLE Postulacion_Oferta;
+TRUNCATE TABLE Oferta_General;
 TRUNCATE TABLE Notificacion2;
 TRUNCATE TABLE Bitacora_eventos;
 TRUNCATE TABLE Solicitudes;
@@ -899,5 +901,142 @@ INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, ho
 (67, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', 205, 3, 6, 3, 5),  -- Camila Vega
 (68, '2026-06-05', '2026-06-06', '20:00:00', '08:00:00', 206, 3, 7, 3, 6),  -- Diego Rojas
 (69, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', NULL, 3, 8, 3, 5);  -- libre
+
+-- ==============================================================
+-- 18. TURNOS — URGENCIAS (servicio 4)
+-- Lunes 04-May-2026: Dia=roster "Lunes Turno T III", Noche=roster "Volante".
+-- Miercoles 06-May-2026 y Martes 05-May-2026: subconjunto de puestos.
+-- Los 2 vacantes de Miercoles (puesto 21 y 31) ya eran huecos reales en
+-- planificacion_asignacion (columna plantilla 4); los 2 vacantes de Lunes Noche
+-- (puesto 29 y 31) son huecos reales del roster "Volante" (plantilla 9).
+-- ID_FUNCIONARIO NULL = turno libre disponible para cobertura.
+-- ==============================================================
+INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla, id_tipo_turno) VALUES
+(70, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 300, 4, 17, 6, 7),  -- Lunes Dia — Coordinador
+(71, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 306, 4, 18, 6, 7),  -- Lunes Dia — Urgenciólogo 1
+(72, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 312, 4, 19, 6, 7),  -- Lunes Dia — Urgenciólogo 2
+(73, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 318, 4, 20, 6, 7),  -- Lunes Dia — Urgenciólogo 3
+(74, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 324, 4, 21, 6, 7),  -- Lunes Dia — Urgenciólogo 4
+(75, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 329, 4, 22, 6, 7),  -- Lunes Dia — Médico General 1
+(76, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 335, 4, 23, 6, 7),  -- Lunes Dia — Médico General 2
+(77, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 341, 4, 24, 6, 7),  -- Lunes Dia — Médico General 3
+(78, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 347, 4, 25, 6, 7),  -- Lunes Dia — Médico General 4
+(79, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 353, 4, 26, 6, 7),  -- Lunes Dia — Médico General 5
+(80, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 359, 4, 27, 6, 7),  -- Lunes Dia — Médico General 6
+(81, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 360, 4, 28, 6, 7),  -- Lunes Dia — Médico General 7
+(82, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 370, 4, 29, 6, 7),  -- Lunes Dia — Médico General 8
+(83, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 374, 4, 30, 6, 7),  -- Lunes Dia — Médico General 9
+(84, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 377, 4, 31, 6, 7),  -- Lunes Dia — Médico General 10
+(85, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 305, 4, 17, 9, 8),  -- Lunes Noche (Volante) — Coordinador
+(86, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 311, 4, 18, 9, 8),  -- Lunes Noche (Volante) — Urgenciólogo 1
+(87, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 317, 4, 19, 9, 8),  -- Lunes Noche (Volante) — Urgenciólogo 2
+(88, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 323, 4, 20, 9, 8),  -- Lunes Noche (Volante) — Urgenciólogo 3
+(89, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 328, 4, 21, 9, 8),  -- Lunes Noche (Volante) — Urgenciólogo 4
+(90, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 334, 4, 22, 9, 8),  -- Lunes Noche (Volante) — Médico General 1
+(91, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 340, 4, 23, 9, 8),  -- Lunes Noche (Volante) — Médico General 2
+(92, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 346, 4, 24, 9, 8),  -- Lunes Noche (Volante) — Médico General 3
+(93, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 352, 4, 25, 9, 8),  -- Lunes Noche (Volante) — Médico General 4
+(94, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 358, 4, 26, 9, 8),  -- Lunes Noche (Volante) — Médico General 5
+(95, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 364, 4, 27, 9, 8),  -- Lunes Noche (Volante) — Médico General 6
+(96, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 369, 4, 28, 9, 8),  -- Lunes Noche (Volante) — Médico General 7
+(97, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', NULL, 4, 29, 9, 8),  -- Lunes Noche (Volante) — Médico General 8
+(98, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', 376, 4, 30, 9, 8),  -- Lunes Noche (Volante) — Médico General 9
+(99, '2026-05-04', '2026-05-05', '20:00:00', '08:00:00', NULL, 4, 31, 9, 8),  -- Lunes Noche (Volante) — Médico General 10
+(100, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', 302, 4, 17, 4, 7),  -- Miercoles Dia — Coordinador
+(101, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', 320, 4, 20, 4, 7),  -- Miercoles Dia — Urgenciólogo 3
+(102, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', NULL, 4, 21, 4, 7),  -- Miercoles Dia — Urgenciólogo 4
+(103, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', 331, 4, 22, 4, 7),  -- Miercoles Dia — Médico General 1
+(104, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', 366, 4, 28, 4, 7),  -- Miercoles Dia — Médico General 7
+(105, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', 339, 4, 30, 4, 7),  -- Miercoles Dia — Médico General 9
+(106, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', NULL, 4, 31, 4, 7),  -- Miercoles Dia — Médico General 10
+(107, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00', 307, 4, 18, 5, 7),  -- Martes Dia — Urgenciólogo 1
+(108, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00', 313, 4, 19, 5, 7),  -- Martes Dia — Urgenciólogo 2
+(109, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00', 336, 4, 23, 5, 7),  -- Martes Dia — Médico General 2
+(110, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00', 348, 4, 25, 5, 7),  -- Martes Dia — Médico General 4
+(111, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00', 371, 4, 29, 5, 7);  -- Martes Dia — Médico General 8
+
+-- ==============================================================
+-- 19. SOLICITUDES — URGENCIAS
+-- Tipo: 1=Permiso  2=Botar turno  3=Cobertura  4=Intercambio  5=Oferta particular
+-- ==============================================================
+INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TURNO, ID_TURNO_RECEPTOR, ID_FUNCIONARIO_RECEPTOR, Aceptado_Receptor, Estado, Fecha_creacion, Fecha_inicio_permiso, Fecha_termino_permiso, Motivo) VALUES
+(13, 300, 1, 70, NULL, NULL, NULL, 'PENDIENTE',
+ '2026-04-30 09:00:00', '2026-05-04 08:00:00', '2026-05-04 20:00:00',
+ 'Control médico preventivo'),
+(14, 311, 2, 86, NULL, NULL, NULL, 'APROBADA',
+ '2026-04-25 10:00:00', NULL, NULL,
+ 'Acumulación de horas extra'),
+(15, 359, 3, 102, NULL, NULL, NULL, 'PENDIENTE',
+ '2026-05-01 11:00:00', NULL, NULL,
+ 'Disponible para cubrir el turno vacante del miércoles (Urgenciólogo 4)'),
+(16, 312, 4, 72, 73, 318, TRUE, 'PENDIENTE',
+ '2026-05-02 09:30:00', NULL, NULL,
+ 'Prefiero el puesto de Urgenciólogo 3 por cercanía con mi área de especialidad'),
+(17, 307, 5, 107, 108, 313, TRUE, 'APROBADA',
+ '2026-04-27 14:00:00', NULL, NULL,
+ 'Prefiero el puesto de Urgenciólogo 2, ya conversado con el receptor'),
+(18, 336, 5, 109, 110, 348, FALSE, 'RECHAZADA',
+ '2026-04-29 16:00:00', NULL, NULL,
+ 'Buscaba cambiar de puesto por comodidad de horario');
+
+-- ==============================================================
+-- 20. NOTIFICACION2 — URGENCIAS (una por solicitud, ID_SOLICITUD OneToOne)
+-- ==============================================================
+INSERT INTO Notificacion2 (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
+(13, 'NO_LEIDO', '2026-04-30 09:01:00',
+ 'Su solicitud de permiso para el 04-May ha sido recibida y está pendiente de aprobación.', 13),
+(14, 'LEIDO', '2026-04-25 10:01:00',
+ 'Su solicitud de botar turno del 04-May (noche) ha sido aprobada.', 14),
+(15, 'NO_LEIDO', '2026-05-01 11:01:00',
+ 'Su solicitud de cobertura del turno vacante del 06-May ha sido recibida.', 15),
+(16, 'NO_LEIDO', '2026-05-02 09:30:01',
+ 'El funcionario receptor ha aceptado el intercambio. Pendiente de aprobación por jefatura.', 16),
+(17, 'LEIDO', '2026-04-27 14:01:00',
+ 'Su oferta de intercambio de turno ha sido aprobada por jefatura.', 17),
+(18, 'LEIDO', '2026-04-29 16:01:00',
+ 'Su oferta de intercambio de turno ha sido rechazada por el receptor.', 18);
+
+-- ==============================================================
+-- 21. BITACORA_EVENTOS — URGENCIAS (una por solicitud, ID_TURNO NULL)
+-- ==============================================================
+INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD, Tipo_evento, Motivo, Observaciones, Fecha_inicio_afectada, Fecha_fin_afectada, Fecha_modificacion, Activo) VALUES
+(13, 300, NULL, 13, 'SOLICITUD_CREADA',
+ 'Control médico preventivo',
+ 'Turno diurno 04-May (id=70), Coordinador.',
+ '2026-04-30 09:00:00', NULL, '2026-04-30 09:00:00', TRUE),
+(14, 311, NULL, 14, 'CAMBIO_ESTADO_APROBADA',
+ 'Acumulación de horas extra',
+ 'Turno nocturno 04-May (id=86), Urgenciólogo 1. Turno queda disponible para cobertura.',
+ '2026-04-25 10:00:00', NULL, '2026-04-25 10:00:00', TRUE),
+(15, 359, NULL, 15, 'SOLICITUD_CREADA',
+ 'Disponible para cubrir el turno vacante del miércoles (Urgenciólogo 4)',
+ 'Turno diurno 06-May (id=102), Urgenciólogo 4 — sin asignar.',
+ '2026-05-01 11:00:00', NULL, '2026-05-01 11:00:00', TRUE),
+(16, 312, NULL, 16, 'OFERTA_ACEPTADA_POR_RECEPTOR',
+ 'Prefiero el puesto de Urgenciólogo 3 por cercanía con mi área de especialidad',
+ 'Func 312 <-> Func 318: turno 04-May puesto Urg.2 <-> puesto Urg.3. Pendiente jefatura.',
+ '2026-05-02 09:30:00', NULL, '2026-05-02 09:30:00', TRUE),
+(17, 307, NULL, 17, 'CAMBIO_ESTADO_APROBADA',
+ 'Prefiero el puesto de Urgenciólogo 2, ya conversado con el receptor',
+ 'Func 307 <-> Func 313 (via receptor): turno 05-May puesto Urg.1 <-> puesto Urg.2. Aprobado.',
+ '2026-04-27 14:00:00', NULL, '2026-04-27 14:00:00', TRUE),
+(18, 336, NULL, 18, 'CAMBIO_ESTADO_RECHAZADA',
+ 'Buscaba cambiar de puesto por comodidad de horario',
+ 'Func 336 ofrece turno 05-May (puesto Medico General 2) a Func 348 (puesto Medico General 4). Rechazado.',
+ '2026-04-29 16:00:00', NULL, '2026-04-29 16:00:00', TRUE);
+
+-- ==============================================================
+-- 22. OFERTA_GENERAL + POSTULACION_OFERTA — URGENCIAS (primer ejemplo del sistema)
+-- ==============================================================
+INSERT INTO Oferta_General (ID_OFERTA_GENERAL, ID_TURNO, ID_OFERTOR, Estado, Motivo, Fecha_creacion) VALUES
+(1, 77, 341, 'ABIERTA', 'Cambio de turno por estudios de posgrado', '2026-04-26 09:00:00'),
+(2, 81, 365, 'CERRADA', 'Cambio de turno por compromiso familiar', '2026-04-20 10:00:00'),
+(3, 70, 300, 'RECHAZADA', 'Jefatura rechaza: el puesto de Coordinador no puede ofertarse públicamente', '2026-04-24 08:00:00');
+
+INSERT INTO Postulacion_Oferta (ID_POSTULACION, ID_OFERTA_GENERAL, ID_POSTULANTE, Fecha_postulacion, Seleccionado) VALUES
+(1, 1, 348, '2026-04-26 15:00:00', FALSE),
+(2, 1, 352, '2026-04-27 08:30:00', FALSE),
+(3, 2, 360, '2026-04-21 09:00:00', TRUE),
+(4, 2, 367, '2026-04-21 11:00:00', FALSE);
 
 SET FOREIGN_KEY_CHECKS = 1;
