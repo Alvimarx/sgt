@@ -80,6 +80,13 @@ const P2 = () => SGT_DATA.PALETTE;
 const isTurnoLibre = (shift) =>
     Boolean(shift?.turnoLibre || shift?.idFuncionario == null);
 
+const mismoPuesto = (turno, puesto) => {
+    const idTurnoPuesto = turno?.idPuesto ?? turno?.raw?.idPuesto ?? "sin-puesto";
+    const idPuesto = puesto?.idPuesto ?? "sin-puesto";
+
+    return String(idTurnoPuesto) === String(idPuesto);
+};
+
 const isSinAsignarMember = (member) => {
     const nombre = String(member?.nombre ?? "").trim().toLowerCase();
     return nombre === "sin asignar" || nombre === "sin-asignar" || nombre === "sin asignado";
@@ -118,6 +125,23 @@ const ShiftDetail = ({
 
     const groupData = shift.teamGroup ?? null;
     const legacyTeam = shift.team ? getAgendaTeam(shift) : null;
+
+    const canManageAssignments = Boolean(canManageTurnAssignment || canAssignFreeTurn);
+    const turnosGrupo = groupData?.turnos || [];
+
+    const firstVacantShift =
+        turnosGrupo.find(isTurnoLibre) ||
+        (turnoLibre ? shift : null);
+
+    const handleAssignVacancy = (vacantShift) => {
+        if (!vacantShift || !onAction) return;
+        onAction("asignar-turno-libre", vacantShift);
+    };
+
+    const handleManageAssignedTurn = (targetShift) => {
+        if (!targetShift || !onAction) return;
+        onAction("editar-asignacion-turno", targetShift);
+    };
 
     const totalTurnos = groupData?.totalTurnos ?? null;
     const asignados = groupData?.asignados ?? null;
@@ -294,6 +318,10 @@ const ShiftDetail = ({
 
                     <TeamByPuesto
                         porPuesto={groupData.porPuesto}
+                        turnosGrupo={turnosGrupo}
+                        canManageAssignments={canManageAssignments}
+                        onAssignVacancy={handleAssignVacancy}
+                        onManageAssignedTurn={handleManageAssignedTurn}
                         onSelectMember={onSelectTargetFuncionario ? handleSelectTarget : undefined}
                         selectedMemberId={selectedTargetFuncionario?.id}
                     />
@@ -329,6 +357,7 @@ const ShiftDetail = ({
                     canRequestExchange={canRequestExchange}
                     canManageTurnAssignment={canManageTurnAssignment}
                     canAssignFreeTurn={canAssignFreeTurn}
+                    assignableVacancyShift={firstVacantShift}
                     onAction={(actionId, currentShift) => {
                         if (actionId === "cambio") {
                             handleExchangeAction();
@@ -477,143 +506,282 @@ const TeamGroup = ({ group, onSelectMember, selectedMemberId = null }) => {
     );
 };
 
-const TeamByPuesto = ({ porPuesto = [], onSelectMember, selectedMemberId = null }) => (
+const TeamByPuesto = ({
+    porPuesto = [],
+    turnosGrupo = [],
+    onSelectMember,
+    selectedMemberId = null,
+    canManageAssignments = false,
+    onAssignVacancy,
+    onManageAssignedTurn,
+}) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {porPuesto.map((puesto) => (
-            <div
-                key={puesto.idPuesto ?? "sin-puesto"}
-                style={{
-                    border: `1px solid ${P2().line}`,
-                    borderRadius: 12,
-                    background: "#fff",
-                    overflow: "hidden",
-                }}
-            >
+        {porPuesto.map((puesto) => {
+            const vacantesDelPuesto = turnosGrupo.filter(
+                (turno) => isTurnoLibre(turno) && mismoPuesto(turno, puesto)
+            );
+
+            const cantidadVacantes = vacantesDelPuesto.length || puesto.vacantes || 0;
+
+            return (
                 <div
+                    key={puesto.idPuesto ?? "sin-puesto"}
                     style={{
-                        padding: "8px 12px",
-                        borderBottom: `1px solid ${P2().line2}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
+                        border: `1px solid ${P2().line}`,
+                        borderRadius: 12,
+                        background: "#fff",
+                        overflow: "hidden",
                     }}
                 >
-                    <span
+                    <div
                         style={{
-                            display: "inline-flex",
+                            padding: "8px 12px",
+                            borderBottom: `1px solid ${P2().line2}`,
+                            display: "flex",
                             alignItems: "center",
-                            gap: 6,
-                            fontSize: 12.5,
-                            fontWeight: 800,
-                            color: P2().ink,
+                            justifyContent: "space-between",
+                            gap: 8,
                         }}
                     >
-                        <SGTIcon name="home" size={13} color={P2().ink2} />
-                        {puesto.nombrePuesto}
-                    </span>
-
-                    {puesto.vacantes > 0 && (
-                        <SGTBadge tone="accent" size="xs">
-                            Falta cubrir{puesto.vacantes > 1 ? ` ×${puesto.vacantes}` : ""}
-                        </SGTBadge>
-                    )}
-                </div>
-
-                <div style={{ padding: "4px 8px 8px" }}>
-                    {(puesto.integrantes || []).map((p) => (
-                        <button
-                            key={p.turnoId ?? p.id}
-                            type="button"
-                            onClick={() => onSelectMember?.(p)}
+                        <span
                             style={{
-                                display: "flex",
+                                display: "inline-flex",
                                 alignItems: "center",
-                                gap: 10,
-                                padding: "7px 6px",
-                                borderRadius: 8,
-                                marginTop: 2,
-                                background:
-                                    p.esYo || String(p.id) === String(selectedMemberId)
-                                        ? P2().primarySoft
-                                        : "transparent",
-                                border: "none",
-                                width: "100%",
-                                textAlign: "left",
-                                cursor: onSelectMember ? "pointer" : "default",
+                                gap: 6,
+                                fontSize: 12.5,
+                                fontWeight: 800,
+                                color: P2().ink,
                             }}
                         >
-                            <SGTAvatar person={p} size={28} />
+                            <SGTIcon name="home" size={13} color={P2().ink2} />
+                            {puesto.nombrePuesto}
+                        </span>
 
-                            <span
-                                style={{
-                                    fontSize: 13,
-                                    fontWeight:
-                                        p.esYo || String(p.id) === String(selectedMemberId)
-                                            ? 800
-                                            : 500,
-                                    color: P2().ink,
-                                    flex: 1,
-                                }}
-                            >
-                                {p.nombre}
-                                {p.esYo && (
+                        {cantidadVacantes > 0 && (
+                            <SGTBadge tone="accent" size="xs">
+                                Falta cubrir{cantidadVacantes > 1 ? ` ×${cantidadVacantes}` : ""}
+                            </SGTBadge>
+                        )}
+                    </div>
+
+                    <div style={{ padding: "4px 8px 8px" }}>
+                        {(puesto.integrantes || []).map((p) => {
+                            const turnoAsociado = turnosGrupo.find((turno) => {
+                                const mismoTurno =
+                                    p.turnoId != null &&
+                                    String(turno?.id) === String(p.turnoId);
+
+                                const mismoFuncionarioYPuesto =
+                                    p.id != null &&
+                                    String(turno?.idFuncionario) === String(p.id) &&
+                                    mismoPuesto(turno, puesto);
+
+                                return !isTurnoLibre(turno) && (mismoTurno || mismoFuncionarioYPuesto);
+                            });
+
+                            const puedeGestionarEsteIntegrante =
+                                canManageAssignments && Boolean(turnoAsociado);
+
+                            const estaSeleccionado =
+                                p.esYo || String(p.id) === String(selectedMemberId);
+
+                            return (
+                                <button
+                                    key={p.turnoId ?? p.id}
+                                    type="button"
+                                    onClick={() => {
+                                        if (puedeGestionarEsteIntegrante) {
+                                            onManageAssignedTurn?.(turnoAsociado);
+                                            return;
+                                        }
+
+                                        onSelectMember?.(p);
+                                    }}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                        padding: "7px 6px",
+                                        borderRadius: 8,
+                                        marginTop: 2,
+                                        background: puedeGestionarEsteIntegrante
+                                            ? P2().primarySoft
+                                            : estaSeleccionado
+                                                ? P2().primarySoft
+                                                : "transparent",
+                                        border: puedeGestionarEsteIntegrante
+                                            ? `1px solid ${P2().line2}`
+                                            : "none",
+                                        width: "100%",
+                                        textAlign: "left",
+                                        cursor: puedeGestionarEsteIntegrante || onSelectMember
+                                            ? "pointer"
+                                            : "default",
+                                    }}
+                                >
+                                    <SGTAvatar person={p} size={28} />
+
                                     <span
                                         style={{
-                                            marginLeft: 6,
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            color: P2().primary,
+                                            fontSize: 13,
+                                            fontWeight: puedeGestionarEsteIntegrante || estaSeleccionado ? 800 : 500,
+                                            color: P2().ink,
+                                            flex: 1,
                                         }}
                                     >
-                                        (tú)
+                                        {p.nombre}
+                                        {p.esYo && (
+                                            <span
+                                                style={{
+                                                    marginLeft: 6,
+                                                    fontSize: 11,
+                                                    fontWeight: 700,
+                                                    color: P2().primary,
+                                                }}
+                                            >
+                                                (tú)
+                                            </span>
+                                        )}
                                     </span>
-                                )}
-                            </span>
-                        </button>
-                    ))}
 
-                    {Array.from({ length: puesto.vacantes || 0 }).map((_, i) => (
-                        <div
-                            key={`vacante-${puesto.idPuesto ?? "sin-puesto"}-${i}`}
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                padding: "7px 6px",
-                                borderRadius: 8,
-                                marginTop: 2,
-                            }}
-                        >
-                            <div
-                                style={{
-                                    width: 28,
-                                    height: 28,
-                                    borderRadius: 99,
-                                    border: `1.5px dashed ${P2().line}`,
-                                    display: "grid",
-                                    placeItems: "center",
-                                }}
-                            >
-                                <SGTIcon name="hand-raised" size={13} color={P2().ink3} />
-                            </div>
+                                    {puedeGestionarEsteIntegrante && (
+                                        <span
+                                            style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: 4,
+                                                fontSize: 11,
+                                                fontWeight: 800,
+                                                color: P2().primary,
+                                            }}
+                                        >
+                                            Editar
+                                            <SGTIcon name="chevron-right" size={12} color={P2().primary} />
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
 
-                            <span
-                                style={{
-                                    fontSize: 12.5,
-                                    fontWeight: 700,
-                                    color: P2().ink3,
-                                    flex: 1,
-                                    fontStyle: "italic",
-                                }}
-                            >
-                                Cupo libre — falta cubrir
-                            </span>
-                        </div>
-                    ))}
+                        {vacantesDelPuesto.length > 0 ? (
+                            vacantesDelPuesto.map((vacante, i) => (
+                                <button
+                                    key={`vacante-${vacante.id ?? i}`}
+                                    type="button"
+                                    onClick={() => {
+                                        if (canManageAssignments) {
+                                            onAssignVacancy?.(vacante);
+                                        }
+                                    }}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                        padding: "8px 6px",
+                                        borderRadius: 8,
+                                        marginTop: 4,
+                                        border: canManageAssignments
+                                            ? `1px dashed ${P2().primary}`
+                                            : "none",
+                                        background: canManageAssignments
+                                            ? P2().primarySoft
+                                            : "transparent",
+                                        width: "100%",
+                                        textAlign: "left",
+                                        cursor: canManageAssignments ? "pointer" : "default",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 99,
+                                            border: `1.5px dashed ${
+                                                canManageAssignments ? P2().primary : P2().line
+                                            }`,
+                                            display: "grid",
+                                            placeItems: "center",
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <SGTIcon
+                                            name={canManageAssignments ? "user-plus" : "hand-raised"}
+                                            size={13}
+                                            color={canManageAssignments ? P2().primary : P2().ink3}
+                                        />
+                                    </div>
+
+                                    <span
+                                        style={{
+                                            fontSize: 12.5,
+                                            fontWeight: 800,
+                                            color: canManageAssignments ? P2().primary : P2().ink3,
+                                            flex: 1,
+                                            fontStyle: canManageAssignments ? "normal" : "italic",
+                                        }}
+                                    >
+                                        {canManageAssignments
+                                            ? "Asignar funcionario a este cupo"
+                                            : "Cupo libre — falta cubrir"}
+                                    </span>
+
+                                    {canManageAssignments && (
+                                        <SGTIcon
+                                            name="chevron-right"
+                                            size={13}
+                                            color={P2().primary}
+                                        />
+                                    )}
+                                </button>
+                            ))
+                        ) : (
+                            Array.from({ length: puesto.vacantes || 0 }).map((_, i) => (
+                                <div
+                                    key={`vacante-${puesto.idPuesto ?? "sin-puesto"}-${i}`}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 10,
+                                        padding: "7px 6px",
+                                        borderRadius: 8,
+                                        marginTop: 2,
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 99,
+                                            border: `1.5px dashed ${P2().line}`,
+                                            display: "grid",
+                                            placeItems: "center",
+                                        }}
+                                    >
+                                        <SGTIcon
+                                            name="hand-raised"
+                                            size={13}
+                                            color={P2().ink3}
+                                        />
+                                    </div>
+
+                                    <span
+                                        style={{
+                                            fontSize: 12.5,
+                                            fontWeight: 700,
+                                            color: P2().ink3,
+                                            flex: 1,
+                                            fontStyle: "italic",
+                                        }}
+                                    >
+                                        Cupo libre — falta cubrir
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
-            </div>
-        ))}
+            );
+        })}
     </div>
 );
 
@@ -623,38 +791,34 @@ const ShiftActions = ({
     canRequestExchange = false,
     canManageTurnAssignment = false,
     canAssignFreeTurn = false,
+    assignableVacancyShift = null,
 }) => {
     const actions = [];
     const turnoLibre = isTurnoLibre(shift);
 
-    // Compatibilidad:
-    // canManageTurnAssignment = nuevo permiso para administración
-    // canAssignFreeTurn = nombre antiguo usado por AgendaView/CalendarView
     const canManageAssignments = Boolean(canManageTurnAssignment || canAssignFreeTurn);
 
     if (!shift?.solicitudPendiente) {
-        // La acción administrativa va primero para que no quede escondida por el flujo de solicitudes.
-        if (canManageAssignments) {
+        if (canManageAssignments && turnoLibre) {
             actions.push({
-                id: turnoLibre ? "asignar-turno-libre" : "editar-asignacion-turno",
-                label: turnoLibre ? "Asignar funcionario" : "Editar asignación",
-                icon: turnoLibre ? "user-plus" : "edit",
+                id: "asignar-turno-libre",
+                label: "Asignar funcionario",
+                icon: "user-plus",
                 tone: "primary",
+                targetShift: shift,
             });
         }
 
-        // Solicitud normal para usuarios no administrativos o cuando un admin quiere usar el flujo normal.
         if (turnoLibre) {
             actions.push({
                 id: "solicitar-turno",
                 label: "Solicitar turno",
                 icon: "plus",
                 tone: canManageAssignments ? "ghost" : "primary",
+                targetShift: shift,
             });
         }
 
-        // Para administradores en modo asignación, ocultamos el botón deshabilitado de intercambio
-        // para que no parezca que el flujo sigue apuntando a solicitudes.
         if (!turnoLibre && !canManageAssignments) {
             actions.push({
                 id: "cambio",
@@ -662,10 +826,10 @@ const ShiftActions = ({
                 icon: "swap",
                 tone: canRequestExchange ? "primary" : "ghost",
                 disabled: !canRequestExchange,
+                targetShift: shift,
             });
         }
 
-        // Si no es admin y sí puede solicitar cambio, se muestra igual.
         if (!turnoLibre && canManageAssignments && canRequestExchange) {
             actions.push({
                 id: "cambio",
@@ -673,6 +837,7 @@ const ShiftActions = ({
                 icon: "swap",
                 tone: "ghost",
                 disabled: false,
+                targetShift: shift,
             });
         }
     }
@@ -682,15 +847,16 @@ const ShiftActions = ({
         label: "Ver historial",
         icon: "history",
         tone: "ghost",
+        targetShift: shift,
     });
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {actions.map((a) => (
                 <ActionBtn
-                    key={a.id}
+                    key={`${a.id}-${a.targetShift?.id ?? "actual"}`}
                     {...a}
-                    onClick={() => onAction?.(a.id, shift)}
+                    onClick={() => onAction?.(a.id, a.targetShift || shift)}
                 />
             ))}
         </div>
