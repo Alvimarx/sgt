@@ -24,7 +24,7 @@ const SubroganteCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoAsignacionTurnos}) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -48,7 +48,7 @@ const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, on
             title="Asignación de turnos"
             desc="Asigna o quita funcionarios de turnos"
             tone="accent"
-            onClick={onGoSolitudes}
+            onClick={onGoAsignacionTurnos}
           />
         )}
         {onGoTiposTurno && (

@@ -102,6 +102,7 @@ const CalendarView = ({
     })();
 
     const rol = String(user?.rol || user?.role || '').toUpperCase();
+
     const rolSistema = String(
         user?.rolSistema ||
         user?.roleSistema ||
@@ -109,16 +110,33 @@ const CalendarView = ({
         ''
     ).toUpperCase();
 
-    const esJefatura = rol === 'JEFATURA' || rol === 'SUBROGANTE';
     const esAdmin =
         rolSistema === 'ADMIN' ||
         rolSistema === 'ADMINISTRADOR' ||
         rol === 'ADMIN' ||
         rol === 'ADMINISTRADOR';
 
+    const esJefatura =
+        rol === 'JEFATURA' ||
+        rolSistema === 'JEFATURA';
+
+    const esSubrogante =
+        rol === 'SUBROGANTE' ||
+        rolSistema === 'SUBROGANTE';
+
+    const puedeEditarAsignacionTurnos =
+        esAdmin ||
+        esJefatura ||
+        esSubrogante;
+
     const servicioIdActivo = user?.servicioId || localStorage.getItem('servicioId');
-    const puedeExportarServicioCompleto = esJefatura || esAdmin;
-    const canManageTurnAssignments = Boolean(modoAsignacionAdmin || esAdmin);
+
+    const puedeExportarServicioCompleto = puedeEditarAsignacionTurnos;
+
+    const canManageTurnAssignments = Boolean(
+        modoAsignacionAdmin ||
+        puedeEditarAsignacionTurnos
+    );
 
     const now = new Date();
     const [viewYear, setViewYear] = useState(now.getFullYear());

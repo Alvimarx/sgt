@@ -24,7 +24,7 @@ const JefaturaCard = ({ icon, title, desc, tone, onClick }) => {
   );
 };
 
-const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServicioJefatura ,onGoFuncionariosJefatura, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion }) => {
+const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServicioJefatura ,onGoFuncionariosJefatura, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion,onGoAsignacionTurnos}) => {
   const PA = SGT_DATA.PALETTE;
 
   return (
@@ -48,7 +48,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             title="Asignación de turnos"
             desc="Asigna o quita funcionarios de turnos"
             tone="accent"
-            onClick={onGoSolitudes}
+            onClick={onGoAsignacionTurnos}
           />
         )}
         {onGoAsignacionJefatura && (

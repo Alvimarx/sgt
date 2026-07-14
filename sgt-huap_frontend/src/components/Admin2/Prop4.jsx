@@ -192,7 +192,11 @@ const Prop4 = ({ tweaks = {} }) => {
       )}
       {currentView === "calendar_view" && (
         <CalendarView
-          modoAsignacionAdmin={calendarReturn === "admin"}
+          modoAsignacionAdmin={
+            calendarReturn === "admin" ||
+            calendarReturn === "jefatura" ||
+            calendarReturn === "subrogante"
+          }
           onBack={() => {
             setCurrentView(calendarReturn);
 
@@ -254,6 +258,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoSolitudes={() => { setSolicitudesReturn("jefatura"); setCurrentView("solicitudes"); }}
           onGoBitacora={() => { setBitacoraReturn("jefatura"); setCurrentView("bitacora"); }}
           onGoAuditoria={() => { setAuditoriaReturn("jefatura"); setCurrentView("auditoria"); }}
+          onGoAsignacionTurnos={() => {setCalendarReturn("jefatura"); setCurrentView("calendar_view");}}
           />
       )}
 
@@ -271,6 +276,7 @@ const Prop4 = ({ tweaks = {} }) => {
           onGoSolitudes={() => { setSolicitudesReturn("subrogante"); setCurrentView("solicitudes"); }}
           onGoBitacora={() => { setBitacoraReturn("subrogante"); setCurrentView("bitacora"); }}
           onGoAuditoria={() => { setAuditoriaReturn("subrogante"); setCurrentView("auditoria"); }}
+          onGoAsignacionTurnos={() => {setCalendarReturn("subrogante"); setCurrentView("calendar_view"); }}
           />
       )}
 

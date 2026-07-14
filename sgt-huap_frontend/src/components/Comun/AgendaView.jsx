@@ -196,17 +196,9 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     onOpenSolicitudes?.(preset);
   };
 
-  const resolveAssignableShift = (shift) => {
-    if (!shift) return null;
-    if (shift.turnoLibre) return shift;
-    return shift.teamGroup?.turnos?.find((t) => t.turnoLibre) || null;
-  };
-
   const openAssignShift = (shift) => {
-    if (!canAssignFreeTurns) return;
-    const target = resolveAssignableShift(shift);
-    if (!target?.turnoLibre) return;
-    setAssignShift(target);
+    if (!canAssignFreeTurns || !shift) return;
+    setAssignShift(shift);
   };
 
   // ---------------------------------------------------------------------------
@@ -403,12 +395,29 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
             onSelectTargetFuncionario={handleSelectTargetFuncionario}
             canAssignFreeTurn={canAssignFreeTurns}
             onAction={(actionId, shift) => {
-              if (actionId === "historial") { onOpenBitacora?.(); return; }
-              if (actionId === "asignar-turno-libre") { openAssignShift(shift); return; }
+              if (actionId === "historial") {
+                onOpenBitacora?.();
+                return;
+              }
+
+              if (actionId === "asignar-turno-libre" || actionId === "editar-asignacion-turno") {
+                openAssignShift(shift);
+                return;
+              }
+
               if (!onOpenSolicitudes) return;
-              if (actionId === "cambio") handleOpenExchangeRequest(shift);
+
+              if (actionId === "cambio") {
+                handleOpenExchangeRequest(shift);
+                return;
+              }
+
               if (actionId === "solicitar-turno") {
-                onOpenSolicitudes({ tipoSolicitudId: 3, idTurno: shift.id, turnoLabel: formatShiftLabel(shift) });
+                onOpenSolicitudes({
+                  tipoSolicitudId: 3,
+                  idTurno: shift.id,
+                  turnoLabel: formatShiftLabel(shift),
+                });
               }
             }}
           />
