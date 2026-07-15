@@ -47,12 +47,12 @@ public class ReglasHorariosTurnosServicioEntity {
     // Tipo de turno cuya hora de ENTRADA (inicio) se desplaza (+tiempoMinutos). Nullable.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_tipo_turno_inicio")
-    private PlantillaTurnoEntity tipoTurnoInicio;
+    private TipoTurnoEntity tipoTurnoInicio;
 
     // Tipo de turno cuya hora de SALIDA (fin) se desplaza (+tiempoMinutos). Nullable.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_tipo_turno_fin")
-    private PlantillaTurnoEntity tipoTurnoFin;
+    private TipoTurnoEntity tipoTurnoFin;
 
     // Desfase en minutos aplicado al inicio de tipoTurnoInicio y al fin de tipoTurnoFin.
     @Builder.Default

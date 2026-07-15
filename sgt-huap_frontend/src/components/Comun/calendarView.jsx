@@ -41,10 +41,10 @@ const getShiftName = (shift) =>
 const buildDayGroups = (shifts = []) => {
     const map = new Map();
     shifts.forEach((shift) => {
-        // Usar idPlantilla como key para consistencia de color con AgendaView
+        // Usar idRotativa como key para consistencia de color con AgendaView
         const key =
             shift.teamKey ||
-            `${shift.idPlantilla ?? shift.idPlantillaTurno ?? getShiftName(shift)}-${shift.inicio ?? ''}-${shift.fin ?? ''}`;
+            `${shift.idRotativa ?? shift.idTipoTurno ?? getShiftName(shift)}-${shift.inicio ?? ''}-${shift.fin ?? ''}`;
 
         if (!map.has(key)) map.set(key, { key, sample: shift, turnos: [] });
         map.get(key).turnos.push(shift);

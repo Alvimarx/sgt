@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import com.pingeso.HUAP.Entity.BitacoraEntity;
 import com.pingeso.HUAP.Entity.OfertaGeneralEntity;
-import com.pingeso.HUAP.Entity.Solicitud2Entity;
+import com.pingeso.HUAP.Entity.SolicitudEntity;
 import com.pingeso.HUAP.Repository.BitacoraRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import java.util.ArrayList;
@@ -246,7 +246,7 @@ public class ExportacionService {
         for (BitacoraEntity evento : eventos) {
             agregarEvento(eventosPorTurno, evento.getTurno(), evento);
 
-            Solicitud2Entity solicitud = evento.getSolicitud();
+            SolicitudEntity solicitud = evento.getSolicitud();
             if (solicitud != null) {
                 agregarEvento(eventosPorTurno, solicitud.getTurno(), evento);
                 agregarEvento(eventosPorTurno, solicitud.getTurnoReceptor(), evento);
@@ -328,7 +328,7 @@ public class ExportacionService {
                 ))
                 .map(c -> new OrigenTurnoInfo(c.origen(), c.detalle()))
                 .orElseGet(() -> {
-                    if (turno.getPlantilla() != null) {
+                    if (turno.getRotativa() != null) {
                         return new OrigenTurnoInfo(
                                 "Rotativa habitual",
                                 "Generado desde planificación mensual"
@@ -341,13 +341,13 @@ public class ExportacionService {
 /* // Métodos auxiliares para clasificar eventos como origen de turno de vieja lógica, se mantienen para referencia histórica y posibles usos futuros
 
     private boolean esIntercambioAprobado(BitacoraEntity evento) {
-        Solicitud2Entity solicitud = evento.getSolicitud();
+        SolicitudEntity solicitud = evento.getSolicitud();
 
         if (solicitud != null
                 && solicitud.getTipoSolicitud() != null
                 && solicitud.getTipoSolicitud().getTipo() != null
                 && solicitud.getTipoSolicitud().getTipo().equals(4)
-                && solicitud.getEstado() == Solicitud2Entity.EstadoSolicitud.APROBADA) {
+                && solicitud.getEstado() == SolicitudEntity.EstadoSolicitud.APROBADA) {
             return true;
         }
 
@@ -358,12 +358,12 @@ public class ExportacionService {
     }
 
     private boolean esSolicitudAprobadaComun(BitacoraEntity evento) {
-        Solicitud2Entity solicitud = evento.getSolicitud();
+        SolicitudEntity solicitud = evento.getSolicitud();
 
         if (solicitud == null
                 || solicitud.getTipoSolicitud() == null
                 || solicitud.getTipoSolicitud().getTipo() == null
-                || solicitud.getEstado() != Solicitud2Entity.EstadoSolicitud.APROBADA) {
+                || solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.APROBADA) {
             return false;
         }
 
@@ -374,13 +374,13 @@ public class ExportacionService {
     }
 
     private boolean esOfertaParticularAprobada(BitacoraEntity evento) {
-        Solicitud2Entity solicitud = evento.getSolicitud();
+        SolicitudEntity solicitud = evento.getSolicitud();
 
         if (solicitud != null
                 && solicitud.getTipoSolicitud() != null
                 && solicitud.getTipoSolicitud().getTipo() != null
                 && solicitud.getTipoSolicitud().getTipo().equals(5)
-                && solicitud.getEstado() == Solicitud2Entity.EstadoSolicitud.APROBADA) {
+                && solicitud.getEstado() == SolicitudEntity.EstadoSolicitud.APROBADA) {
             return true;
         }
 
@@ -479,7 +479,7 @@ public class ExportacionService {
         }
 
         if (tipoEvento.equals("CAMBIO_ESTADO_APROBADA")) {
-            Solicitud2Entity solicitud = evento.getSolicitud();
+            SolicitudEntity solicitud = evento.getSolicitud();
 
             if (solicitud == null
                     || solicitud.getTipoSolicitud() == null

@@ -9,8 +9,8 @@ import java.time.LocalTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlantillaTurnoDTO {
-    private Long idPlantillaTurno;
+public class TipoTurnoDTO {
+    private Long idTipoTurno;
     private String nombre;
     private LocalTime horaInicio;
     private LocalTime horaTermino;

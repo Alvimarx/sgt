@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Clock, Plus, Pencil, Trash2, X, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { tiposTurnoService, formatHora } from '../../services/plantillasService';
+import { tiposTurnoService, formatHora } from '../../services/rotativasService';
 import { SGTIcon } from '../Style/UIPrimitives';
 
 // ─── Paleta de colores reutilizable ────────────────────────────────────────
@@ -321,7 +321,7 @@ export default function TiposTurnoView({ onBack }) {
         setSaving(true);
         try {
             if (editing) {
-                await tiposTurnoService.update(editing.idPlantillaTurno, { nombre, horaInicio, horaTermino });
+                await tiposTurnoService.update(editing.idTipoTurno, { nombre, horaInicio, horaTermino });
             } else {
                 await tiposTurnoService.create({ nombre, horaInicio, horaTermino, idServicio: user?.servicioId });
             }
@@ -340,7 +340,7 @@ export default function TiposTurnoView({ onBack }) {
         setAfectadas([]);
         setLoadingImpacto(true);
         try {
-            const rotativas = await tiposTurnoService.getRotativasAfectadas(turno.idPlantillaTurno);
+            const rotativas = await tiposTurnoService.getRotativasAfectadas(turno.idTipoTurno);
             setAfectadas(rotativas);
         } catch {
             // Si no se pudo consultar el impacto, se permite eliminar igual sin la advertencia.
@@ -354,7 +354,7 @@ export default function TiposTurnoView({ onBack }) {
         if (!confirmDel) return;
         setDeleting(true);
         try {
-            await tiposTurnoService.delete(confirmDel.idPlantillaTurno);
+            await tiposTurnoService.delete(confirmDel.idTipoTurno);
             setConfirmDel(null);
             await load();
         } catch (e) {
@@ -447,7 +447,7 @@ export default function TiposTurnoView({ onBack }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {tipos.map((t, i) => (
                             <TurnoCard
-                                key={t.idPlantillaTurno}
+                                key={t.idTipoTurno}
                                 turno={t}
                                 index={i}
                                 onEdit={openEdit}

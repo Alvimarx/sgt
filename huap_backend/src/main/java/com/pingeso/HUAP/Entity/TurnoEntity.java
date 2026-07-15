@@ -53,11 +53,11 @@ public class TurnoEntity {
     private PuestoEntity puesto;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_plantilla")
-    private PlantillaEntity plantilla;
+    @JoinColumn(name = "id_rotativa")
+    private RotativaEntity rotativa;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_tipo_turno")
-    private PlantillaTurnoEntity tipoTurno;
+    private TipoTurnoEntity tipoTurno;
 
 }

@@ -193,7 +193,7 @@ const AdminStats = ({ onBack }) => {
   const opcionesTipo      = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.tipoTurno).filter(Boolean))].sort(), [todosDetalle]);
   const opcionesPuesto    = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombrePuesto).filter(Boolean))].sort(), [todosDetalle]);
   const opcionesFecha     = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.fecha).filter(Boolean))].sort(), [todosDetalle]);
-  const opcionesPlantilla = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombrePlantilla).filter(Boolean))].sort(), [todosDetalle]);
+  const opcionesPlantilla = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombreRotativa).filter(Boolean))].sort(), [todosDetalle]);
 
   const turnosFiltrados = React.useMemo(() => {
     if (!todosDetalle) return [];
@@ -201,7 +201,7 @@ const AdminStats = ({ onBack }) => {
       if (filtroTipo      && t.tipoTurno      !== filtroTipo)      return false;
       if (filtroPuesto    && t.nombrePuesto   !== filtroPuesto)    return false;
       if (filtroFecha     && t.fecha          !== filtroFecha)     return false;
-      if (filtroPlantilla && t.nombrePlantilla !== filtroPlantilla) return false;
+      if (filtroPlantilla && t.nombreRotativa !== filtroPlantilla) return false;
       return true;
     });
   }, [todosDetalle, filtroTipo, filtroPuesto, filtroFecha, filtroPlantilla]);

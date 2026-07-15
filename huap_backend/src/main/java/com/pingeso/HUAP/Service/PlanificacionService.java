@@ -5,9 +5,9 @@ import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.PuestoEntity;
 import com.pingeso.HUAP.Entity.PlanificacionAsignacionEntity;
 import com.pingeso.HUAP.Entity.PlanificacionEntity;
-import com.pingeso.HUAP.Entity.PlantillaDiaEntity;
-import com.pingeso.HUAP.Entity.PlantillaEntity;
-import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
+import com.pingeso.HUAP.Entity.RotativaDiaEntity;
+import com.pingeso.HUAP.Entity.RotativaEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.FeriadoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
@@ -15,8 +15,8 @@ import com.pingeso.HUAP.Repository.FeriadoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.PlanificacionRepository;
-import com.pingeso.HUAP.Repository.PlantillaDiaRepository;
-import com.pingeso.HUAP.Repository.PlantillaRepository;
+import com.pingeso.HUAP.Repository.RotativaDiaRepository;
+import com.pingeso.HUAP.Repository.RotativaRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import jakarta.transaction.Transactional;
@@ -44,10 +44,10 @@ public class PlanificacionService {
 
     private final PlanificacionRepository planificacionRepository;
     private final ServicioRepository servicioRepository;
-    private final PlantillaRepository plantillaRepository;
+    private final RotativaRepository rotativaRepository;
     private final FuncionarioRepository funcionarioRepository;
     private final PuestoRepository puestoRepository;
-    private final PlantillaDiaRepository plantillaDiaRepository;
+    private final RotativaDiaRepository rotativaDiaRepository;
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
     private final ReglaServicioService reglaServicioService;
@@ -56,10 +56,10 @@ public class PlanificacionService {
     public PlanificacionService(
             PlanificacionRepository planificacionRepository,
             ServicioRepository servicioRepository,
-            PlantillaRepository plantillaRepository,
+            RotativaRepository rotativaRepository,
             FuncionarioRepository funcionarioRepository,
             PuestoRepository puestoRepository,
-            PlantillaDiaRepository plantillaDiaRepository,
+            RotativaDiaRepository rotativaDiaRepository,
             TurnoRepository turnoRepository,
             BitacoraService bitacoraService,
             ReglaServicioService reglaServicioService,
@@ -67,10 +67,10 @@ public class PlanificacionService {
     ) {
         this.planificacionRepository = planificacionRepository;
         this.servicioRepository = servicioRepository;
-        this.plantillaRepository = plantillaRepository;
+        this.rotativaRepository = rotativaRepository;
         this.funcionarioRepository = funcionarioRepository;
         this.puestoRepository = puestoRepository;
-        this.plantillaDiaRepository = plantillaDiaRepository;
+        this.rotativaDiaRepository = rotativaDiaRepository;
         this.turnoRepository = turnoRepository;
         this.bitacoraService = bitacoraService;
         this.reglaServicioService = reglaServicioService;
@@ -165,21 +165,21 @@ public class PlanificacionService {
         FuncionarioEntity actor = (actorId != null)
                 ? funcionarioRepository.findById(actorId).orElse(null) : null;
 
-        // Asignaciones vigentes (sin plantilla/puesto eliminado), filtradas una sola vez.
+        // Asignaciones vigentes (sin rotativa/puesto eliminado), filtradas una sola vez.
         List<PlanificacionAsignacionEntity> asignacionesVigentes = plan.getAsignaciones().stream()
-                .filter(a -> a.getPlantilla() != null && !a.getPlantilla().isEliminado())
+                .filter(a -> a.getRotativa() != null && !a.getRotativa().isEliminado())
                 .filter(a -> a.getPuesto() == null || !a.getPuesto().isEliminado())
                 .toList();
 
         // Secuencia de días por rotativa DISTINTA (varios puestos comparten la misma rotativa;
-        // antes se volvía a consultar por cada asignación aunque la plantilla ya se hubiera leído).
-        Map<Long, List<PlantillaDiaEntity>> secuenciaPorPlantilla = new HashMap<>();
+        // antes se volvía a consultar por cada asignación aunque la rotativa ya se hubiera leído).
+        Map<Long, List<RotativaDiaEntity>> secuenciaPorRotativa = new HashMap<>();
         int maxDiaIndex = 0;
         for (PlanificacionAsignacionEntity asignacion : asignacionesVigentes) {
-            Long idPlantilla = asignacion.getPlantilla().getIdPlantilla();
-            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.computeIfAbsent(idPlantilla,
-                    id -> plantillaDiaRepository.findByPlantilla_IdPlantillaOrderByDiaIndexAsc(id));
-            for (PlantillaDiaEntity dia : secuencia) {
+            Long idRotativa = asignacion.getRotativa().getIdRotativa();
+            List<RotativaDiaEntity> secuencia = secuenciaPorRotativa.computeIfAbsent(idRotativa,
+                    id -> rotativaDiaRepository.findByRotativa_IdRotativaOrderByDiaIndexAsc(id));
+            for (RotativaDiaEntity dia : secuencia) {
                 if (dia.getDiaIndex() > maxDiaIndex) maxDiaIndex = dia.getDiaIndex();
             }
         }
@@ -212,10 +212,10 @@ public class PlanificacionService {
         Map<Long, List<TurnoEntity>> creadosPorFuncionario = new HashMap<>();
 
         for (PlanificacionAsignacionEntity asignacion : asignacionesVigentes) {
-            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.get(asignacion.getPlantilla().getIdPlantilla());
+            List<RotativaDiaEntity> secuencia = secuenciaPorRotativa.get(asignacion.getRotativa().getIdRotativa());
 
-            for (PlantillaDiaEntity dia : secuencia) {
-                PlantillaTurnoEntity tipo = dia.getPlantillaTurno();
+            for (RotativaDiaEntity dia : secuencia) {
+                TipoTurnoEntity tipo = dia.getTipoTurno();
                 if (tipo == null || tipo.isEliminado()) continue; // día libre o tipo eliminado
 
                 LocalDate fechaDia = fechaInicio.plusDays(dia.getDiaIndex());
@@ -229,7 +229,7 @@ public class PlanificacionService {
                         .horaFin(tipo.getHoraTermino())
                         .servicio(servicio)
                         .puesto(asignacion.getPuesto())
-                        .plantilla(asignacion.getPlantilla())
+                        .rotativa(asignacion.getRotativa())
                         .build();
 
                 reglaServicioService.aplicarReglas(turno, reglasSel, feriados); // ajusta horaInicio/horaFin según reglas seleccionadas
@@ -281,19 +281,19 @@ public class PlanificacionService {
 
         // Asignaciones vigentes con funcionario asignado (sin funcionario no hay choque posible).
         List<PlanificacionAsignacionEntity> asignacionesConFuncionario = plan.getAsignaciones().stream()
-                .filter(a -> a.getPlantilla() != null && !a.getPlantilla().isEliminado())
+                .filter(a -> a.getRotativa() != null && !a.getRotativa().isEliminado())
                 .filter(a -> a.getPuesto() == null || !a.getPuesto().isEliminado())
                 .filter(a -> a.getFuncionario() != null && !a.getFuncionario().isEliminado())
                 .toList();
 
         // Secuencia de días por rotativa DISTINTA + rango de fechas total del pre-chequeo.
-        Map<Long, List<PlantillaDiaEntity>> secuenciaPorPlantilla = new HashMap<>();
+        Map<Long, List<RotativaDiaEntity>> secuenciaPorRotativa = new HashMap<>();
         int maxDiaIndex = 0;
         for (PlanificacionAsignacionEntity asignacion : asignacionesConFuncionario) {
-            Long idPlantilla = asignacion.getPlantilla().getIdPlantilla();
-            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.computeIfAbsent(idPlantilla,
-                    id -> plantillaDiaRepository.findByPlantilla_IdPlantillaOrderByDiaIndexAsc(id));
-            for (PlantillaDiaEntity dia : secuencia) {
+            Long idRotativa = asignacion.getRotativa().getIdRotativa();
+            List<RotativaDiaEntity> secuencia = secuenciaPorRotativa.computeIfAbsent(idRotativa,
+                    id -> rotativaDiaRepository.findByRotativa_IdRotativaOrderByDiaIndexAsc(id));
+            for (RotativaDiaEntity dia : secuencia) {
                 if (dia.getDiaIndex() > maxDiaIndex) maxDiaIndex = dia.getDiaIndex();
             }
         }
@@ -313,10 +313,10 @@ public class PlanificacionService {
 
         for (PlanificacionAsignacionEntity asignacion : asignacionesConFuncionario) {
             FuncionarioEntity func = asignacion.getFuncionario();
-            List<PlantillaDiaEntity> secuencia = secuenciaPorPlantilla.get(asignacion.getPlantilla().getIdPlantilla());
+            List<RotativaDiaEntity> secuencia = secuenciaPorRotativa.get(asignacion.getRotativa().getIdRotativa());
 
-            for (PlantillaDiaEntity dia : secuencia) {
-                PlantillaTurnoEntity tipo = dia.getPlantillaTurno();
+            for (RotativaDiaEntity dia : secuencia) {
+                TipoTurnoEntity tipo = dia.getTipoTurno();
                 if (tipo == null || tipo.isEliminado()) continue;
 
                 LocalDate fechaDia = fechaInicio.plusDays(dia.getDiaIndex());
@@ -333,7 +333,7 @@ public class PlanificacionService {
                     c.put("fecha", fechaDia.toString());
                     c.put("horaInicio", hi.toString());
                     c.put("horaFin", hf.toString());
-                    c.put("nombreRotativa", asignacion.getPlantilla().getNombre());
+                    c.put("nombreRotativa", asignacion.getRotativa().getNombre());
                     c.put("servicioEnConflicto",
                             existente.getServicio() != null ? existente.getServicio().getNombre() : null);
                     conflictos.add(c);
@@ -396,17 +396,17 @@ public class PlanificacionService {
     }
 
     private PlanificacionAsignacionEntity construirAsignacion(PlanificacionEntity plan, PlanificacionAsignacionDTO dto, Long idServicio) {
-        if (dto.getIdPlantilla() == null) {
-            throw new RuntimeException("Cada asignación debe indicar una rotativa (idPlantilla)");
+        if (dto.getIdRotativa() == null) {
+            throw new RuntimeException("Cada asignación debe indicar una rotativa (idRotativa)");
         }
 
-        PlantillaEntity plantilla = plantillaRepository.findById(dto.getIdPlantilla())
-                .orElseThrow(() -> new RuntimeException("Rotativa no encontrada: ID " + dto.getIdPlantilla()));
-        if (plantilla.isEliminado()) {
+        RotativaEntity rotativa = rotativaRepository.findById(dto.getIdRotativa())
+                .orElseThrow(() -> new RuntimeException("Rotativa no encontrada: ID " + dto.getIdRotativa()));
+        if (rotativa.isEliminado()) {
             throw new RuntimeException("La rotativa seleccionada fue eliminada y no puede usarse.");
         }
-        if (!plantilla.getServicio().getIdServicio().equals(idServicio)) {
-            throw new RuntimeException("La rotativa '" + plantilla.getNombre() + "' no pertenece a este servicio.");
+        if (!rotativa.getServicio().getIdServicio().equals(idServicio)) {
+            throw new RuntimeException("La rotativa '" + rotativa.getNombre() + "' no pertenece a este servicio.");
         }
 
         FuncionarioEntity funcionario = null;
@@ -430,6 +430,6 @@ public class PlanificacionService {
             }
         }
 
-        return new PlanificacionAsignacionEntity(plan, plantilla, funcionario, puesto);
+        return new PlanificacionAsignacionEntity(plan, rotativa, funcionario, puesto);
     }
 }

@@ -35,7 +35,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
     // Conteos informativos (advisory). Incluyen histórico; no filtran eliminado.
     long countByPuesto_IdPuesto(Long idPuesto);
 
-    long countByTipoTurno_IdPlantillaTurno(Long idPlantillaTurno);
+    long countByTipoTurno_IdTipoTurno(Long idTipoTurno);
 
     long countByServicio_IdServicio(Long idServicio);
 

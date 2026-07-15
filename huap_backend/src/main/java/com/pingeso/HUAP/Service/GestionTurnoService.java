@@ -22,7 +22,7 @@ public class GestionTurnoService {
     private final FuncionarioRepository funcionarioRepository;
     private final TurnoService turnoService;
     private final BitacoraService bitacoraService;
-    private final Notificacion2Service notificacion2Service;
+    private final NotificacionService notificacionService;
     private final ServiciosFuncionarioRepository serviciosFuncionarioRepository;
 
     @Transactional
@@ -77,7 +77,7 @@ public class GestionTurnoService {
         registrarEnBitacora(admin, turno, "ASIGNACION_MANUAL_TURNO",
                 "Turno asignado manualmente a " + nombreCompleto(nuevo), request.getMotivo());
 
-        notificacion2Service.crearNotificacionSistema(nuevo,
+        notificacionService.crearNotificacionSistema(nuevo,
                 "Se te ha asignado un turno del " + turno.getDiaInicioTurno()
                 + " (" + turno.getHoraInicio() + " - " + turno.getHoraFin() + ").");
 
@@ -96,7 +96,7 @@ public class GestionTurnoService {
           "Funcionario eliminado manualmente del turno: " + anteriorNombre, request.getMotivo());
 
         if (funcionarioAnterior != null) {
-            notificacion2Service.crearNotificacionSistema(funcionarioAnterior,
+            notificacionService.crearNotificacionSistema(funcionarioAnterior,
                     "Tu turno del " + turno.getDiaInicioTurno()
                     + " ha sido desasignado. Motivo: " + request.getMotivo());
         }
@@ -126,11 +126,11 @@ public class GestionTurnoService {
                 request.getMotivo());
 
         if (funcionarioAnterior != null) {
-            notificacion2Service.crearNotificacionSistema(funcionarioAnterior,
+            notificacionService.crearNotificacionSistema(funcionarioAnterior,
                     "Tu turno del " + turno.getDiaInicioTurno()
                     + " ha sido reasignado a otro funcionario. Motivo: " + request.getMotivo());
         }
-        notificacion2Service.crearNotificacionSistema(nuevo,
+        notificacionService.crearNotificacionSistema(nuevo,
                 "Se te ha reasignado el turno del " + turno.getDiaInicioTurno()
                 + " (" + turno.getHoraInicio() + " - " + turno.getHoraFin() + ").");
 
@@ -156,7 +156,7 @@ public class GestionTurnoService {
                 request.getMotivo());
 
         if (asignado != null) {
-            notificacion2Service.crearNotificacionSistema(asignado,
+            notificacionService.crearNotificacionSistema(asignado,
                     "El horario de tu turno del " + turno.getDiaInicioTurno()
                     + " fue modificado. Nuevo horario: "
                     + request.getNuevaHoraInicio() + " - " + request.getNuevaHoraFin()

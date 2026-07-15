@@ -31,7 +31,7 @@ public class BitacoraEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_SOLICITUD")
-    private Solicitud2Entity solicitud;
+    private SolicitudEntity solicitud;
 
     @Column(name = "Tipo_evento")
     private String tipoEvento;

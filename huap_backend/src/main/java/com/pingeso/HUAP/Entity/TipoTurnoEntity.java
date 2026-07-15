@@ -6,18 +6,18 @@ import java.time.LocalTime;
 
 @Entity
 @Table(
-    name = "plantilla_turno",
+    name = "tipo_turno",
     uniqueConstraints = @UniqueConstraint(columnNames = {"id_servicio", "nombre"}) // Evita que haya dos tipos de turno con el mismo nombre dentro del mismo servicio
 )
 @Getter
 @Setter
 @NoArgsConstructor
-public class PlantillaTurnoEntity {
+public class TipoTurnoEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_plantilla_turno")
-    private Long idPlantillaTurno;
+    @Column(name = "id_tipo_turno")
+    private Long idTipoTurno;
 
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
@@ -35,7 +35,7 @@ public class PlantillaTurnoEntity {
     @Column(name = "eliminado", nullable = false, columnDefinition = "bit(1) default 0")
     private boolean eliminado = false;
 
-    public PlantillaTurnoEntity(String nombre, ServicioEntity servicio, LocalTime horaInicio, LocalTime horaTermino) {
+    public TipoTurnoEntity(String nombre, ServicioEntity servicio, LocalTime horaInicio, LocalTime horaTermino) {
         this.nombre = nombre;
         this.servicio = servicio;
         this.horaInicio = horaInicio;

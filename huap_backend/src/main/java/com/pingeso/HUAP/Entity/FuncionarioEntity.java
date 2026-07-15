@@ -76,12 +76,12 @@ public class    FuncionarioEntity {
     @JsonIgnore
     @Builder.Default
     @OneToMany(mappedBy = "funcionario")
-    private List<Solicitud2Entity> solicitudesEmitidas = new ArrayList<>();
+    private List<SolicitudEntity> solicitudesEmitidas = new ArrayList<>();
 
     @JsonIgnore
     @Builder.Default
     @OneToMany(mappedBy = "funcionarioReceptor")
-    private List<Solicitud2Entity> solicitudesRecibidas = new ArrayList<>();
+    private List<SolicitudEntity> solicitudesRecibidas = new ArrayList<>();
 
     // --- Constructor útil sin ID ---
 

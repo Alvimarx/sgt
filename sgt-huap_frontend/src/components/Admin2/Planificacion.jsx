@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { plantillasService, tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/plantillasService';
+import { plantillasService, tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/rotativasService';
 import { getPuestosPorServicio } from '../../services/puestosService';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { planificacionService } from '../../services/planificacionService';
@@ -30,9 +30,9 @@ function buildMonthGrid(seedDateStr){
 /* ─── Helpers de tipos / horarios / colores ────────────────────────────────── */
 const HUES=[250,150,30,85,320,200,45,170,110,300];
 
-/** Construye un mapa idPlantillaTurno → color estable según el orden de los tipos. */
+/** Construye un mapa idTipoTurno → color estable según el orden de los tipos. */
 function makeTipoColor(tipos){
-  const idx={}; (tipos||[]).forEach((t,i)=>{ idx[t.idPlantillaTurno]=i; });
+  const idx={}; (tipos||[]).forEach((t,i)=>{ idx[t.idTipoTurno]=i; });
   return (idTipo)=>{ const i=idx[idTipo]??0; const h=HUES[i%HUES.length]; return {bg:`oklch(0.94 0.045 ${h})`,soft:`oklch(0.97 0.025 ${h})`,ink:`oklch(0.36 0.10 ${h})`,bar:`oklch(0.62 0.13 ${h})`}; };
 }
 
@@ -56,14 +56,14 @@ function findDobleAsignacion(instancias,instanceId,funcionarioId){
   return null;
 }
 
-/** Secuencia porDia [{idPlantillaTurno,nombre,horaInicio,horaTermino}...] desde PlantillaDTO.secuenciaDias. */
+/** Secuencia porDia [{idTipoTurno,nombre,horaInicio,horaTermino}...] desde PlantillaDTO.secuenciaDias. */
 function buildSecuencia(plantilla){
   const total=(plantilla.semanas||0)*7;
   const porDia=Array.from({length:total},()=>[]);
   (plantilla.secuenciaDias||[]).forEach(d=>{
     const idx=d?.diaIndex; const t=d?.turno;
-    if(idx!=null && idx>=0 && idx<total && t && t.idPlantillaTurno!=null){
-      porDia[idx].push({ idPlantillaTurno:t.idPlantillaTurno, nombre:t.nombre, horaInicio:t.horaInicio, horaTermino:t.horaTermino });
+    if(idx!=null && idx>=0 && idx<total && t && t.idTipoTurno!=null){
+      porDia[idx].push({ idTipoTurno:t.idTipoTurno, nombre:t.nombre, horaInicio:t.horaInicio, horaTermino:t.horaTermino });
     }
   });
   return porDia;
@@ -202,7 +202,7 @@ function buildDayCoverage(entradasDelDia){
   // entradasDelDia: [{inst, tipo}]
   const byTipo={};
   entradasDelDia.forEach(({inst,tipo})=>{
-    const key=tipo.idPlantillaTurno;
+    const key=tipo.idTipoTurno;
     if(!byTipo[key])byTipo[key]={tipo,asignadas:[],pendientes:[]};
     if(inst.idFuncionario)byTipo[key].asignadas.push(inst); else byTipo[key].pendientes.push(inst);
   });
@@ -220,15 +220,15 @@ function usePlanificacionState({plantillas,funcionarios,puestos}){
     counter.current+=1; const n=counter.current;
     return {
       id:`inst-${n}`, label:`R${n}`,
-      idPlantilla:plantilla.idPlantilla, nombrePlantilla:plantilla.nombre,
+      idRotativa:plantilla.idRotativa, nombreRotativa:plantilla.nombre,
       semanas:plantilla.semanas, secuencia:buildSecuencia(plantilla),
       idFuncionario:null, nombreFuncionario:null, iniciales:null, profesion:null,
       idPuesto:null, nombrePuesto:null, ...extra,
     };
   };
 
-  const inject=({idPlantilla,idPuesto})=>{
-    const plantilla=plantillas.find(p=>p.idPlantilla===Number(idPlantilla)); if(!plantilla)return null;
+  const inject=({idRotativa,idPuesto})=>{
+    const plantilla=plantillas.find(p=>p.idRotativa===Number(idRotativa)); if(!plantilla)return null;
     const puesto=idPuesto?puestos.find(p=>p.idPuesto===Number(idPuesto)):null;
     const nueva=instanciaDesdePlantilla(plantilla,{idPuesto:puesto?.idPuesto||null,nombrePuesto:puesto?.nombre||null});
     setInstancias(prev=>[...prev,nueva]);
@@ -248,11 +248,11 @@ function usePlanificacionState({plantillas,funcionarios,puestos}){
   const loadMolde=(planificacion)=>{
     counter.current=0;
     const nuevas=(planificacion.asignaciones||[]).map(a=>{
-      const plantilla=plantillas.find(p=>p.idPlantilla===a.idPlantilla);
+      const plantilla=plantillas.find(p=>p.idRotativa===a.idRotativa);
       counter.current+=1; const n=counter.current;
       return {
         id:`inst-${n}`, label:`R${n}`,
-        idPlantilla:a.idPlantilla, nombrePlantilla:a.nombrePlantilla||plantilla?.nombre||'Rotativa',
+        idRotativa:a.idRotativa, nombreRotativa:a.nombreRotativa||plantilla?.nombre||'Rotativa',
         semanas:plantilla?.semanas||0, secuencia:plantilla?buildSecuencia(plantilla):[],
         idFuncionario:a.idFuncionario||null, nombreFuncionario:a.nombreFuncionario||null,
         iniciales:a.nombreFuncionario?a.nombreFuncionario.split(/\s+/).slice(0,2).map(s=>s[0]?.toUpperCase()||'').join(''):null,
@@ -263,7 +263,7 @@ function usePlanificacionState({plantillas,funcionarios,puestos}){
   };
 
   // Asignaciones para enviar al backend.
-  const toAsignaciones=()=>instancias.map(i=>({ idPlantilla:i.idPlantilla, idFuncionario:i.idFuncionario||null, idPuesto:i.idPuesto||null }));
+  const toAsignaciones=()=>instancias.map(i=>({ idRotativa:i.idRotativa, idFuncionario:i.idFuncionario||null, idPuesto:i.idPuesto||null }));
 
   const daysIndex=useMemo(()=>{
     const m={};
@@ -277,12 +277,12 @@ function usePlanificacionState({plantillas,funcionarios,puestos}){
 
 /* ─── InyectarSheet ──────────────────────────────────────────────────────────── */
 function InyectarSheet({open,onClose,onInject,plantillas,puestos}){
-  const[idPlantilla,setIdPlantilla]=useState('');
+  const[idRotativa,setIdRotativa]=useState('');
   const[idPuesto,setIdPuesto]=useState('');
   const[err,setErr]=useState('');
   if(!open)return null;
 
-  const handle=()=>{ if(!idPlantilla)return setErr('Selecciona una rotativa.'); if(!idPuesto)return setErr('Selecciona el puesto.'); setErr(''); onInject({idPlantilla:Number(idPlantilla),idPuesto:Number(idPuesto)}); setIdPlantilla(''); setIdPuesto(''); };
+  const handle=()=>{ if(!idRotativa)return setErr('Selecciona una rotativa.'); if(!idPuesto)return setErr('Selecciona el puesto.'); setErr(''); onInject({idRotativa:Number(idRotativa),idPuesto:Number(idPuesto)}); setIdRotativa(''); setIdPuesto(''); };
   const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
 
   return(
@@ -296,8 +296,8 @@ function InyectarSheet({open,onClose,onInject,plantillas,puestos}){
             <div style={{fontSize:12,color:'var(--ink3)',fontWeight:600}}>No hay rotativas en este servicio. Créalas en «Rotativas».</div>
           ):(
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {plantillas.map(p=>{ const selected=String(p.idPlantilla)===idPlantilla; const turnos=buildSecuencia(p).reduce((s,d)=>s+d.length,0); return(
-                <button key={p.idPlantilla} onClick={()=>setIdPlantilla(String(p.idPlantilla))} style={{textAlign:'left',cursor:'pointer',fontFamily:'inherit',background:selected?'var(--primary-soft)':'#fff',border:`1.5px solid ${selected?'var(--primary)':'var(--line)'}`,borderRadius:12,padding:'11px 13px',display:'flex',alignItems:'center',gap:10}}>
+              {plantillas.map(p=>{ const selected=String(p.idRotativa)===idRotativa; const turnos=buildSecuencia(p).reduce((s,d)=>s+d.length,0); return(
+                <button key={p.idRotativa} onClick={()=>setIdRotativa(String(p.idRotativa))} style={{textAlign:'left',cursor:'pointer',fontFamily:'inherit',background:selected?'var(--primary-soft)':'#fff',border:`1.5px solid ${selected?'var(--primary)':'var(--line)'}`,borderRadius:12,padding:'11px 13px',display:'flex',alignItems:'center',gap:10}}>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:13.5,fontWeight:800,color:'var(--ink)'}}>{p.nombre}</div><div style={{fontSize:11.5,color:'var(--ink3)',fontWeight:600,marginTop:1}}>{p.semanas} semanas · {turnos} turnos</div></div>
                   <div style={{width:18,height:18,borderRadius:99,border:`2px solid ${selected?'var(--primary)':'var(--line)'}`,background:selected?'var(--primary)':'transparent',display:'grid',placeItems:'center',flexShrink:0}}>{selected&&<SGTIcon name="check" size={10} color="#fff" strokeWidth={3.5}/>}</div>
                 </button>
@@ -327,7 +327,7 @@ function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onR
   const handle=()=>{
     if(!idFuncionario)return setErr('Selecciona un funcionario.');
     const conflicto=findDobleAsignacion(instancias,instancia.id,Number(idFuncionario));
-    if(conflicto){ const f=funcionarios.find(x=>x.idFuncionario===Number(idFuncionario)); return setErr(`${f?nombreFunc(f):'Esta persona'} ya cubre ${conflicto.label} · ${conflicto.nombrePlantilla}, que se superpone en horario.`); }
+    if(conflicto){ const f=funcionarios.find(x=>x.idFuncionario===Number(idFuncionario)); return setErr(`${f?nombreFunc(f):'Esta persona'} ya cubre ${conflicto.label} · ${conflicto.nombreRotativa}, que se superpone en horario.`); }
     setErr(''); onAssign(instancia.id,Number(idFuncionario));
   };
   const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
@@ -336,7 +336,7 @@ function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onR
     <Sheet open={open} onClose={onClose} title={`Asignar a ${instancia.label}`} maxHeight="90%">
       <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:14}}>
         <div style={{background:'var(--surface2)',borderRadius:14,padding:14}}>
-          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}><span style={{fontSize:10.5,fontWeight:900,color:'#fff',background:'var(--primary)',padding:'2px 7px',borderRadius:99}}>{instancia.label}</span><span style={{fontSize:13.5,fontWeight:800,color:'var(--ink)'}}>{instancia.nombrePlantilla}</span></div>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}><span style={{fontSize:10.5,fontWeight:900,color:'#fff',background:'var(--primary)',padding:'2px 7px',borderRadius:99}}>{instancia.label}</span><span style={{fontSize:13.5,fontWeight:800,color:'var(--ink)'}}>{instancia.nombreRotativa}</span></div>
           <div style={{fontSize:11.5,color:'var(--ink3)',fontWeight:600,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>{instancia.semanas} semanas · {totalTurnos} turnos<PuestoTag inst={instancia} size="xs"/></div>
         </div>
         {err&&<div style={{display:'flex',alignItems:'center',gap:6,background:'var(--warn-soft)',color:'var(--warn)',borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:700}}><SGTIcon name="alert" size={14}/>{err}</div>}
@@ -445,9 +445,9 @@ function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssig
       <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:14}}>
         {grupos.length===0&&<div style={{padding:20,textAlign:'center',fontSize:12.5,color:'var(--ink3)',fontWeight:600}}>Día libre (sin turnos).</div>}
         {grupos.map(({tipo,asignadas,pendientes})=>{
-          const c=tipoColor(tipo.idPlantillaTurno);
+          const c=tipoColor(tipo.idTipoTurno);
           return(
-            <div key={tipo.idPlantillaTurno} style={{background:'#fff',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden'}}>
+            <div key={tipo.idTipoTurno} style={{background:'#fff',border:'1px solid var(--line)',borderRadius:14,overflow:'hidden'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:c.soft}}>
                 <div style={{width:32,height:32,borderRadius:9,background:c.bar,display:'grid',placeItems:'center'}}><SGTIcon name="clock" size={15} color="#fff"/></div>
                 <div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:800,color:c.ink}}>{tipo.nombre}</div><div style={{fontSize:10.5,color:c.ink,opacity:0.75,fontWeight:700,marginTop:1}}>{rangoHoras(tipo)}</div></div>
@@ -480,7 +480,7 @@ function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssig
 
 /* ─── RotativasList (pestañas colapsables por rotativa) ──────────────────────── */
 function RotativasList({instancias,onAssign,tipoColor}){
-  const grouped=useMemo(()=>{ const m={}; instancias.forEach(inst=>{ (m[inst.nombrePlantilla]??=[]).push(inst); }); return Object.entries(m).sort(([a],[b])=>a.localeCompare(b,'es')); },[instancias]);
+  const grouped=useMemo(()=>{ const m={}; instancias.forEach(inst=>{ (m[inst.nombreRotativa]??=[]).push(inst); }); return Object.entries(m).sort(([a],[b])=>a.localeCompare(b,'es')); },[instancias]);
   const[abierto,setAbierto]=useState({});
   const toggle=(name)=>setAbierto(p=>({...p,[name]:!p[name]}));
 
@@ -488,16 +488,16 @@ function RotativasList({instancias,onAssign,tipoColor}){
 
   return(
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
-      {grouped.map(([nombrePlantilla,list])=>{
+      {grouped.map(([nombreRotativa,list])=>{
         const primerTipo=(list[0].secuencia||[]).flat()[0];
-        const c=tipoColor(primerTipo?.idPlantillaTurno);
-        const pend=list.filter(i=>!i.idFuncionario).length, open=!!abierto[nombrePlantilla];
+        const c=tipoColor(primerTipo?.idTipoTurno);
+        const pend=list.filter(i=>!i.idFuncionario).length, open=!!abierto[nombreRotativa];
         return(
-          <div key={nombrePlantilla} style={{background:'#fff',borderRadius:12,border:'1px solid var(--line)',overflow:'hidden'}}>
-            <button onClick={()=>toggle(nombrePlantilla)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 12px',background:'none',border:'none',borderLeft:`5px solid ${c.bar}`,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
+          <div key={nombreRotativa} style={{background:'#fff',borderRadius:12,border:'1px solid var(--line)',overflow:'hidden'}}>
+            <button onClick={()=>toggle(nombreRotativa)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'11px 12px',background:'none',border:'none',borderLeft:`5px solid ${c.bar}`,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
               <div style={{width:30,height:30,borderRadius:8,background:c.bar,display:'grid',placeItems:'center',flexShrink:0}}><SGTIcon name="calendar" size={15} color="#fff"/></div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:800,color:'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nombrePlantilla}</div>
+                <div style={{fontSize:13,fontWeight:800,color:'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nombreRotativa}</div>
                 <div style={{fontSize:11,color:'var(--ink3)',fontWeight:700,marginTop:1}}>{list.length} {list.length===1?'rotativa':'rotativas'} · {list.length-pend}/{list.length} asignadas</div>
               </div>
               <span style={{fontSize:9.5,fontWeight:900,padding:'2px 8px',borderRadius:99,background:pend>0?'var(--warn-soft)':'var(--success-soft)',color:pend>0?'var(--warn)':'var(--success)',textTransform:'uppercase',letterSpacing:0.3,flexShrink:0}}>{pend>0?`${pend} vac.`:'Completo'}</span>
@@ -557,8 +557,8 @@ function RelativeWeekGrid({maxSemanas,daysIndex,tipoColor,onDayClick}){
               return(
                 <div key={diaIndex} onClick={()=>entradas.length&&onDayClick(diaIndex)} style={{minWidth:0,minHeight:46,borderRadius:9,background:entradas.length?'#fff':'var(--surface2)',border:'1px solid var(--line2)',padding:'4px 3px 5px',display:'flex',flexDirection:'column',gap:3,cursor:entradas.length?'pointer':'default'}}>
                   <div style={{fontSize:10,fontWeight:800,color:d>=5?'var(--accent)':'var(--ink3)',textAlign:'center'}}>{WEEK_DAYS_LBL[d]}</div>
-                  {grupos.map(({tipo,asignadas,pendientes})=>{ const c=tipoColor(tipo.idPlantillaTurno); const total=asignadas.length+pendientes.length; const allAssigned=pendientes.length===0; return(
-                    <div key={tipo.idPlantillaTurno} style={{height:22,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',gap:3,background:allAssigned?c.bg:'#fff',backgroundImage:allAssigned?'none':`repeating-linear-gradient(45deg,${c.soft} 0 5px,transparent 5px 10px)`,border:`1.5px solid ${c.bar}`,borderStyle:allAssigned?'solid':'dashed',position:'relative'}}>
+                  {grupos.map(({tipo,asignadas,pendientes})=>{ const c=tipoColor(tipo.idTipoTurno); const total=asignadas.length+pendientes.length; const allAssigned=pendientes.length===0; return(
+                    <div key={tipo.idTipoTurno} style={{height:22,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',gap:3,background:allAssigned?c.bg:'#fff',backgroundImage:allAssigned?'none':`repeating-linear-gradient(45deg,${c.soft} 0 5px,transparent 5px 10px)`,border:`1.5px solid ${c.bar}`,borderStyle:allAssigned?'solid':'dashed',position:'relative'}}>
                       <span style={{fontSize:10,fontWeight:900,color:c.ink,lineHeight:1}}>{total}</span>
                       {pendientes.length>0&&<span style={{position:'absolute',top:-5,right:-4,minWidth:14,height:14,padding:'0 3px',borderRadius:99,background:'var(--warn)',color:'#fff',fontSize:9,fontWeight:900,lineHeight:'14px',textAlign:'center',boxShadow:'0 0 0 1.5px #fff'}}>{pendientes.length}</span>}
                     </div>
@@ -649,7 +649,7 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
   // inicio; fin por día final, que es el siguiente si el turno cruza medianoche).
   const reglaAfecta=(tipo,dt)=>{
     if(!reglasSel.length)return false;
-    const id=tipo.idPlantillaTurno;
+    const id=tipo.idTipoTurno;
     const overnight=horaMin(tipo.horaTermino)<=horaMin(tipo.horaInicio);
     const finDt=new Date(dt); if(overnight)finDt.setDate(dt.getDate()+1);
     return reglasSel.some(r=>
@@ -660,7 +660,7 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
 
   // Presentación de reglas (pestaña "Reglas activas").
   const badgeMini={fontSize:9.5,fontWeight:800,textTransform:'uppercase',letterSpacing:0.3,color:'var(--primary)',background:'var(--primary-soft)',padding:'2px 8px',borderRadius:99,whiteSpace:'nowrap'};
-  const infoTipo=(idTipo,fallback)=>{ const t=(tipos||[]).find(x=>x.idPlantillaTurno===idTipo); return t?{nombre:t.nombre,hi:t.horaInicio,hf:t.horaTermino}:{nombre:fallback||`#${idTipo}`,hi:null,hf:null}; };
+  const infoTipo=(idTipo,fallback)=>{ const t=(tipos||[]).find(x=>x.idTipoTurno===idTipo); return t?{nombre:t.nombre,hi:t.horaInicio,hf:t.horaTermino}:{nombre:fallback||`#${idTipo}`,hi:null,hf:null}; };
   const filaCambio=(idTipo,fallback,bound,tiempo)=>{
     const{nombre,hi,hf}=infoTipo(idTipo,fallback); const ok=hi!=null&&hf!=null;
     const dI=bound==='inicio'?shiftHora(hi,tiempo):formatHora(hi);
@@ -762,8 +762,8 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
                   {Array.from({length:7},(_,d)=>{ const diaIndex=w*7+d, grupos=buildDayCoverage(daysIndex[diaIndex]||[]), dt=fechaReal(diaIndex); const esFeriado=feriados.has(toDateStr(dt)); const ajustado=esFeriado||d>=5; return(
                     <div key={diaIndex} style={{minWidth:0,minHeight:56,borderRadius:10,background:esFeriado?'var(--warn-soft)':grupos.length?'#fff':'var(--surface2)',border:`1px solid ${esFeriado?'var(--warn)':'var(--line2)'}`,padding:'5px 4px 6px',display:'flex',flexDirection:'column',gap:4}}>
                       <div title={esFeriado?'Feriado — se ajustan los horarios':ajustado?'Fin de semana — se ajustan los horarios':undefined} style={{fontSize:12,fontWeight:800,color:esFeriado?'var(--warn)':d>=5?'var(--accent)':'var(--ink)',textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:3}}>{esFeriado&&<span style={{width:5,height:5,borderRadius:99,background:'var(--warn)',flexShrink:0}}/>}{dt.getDate()}<span style={{fontSize:8.5,color:'var(--ink3)',fontWeight:700}}> {MONTHS_SHORT[dt.getMonth()].toLowerCase()}</span></div>
-                      {grupos.map(({tipo,asignadas,pendientes})=>{ const c=tipoColor(tipo.idPlantillaTurno); const enConf=conflictoKeys.has(`${toDateStr(dt)}|${formatHora(tipo.horaInicio)}`); const afectada=!enConf&&reglaAfecta(tipo,dt); return(
-                        <div key={tipo.idPlantillaTurno} title={afectada?'Horario ajustado por una regla':undefined} style={{height:22,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',gap:2,background:enConf?'var(--warn-soft)':c.bg,border:`1.5px solid ${enConf?'var(--warn)':afectada?'var(--primary)':c.bar}`,boxShadow:afectada?'0 0 0 1px var(--primary-soft)':'none'}}>
+                      {grupos.map(({tipo,asignadas,pendientes})=>{ const c=tipoColor(tipo.idTipoTurno); const enConf=conflictoKeys.has(`${toDateStr(dt)}|${formatHora(tipo.horaInicio)}`); const afectada=!enConf&&reglaAfecta(tipo,dt); return(
+                        <div key={tipo.idTipoTurno} title={afectada?'Horario ajustado por una regla':undefined} style={{height:22,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',gap:2,background:enConf?'var(--warn-soft)':c.bg,border:`1.5px solid ${enConf?'var(--warn)':afectada?'var(--primary)':c.bar}`,boxShadow:afectada?'0 0 0 1px var(--primary-soft)':'none'}}>
                           {enConf&&<SGTIcon name="alert" size={10} color="var(--warn)"/>}
                           {afectada&&<SGTIcon name="clock" size={10} color="var(--primary)"/>}
                           <span style={{fontSize:11,fontWeight:900,color:enConf?'var(--warn)':afectada?'var(--primary)':c.ink,lineHeight:1}}>{asignadas.length+pendientes.length}</span>
@@ -895,7 +895,7 @@ function PlanGuardarBase({onBack}){
     finally{ setCargandoMoldes(false); }
   };
 
-  const onInject=(dto)=>{ const created=inject(dto); setInjectOpen(false); if(created)flash(`${created.label} · ${created.nombrePlantilla}${created.nombrePuesto?' · '+created.nombrePuesto:''}`); };
+  const onInject=(dto)=>{ const created=inject(dto); setInjectOpen(false); if(created)flash(`${created.label} · ${created.nombreRotativa}${created.nombrePuesto?' · '+created.nombrePuesto:''}`); };
   const onAssign=(id,idFunc)=>{ assign(id,idFunc); setAssignInstance(null); flash('Funcionario asignado'); };
 
   const onSave=async(nombre)=>{

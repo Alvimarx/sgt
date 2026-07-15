@@ -29,7 +29,7 @@ const hashStr = (value = "") => {
 };
 
 export const getTeamColor = (shift) => {
-    const seed = shift?.idPlantilla ?? `tipo-${shift?.tipo || "sin-tipo"}`;
+    const seed = shift?.idRotativa ?? `tipo-${shift?.tipo || "sin-tipo"}`;
     return TEAM_COLORS[hashStr(String(seed)) % TEAM_COLORS.length];
 };
 

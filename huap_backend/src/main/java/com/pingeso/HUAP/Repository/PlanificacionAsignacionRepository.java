@@ -14,8 +14,8 @@ public interface PlanificacionAsignacionRepository extends JpaRepository<Planifi
      * Borra todas las asignaciones de planificación que usan una rotativa concreta.
      */
     @Modifying
-    @Query("DELETE FROM PlanificacionAsignacionEntity a WHERE a.plantilla.idPlantilla = :idPlantilla")
-    int deleteByPlantilla(@Param("idPlantilla") Long idPlantilla);
+    @Query("DELETE FROM PlanificacionAsignacionEntity a WHERE a.rotativa.idRotativa = :idRotativa")
+    int deleteByRotativa(@Param("idRotativa") Long idRotativa);
 
     /**
      * Borra las rotativas de planificación que usan un puesto concreto.

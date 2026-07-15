@@ -3,7 +3,7 @@ import {
     CalendarDays, Plus, Trash2, X, Check, AlertCircle, Clock, Brush,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { plantillasService, tiposTurnoService, formatHora } from '../../services/plantillasService';
+import { plantillasService, tiposTurnoService, formatHora } from '../../services/rotativasService';
 import { SGTIcon } from '../Style/UIPrimitives';
 
 // ─── Paleta ─────────────────────────────────────────────────────────────────
@@ -37,7 +37,7 @@ const parseSecuenciaFromBackend = (secuenciaDias, semanas) => {
     const matriz = matrizVacia(semanas);
     for (const d of (secuenciaDias ?? [])) {
         const idx = d?.diaIndex;
-        const tid = d?.turno?.idPlantillaTurno;
+        const tid = d?.turno?.idTipoTurno;
         if (idx != null && idx >= 0 && idx < matriz.length && tid != null) {
             matriz[idx].push(tid);
         }
@@ -91,7 +91,7 @@ function DayCell({ diaIndex, turnoIds, tipos, active, onClick }) {
     const dayPos = diaIndex % 7;
     const items = turnoIds
         .map(id => {
-            const idx = tipos.findIndex(t => t.idPlantillaTurno === id);
+            const idx = tipos.findIndex(t => t.idTipoTurno === id);
             return idx >= 0 ? { tipo: tipos[idx], color: turnoColor(idx) } : null;
         })
         .filter(Boolean);
@@ -193,11 +193,11 @@ function TurnoSheet({ diaIndex, tipos, turnoIds, onToggle, onLibre, onClose }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {tipos.map((t, i) => {
                         const c = turnoColor(i);
-                        const selected = turnoIds.includes(t.idPlantillaTurno);
+                        const selected = turnoIds.includes(t.idTipoTurno);
                         return (
                             <button
-                                key={t.idPlantillaTurno}
-                                onClick={() => onToggle(t.idPlantillaTurno)}
+                                key={t.idTipoTurno}
+                                onClick={() => onToggle(t.idTipoTurno)}
                                 style={{
                                     width: '100%', padding: '12px 14px', borderRadius: 10, textAlign: 'left',
                                     border: `1.5px solid ${selected ? c.ink : PA.line}`,
@@ -242,9 +242,9 @@ function DayGrid({ semanas, diasMatrix, tipos, brush, onChange, onError }) {
             return;
         }
 
-        const nuevo = tipos.find(t => t.idPlantillaTurno === idTurno);
+        const nuevo = tipos.find(t => t.idTipoTurno === idTurno);
         const conflicto = dia
-            .map(id => tipos.find(t => t.idPlantillaTurno === id))
+            .map(id => tipos.find(t => t.idTipoTurno === id))
             .filter(Boolean)
             .find(existente => seSuperponen(existente, nuevo));
 
@@ -332,7 +332,7 @@ function DayGrid({ semanas, diasMatrix, tipos, brush, onChange, onError }) {
 
 // ─── Sub: panel editor (crear o editar plantilla) ────────────────────────────
 function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
-    const isNew = !plantilla?.idPlantilla;
+    const isNew = !plantilla?.idRotativa;
 
     const [nombre, setNombre]   = useState(plantilla?.nombre ?? '');
     const [semanas, setSemanas] = useState(plantilla?.semanas ?? 2);
@@ -344,7 +344,7 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
     const [saving, setSaving] = useState(false);
     const [err, setErr]       = useState('');
     const [gridError, setGridError] = useState('');
-    const [brush, setBrush]   = useState(null);   // null | 'libre' | idPlantillaTurno
+    const [brush, setBrush]   = useState(null);   // null | 'libre' | idTipoTurno
 
     const handleSemanasChange = (val) => {
         const n = Math.max(1, Math.min(12, Number(val) || 1));
@@ -369,14 +369,14 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
                     semanas: Number(semanas),
                     idServicio: servicioId,
                 });
-                await plantillasService.setSecuencia(creada.idPlantilla, diasMatrix);
+                await plantillasService.setSecuencia(creada.idRotativa, diasMatrix);
                 result = creada;
             } else {
-                await plantillasService.update(plantilla.idPlantilla, {
+                await plantillasService.update(plantilla.idRotativa, {
                     nombre: nombre.trim(),
                     semanas: Number(semanas),
                 });
-                result = await plantillasService.setSecuencia(plantilla.idPlantilla, diasMatrix);
+                result = await plantillasService.setSecuencia(plantilla.idRotativa, diasMatrix);
             }
             onSaved(result);
         } catch (e) {
@@ -394,7 +394,7 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
 
     // Horas totales del patrón y promedio semanal que haría la persona.
     const totalMin = diasMatrix.reduce((acc, dia) => acc + dia.reduce((a, id) => {
-        const t = tipos.find(tt => tt.idPlantillaTurno === id);
+        const t = tipos.find(tt => tt.idTipoTurno === id);
         return a + (t ? duracionMin(t) : 0);
     }, 0), 0);
     const horasTotales  = totalMin / 60;
@@ -492,11 +492,11 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {tipos.map((t, i) => {
                             const c = turnoColor(i);
-                            const activo = brush === t.idPlantillaTurno;
+                            const activo = brush === t.idTipoTurno;
                             return (
                                 <button
-                                    key={t.idPlantillaTurno}
-                                    onClick={() => setBrush(activo ? null : t.idPlantillaTurno)}
+                                    key={t.idTipoTurno}
+                                    onClick={() => setBrush(activo ? null : t.idTipoTurno)}
                                     style={{
                                         display: 'flex', alignItems: 'center', gap: 5,
                                         background: c.bg, color: c.ink,
@@ -692,7 +692,7 @@ export default function PlantillasView({ onBack }) {
         if (!confirmDel) return;
         setDeleting(true);
         try {
-            await plantillasService.delete(confirmDel.idPlantilla);
+            await plantillasService.delete(confirmDel.idRotativa);
             setConfirmDel(null);
             await load();
         } catch (e) {
@@ -803,7 +803,7 @@ export default function PlantillasView({ onBack }) {
                 ) : (
                     plantillas.map(p => (
                         <PlantillaCard
-                            key={p.idPlantilla}
+                            key={p.idRotativa}
                             plantilla={p}
                             onEdit={setEditing}
                             onDelete={setConfirmDel}

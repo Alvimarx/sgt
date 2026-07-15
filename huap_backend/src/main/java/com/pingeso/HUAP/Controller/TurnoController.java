@@ -22,8 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.pingeso.HUAP.DTO.AlterarTurnoRequest;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
-import com.pingeso.HUAP.Repository.PlantillaRepository;
-import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
+import com.pingeso.HUAP.Repository.RotativaRepository;
+import com.pingeso.HUAP.Repository.TipoTurnoRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Service.GestionTurnoService;
@@ -46,10 +46,10 @@ public class TurnoController {
     private FuncionarioRepository funcionarioRepository;
 
     @Autowired
-    private PlantillaRepository plantillaRepository;
+    private RotativaRepository rotativaRepository;
 
     @Autowired
-    private PlantillaTurnoRepository plantillaTurnoRepository;
+    private TipoTurnoRepository tipoTurnoRepository;
 
     @Autowired
     private GestionTurnoService gestionTurnoService;
@@ -311,14 +311,14 @@ public class TurnoController {
             funcionarioRepository.findById(idFuncionario).ifPresent(turno::setFuncionario);
         }
 
-        if (payload.get("idPlantilla") != null) {
-            Long idPlantilla = Long.parseLong(payload.get("idPlantilla").toString());
-            plantillaRepository.findById(idPlantilla).ifPresent(turno::setPlantilla);
+        if (payload.get("idRotativa") != null) {
+            Long idRotativa = Long.parseLong(payload.get("idRotativa").toString());
+            rotativaRepository.findById(idRotativa).ifPresent(turno::setRotativa);
         }
 
         if (payload.get("idTipoTurno") != null) {
             Long idTipoTurno = Long.parseLong(payload.get("idTipoTurno").toString());
-            plantillaTurnoRepository.findById(idTipoTurno).ifPresent(tt -> {
+            tipoTurnoRepository.findById(idTipoTurno).ifPresent(tt -> {
                 if (tt.isEliminado()) throw new RuntimeException("El tipo de turno seleccionado fue eliminado y no puede usarse.");
                 turno.setTipoTurno(tt);
             });

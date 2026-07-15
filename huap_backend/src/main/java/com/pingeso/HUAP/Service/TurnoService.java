@@ -1,7 +1,7 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.TurnoEntity;
-import com.pingeso.HUAP.Repository.Solicitud2Repository;
+import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
@@ -31,7 +31,7 @@ public class TurnoService {
     private FuncionarioRepository funcionarioRepository;
 
     @Autowired
-    private Solicitud2Repository solicitud2Repository;
+    private SolicitudRepository solicitudRepository;
 
     @Transactional
     public TurnoEntity updateTurno(Long id, TurnoEntity turnoActualizado) throws Exception {
@@ -46,11 +46,11 @@ public class TurnoService {
         turnoExistente.setHoraInicio(turnoActualizado.getHoraInicio());
         turnoExistente.setHoraFin(turnoActualizado.getHoraFin());
 
-        // 2. Relaciones (Puesto, Servicio, Funcionario, Plantilla, TipoTurno)
+        // 2. Relaciones (Puesto, Servicio, Funcionario, Rotativa, TipoTurno)
         turnoExistente.setFuncionario(turnoActualizado.getFuncionario());
         turnoExistente.setServicio(turnoActualizado.getServicio());
         turnoExistente.setPuesto(turnoActualizado.getPuesto());
-        turnoExistente.setPlantilla(turnoActualizado.getPlantilla());
+        turnoExistente.setRotativa(turnoActualizado.getRotativa());
         turnoExistente.setTipoTurno(turnoActualizado.getTipoTurno());
 
         return saveTurno(turnoExistente);
@@ -125,7 +125,7 @@ public class TurnoService {
         m.put("id", t.getIdTurno());
 
         if (t.getTipoTurno() != null) {
-            m.put("idTipoTurno", t.getTipoTurno().getIdPlantillaTurno());
+            m.put("idTipoTurno", t.getTipoTurno().getIdTipoTurno());
             m.put("nombre", t.getTipoTurno().getNombre());
             m.put("nombreTipo", t.getTipoTurno().getNombre());
             m.put("nombreTipoTurno", t.getTipoTurno().getNombre());
@@ -162,13 +162,13 @@ public class TurnoService {
             m.put("rutFuncionario", null);
         }
 
-        // Plantilla (rotativa con la que fue designado el turno)
-        if (t.getPlantilla() != null) {
-            m.put("idPlantilla", t.getPlantilla().getIdPlantilla());
-            m.put("nombrePlantilla", t.getPlantilla().getNombre());
+        // Rotativa (rotativa con la que fue designado el turno)
+        if (t.getRotativa() != null) {
+            m.put("idRotativa", t.getRotativa().getIdRotativa());
+            m.put("nombreRotativa", t.getRotativa().getNombre());
         } else {
-            m.put("idPlantilla", null);
-            m.put("nombrePlantilla", "Sin Plantilla");
+            m.put("idRotativa", null);
+            m.put("nombreRotativa", "Sin Rotativa");
         }
 
         return m;
@@ -374,7 +374,7 @@ public class TurnoService {
                     m.put("horaFin",          t.getHoraFin()    != null ? t.getHoraFin().toString()    : null);
                     m.put("asignado",          asignado);
                     m.put("nombreFuncionario", nombreFuncionario);
-                    m.put("nombrePlantilla",   t.getPlantilla() != null ? t.getPlantilla().getNombre() : null);
+                    m.put("nombreRotativa",   t.getRotativa() != null ? t.getRotativa().getNombre() : null);
                     return m;
                 })
                 .collect(Collectors.toList());

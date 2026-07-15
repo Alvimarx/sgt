@@ -14,8 +14,8 @@ import lombok.NoArgsConstructor;
 public class PlanificacionAsignacionDTO {
     private Long idAsignacion;
 
-    private Long idPlantilla;
-    private String nombrePlantilla;
+    private Long idRotativa;
+    private String nombreRotativa;
 
     private Long idFuncionario;     // opcional (puede ser null)
     private String nombreFuncionario;

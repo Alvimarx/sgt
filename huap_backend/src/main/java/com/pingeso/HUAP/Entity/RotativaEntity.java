@@ -7,16 +7,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "plantilla")
+@Table(name = "rotativa")
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PlantillaEntity {
+public class RotativaEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_plantilla")
-    private Long idPlantilla;
+    @Column(name = "id_rotativa")
+    private Long idRotativa;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_servicio", nullable = false)
@@ -32,11 +32,11 @@ public class PlantillaEntity {
     private boolean eliminado = false;
 
     @JsonIgnore
-    @OneToMany(mappedBy = "plantilla", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "rotativa", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("diaIndex ASC")
-    private List<PlantillaDiaEntity> secuenciaDias = new ArrayList<>();
+    private List<RotativaDiaEntity> secuenciaDias = new ArrayList<>();
 
-    public PlantillaEntity(ServicioEntity servicio, String nombre, Byte semanas) {
+    public RotativaEntity(ServicioEntity servicio, String nombre, Byte semanas) {
         this.servicio = servicio;
         this.nombre = nombre;
         this.semanas = semanas;

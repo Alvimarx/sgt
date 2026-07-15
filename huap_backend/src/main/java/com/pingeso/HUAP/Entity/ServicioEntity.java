@@ -32,6 +32,6 @@ public class ServicioEntity {
 
     @JsonIgnore
     @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<PlantillaEntity> plantilla;
+    private List<RotativaEntity> rotativa;
 
 }

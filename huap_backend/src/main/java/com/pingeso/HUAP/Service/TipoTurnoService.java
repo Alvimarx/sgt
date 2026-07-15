@@ -1,9 +1,9 @@
 package com.pingeso.HUAP.Service;
 
-import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
-import com.pingeso.HUAP.Repository.PlantillaDiaRepository;
-import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
+import com.pingeso.HUAP.Repository.RotativaDiaRepository;
+import com.pingeso.HUAP.Repository.TipoTurnoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import jakarta.transaction.Transactional;
@@ -14,21 +14,21 @@ import java.util.List;
 
 @Service
 @Transactional
-public class PlantillaTurnoService {
+public class TipoTurnoService {
 
-    private final PlantillaTurnoRepository plantillaTurnoRepository;
-    private final PlantillaDiaRepository plantillaDiaRepository;
+    private final TipoTurnoRepository tipoTurnoRepository;
+    private final RotativaDiaRepository rotativaDiaRepository;
     private final ServicioRepository servicioRepository;
     private final TurnoRepository turnoRepository;
 
-    public PlantillaTurnoService(
-            PlantillaTurnoRepository plantillaTurnoRepository,
-            PlantillaDiaRepository plantillaDiaRepository,
+    public TipoTurnoService(
+            TipoTurnoRepository tipoTurnoRepository,
+            RotativaDiaRepository rotativaDiaRepository,
             ServicioRepository servicioRepository,
             TurnoRepository turnoRepository
     ) {
-        this.plantillaTurnoRepository = plantillaTurnoRepository;
-        this.plantillaDiaRepository = plantillaDiaRepository;
+        this.tipoTurnoRepository = tipoTurnoRepository;
+        this.rotativaDiaRepository = rotativaDiaRepository;
         this.servicioRepository = servicioRepository;
         this.turnoRepository = turnoRepository;
     }
@@ -37,7 +37,7 @@ public class PlantillaTurnoService {
     // CRUD DEL CATÁLOGO DE TIPOS DE TURNO
     // =========================================================
 
-    public PlantillaTurnoEntity crearTipoDeTurno(
+    public TipoTurnoEntity crearTipoDeTurno(
             String nombre,
             LocalTime horaInicio,
             LocalTime horaTermino,
@@ -48,15 +48,15 @@ public class PlantillaTurnoService {
         ServicioEntity servicio = servicioRepository.findById(idServicio)
                 .orElseThrow(() -> new RuntimeException("Servicio no encontrado"));
 
-        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombreAndEliminadoFalse(idServicio, nombre)) {
+        if (tipoTurnoRepository.existsByServicio_IdServicioAndNombreAndEliminadoFalse(idServicio, nombre)) {
             throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
         }
 
-        return plantillaTurnoRepository.save(new PlantillaTurnoEntity(nombre, servicio, horaInicio, horaTermino));
+        return tipoTurnoRepository.save(new TipoTurnoEntity(nombre, servicio, horaInicio, horaTermino));
     }
 
-    public PlantillaTurnoEntity obtenerTipoDeTurno(Long idPlantillaTurno) {
-        return plantillaTurnoRepository.findById(idPlantillaTurno)
+    public TipoTurnoEntity obtenerTipoDeTurno(Long idTipoTurno) {
+        return tipoTurnoRepository.findById(idTipoTurno)
                 .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado"));
     }
 
@@ -64,33 +64,33 @@ public class PlantillaTurnoService {
      * Nombres de las rotativas que se verán afectadas al eliminar el tipo de turno
      * (los días que lo usan pasarán a ser libres). Lista vacía = no está en uso.
      */
-    public List<String> obtenerRotativasAfectadas(Long idPlantillaTurno) {
-        obtenerTipoDeTurno(idPlantillaTurno);
-        return plantillaDiaRepository.findNombresRotativasUsando(idPlantillaTurno);
+    public List<String> obtenerRotativasAfectadas(Long idTipoTurno) {
+        obtenerTipoDeTurno(idTipoTurno);
+        return rotativaDiaRepository.findNombresRotativasUsando(idTipoTurno);
     }
 
-    public List<PlantillaTurnoEntity> obtenerCatalogo() {
-        return plantillaTurnoRepository.findByEliminadoFalse();
+    public List<TipoTurnoEntity> obtenerCatalogo() {
+        return tipoTurnoRepository.findByEliminadoFalse();
     }
 
     /**
      * Devuelve todos los tipos de turno (no eliminados) que pertenecen a un servicio específico.
      */
-    public List<PlantillaTurnoEntity> obtenerTiposDeTurnoPorServicio(Long idServicio) {
-        return plantillaTurnoRepository.findByServicio_IdServicioAndEliminadoFalse(idServicio);
+    public List<TipoTurnoEntity> obtenerTiposDeTurnoPorServicio(Long idServicio) {
+        return tipoTurnoRepository.findByServicio_IdServicioAndEliminadoFalse(idServicio);
     }
 
-    public PlantillaTurnoEntity actualizarTipoDeTurno(
-            Long idPlantillaTurno,
+    public TipoTurnoEntity actualizarTipoDeTurno(
+            Long idTipoTurno,
             String nombre,
             LocalTime horaInicio,
             LocalTime horaTermino
     ) {
         validarHorario(horaInicio, horaTermino);
-        PlantillaTurnoEntity tipo = obtenerTipoDeTurno(idPlantillaTurno);
+        TipoTurnoEntity tipo = obtenerTipoDeTurno(idTipoTurno);
 
         Long idServicio = tipo.getServicio().getIdServicio();
-        if (plantillaTurnoRepository.existsByServicio_IdServicioAndNombreAndIdPlantillaTurnoNotAndEliminadoFalse(idServicio, nombre, idPlantillaTurno)) {
+        if (tipoTurnoRepository.existsByServicio_IdServicioAndNombreAndIdTipoTurnoNotAndEliminadoFalse(idServicio, nombre, idTipoTurno)) {
             throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
         }
 
@@ -98,7 +98,7 @@ public class PlantillaTurnoService {
         tipo.setHoraInicio(horaInicio);
         tipo.setHoraTermino(horaTermino);
 
-        return plantillaTurnoRepository.save(tipo);
+        return tipoTurnoRepository.save(tipo);
     }
 
     
@@ -109,15 +109,15 @@ public class PlantillaTurnoService {
      * por detrás: los turnos ya creados conservan su referencia y resuelven su nombre
      * (navegación FK no filtrada). El catálogo lo oculta.
      */
-    public void eliminarTipoDeTurno(Long idPlantillaTurno) {
-        PlantillaTurnoEntity tipo = obtenerTipoDeTurno(idPlantillaTurno);
+    public void eliminarTipoDeTurno(Long idTipoTurno) {
+        TipoTurnoEntity tipo = obtenerTipoDeTurno(idTipoTurno);
 
-        // Libera las referencias en las rotativas (plantilla_secuencia_dias):
-        // id_plantilla_turno -> NULL, el día queda libre conservando su posición.
-        plantillaDiaRepository.liberarReferenciasAlTipoTurno(idPlantillaTurno);
+        // Libera las referencias en las rotativas (rotativa_secuencia_dias):
+        // id_tipo_turno -> NULL, el día queda libre conservando su posición.
+        rotativaDiaRepository.liberarReferenciasAlTipoTurno(idTipoTurno);
 
         tipo.setEliminado(true);
-        plantillaTurnoRepository.save(tipo);
+        tipoTurnoRepository.save(tipo);
     }
 
     // =========================================================

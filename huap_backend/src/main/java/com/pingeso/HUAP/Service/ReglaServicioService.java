@@ -1,11 +1,11 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.DTO.ReglaServicioDTO;
-import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.ReglasHorariosTurnosServicioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
-import com.pingeso.HUAP.Repository.PlantillaTurnoRepository;
+import com.pingeso.HUAP.Repository.TipoTurnoRepository;
 import com.pingeso.HUAP.Repository.ReglasHorariosTurnosServicioRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import jakarta.transaction.Transactional;
@@ -28,14 +28,14 @@ public class ReglaServicioService {
 
     private final ReglasHorariosTurnosServicioRepository reglaRepository;
     private final ServicioRepository servicioRepository;
-    private final PlantillaTurnoRepository plantillaTurnoRepository;
+    private final TipoTurnoRepository tipoTurnoRepository;
 
     public ReglaServicioService(ReglasHorariosTurnosServicioRepository reglaRepository,
                                 ServicioRepository servicioRepository,
-                                PlantillaTurnoRepository plantillaTurnoRepository) {
+                                TipoTurnoRepository tipoTurnoRepository) {
         this.reglaRepository = reglaRepository;
         this.servicioRepository = servicioRepository;
-        this.plantillaTurnoRepository = plantillaTurnoRepository;
+        this.tipoTurnoRepository = tipoTurnoRepository;
     }
 
     // =========================================================
@@ -116,7 +116,7 @@ public class ReglaServicioService {
             return;
         }
 
-        Long tipoId = turno.getTipoTurno().getIdPlantillaTurno();
+        Long tipoId = turno.getTipoTurno().getIdTipoTurno();
         LocalDate diaInicio = turno.getDiaInicioTurno();
         LocalDate diaFin = turno.getDiaFinalTurno();
         boolean esFeriadoInicio = feriados.contains(diaInicio);
@@ -149,8 +149,8 @@ public class ReglaServicioService {
         return (finde && r.isAplicaFinDeSemana()) || (esFeriado && r.isAplicaFeriado());
     }
 
-    private boolean esTipo(PlantillaTurnoEntity tipo, Long tipoId) {
-        return tipo != null && tipo.getIdPlantillaTurno().equals(tipoId);
+    private boolean esTipo(TipoTurnoEntity tipo, Long tipoId) {
+        return tipo != null && tipo.getIdTipoTurno().equals(tipoId);
     }
 
     // =========================================================
@@ -173,9 +173,9 @@ public class ReglaServicioService {
     }
 
     /** Resuelve y valida un tipo de turno por id; null si no se indica (ajuste opcional). */
-    private PlantillaTurnoEntity resolverTipo(Long idTipo, Long idServicio) {
+    private TipoTurnoEntity resolverTipo(Long idTipo, Long idServicio) {
         if (idTipo == null) return null;
-        PlantillaTurnoEntity tipo = plantillaTurnoRepository.findById(idTipo)
+        TipoTurnoEntity tipo = tipoTurnoRepository.findById(idTipo)
                 .orElseThrow(() -> new RuntimeException("Tipo de turno no encontrado: ID " + idTipo));
         if (tipo.isEliminado()) {
             throw new RuntimeException("El tipo de turno '" + tipo.getNombre() + "' fue eliminado.");
@@ -194,8 +194,8 @@ public class ReglaServicioService {
                 .aplicaFinDeSemana(r.isAplicaFinDeSemana())
                 .aplicaFeriado(r.isAplicaFeriado())
                 .tiempoMinutos(r.getTiempoMinutos())
-                .idTipoTurnoInicio(r.getTipoTurnoInicio() != null ? r.getTipoTurnoInicio().getIdPlantillaTurno() : null)
-                .idTipoTurnoFin(r.getTipoTurnoFin() != null ? r.getTipoTurnoFin().getIdPlantillaTurno() : null)
+                .idTipoTurnoInicio(r.getTipoTurnoInicio() != null ? r.getTipoTurnoInicio().getIdTipoTurno() : null)
+                .idTipoTurnoFin(r.getTipoTurnoFin() != null ? r.getTipoTurnoFin().getIdTipoTurno() : null)
                 .nombreTipoTurnoInicio(r.getTipoTurnoInicio() != null ? r.getTipoTurnoInicio().getNombre() : null)
                 .nombreTipoTurnoFin(r.getTipoTurnoFin() != null ? r.getTipoTurnoFin().getNombre() : null)
                 .build();

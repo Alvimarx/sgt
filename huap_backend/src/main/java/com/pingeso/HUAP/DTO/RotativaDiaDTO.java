@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlantillaDiaDTO {
+public class RotativaDiaDTO {
     private int diaIndex;
-    private PlantillaTurnoDTO turno; // Será null si es un día libre
+    private TipoTurnoDTO turno; // Será null si es un día libre
 }

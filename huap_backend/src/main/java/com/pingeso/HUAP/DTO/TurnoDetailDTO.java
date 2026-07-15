@@ -27,8 +27,8 @@ public class TurnoDetailDTO {
     private Long idPuesto;
     private String nombrePuesto;
 
-    private Long idPlantilla;
-    private String nombrePlantilla;
+    private Long idRotativa;
+    private String nombreRotativa;
 
     private Long idTipoTurno;
     private String nombreTipoTurno;

@@ -1,8 +1,8 @@
 package com.pingeso.HUAP.Controller;
 
-import com.pingeso.HUAP.DTO.PlantillaTurnoDTO;
-import com.pingeso.HUAP.Entity.PlantillaTurnoEntity;
-import com.pingeso.HUAP.Service.PlantillaTurnoService;
+import com.pingeso.HUAP.DTO.TipoTurnoDTO;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
+import com.pingeso.HUAP.Service.TipoTurnoService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,17 +11,17 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v2/tipos-turno")
-public class PlantillaTurnoController {
+public class TipoTurnoController {
 
-    private final PlantillaTurnoService plantillaTurnoService;
+    private final TipoTurnoService tipoTurnoService;
 
-    public PlantillaTurnoController(PlantillaTurnoService plantillaTurnoService) {
-        this.plantillaTurnoService = plantillaTurnoService;
+    public TipoTurnoController(TipoTurnoService tipoTurnoService) {
+        this.tipoTurnoService = tipoTurnoService;
     }
 
     @PostMapping
-    public ResponseEntity<PlantillaTurnoDTO> crearTipoDeTurno(@RequestBody PlantillaTurnoDTO dto) {
-        PlantillaTurnoEntity entidad = plantillaTurnoService.crearTipoDeTurno(
+    public ResponseEntity<TipoTurnoDTO> crearTipoDeTurno(@RequestBody TipoTurnoDTO dto) {
+        TipoTurnoEntity entidad = tipoTurnoService.crearTipoDeTurno(
                 dto.getNombre(),
                 dto.getHoraInicio(),
                 dto.getHoraTermino(),
@@ -32,35 +32,35 @@ public class PlantillaTurnoController {
 
 
     @GetMapping("/servicio/{servicioId}")
-    public ResponseEntity<List<PlantillaTurnoDTO>> obtenerTiposDeTurnoPorServicio(@PathVariable Long servicioId) {
-        List<PlantillaTurnoEntity> entidades = plantillaTurnoService.obtenerTiposDeTurnoPorServicio(servicioId);
-        List<PlantillaTurnoDTO> respuesta = entidades.stream()
+    public ResponseEntity<List<TipoTurnoDTO>> obtenerTiposDeTurnoPorServicio(@PathVariable Long servicioId) {
+        List<TipoTurnoEntity> entidades = tipoTurnoService.obtenerTiposDeTurnoPorServicio(servicioId);
+        List<TipoTurnoDTO> respuesta = entidades.stream()
                 .map(this::convertToDTO)
                 .toList();
         return ResponseEntity.ok(respuesta);
     }
 
     @GetMapping
-    public ResponseEntity<List<PlantillaTurnoDTO>> obtenerCatalogo() {
-        List<PlantillaTurnoEntity> entidades = plantillaTurnoService.obtenerCatalogo();
-        List<PlantillaTurnoDTO> respuesta = entidades.stream()
+    public ResponseEntity<List<TipoTurnoDTO>> obtenerCatalogo() {
+        List<TipoTurnoEntity> entidades = tipoTurnoService.obtenerCatalogo();
+        List<TipoTurnoDTO> respuesta = entidades.stream()
                 .map(this::convertToDTO)
                 .toList();
         return ResponseEntity.ok(respuesta);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<PlantillaTurnoDTO> obtenerTipoDeTurno(@PathVariable Long id) {
-        PlantillaTurnoEntity entidad = plantillaTurnoService.obtenerTipoDeTurno(id);
+    public ResponseEntity<TipoTurnoDTO> obtenerTipoDeTurno(@PathVariable Long id) {
+        TipoTurnoEntity entidad = tipoTurnoService.obtenerTipoDeTurno(id);
         return ResponseEntity.ok(convertToDTO(entidad));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<PlantillaTurnoDTO> actualizarTipoDeTurno(
+    public ResponseEntity<TipoTurnoDTO> actualizarTipoDeTurno(
             @PathVariable Long id,
-            @RequestBody PlantillaTurnoDTO dto
+            @RequestBody TipoTurnoDTO dto
     ) {
-        PlantillaTurnoEntity entidad = plantillaTurnoService.actualizarTipoDeTurno(
+        TipoTurnoEntity entidad = tipoTurnoService.actualizarTipoDeTurno(
                 id,
                 dto.getNombre(),
                 dto.getHoraInicio(),
@@ -75,7 +75,7 @@ public class PlantillaTurnoController {
      */
     @GetMapping("/{id}/rotativas-afectadas")
     public ResponseEntity<List<String>> obtenerRotativasAfectadas(@PathVariable Long id) {
-        return ResponseEntity.ok(plantillaTurnoService.obtenerRotativasAfectadas(id));
+        return ResponseEntity.ok(tipoTurnoService.obtenerRotativasAfectadas(id));
     }
 
     /**
@@ -84,7 +84,7 @@ public class PlantillaTurnoController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarTipoDeTurno(@PathVariable Long id) {
         try {
-            plantillaTurnoService.eliminarTipoDeTurno(id);
+            tipoTurnoService.eliminarTipoDeTurno(id);
             return ResponseEntity.noContent().build();
         } catch (RuntimeException e) {
             // p. ej. bloqueo por turnos asociados: devolvemos el mensaje como texto plano
@@ -100,11 +100,11 @@ public class PlantillaTurnoController {
      * Convierte la entidad de la Base de Datos a un JSON plano (DTO).
      * Esto elimina los objetos Proxy de Hibernate evitando el "hibernateLazyInitializer".
      */
-    private PlantillaTurnoDTO convertToDTO(PlantillaTurnoEntity entidad) {
+    private TipoTurnoDTO convertToDTO(TipoTurnoEntity entidad) {
         if (entidad == null) return null;
 
-        PlantillaTurnoDTO dto = new PlantillaTurnoDTO();
-        dto.setIdPlantillaTurno(entidad.getIdPlantillaTurno());
+        TipoTurnoDTO dto = new TipoTurnoDTO();
+        dto.setIdTipoTurno(entidad.getIdTipoTurno());
         dto.setNombre(entidad.getNombre());
         dto.setHoraInicio(entidad.getHoraInicio());
         dto.setHoraTermino(entidad.getHoraTermino());

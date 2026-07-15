@@ -132,7 +132,7 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         cambioAprobado: Boolean(turno?.cambioAprobado),
         cambioAprobadoCon: turno?.cambioAprobadoCon ?? null,
         cruzaMedianoche: Boolean(turno?.cruzaMedianoche),
-        idPlantilla: turno?.idPlantilla ?? null,
+        idRotativa: turno?.idRotativa ?? null,
         teamKey,
         raw: turno,
     };

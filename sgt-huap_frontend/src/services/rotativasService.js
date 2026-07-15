@@ -1,5 +1,5 @@
-// plantillasService.js
-// Tipos de Turno (catálogo por servicio) y Plantillas (rotativas)
+// rotativasService.js
+// Tipos de Turno (catálogo por servicio) y Rotativas
 
 import axiosInstance from '../utils/axiosConfig';
 import { getServicioId as getServicioIdFromToken } from '../utils/tokenManager';
@@ -102,74 +102,74 @@ export const tiposTurnoService = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PLANTILLAS (ROTATIVAS)  →  /api/v2/plantillas
+// PLANTILLAS (ROTATIVAS)  →  /api/v2/rotativas
 // ─────────────────────────────────────────────────────────────────────────────
 export const plantillasService = {
 
-    /** GET /plantillas/servicio/{id} — lista de plantillas del servicio. */
+    /** GET /rotativas/servicio/{id} — lista de plantillas del servicio. */
     getByServicio: async (servicioId = null) => {
         const sId = servicioId || getServicioId();
         if (!sId) throw new Error('servicioId es requerido');
-        const res = await axiosInstance.get(`/plantillas/servicio/${sId}`);
+        const res = await axiosInstance.get(`/rotativas/servicio/${sId}`);
         return res.data;
     },
 
-    /** GET /plantillas/{id} — una plantilla con su secuencia completa. */
+    /** GET /rotativas/{id} — una plantilla con su secuencia completa. */
     getById: async (id) => {
-        const res = await axiosInstance.get(`/plantillas/${id}`);
+        const res = await axiosInstance.get(`/rotativas/${id}`);
         return res.data;
     },
 
     /**
-     * POST /plantillas — crea plantilla y opcionalmente establece su secuencia.
-     * dto: { nombre, semanas, idServicio, secuenciaDias?: [{diaIndex, turno: {idPlantillaTurno}|null}] }
+     * POST /rotativas — crea plantilla y opcionalmente establece su secuencia.
+     * dto: { nombre, semanas, idServicio, secuenciaDias?: [{diaIndex, turno: {idTipoTurno}|null}] }
      */
     create: async (dto) => {
         const sId = dto.idServicio || getServicioId();
-        const res = await axiosInstance.post('/plantillas', { ...dto, idServicio: Number(sId) });
+        const res = await axiosInstance.post('/rotativas', { ...dto, idServicio: Number(sId) });
         return res.data;
     },
 
-    /** PUT /plantillas/{id} — actualiza nombre y semanas (no la secuencia). */
+    /** PUT /rotativas/{id} — actualiza nombre y semanas (no la secuencia). */
     update: async (id, { nombre, semanas }) => {
-        const res = await axiosInstance.put(`/plantillas/${id}`, {
+        const res = await axiosInstance.put(`/rotativas/${id}`, {
             nombre,
             semanas: Number(semanas),
         });
         return res.data;
     },
 
-    /** DELETE /plantillas/{id} */
+    /** DELETE /rotativas/{id} */
     delete: async (id) => {
-        const res = await axiosInstance.delete(`/plantillas/${id}`);
+        const res = await axiosInstance.delete(`/rotativas/${id}`);
         return res.data;
     },
 
-    /** GET /plantillas/{id}/secuencia — secuencia ordenada de días. */
+    /** GET /rotativas/{id}/secuencia — secuencia ordenada de días. */
     getSecuencia: async (id) => {
-        const res = await axiosInstance.get(`/plantillas/${id}/secuencia`);
+        const res = await axiosInstance.get(`/rotativas/${id}/secuencia`);
         return res.data;
     },
 
     /**
-     * PUT /plantillas/{id}/secuencia — reemplaza la secuencia completa.
+     * PUT /rotativas/{id}/secuencia — reemplaza la secuencia completa.
      * dias: (Long[])[] — una lista de tipos de turno por día (varios = jornada
      * compuesta como día + noche). Lista interior vacía = día libre.
      */
     setSecuencia: async (id, dias) => {
-        const res = await axiosInstance.put(`/plantillas/${id}/secuencia`, dias);
+        const res = await axiosInstance.put(`/rotativas/${id}/secuencia`, dias);
         return res.data;
     },
 
-    /** POST /plantillas/{id}/duplicar — crea una copia de la plantilla. */
+    /** POST /rotativas/{id}/duplicar — crea una copia de la plantilla. */
     duplicar: async (id) => {
-        const res = await axiosInstance.post(`/plantillas/${id}/duplicar`);
+        const res = await axiosInstance.post(`/rotativas/${id}/duplicar`);
         return res.data;
     },
 
-    /** GET /plantillas/{id}/validar — valida coherencia semanas/secuencia. */
+    /** GET /rotativas/{id}/validar — valida coherencia semanas/secuencia. */
     validar: async (id) => {
-        const res = await axiosInstance.get(`/plantillas/${id}/validar`);
+        const res = await axiosInstance.get(`/rotativas/${id}/validar`);
         return res.data;
     },
 };

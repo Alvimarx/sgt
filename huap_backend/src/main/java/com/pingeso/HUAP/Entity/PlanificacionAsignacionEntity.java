@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 /**
- * Una designación dentro de una planificación: una rotativa (plantilla) cubierta
+ * Una designación dentro de una planificación: una rotativa (rotativa) cubierta
  * por un funcionario en un puesto. funcionario y puesto son opcionales (se puede
  * colocar la rotativa antes de decidir quién la cubre o dónde).
  */
@@ -27,8 +27,8 @@ public class PlanificacionAsignacionEntity {
     private PlanificacionEntity planificacion;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "id_plantilla", nullable = false)
-    private PlantillaEntity plantilla;
+    @JoinColumn(name = "id_rotativa", nullable = false)
+    private RotativaEntity rotativa;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_funcionario", nullable = true)
@@ -40,12 +40,12 @@ public class PlanificacionAsignacionEntity {
 
     public PlanificacionAsignacionEntity(
             PlanificacionEntity planificacion,
-            PlantillaEntity plantilla,
+            RotativaEntity rotativa,
             FuncionarioEntity funcionario,
             PuestoEntity puesto
     ) {
         this.planificacion = planificacion;
-        this.plantilla = plantilla;
+        this.rotativa = rotativa;
         this.funcionario = funcionario;
         this.puesto = puesto;
     }

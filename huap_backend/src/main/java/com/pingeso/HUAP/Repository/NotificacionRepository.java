@@ -1,6 +1,6 @@
 package com.pingeso.HUAP.Repository;
 
-import com.pingeso.HUAP.Entity.Notificacion2Entity;
+import com.pingeso.HUAP.Entity.NotificacionEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,18 +10,18 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface Notificacion2Repository extends JpaRepository<Notificacion2Entity, Long> {
+public interface NotificacionRepository extends JpaRepository<NotificacionEntity, Long> {
 
-    Optional<Notificacion2Entity> findBySolicitud_IdSolicitud(Long idSolicitud);
-    @Query("SELECT n FROM Notificacion2Entity n JOIN n.solicitud s " +
+    Optional<NotificacionEntity> findBySolicitud_IdSolicitud(Long idSolicitud);
+    @Query("SELECT n FROM NotificacionEntity n JOIN n.solicitud s " +
             "WHERE (s.funcionario.idFuncionario = :idFuncionario " +
             "OR s.funcionarioReceptor.idFuncionario = :idFuncionario) " +
             "AND n.estado != 'ELIMINADO' " +
             "ORDER BY n.fechaEnvio DESC")
             
-    List<Notificacion2Entity> findByFuncionarioId(@Param("idFuncionario") Long idFuncionario);
+    List<NotificacionEntity> findByFuncionarioId(@Param("idFuncionario") Long idFuncionario);
     
-    @Query("SELECT COUNT(n) FROM Notificacion2Entity n JOIN n.solicitud s " +
+    @Query("SELECT COUNT(n) FROM NotificacionEntity n JOIN n.solicitud s " +
        "WHERE (s.funcionario.idFuncionario = :idFuncionario OR s.funcionarioReceptor.idFuncionario = :idFuncionario) " +
        "AND n.estado = 'NO_LEIDO'")
     long countNoLeidasByFuncionario(@Param("idFuncionario") Long idFuncionario);

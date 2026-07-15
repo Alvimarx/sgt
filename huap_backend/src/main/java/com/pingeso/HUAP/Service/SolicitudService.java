@@ -14,37 +14,37 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class Solicitud2Service {
+public class SolicitudService {
 
-    private final Solicitud2Repository solicitud2Repository;
+    private final SolicitudRepository solicitudRepository;
     private final FuncionarioRepository funcionarioRepository;
     private final TipoSolicitudRepository tipoSolicitudRepository;
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
 
     @Transactional
-    public List<Solicitud2Entity> findAllSolicitudes() {
-        return solicitud2Repository.findAll();
+    public List<SolicitudEntity> findAllSolicitudes() {
+        return solicitudRepository.findAll();
     }
 
     @Transactional
-    public List<Solicitud2Entity> findByFuncionario(Long idFuncionario) {
-        return solicitud2Repository.findByFuncionario_IdFuncionario(idFuncionario);
+    public List<SolicitudEntity> findByFuncionario(Long idFuncionario) {
+        return solicitudRepository.findByFuncionario_IdFuncionario(idFuncionario);
     }
 
     @Transactional
-    public List<Solicitud2Entity> findByFuncionarioReceptor(Long idFuncionario) {
-        return solicitud2Repository.findByFuncionarioReceptor_IdFuncionario(idFuncionario);
+    public List<SolicitudEntity> findByFuncionarioReceptor(Long idFuncionario) {
+        return solicitudRepository.findByFuncionarioReceptor_IdFuncionario(idFuncionario);
     }
 
     @Transactional
-    public List<Solicitud2Entity> findByTipoSolicitud(Long idTipoSolicitud) {
-        return solicitud2Repository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud);
+    public List<SolicitudEntity> findByTipoSolicitud(Long idTipoSolicitud) {
+        return solicitudRepository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud);
     }
 
     @Transactional
-    public List<Solicitud2Entity> findByTurno(Long idTurno) {
-        return solicitud2Repository.findByTurno_IdTurno(idTurno);
+    public List<SolicitudEntity> findByTurno(Long idTurno) {
+        return solicitudRepository.findByTurno_IdTurno(idTurno);
     }
 
     /*
@@ -52,7 +52,7 @@ public class Solicitud2Service {
     */
 
     @Transactional
-    public Solicitud2Entity crearSolicitud(CrearSolicitudDTO dto) {
+    public SolicitudEntity crearSolicitud(CrearSolicitudDTO dto) {
         FuncionarioEntity funcionario = funcionarioRepository.findById(dto.getIdFuncionario())
                 .orElseThrow(() -> new RuntimeException("Funcionario emisor no existe"));
 
@@ -68,13 +68,13 @@ public class Solicitud2Service {
         TurnoEntity turnoIntercambio = dto.getIdTurnoIntercambio() != null ?
                 turnoRepository.findById(dto.getIdTurnoIntercambio()).orElse(null) : null;
 
-        Solicitud2Entity solicitud = Solicitud2Entity.builder()
+        SolicitudEntity solicitud = SolicitudEntity.builder()
                 .funcionario(funcionario)
                 .funcionarioReceptor(receptor)
                 .tipoSolicitud(tipoSolicitud)
                 .turno(turno)
                 .turnoReceptor(turnoIntercambio)
-                .estado(Solicitud2Entity.EstadoSolicitud.PENDIENTE)
+                .estado(SolicitudEntity.EstadoSolicitud.PENDIENTE)
                 .fechaCreacion(LocalDateTime.now())
                 .fechaInicioPermiso(dto.getFechaInicioPermiso())
                 .fechaTerminoPermiso(dto.getFechaTerminoPermiso())
@@ -82,7 +82,7 @@ public class Solicitud2Service {
                 .aceptadoReceptor(null)
                 .build();
 
-        Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
+        SolicitudEntity guardada = solicitudRepository.save(solicitud);
 
         agendarBitacora("SOLICITUD_CREADA", guardada.getIdSolicitud(),
                 funcionario.getIdFuncionario());
@@ -91,8 +91,8 @@ public class Solicitud2Service {
     }
 
     @Transactional
-    public Solicitud2Entity responderOfertaParticular(Long idSolicitud, Long idReceptor, boolean acepta) {
-        Solicitud2Entity solicitud = solicitud2Repository.findById(idSolicitud)
+    public SolicitudEntity responderOfertaParticular(Long idSolicitud, Long idReceptor, boolean acepta) {
+        SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
         if (!solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
@@ -105,10 +105,10 @@ public class Solicitud2Service {
             solicitud.setAceptadoReceptor(true);
         } else {
             solicitud.setAceptadoReceptor(false);
-            solicitud.setEstado(Solicitud2Entity.EstadoSolicitud.RECHAZADA);
+            solicitud.setEstado(SolicitudEntity.EstadoSolicitud.RECHAZADA);
         }
 
-        Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
+        SolicitudEntity guardada = solicitudRepository.save(solicitud);
 
         String evento = acepta ? "OFERTA_PARTICULAR_ACEPTADA_POR_RECEPTOR" : "OFERTA_PARTICULAR_RECHAZADA_POR_RECEPTOR";
         agendarBitacora(evento, guardada.getIdSolicitud(), receptor.getIdFuncionario());
@@ -117,8 +117,8 @@ public class Solicitud2Service {
     }
 
     @Transactional
-    public Solicitud2Entity responderOfertaIntercambio(Long idSolicitud, Long idReceptor, boolean acepta) {
-        Solicitud2Entity solicitud = solicitud2Repository.findById(idSolicitud)
+    public SolicitudEntity responderOfertaIntercambio(Long idSolicitud, Long idReceptor, boolean acepta) {
+        SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
         if (!solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
@@ -131,10 +131,10 @@ public class Solicitud2Service {
             solicitud.setAceptadoReceptor(true);
         } else {
             solicitud.setAceptadoReceptor(false);
-            solicitud.setEstado(Solicitud2Entity.EstadoSolicitud.RECHAZADA);
+            solicitud.setEstado(SolicitudEntity.EstadoSolicitud.RECHAZADA);
         }
 
-        Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
+        SolicitudEntity guardada = solicitudRepository.save(solicitud);
 
         String evento = acepta ? "OFERTA_ACEPTADA_POR_RECEPTOR" : "OFERTA_RECHAZADA_POR_RECEPTOR";
         agendarBitacora(evento, guardada.getIdSolicitud(), receptor.getIdFuncionario());
@@ -143,14 +143,14 @@ public class Solicitud2Service {
     }
 
     @Transactional
-    public Solicitud2Entity cambiarEstado(Long idSolicitud, Solicitud2Entity.EstadoSolicitud nuevoEstado, Long idUsuarioAsignador) {
-        Solicitud2Entity solicitud = solicitud2Repository.findById(idSolicitud)
+    public SolicitudEntity cambiarEstado(Long idSolicitud, SolicitudEntity.EstadoSolicitud nuevoEstado, Long idUsuarioAsignador) {
+        SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
         FuncionarioEntity asignador = funcionarioRepository.findById(idUsuarioAsignador).orElse(null);
         Integer tipoSolicitud = solicitud.getTipoSolicitud().getTipo();
 
-        if (nuevoEstado == Solicitud2Entity.EstadoSolicitud.APROBADA) {
+        if (nuevoEstado == SolicitudEntity.EstadoSolicitud.APROBADA) {
             if (solicitud.getTurno() != null) {
                 rechazarSolicitudesCompetitivas(solicitud.getTurno().getIdTurno(), idSolicitud, asignador);
             }
@@ -180,7 +180,7 @@ public class Solicitud2Service {
         }
 
         solicitud.setEstado(nuevoEstado);
-        Solicitud2Entity guardada = solicitud2Repository.save(solicitud);
+        SolicitudEntity guardada = solicitudRepository.save(solicitud);
 
         Long idAsignador = asignador != null ? asignador.getIdFuncionario() : null;
         agendarBitacora("CAMBIO_ESTADO_" + nuevoEstado.name(), guardada.getIdSolicitud(), idAsignador);
@@ -191,26 +191,26 @@ public class Solicitud2Service {
     private void rechazarSolicitudesCompetitivas(Long idTurno, Long idSolicitudAprobada, FuncionarioEntity asignador) {
         Long idAsignador = asignador != null ? asignador.getIdFuncionario() : null;
 
-        solicitud2Repository.findByTurno_IdTurno(idTurno).stream()
-                .filter(s -> s.getEstado() == Solicitud2Entity.EstadoSolicitud.PENDIENTE
+        solicitudRepository.findByTurno_IdTurno(idTurno).stream()
+                .filter(s -> s.getEstado() == SolicitudEntity.EstadoSolicitud.PENDIENTE
                         && !s.getIdSolicitud().equals(idSolicitudAprobada))
                 .forEach(conflicto -> {
-                    conflicto.setEstado(Solicitud2Entity.EstadoSolicitud.RECHAZADA);
+                    conflicto.setEstado(SolicitudEntity.EstadoSolicitud.RECHAZADA);
                     conflicto.setMotivo("Rechazo automático: Otra solicitud para este turno fue aprobada.");
-                    Solicitud2Entity guardado = solicitud2Repository.save(conflicto);
+                    SolicitudEntity guardado = solicitudRepository.save(conflicto);
                     agendarBitacora("RECHAZO_AUTOMATICO", guardado.getIdSolicitud(), idAsignador);
                 });
     }
 
     @Transactional
-    public Solicitud2Entity modificarMotivo(Long idSolicitud, String nuevoMotivo) {
-        Solicitud2Entity solicitud = solicitud2Repository.findById(idSolicitud)
+    public SolicitudEntity modificarMotivo(Long idSolicitud, String nuevoMotivo) {
+        SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
-        if (solicitud.getEstado() != Solicitud2Entity.EstadoSolicitud.PENDIENTE) {
+        if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
             throw new RuntimeException("Solo se puede modificar el motivo si la solicitud está en estado PENDIENTE");
         }
         solicitud.setMotivo(nuevoMotivo);
-        return solicitud2Repository.save(solicitud);
+        return solicitudRepository.save(solicitud);
     }
 
     // Registra el evento en bitácora DESPUÉS de que la TX principal commitee,

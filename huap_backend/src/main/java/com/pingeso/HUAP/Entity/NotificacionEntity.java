@@ -10,12 +10,12 @@ import java.time.LocalDateTime;
 
 @Builder
 @Data
-@Table(name = "Notificacion2")
+@Table(name = "Notificacion")
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
 
-public class Notificacion2Entity {
+public class NotificacionEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,5 +34,5 @@ public class Notificacion2Entity {
     // Nullable con el fin de poder notificar a un funcionario sin necesidad de una solicitud asociada
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ID_SOLICITUD", nullable = true)
-    private Solicitud2Entity solicitud;
+    private SolicitudEntity solicitud;
 }

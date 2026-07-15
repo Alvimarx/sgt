@@ -9,8 +9,8 @@
 -- Tablas gestionadas por Hibernate en innhosp2:
 --   Rol_Sistema, Rol_Servicio, servicios, Funcionario,
 --   Servicios_Funcionario, puestos, Tipo_Solicitud,
---   Turnos, plantilla, planti--   plantilla_secuencia_dias,
---   Solicitudes, Notificacion2, Bitacora_eventos
+--   Turnos, rotativa, planti--   rotativa_secuencia_dias,
+--   Solicitudes, Notificacion, Bitacora_eventos
 --
 -- Encoder: MessageDigestPasswordEncoder("SHA-512") — sin salt
 -- Contraseña por defecto: "huap2025"
@@ -35,16 +35,16 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- Orden: hijos antes que padres (aunque FK_CHECKS=0 lo permite en cualquier orden).
 TRUNCATE TABLE Postulacion_Oferta;
 TRUNCATE TABLE Oferta_General;
-TRUNCATE TABLE Notificacion2;
+TRUNCATE TABLE Notificacion;
 TRUNCATE TABLE Bitacora_eventos;
 TRUNCATE TABLE Solicitudes;
 TRUNCATE TABLE Turnos;
 TRUNCATE TABLE planificacion_asignacion;
 TRUNCATE TABLE planificacion;
 TRUNCATE TABLE reglas_horarios_turnos_servicio;
-TRUNCATE TABLE plantilla_secuencia_dias;
-TRUNCATE TABLE plantilla_turno;
-TRUNCATE TABLE plantilla;
+TRUNCATE TABLE rotativa_secuencia_dias;
+TRUNCATE TABLE tipo_turno;
+TRUNCATE TABLE rotativa;
 TRUNCATE TABLE Servicios_Funcionario;
 TRUNCATE TABLE puestos;
 TRUNCATE TABLE Funcionario;
@@ -456,17 +456,17 @@ INSERT INTO Tipo_Solicitud (ID_TIPO_SOLICITUD, Tipo) VALUES
 (5, 5);
 
 -- ==============================================================
--- 8. PLANTILLA  →  tabla: plantilla
+-- 8. ROTATIVA  →  tabla: rotativa
 -- Columnas: id_servicio, nombre, semanas (ciclo de rotación)
--- La secuencia de días se define en plantilla_secuencia_dias.
+-- La secuencia de días se define en rotativa_secuencia_dias.
 -- ==============================================================
-INSERT INTO plantilla (id_servicio, nombre, semanas) VALUES
+INSERT INTO rotativa (id_servicio, nombre, semanas) VALUES
 (1, 'Plantilla Estándar - Medicina Interna', 4),  -- id auto = 1
 (2, 'Plantilla Estándar - Enfermería',        4),  -- id auto = 2
 (3, 'Plantilla Estándar - Cirugía',           2);  -- id auto = 3
 
 -- Urgencias (id_servicio=4) — 6 rotativas de 6 semanas cada una
-INSERT INTO plantilla (id_servicio, nombre, semanas) VALUES
+INSERT INTO rotativa (id_servicio, nombre, semanas) VALUES
 (4, 'Miercoles Turno (T I)', 6),  -- id auto = 4
 (4, 'Martes Turno (T II)',    6),  -- id auto = 5
 (4, 'Lunes Turno (T III)',     6),  -- id auto = 6
@@ -475,13 +475,13 @@ INSERT INTO plantilla (id_servicio, nombre, semanas) VALUES
 (4, 'Volante (T VOL)',      6);  -- id auto = 9
 
 -- ==============================================================
--- 9. PLANTILLA_TURNO  →  tabla: plantilla_turno
--- Catálogo de tipos de turno POR SERVICIO (no por plantilla).
+-- 9. TIPO_TURNO  →  tabla: tipo_turno
+-- Catálogo de tipos de turno POR SERVICIO (no por rotativa).
 -- Cada tipo pertenece a un servicio; el nombre es globalmente
 -- único en toda la tabla (constraint UNIQUE en columna nombre).
 -- Columnas: id_servicio, hora_inicio, hora_termino, nombre
 -- ==============================================================
-INSERT INTO plantilla_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
+INSERT INTO tipo_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
 -- Medicina Interna (id_servicio=1)
 (1, '08:00:00', '20:00:00', 'Diurno MI'),     -- id auto = 1
 (1, '20:00:00', '08:00:00', 'Nocturno MI'),   -- id auto = 2
@@ -493,18 +493,18 @@ INSERT INTO plantilla_turno (id_servicio, hora_inicio, hora_termino, nombre) VAL
 (3, '20:00:00', '08:00:00', 'Nocturno CIR');  -- id auto = 6
 
 -- Urgencias (id_servicio=4) — mismos rangos horarios que Diurno/Nocturno MI
-INSERT INTO plantilla_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
+INSERT INTO tipo_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
 (4, '08:00:00', '20:00:00', 'Dia'),     -- id auto = 7
 (4, '20:00:00', '08:00:00', 'Noche');   -- id auto = 8
 
 -- ==============================================================
--- 10. PLANTILLA_SECUENCIA_DIAS  →  tabla: plantilla_secuencia_dias
--- Patrón de días ordenado para cada plantilla.
--- id_plantilla_turno NULL = día libre (no genera TurnoEntity).
--- Unique constraint: (id_plantilla, dia_index).
+-- 10. ROTATIVA_SECUENCIA_DIAS  →  tabla: rotativa_secuencia_dias
+-- Patrón de días ordenado para cada rotativa.
+-- id_tipo_turno NULL = día libre (no genera TurnoEntity).
+-- Unique constraint: (id_rotativa, dia_index).
 --
 -- Referencia de IDs usados:
---   id_plantilla_turno: 1=DiurnoMI  2=NocturnoMI
+--   id_tipo_turno: 1=DiurnoMI  2=NocturnoMI
 --                       3=DiurnoENF 4=NocturnoENF
 --                       5=DiurnoCIR 6=NocturnoCIR
 --
@@ -513,7 +513,7 @@ INSERT INTO plantilla_turno (id_servicio, hora_inicio, hora_termino, nombre) VAL
 --   Enfermería       (id=2, 4 sem=28 días): D,N,2L    × 7
 --   Cirugía          (id=3, 2 sem=14 días): 2D,N,4L   × 2
 -- ==============================================================
-INSERT INTO plantilla_secuencia_dias (id_plantilla, dia_index, id_plantilla_turno) VALUES
+INSERT INTO rotativa_secuencia_dias (id_rotativa, dia_index, id_tipo_turno) VALUES
 -- Medicina Interna — Semana 1 (índices 0–6)
 (1,  0, 1), (1,  1, 1), (1,  2, 2), (1,  3, 2), (1,  4, NULL), (1,  5, NULL), (1,  6, NULL),
 -- Medicina Interna — Semana 2 (índices 7–13)
@@ -538,44 +538,44 @@ INSERT INTO plantilla_secuencia_dias (id_plantilla, dia_index, id_plantilla_turn
 (3,  7, 5), (3,  8, 5), (3,  9, 6), (3, 10, NULL), (3, 11, NULL), (3, 12, NULL), (3, 13, NULL);
 
 -- Urgencias — secuencias de 6 semanas (42 días) por rotativa.
--- id_plantilla_turno: 7=Dia  8=Noche  NULL=día libre.
-INSERT INTO plantilla_secuencia_dias (id_plantilla, dia_index, id_plantilla_turno) VALUES
--- Plantilla 4: Miercoles Turno (T1)
+-- id_tipo_turno: 7=Dia  8=Noche  NULL=día libre.
+INSERT INTO rotativa_secuencia_dias (id_rotativa, dia_index, id_tipo_turno) VALUES
+-- Rotativa 4: Miercoles Turno (T1)
 (4,0,NULL),(4,1,NULL),(4,2,7),(4,3,NULL),(4,4,NULL),(4,5,8),(4,6,NULL),
 (4,7,NULL),(4,8,NULL),(4,9,7),(4,10,8),(4,11,NULL),(4,12,NULL),(4,13,NULL),
 (4,14,NULL),(4,15,NULL),(4,16,7),(4,17,8),(4,18,NULL),(4,19,NULL),(4,20,NULL),
 (4,21,NULL),(4,22,NULL),(4,23,7),(4,24,8),(4,25,NULL),(4,26,NULL),(4,27,NULL),
 (4,28,NULL),(4,29,NULL),(4,30,7),(4,31,8),(4,32,NULL),(4,33,7),(4,34,8),
 (4,35,NULL),(4,36,NULL),(4,37,NULL),(4,38,NULL),(4,39,8),(4,40,NULL),(4,41,7),
--- Plantilla 5: Martes Turno (T2)
+-- Rotativa 5: Martes Turno (T2)
 (5,0,NULL),(5,1,NULL),(5,2,NULL),(5,3,NULL),(5,4,8),(5,5,NULL),(5,6,7),
 (5,7,NULL),(5,8,7),(5,9,NULL),(5,10,NULL),(5,11,NULL),(5,12,8),(5,13,NULL),
 (5,14,NULL),(5,15,7),(5,16,8),(5,17,NULL),(5,18,NULL),(5,19,NULL),(5,20,NULL),
 (5,21,NULL),(5,22,7),(5,23,8),(5,24,NULL),(5,25,NULL),(5,26,NULL),(5,27,NULL),
 (5,28,NULL),(5,29,7),(5,30,8),(5,31,NULL),(5,32,NULL),(5,33,NULL),(5,34,NULL),
 (5,35,NULL),(5,36,7),(5,37,8),(5,38,NULL),(5,39,NULL),(5,40,7),(5,41,8),
--- Plantilla 6: Lunes Turno (T3)
+-- Rotativa 6: Lunes Turno (T3)
 (6,0,7),(6,1,8),(6,2,NULL),(6,3,NULL),(6,4,NULL),(6,5,7),(6,6,8),
 (6,7,NULL),(6,8,NULL),(6,9,NULL),(6,10,NULL),(6,11,8),(6,12,NULL),(6,13,7),
 (6,14,7),(6,15,NULL),(6,16,NULL),(6,17,NULL),(6,18,NULL),(6,19,8),(6,20,NULL),
 (6,21,7),(6,22,8),(6,23,NULL),(6,24,NULL),(6,25,NULL),(6,26,NULL),(6,27,NULL),
 (6,28,7),(6,29,8),(6,30,NULL),(6,31,NULL),(6,32,NULL),(6,33,NULL),(6,34,NULL),
 (6,35,7),(6,36,8),(6,37,NULL),(6,38,NULL),(6,39,NULL),(6,40,NULL),(6,41,NULL),
--- Plantilla 7: Viernes Turno (T4)
+-- Rotativa 7: Viernes Turno (T4)
 (7,0,NULL),(7,1,NULL),(7,2,8),(7,3,NULL),(7,4,7),(7,5,NULL),(7,6,NULL),
 (7,7,NULL),(7,8,NULL),(7,9,8),(7,10,NULL),(7,11,7),(7,12,NULL),(7,13,NULL),
 (7,14,NULL),(7,15,8),(7,16,NULL),(7,17,NULL),(7,18,7),(7,19,7),(7,20,8),
 (7,21,NULL),(7,22,NULL),(7,23,NULL),(7,24,NULL),(7,25,8),(7,26,NULL),(7,27,7),
 (7,28,NULL),(7,29,NULL),(7,30,NULL),(7,31,NULL),(7,32,7),(7,33,8),(7,34,NULL),
 (7,35,8),(7,36,NULL),(7,37,NULL),(7,38,NULL),(7,39,7),(7,40,NULL),(7,41,NULL),
--- Plantilla 8: Jueves Turno (T5)
+-- Rotativa 8: Jueves Turno (T5)
 (8,0,8),(8,1,NULL),(8,2,NULL),(8,3,7),(8,4,NULL),(8,5,NULL),(8,6,NULL),
 (8,7,8),(8,8,NULL),(8,9,NULL),(8,10,7),(8,11,NULL),(8,12,NULL),(8,13,NULL),
 (8,14,8),(8,15,NULL),(8,16,NULL),(8,17,7),(8,18,NULL),(8,19,NULL),(8,20,NULL),
 (8,21,8),(8,22,NULL),(8,23,NULL),(8,24,7),(8,25,NULL),(8,26,7),(8,27,8),
 (8,28,NULL),(8,29,NULL),(8,30,NULL),(8,31,NULL),(8,32,8),(8,33,NULL),(8,34,7),
 (8,35,NULL),(8,36,NULL),(8,37,NULL),(8,38,7),(8,39,NULL),(8,40,8),(8,41,NULL),
--- Plantilla 9: Volante (T VOL)
+-- Rotativa 9: Volante (T VOL)
 (9,0,NULL),(9,1,7),(9,2,NULL),(9,3,8),(9,4,NULL),(9,5,NULL),(9,6,NULL),
 (9,7,7),(9,8,8),(9,9,NULL),(9,10,NULL),(9,11,NULL),(9,12,7),(9,13,8),
 (9,14,NULL),(9,15,NULL),(9,16,NULL),(9,17,NULL),(9,18,8),(9,19,NULL),(9,20,7),
@@ -601,7 +601,7 @@ INSERT INTO planificacion (nombre, id_servicio) VALUES
 ('Rotativa 2026', 4);
 
 -- Urgencias — asignaciones de "Rotativa 2026" (id_planificacion = 1)
-INSERT INTO planificacion_asignacion (id_planificacion, id_plantilla, id_funcionario, id_puesto) VALUES
+INSERT INTO planificacion_asignacion (id_planificacion, id_rotativa, id_funcionario, id_puesto) VALUES
 (1, 6, 300, 17), (1, 5, 301, 17), (1, 4, 302, 17), (1, 8, 303, 17), (1, 7, 304, 17), (1, 9, 305, 17),  -- Coordinador
 (1, 6, 306, 18), (1, 5, 307, 18), (1, 4, 308, 18), (1, 8, 309, 18), (1, 7, 310, 18), (1, 9, 311, 18),  -- Urgenciólogo 1
 (1, 6, 312, 19), (1, 5, 313, 19), (1, 4, 314, 19), (1, 8, 315, 19), (1, 7, 316, 19), (1, 9, 317, 19),  -- Urgenciólogo 2
@@ -620,15 +620,15 @@ INSERT INTO planificacion_asignacion (id_planificacion, id_plantilla, id_funcion
 
 -- ==============================================================
 -- 11. TURNOS  →  tabla: Turnos
--- Turnos concretos para mayo 2026, generados desde plantilla.
+-- Turnos concretos para mayo 2026, generados desde rotativa.
 -- Puestos (auto-increment tras TRUNCATE+INSERT ordenado):
 --   1=Sala Hombres(MI)  2=Sala Mujeres(MI)  3=Pabellón(MI)
 --   4=Puesto A(ENF)      5=Puesto B(ENF)
 --   6=Pabellón Central(CIR) 7=Recuperación(CIR) 8=Pre-Quirúrgico(CIR)
 -- ID_FUNCIONARIO NULL = turno libre disponible para cobertura.
 -- ==============================================================
-INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla, id_tipo_turno) VALUES
--- === Medicina Interna (id_servicio=1, id_plantilla=1) ===
+INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_rotativa, id_tipo_turno) VALUES
+-- === Medicina Interna (id_servicio=1, id_rotativa=1) ===
 (1,  '2026-05-05', '2026-05-05', '08:00:00', '20:00:00',  2,    1, 1, 1, 1),
 (2,  '2026-05-06', '2026-05-06', '08:00:00', '20:00:00',  3,    1, 2, 1, 1),
 (3,  '2026-05-07', '2026-05-07', '08:00:00', '20:00:00',  4,    1, 1, 1, 1),
@@ -646,7 +646,7 @@ INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, ho
 (15, '2026-05-20', '2026-05-20', '08:00:00', '20:00:00', 16,    1, 1, 1, 1),
 (16, '2026-05-22', '2026-05-22', '08:00:00', '20:00:00', NULL,  1, 2, 1, 1),
 (17, '2026-05-19', '2026-05-20', '20:00:00', '08:00:00', NULL,  1, 3, 1, 2),
--- === Enfermería (id_servicio=2, id_plantilla=2) ===
+-- === Enfermería (id_servicio=2, id_rotativa=2) ===
 (18, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00', 102,   2, 4, 2, 3),
 (19, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', 103,   2, 5, 2, 3),
 (20, '2026-05-05', '2026-05-06', '20:00:00', '08:00:00', 104,   2, 4, 2, 4),
@@ -656,7 +656,7 @@ INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, ho
 (24, '2026-05-12', '2026-05-12', '08:00:00', '20:00:00', 102,   2, 4, 2, 3),
 (25, '2026-05-13', '2026-05-13', '08:00:00', '20:00:00', 103,   2, 5, 2, 3),
 (26, '2026-05-20', '2026-05-20', '08:00:00', '20:00:00', NULL,  2, 4, 2, 3),
--- === Cirugía (id_servicio=3, id_plantilla=3) ===
+-- === Cirugía (id_servicio=3, id_rotativa=3) ===
 (27, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00', 202,   3, 6, 3, 5),
 (28, '2026-05-06', '2026-05-06', '08:00:00', '20:00:00', 203,   3, 7, 3, 5),
 (29, '2026-05-07', '2026-05-07', '08:00:00', '20:00:00', 204,   3, 8, 3, 5),
@@ -691,10 +691,10 @@ INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TUR
  'Acumulación de horas extra, aprobado por jefatura');
 
 -- ==============================================================
--- 13. NOTIFICACION2  →  tabla: Notificacion2
+-- 13. NOTIFICACION  →  tabla: Notificacion
 -- ID_SOLICITUD es @OneToOne → un registro por solicitud.
 -- ==============================================================
-INSERT INTO Notificacion2 (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
+INSERT INTO Notificacion (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
 (1, 'NO_LEIDO', '2026-05-01 09:00:01',
  'Su solicitud de permiso para el 05-May ha sido recibida y está pendiente de aprobación.', 1),
 (2, 'NO_LEIDO', '2026-05-10 14:00:01',
@@ -730,7 +730,7 @@ INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD,
 -- ==============================================================
 -- DEMO: Turnos de Álvaro López (ID_FUNCIONARIO=1) + relleno mayo
 -- ==============================================================
-INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla, id_tipo_turno) VALUES
+INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_rotativa, id_tipo_turno) VALUES
 -- Álvaro López – 10 turnos distribuidos en mayo 2026
 (36, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00',  1, 1, 3, 1, 1),
 (37, '2026-05-06', '2026-05-07', '20:00:00', '08:00:00',  1, 1, 1, 1, 2),
@@ -796,7 +796,7 @@ INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TUR
 -- ==============================================================
 -- DEMO: Notificaciones adicionales (IDs 5-12)
 -- ==============================================================
-INSERT INTO Notificacion2 (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
+INSERT INTO Notificacion (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
 (5, 'NO_LEIDA', '2026-05-02 08:30:01',
  'Su solicitud de permiso para el 05-May (Congreso SOCHINMI) ha sido recibida y está pendiente de aprobación.', 5),
 (6, 'NO_LEIDA', '2026-05-03 11:00:01',
@@ -874,9 +874,9 @@ INSERT INTO Servicios_Funcionario (ID_FUNCIONARIO, id_servicio, id_rol_servicio)
 -- y generar desde el 01-Jun, esos turnos saldrán VACANTES por conflicto
 -- con su turno ya existente en Cirugía (cross-servicio).
 -- (La inyección es libre de conflictos: cada persona tiene UN solo turno en junio.)
---   plantilla_turno CIR: 5=Diurno CIR  6=Nocturno CIR · puestos CIR: 6,7,8
+--   tipo_turno CIR: 5=Diurno CIR  6=Nocturno CIR · puestos CIR: 6,7,8
 -- ==============================================================
-INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla, id_tipo_turno) VALUES
+INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_rotativa, id_tipo_turno) VALUES
 (56, '2026-06-01', '2026-06-01', '08:00:00', '20:00:00',   2, 3, 6, 3, 5),  -- Fernando, Cirugía → choca con MI-gen Jun 1 diurno
 (57, '2026-06-02', '2026-06-02', '08:00:00', '20:00:00',   3, 3, 7, 3, 5),  -- Sergio,   Cirugía → choca con MI-gen Jun 2 diurno
 (58, '2026-06-03', '2026-06-04', '20:00:00', '08:00:00',   4, 3, 8, 3, 6),  -- Andrés,   Cirugía → choca con MI-gen Jun 3 nocturno
@@ -887,7 +887,7 @@ INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, ho
 -- Viernes 05-Jun-2026. Mezcla de asignados y libres, sin conflictos
 -- (ninguna persona queda con dos turnos solapados ese día).
 -- ==============================================================
-INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla, id_tipo_turno) VALUES
+INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_rotativa, id_tipo_turno) VALUES
 -- Medicina Interna (servicio 1)
 (60, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00',   1, 1, 3, 1, 1),  -- Álvaro López
 (61, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00',   6, 1, 1, 1, 1),  -- Tania Bustos
@@ -907,11 +907,11 @@ INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, ho
 -- Lunes 04-May-2026: Dia=roster "Lunes Turno T III", Noche=roster "Volante".
 -- Miercoles 06-May-2026 y Martes 05-May-2026: subconjunto de puestos.
 -- Los 2 vacantes de Miercoles (puesto 21 y 31) ya eran huecos reales en
--- planificacion_asignacion (columna plantilla 4); los 2 vacantes de Lunes Noche
--- (puesto 29 y 31) son huecos reales del roster "Volante" (plantilla 9).
+-- planificacion_asignacion (columna rotativa 4); los 2 vacantes de Lunes Noche
+-- (puesto 29 y 31) son huecos reales del roster "Volante" (rotativa 9).
 -- ID_FUNCIONARIO NULL = turno libre disponible para cobertura.
 -- ==============================================================
-INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_plantilla, id_tipo_turno) VALUES
+INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_rotativa, id_tipo_turno) VALUES
 (70, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 300, 4, 17, 6, 7),  -- Lunes Dia — Coordinador
 (71, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 306, 4, 18, 6, 7),  -- Lunes Dia — Urgenciólogo 1
 (72, '2026-05-04', '2026-05-04', '08:00:00', '20:00:00', 312, 4, 19, 6, 7),  -- Lunes Dia — Urgenciólogo 2
@@ -980,9 +980,9 @@ INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TUR
  'Buscaba cambiar de puesto por comodidad de horario');
 
 -- ==============================================================
--- 20. NOTIFICACION2 — URGENCIAS (una por solicitud, ID_SOLICITUD OneToOne)
+-- 20. NOTIFICACION — URGENCIAS (una por solicitud, ID_SOLICITUD OneToOne)
 -- ==============================================================
-INSERT INTO Notificacion2 (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
+INSERT INTO Notificacion (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLICITUD) VALUES
 (13, 'NO_LEIDO', '2026-04-30 09:01:00',
  'Su solicitud de permiso para el 04-May ha sido recibida y está pendiente de aprobación.', 13),
 (14, 'LEIDO', '2026-04-25 10:01:00',

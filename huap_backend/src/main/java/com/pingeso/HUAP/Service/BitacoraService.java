@@ -4,12 +4,12 @@ import com.pingeso.HUAP.DTO.BitacoraResponseDTO;
 import com.pingeso.HUAP.Entity.BitacoraEntity;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.OfertaGeneralEntity;
-import com.pingeso.HUAP.Entity.Solicitud2Entity;
+import com.pingeso.HUAP.Entity.SolicitudEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.BitacoraRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
-import com.pingeso.HUAP.Repository.Solicitud2Repository;
+import com.pingeso.HUAP.Repository.SolicitudRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public class BitacoraService {
 
     private final BitacoraRepository bitacoraRepository;
-    private final Solicitud2Repository solicitud2Repository;
+    private final SolicitudRepository solicitudRepository;
     private final FuncionarioRepository funcionarioRepository;
     private final OfertaGeneralRepository ofertaGeneralRepository;
 
@@ -85,7 +85,7 @@ public class BitacoraService {
     public BitacoraResponseDTO convertToDTO(BitacoraEntity e) {
         FuncionarioEntity actor   = e.getFuncionario();
         TurnoEntity       turno   = e.getTurno();
-        Solicitud2Entity  s       = e.getSolicitud();
+        SolicitudEntity  s       = e.getSolicitud();
 
         // Relaciones de la solicitud
         FuncionarioEntity emisor    = s != null ? s.getFuncionario()         : null;
@@ -249,8 +249,8 @@ public class BitacoraService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrarEvento(String tipoEvento, Long idSolicitud, Long idFuncionario) {
         try {
-            Solicitud2Entity solicitud = idSolicitud != null
-                    ? solicitud2Repository.findById(idSolicitud).orElse(null) : null;
+            SolicitudEntity solicitud = idSolicitud != null
+                    ? solicitudRepository.findById(idSolicitud).orElse(null) : null;
             FuncionarioEntity actor = idFuncionario != null
                     ? funcionarioRepository.findById(idFuncionario).orElse(null) : null;
 

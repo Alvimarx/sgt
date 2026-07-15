@@ -38,7 +38,7 @@ public class SecurityConfig {
     private static final String[] GLOBAL_ADMIN_PATHS = {
             "/api/v2/servicios/**",
             "/api/v2/tipos-turno/**",
-            "/api/v2/plantillas/**",
+            "/api/v2/rotativas/**",
             "/api/v2/planificaciones/**"
     };
 

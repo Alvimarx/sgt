@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { SGT_DATA } from './data';
 import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
 import { reglasServicioService } from '../../services/reglasServicioService';
-import { tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/plantillasService';
+import { tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/rotativasService';
 
 const HORAS_MIN = -5;
 const HORAS_MAX = 5;
@@ -142,7 +142,7 @@ const ReglasServicioView = ({ onBack }) => {
     >
       <option value="">— Ninguno —</option>
       {tipos.map(t => (
-        <option key={t.idPlantillaTurno} value={t.idPlantillaTurno}>
+        <option key={t.idTipoTurno} value={t.idTipoTurno}>
           {t.nombre} ({formatHora(t.horaInicio)}–{formatHora(t.horaTermino)})
         </option>
       ))}
@@ -151,7 +151,7 @@ const ReglasServicioView = ({ onBack }) => {
 
   // Datos de un tipo de turno (horas base) para mostrar antes→después.
   const infoTipo = (idTipo, fallbackNombre) => {
-    const t = tipos.find(x => x.idPlantillaTurno === idTipo);
+    const t = tipos.find(x => x.idTipoTurno === idTipo);
     if (t) return { nombre: t.nombre, hi: t.horaInicio, hf: t.horaTermino };
     return { nombre: fallbackNombre || `#${idTipo}`, hi: null, hf: null };
   };

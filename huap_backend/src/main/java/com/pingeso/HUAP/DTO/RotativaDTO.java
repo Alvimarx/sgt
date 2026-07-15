@@ -8,11 +8,11 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlantillaDTO {
-    private Long idPlantilla;
+public class RotativaDTO {
+    private Long idRotativa;
     private Long idServicio;
     private String nombreServicio;
     private String nombre;
     private Byte semanas;
-    private List<PlantillaDiaDTO> secuenciaDias;
+    private List<RotativaDiaDTO> secuenciaDias;
 }
