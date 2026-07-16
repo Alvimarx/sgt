@@ -7,6 +7,7 @@ import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,14 @@ public class TurnoService {
 
     @Autowired
     private SolicitudRepository solicitudRepository;
+
+    /**
+     * Kill-switch del lock pesimista sobre el funcionario (por defecto activado). Existe para poder
+     * medir A/B el costo del lock contra la versión sin él (ver {@code LockBenchmark}). En producción
+     * NO debe desactivarse: sin el lock, {@link #saveTurno} vuelve a ser vulnerable a doble-reserva.
+     */
+    @Value("${huap.concurrencia.lock-pesimista:true}")
+    private boolean lockPesimista;
 
     @Transactional
     public TurnoEntity updateTurno(Long id, TurnoEntity turnoActualizado) throws Exception {
@@ -82,6 +91,13 @@ public class TurnoService {
 
         // 1. Validar conflictos de Funcionario (evitar que un médico esté en dos lugares a la vez)
         if (turno.getFuncionario() != null) {
+            // Lock pesimista del funcionario ANTES del chequeo: serializa chequeo+inserción para un
+            // mismo funcionario, cerrando la carrera check-then-act que permitía doble-reserva cuando
+            // dos transacciones validaban en paralelo (ninguna veía el turno aún no committeado de la otra).
+            if (lockPesimista) {
+                funcionarioRepository.lockFuncionario(turno.getFuncionario().getIdFuncionario());
+            }
+
             List<TurnoEntity> conflictosFuncionario = turnoRepository.findConflictosByFuncionario(
                     turno.getFuncionario().getIdFuncionario(),
                     turno.getDiaInicioTurno(),

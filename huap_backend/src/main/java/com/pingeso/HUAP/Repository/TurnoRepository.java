@@ -1,27 +1,36 @@
 package com.pingeso.HUAP.Repository;
 
 import com.pingeso.HUAP.Entity.TurnoEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
-    // Soft-delete: las consultas de agenda/vigentes/conflicto excluyen turnos con
-    // eliminado = true. La navegación @ManyToOne NO se filtra, por lo que un turno
-    // histórico (ej. en bitácora) sigue resolviendo el nombre de un puesto/tipo eliminado.
-
     // ====================================================================
-    // BÚSQUEDAS BÁSICAS POR ENTIDAD (vigentes)
+    // BÚSQUEDAS BÁSICAS POR ENTIDAD 
     // ====================================================================
 
     // Todos los turnos vigentes (no eliminados).
     List<TurnoEntity> findByEliminadoFalse();
+
+    /**
+     * Carga el turno con lock pesimista (SELECT ... FOR UPDATE). Se usa al inicio de una operación
+     * que modifica el turno (asignar/reasignar/etc.) para serializar accesos concurrentes a la MISMA
+     * fila de turno y evitar el lost-update de dos asignaciones compitiendo por el mismo turno.
+     * Debe invocarse dentro de una transacción.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM TurnoEntity t WHERE t.idTurno = :id")
+    Optional<TurnoEntity> findByIdForUpdate(@Param("id") Long id);
 
     @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario.idFuncionario = ?1 AND t.eliminado = false")
     List<TurnoEntity> findByFuncionario_IdFuncionario(Long idFuncionario);

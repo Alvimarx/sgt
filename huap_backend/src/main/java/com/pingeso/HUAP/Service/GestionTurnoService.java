@@ -8,6 +8,7 @@ import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.pingeso.HUAP.Repository.ServiciosFuncionarioRepository;
 
@@ -25,10 +26,23 @@ public class GestionTurnoService {
     private final NotificacionService notificacionService;
     private final ServiciosFuncionarioRepository serviciosFuncionarioRepository;
 
+    /**
+     * Kill-switch del lock pesimista (por defecto activado). Existe para poder medir A/B el costo del
+     * lock contra la versión sin él (ver {@code LockBenchmark}). En producción NO debe desactivarse:
+     * sin el lock, {@link #alterarTurno} vuelve a ser vulnerable al lost-update.
+     */
+    @Value("${huap.concurrencia.lock-pesimista:true}")
+    private boolean lockPesimista;
+
     @Transactional
     public Map<String, Object> alterarTurno(AlterarTurnoRequest request) throws Exception {
 
-        TurnoEntity turno = turnoRepository.findById(request.getIdTurno())
+        // Lock pesimista de la fila del turno: serializa cualquier par de operaciones sobre el MISMO
+        // turno, evitando el lost-update de dos asignaciones concurrentes (el 2º hilo espera, re-lee
+        // el estado ya committeado y los guards de cada acción lo tratan correctamente).
+        TurnoEntity turno = (lockPesimista
+                        ? turnoRepository.findByIdForUpdate(request.getIdTurno())
+                        : turnoRepository.findById(request.getIdTurno()))
                 .orElseThrow(() -> new RuntimeException("Turno no encontrado: " + request.getIdTurno()));
 
         if (turno.isEliminado()) {
@@ -173,6 +187,13 @@ public class GestionTurnoService {
     // ---------------------------------------------------------------
 
     private void validarConflictoFuncionario(Long idFuncionario, TurnoEntity turno) throws Exception {
+        // Lock pesimista del funcionario ANTES del chequeo: serializa validación+asignación para un
+        // mismo funcionario (cubre ASIGNAR y REASIGNAR), cerrando la carrera check-then-act que
+        // permitía doble-reserva entre acciones concurrentes. Se libera al commit de alterarTurno.
+        if (lockPesimista) {
+            funcionarioRepository.lockFuncionario(idFuncionario);
+        }
+
         LocalDateTime inicioObjetivo = turno.getDiaInicioTurno().atTime(turno.getHoraInicio());
         LocalDateTime finObjetivo = turno.getDiaFinalTurno().atTime(turno.getHoraFin());
 

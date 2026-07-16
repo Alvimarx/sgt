@@ -201,6 +201,11 @@ public class PlanificacionService {
                 .filter(f -> f != null && !f.isEliminado())
                 .map(FuncionarioEntity::getIdFuncionario)
                 .collect(Collectors.toSet());
+        // Lock pesimista de los funcionarios involucrados ANTES de cargar los conflictos, en orden
+        // de id (orden determinista => sin deadlock entre generaciones concurrentes). Serializa las
+        // generaciones que compartan funcionarios y garantiza que el chequeo vea los turnos que otra
+        // generación ya haya committeado, evitando doble-reserva.
+        idsFuncionarios.stream().sorted().forEach(funcionarioRepository::lockFuncionario);
         Map<Long, List<TurnoEntity>> conflictosExistentes = idsFuncionarios.isEmpty()
                 ? Map.of()
                 : turnoRepository.findConflictosByFuncionarios(new ArrayList<>(idsFuncionarios), fechaInicio, fechaFinGeneracion)
