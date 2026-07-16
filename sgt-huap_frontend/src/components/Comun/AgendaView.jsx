@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SGT_DATA } from "../Admin2/data";
 import { getTurnosServicio } from "../../services/funcionarioService";
-import ShiftDetail, { getTeamColor, getAgendaTeam, formatShiftLabel } from "../Comun/ShiftDetail";
+import ShiftDetail, { getTipoTurnoColor, getAgendaTeam, formatShiftLabel } from "../Comun/ShiftDetail";
 import AsignarTurnoLibreSheet from "./AsignarTurnoLibreSheet";
 
 import {
@@ -26,6 +26,12 @@ const emptyAgendaState = {
   shiftsByDay: {},
   turnos: [],
 };
+
+// Nombres de mes para los separadores de la lista de días (day.key = "YYYY-MM-DD").
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
 
 // ---------------------------------------------------------------------------
 // AGENDAVIEW — componente raíz de la vista
@@ -364,17 +370,32 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
           </div>
         ) : (
           <>
-            {visibleDays.map((day) => (
-              <DayRow
-                key={day.key}
-                day={day}
-                shifts={getShifts(day.key)}
-                todayKey={todayKey}
-                density={tweaks.density}
-                defaultExpanded={day.key === todayKey && filter === "todos"}
-                onOpen={(s) => setDetailShift(s)}
-              />
-            ))}
+            {visibleDays.map((day, i) => {
+              // Separador "Mayo 2026" cada vez que cambia el mes respecto al día visible anterior.
+              const prev = visibleDays[i - 1];
+              const cambiaMes = !prev || prev.key.slice(0, 7) !== day.key.slice(0, 7);
+              return (
+                <React.Fragment key={day.key}>
+                  {cambiaMes && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 2px 10px" }}>
+                      <span style={{ flex: 1, height: 1, background: PA.line }} aria-hidden="true" />
+                      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, textTransform: "uppercase", color: PA.ink2 }}>
+                        {MESES[Number(day.key.slice(5, 7)) - 1]} {day.key.slice(0, 4)}
+                      </span>
+                      <span style={{ flex: 1, height: 1, background: PA.line }} aria-hidden="true" />
+                    </div>
+                  )}
+                  <DayRow
+                    day={day}
+                    shifts={getShifts(day.key)}
+                    todayKey={todayKey}
+                    density={tweaks.density}
+                    defaultExpanded={day.key === todayKey && filter === "todos"}
+                    onOpen={(s) => setDetailShift(s)}
+                  />
+                </React.Fragment>
+              );
+            })}
             {visibleDays.length === 0 && !loadingAgenda && (
               <div style={{ padding: 48, textAlign: "center", color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
                 <div style={{ marginBottom: 8, fontSize: 22 }}>🗓</div>
@@ -509,7 +530,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         {/* Resumen */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {miShift ? (() => {
-            const tc = getTeamColor(miShift);
+            const tc = getTipoTurnoColor(miShift);
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -517,7 +538,6 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                     <SGTIcon name={miShift.tipo === "dia" ? "sun" : "moon"} size={11} color={tc.ink} />
                     {miShift.tipo === "dia" ? "Día" : "Noche"}
                   </div>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>{miShift.inicio}–{miShift.fin}</span>
                   {day.resumen?.tieneMultiplesTurnos && (
                     <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 700 }}>+{day.resumen.misTurnos.length - 1} más</span>
                   )}
@@ -559,14 +579,12 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
             <p style={{ fontSize: 12, color: PA.ink3, margin: "10px 0 0", fontWeight: 600 }}>No hay turnos este día.</p>
           ) : (
             dayTeams.map(({ key, group, rep, shifts: teamShifts }) => {
-              const t = getTeamColor(rep);
+              const t = getTipoTurnoColor(rep);
               const team = getAgendaTeam(rep);
               const total = group?.totalTurnos ?? teamShifts.length;
               const asignados = group?.asignados ?? teamShifts.filter((x) => x.idFuncionario != null).length;
               const vacantes = total - asignados;
               const hayMiTurno = teamShifts.some((x) => x.miTurno);
-              const inicio = group?.inicio ?? rep.inicio;
-              const fin = group?.fin ?? rep.fin;
 
               return (
                 <div
@@ -575,13 +593,13 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === "Enter" && onOpen(rep)}
-                  aria-label={`Ver detalle: ${rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")} ${inicio}–${fin}`}
+                  aria-label={`Ver detalle: ${rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")}`}
                   style={{ marginTop: 10, background: t.bg, border: `1.5px solid ${t.soft}`, borderRadius: 12, padding: 10, cursor: "pointer", transition: "opacity 0.15s" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: team ? 8 : 0, flexWrap: "wrap" }}>
                     <SGTIcon name={rep.tipo === "dia" ? "sun" : "moon"} size={14} color={t.ink} />
                     <span style={{ fontSize: 12.5, fontWeight: 800, color: t.ink, flex: 1, minWidth: 0 }}>
-                      {rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")} · {inicio}–{fin}
+                      {rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")}
                     </span>
                     {hayMiTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
                     <SGTBadge tone={vacantes > 0 ? "accent" : "success"} size="xs">

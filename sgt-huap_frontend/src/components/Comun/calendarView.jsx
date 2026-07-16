@@ -3,7 +3,7 @@ import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
-import ShiftDetail, { getTeamColor, formatShiftLabel } from '../Comun/ShiftDetail';
+import ShiftDetail, { getTipoTurnoColor, formatShiftLabel } from '../Comun/ShiftDetail';
 import AsignarTurnoLibreSheet from './AsignarTurnoLibreSheet';
 import { exportarTurnosCsv } from '../../services/exportacionService';
 
@@ -41,7 +41,7 @@ const getShiftName = (shift) =>
 const buildDayGroups = (shifts = []) => {
     const map = new Map();
     shifts.forEach((shift) => {
-        // Usar idRotativa como key para consistencia de color con AgendaView
+        // Agrupa por rotativa/tipo; el color ya no depende de esta key (es fijo por tipo dia/noche)
         const key =
             shift.teamKey ||
             `${shift.idRotativa ?? shift.idTipoTurno ?? getShiftName(shift)}-${shift.inicio ?? ''}-${shift.fin ?? ''}`;
@@ -582,7 +582,7 @@ const DayDetailOverview = ({ stats, onOpen }) => {
 
             {/* Grupos de turno */}
             {stats.groups.map(group => {
-                const color = getTeamColor(group.sample);
+                const color = getTipoTurnoColor(group.sample);
                 const asignados = group.turnos.filter(t => t.idFuncionario != null && !t.turnoLibre);
                 const vacantes = group.turnos.filter(t => t.idFuncionario == null || t.turnoLibre);
 

@@ -10,28 +10,14 @@ import { SGTAvatar, SGTBadge, SGTIcon } from "../Style/UIPrimitives";
 // HELPERS
 // ---------------------------------------------------------------------------
 
-const TEAM_COLORS = [
-    { bg: "#b0baee",          soft: "#D7E2FF", ink: "#183b6b" },
-    { bg: "rgb(166,231,180)", soft: "#D2E9D6", ink: "#24513A" },
-    { bg: "rgb(245,223,188)", soft: "#F5E0B7", ink: "#6B4D15" },
-    { bg: "rgb(225,188,245)", soft: "#E3D1F3", ink: "#5A3A72" },
-    { bg: "rgb(248,208,223)", soft: "#F2D1D5", ink: "#8C3F44" },
-    { bg: "rgb(173,224,231)", soft: "#CFE9F0", ink: "#2C6270" },
-];
-
-const hashStr = (value = "") => {
-    let h = 0;
-    const s = String(value);
-    for (let i = 0; i < s.length; i += 1) {
-        h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    }
-    return h;
+// Colores estándar por tipo de turno (constantes en toda la app: Agenda, Calendario y Detalle).
+const TIPO_TURNO_COLORS = {
+    dia:   { bg: "rgb(245,223,188)", soft: "#F5E0B7", ink: "#6B4D15" },  // ámbar cálido (sol)
+    noche: { bg: "#b0baee",          soft: "#D7E2FF", ink: "#183b6b" },  // azul (luna)
 };
 
-export const getTeamColor = (shift) => {
-    const seed = shift?.idRotativa ?? `tipo-${shift?.tipo || "sin-tipo"}`;
-    return TEAM_COLORS[hashStr(String(seed)) % TEAM_COLORS.length];
-};
+export const getTipoTurnoColor = (shift) =>
+    TIPO_TURNO_COLORS[shift?.tipo === "noche" ? "noche" : "dia"];
 
 const buildInitials = (name = "") =>
     String(name || "?")
@@ -119,7 +105,7 @@ const ShiftDetail = ({
         return null;
     }
 
-    const teamColor = getTeamColor(shift);
+    const teamColor = getTipoTurnoColor(shift);
     const fecha = shift.fecha || shift.raw?.diaInicioTurno || null;
     const turnoLibre = isTurnoLibre(shift);
 
