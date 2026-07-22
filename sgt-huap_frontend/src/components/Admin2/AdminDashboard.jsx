@@ -67,7 +67,7 @@ const AdminDashboard = ({ onBack, onGoFuncionariosSistema, onGoServicios, onGoAs
           icon="users" 
           title="Asignación de turnos" 
           desc="Asigna o quita funcionarios de turnos" 
-          tone="accent" 
+          tone="primary" 
           onClick={onGoAsignacionTurnos} 
         />
         <AdminCard 
@@ -81,21 +81,21 @@ const AdminDashboard = ({ onBack, onGoFuncionariosSistema, onGoServicios, onGoAs
           icon="calendar" 
           title="Crear tipo de Turno" 
           desc="Diseña un nuevo tipo de turno." 
-          tone="accent" 
+          tone="primary" 
           onClick={onGoTiposTurno} 
         />
         <AdminCard 
           icon="calendar" 
           title="Crear Rotativa" 
           desc="Diseña una nueva rotativa." 
-          tone="accent" 
+          tone="primary" 
           onClick={onGoPlantillas} 
         />
         <AdminCard 
           icon="calendar" 
           title="Crear Planificación Mensual" 
           desc="Diseña una nueva planificación mensual." 
-          tone="accent" 
+          tone="primary" 
           onClick={onGoPlanificacion} 
         />
 
@@ -103,7 +103,7 @@ const AdminDashboard = ({ onBack, onGoFuncionariosSistema, onGoServicios, onGoAs
           icon="alert" 
           title="Evaluar Solicitudes" 
           desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos." 
-          tone="accent" 
+          tone="primary" 
           onClick={onGoSolitudes} 
         />
         <AdminCard
@@ -117,7 +117,7 @@ const AdminDashboard = ({ onBack, onGoFuncionariosSistema, onGoServicios, onGoAs
           icon="sliders"
           title="Reglas de Horario del Servicio"
           desc="Ajuste automático de horas en fines de semana y feriados."
-          tone="accent"
+          tone="primary"
           onClick={onGoReglas}
         />
         <AdminCard
@@ -131,14 +131,14 @@ const AdminDashboard = ({ onBack, onGoFuncionariosSistema, onGoServicios, onGoAs
           icon="history"
           title="Bitácora de Cambios"
           desc="Registro cronológico de todos los eventos del sistema."
-          tone="accent"
+          tone="primary"
           onClick={onGoBitacora}
         />
         <AdminCard
           icon="check-circle"
           title="Auditoría de Asistencia"
           desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
-          tone="accent"
+          tone="primary"
           onClick={onGoAuditoria}
         />
       </div>

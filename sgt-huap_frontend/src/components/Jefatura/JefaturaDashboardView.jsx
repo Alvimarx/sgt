@@ -47,7 +47,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             icon="users"
             title="Asignación de turnos"
             desc="Asigna o quita funcionarios de turnos"
-            tone="accent"
+            tone="primary"
             onClick={onGoAsignacionTurnos}
           />
         )}
@@ -73,7 +73,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
           <JefaturaCard
             icon="user"
             title="Jerarquía de Funcionarios"
-            desc="Designa nuevas jefaturas al sistema."
+            desc="Designa nuevos subrogantes al sistema."
             tone="primary"
             onClick={onGoFuncionariosJefatura}
           />
@@ -83,7 +83,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             icon="calendar"
             title="Crear tipo de Turno"
             desc="Diseña un nuevo tipo de turno."
-            tone="accent"
+            tone="primary"
             onClick={onGoTiposTurno}
           />
         )}
@@ -92,7 +92,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             icon="calendar"
             title="Crear Rotativa"
             desc="Diseña una nueva rotativa."
-            tone="accent"
+            tone="primary"
             onClick={onGoPlantillas}
           />
         )}
@@ -101,7 +101,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             icon="calendar"
             title="Crear Planificación Mensual"
             desc="Diseña una nueva planificación mensual."
-            tone="accent"
+            tone="primary"
             onClick={onGoPlanificacion}
           />
         )}
@@ -110,7 +110,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             icon="alert"
             title="Evaluar Solicitudes"
             desc="Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos."
-            tone="accent"
+            tone="primary"
             onClick={onGoSolitudes}
           />
         )}
@@ -137,7 +137,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             icon="history"
             title="Bitácora de Cambios"
             desc="Registro cronológico de todos los eventos del sistema."
-            tone="accent"
+            tone="primary"
             onClick={onGoBitacora}
           />
         )}
@@ -146,7 +146,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             icon="check-circle"
             title="Auditoría de Asistencia"
             desc="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
-            tone="accent"
+            tone="primary"
             onClick={onGoAuditoria}
           />
         )}
