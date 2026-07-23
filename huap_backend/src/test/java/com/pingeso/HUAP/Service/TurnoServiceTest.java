@@ -132,6 +132,35 @@ class TurnoServiceTest {
         assertEquals(0.0, (double) cob.get("horasRealesCubiertas"), 1e-9);
     }
 
+    @Test
+    void cobertura_turnoNocturno_seFusionaConElSiguienteDiaSiSonAdyacentes() {
+        FuncionarioEntity f = func(1L);
+        LocalDate martes = LUNES.plusDays(1);
+        List<TurnoEntity> turnos = List.of(
+                turno(f, LUNES, LocalTime.of(20, 0), martes, LocalTime.of(8, 0)),   // noche: 12h, termina 08:00 martes
+                turno(f, martes, LocalTime.of(8, 0), martes, LocalTime.of(12, 0))); // empieza justo 08:00 martes: adyacente
+        when(turnoRepository.findByServicioIdAndDateRange(1L, LUNES, martes)).thenReturn(turnos);
+
+        Map<String, Object> cob = turnoService.getCoberturaRealByServicio(1L, LUNES, martes);
+
+        // Adyacentes (fin == inicio del siguiente) se fusionan en un solo intervalo: 12h + 4h = 16h.
+        assertEquals(16.0, (double) cob.get("horasRealesCubiertas"), 1e-9);
+    }
+
+    @Test
+    void cobertura_turnoConFechaUHoraNull_seFiltraSinRomperElCalculo() {
+        FuncionarioEntity f = func(1L);
+        TurnoEntity valido = turno(f, LUNES, LocalTime.of(8, 0), LUNES, LocalTime.of(12, 0)); // 4h
+        TurnoEntity sinFecha = TurnoEntity.builder()
+                .funcionario(f).diaInicioTurno(null).horaInicio(LocalTime.of(14, 0))
+                .diaFinalTurno(LUNES).horaFin(LocalTime.of(18, 0)).build();
+        when(turnoRepository.findByServicioIdAndDateRange(1L, LUNES, LUNES)).thenReturn(List.of(valido, sinFecha));
+
+        Map<String, Object> cob = turnoService.getCoberturaRealByServicio(1L, LUNES, LUNES);
+
+        assertEquals(4.0, (double) cob.get("horasRealesCubiertas"), 1e-9);
+    }
+
     // ============================ getTurnosStatsByServicio ============================
 
     @Test
@@ -158,6 +187,19 @@ class TurnoServiceTest {
         assertEquals(1L, stats.get("turnosAsignados"));
         assertEquals(2L, stats.get("turnosVacantes"));
         assertEquals(33.33, (double) stats.get("porcentajeCobertura"), 1e-9);
+    }
+
+    // ============================ getFuncionariosStatsServicio ============================
+
+    @Test
+    void funcionariosStats_combinaConteoConTurnoYTotalDelServicio() {
+        when(turnoRepository.countDistinctFuncionariosByServicioAndDateRange(1L, LUNES, LUNES)).thenReturn(3L);
+        when(funcionarioRepository.contarFuncionariosPorServicio(1L)).thenReturn(5L);
+
+        Map<String, Object> stats = turnoService.getFuncionariosStatsServicio(1L, LUNES, LUNES);
+
+        assertEquals(3L, stats.get("funcionariosConTurno"));
+        assertEquals(5L, stats.get("totalFuncionarios"));
     }
 
     // ============================ getTurnosByMedicoAndMonthAndYear ============================

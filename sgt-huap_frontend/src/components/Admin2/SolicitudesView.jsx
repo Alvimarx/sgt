@@ -1014,7 +1014,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             onEditMotivo={isMedico ? setEditSolicitud : null}
             onResponderIntercambio={handleResponder}
             onResponderOfertaParticular={handleResponderOfertaParticular}
-            esMiReceptor={tab === 'recibidas'}
+            esMiReceptor={String(s.funcionarioReceptor?.idFuncionario) === String(user?.id)}
           />
         ))}
       </div>

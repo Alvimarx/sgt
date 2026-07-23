@@ -11,6 +11,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -95,7 +97,7 @@ public class SolicitudService {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
-        if (!solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
+        if (solicitud.getFuncionarioReceptor() == null || !solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
 
@@ -121,7 +123,7 @@ public class SolicitudService {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
-        if (!solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
+        if (solicitud.getFuncionarioReceptor() == null || !solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
 
@@ -151,6 +153,23 @@ public class SolicitudService {
         Integer tipoSolicitud = solicitud.getTipoSolicitud().getTipo();
 
         if (nuevoEstado == SolicitudEntity.EstadoSolicitud.APROBADA) {
+            // Serializa aprobaciones concurrentes que compiten por el/los mismo(s) turno(s):
+            // se bloquean los turnos involucrados ANTES de tocar cualquier solicitud. En el
+            // intercambio (tipo 4) hay dos turnos; se bloquean siempre ordenados por id para que
+            // dos intercambios cruzados nunca se esperen mutuamente en sentido opuesto (deadlock).
+            lockTurnosInvolucrados(solicitud, tipoSolicitud);
+
+            // Tras obtener el lock, se relee la solicitud CON LOCK PROPIO: una lectura normal
+            // seguiría viendo la foto de antes de esperar (snapshot de la transacción), por lo
+            // que si otra aprobación concurrente ya la resolvió mientras esperábamos, esto lo
+            // detecta con datos frescos.
+            solicitud = solicitudRepository.findByIdForUpdate(idSolicitud)
+                    .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
+            if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
+                throw new RuntimeException(
+                        "Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)");
+            }
+
             if (solicitud.getTurno() != null) {
                 rechazarSolicitudesCompetitivas(solicitud.getTurno().getIdTurno(), idSolicitud, asignador);
             }
@@ -163,17 +182,26 @@ public class SolicitudService {
                 }
             } else if (tipoSolicitud.equals(3)) {
                 TurnoEntity turno = solicitud.getTurno();
+                if (turno == null) {
+                    throw new RuntimeException("La solicitud de cobertura no tiene un turno asociado");
+                }
                 turno.setFuncionario(solicitud.getFuncionario());
                 turnoRepository.save(turno);
             } else if (tipoSolicitud.equals(4)) {
                 TurnoEntity turnoDeseado = solicitud.getTurno();
                 TurnoEntity turnoPropio = solicitud.getTurnoReceptor();
+                if (turnoDeseado == null || turnoPropio == null) {
+                    throw new RuntimeException("La solicitud de intercambio no tiene ambos turnos asociados");
+                }
                 turnoDeseado.setFuncionario(solicitud.getFuncionario());
                 turnoPropio.setFuncionario(solicitud.getFuncionarioReceptor());
                 turnoRepository.save(turnoDeseado);
                 turnoRepository.save(turnoPropio);
             } else if (tipoSolicitud.equals(5)) {
                 TurnoEntity turno = solicitud.getTurno();
+                if (turno == null) {
+                    throw new RuntimeException("La solicitud de oferta particular no tiene un turno asociado");
+                }
                 turno.setFuncionario(solicitud.getFuncionarioReceptor());
                 turnoRepository.save(turno);
             }
@@ -186,6 +214,19 @@ public class SolicitudService {
         agendarBitacora("CAMBIO_ESTADO_" + nuevoEstado.name(), guardada.getIdSolicitud(), idAsignador);
 
         return guardada;
+    }
+
+    private void lockTurnosInvolucrados(SolicitudEntity solicitud, Integer tipoSolicitud) {
+        if (Integer.valueOf(4).equals(tipoSolicitud)) {
+            Long idTurnoDeseado = solicitud.getTurno() != null ? solicitud.getTurno().getIdTurno() : null;
+            Long idTurnoPropio = solicitud.getTurnoReceptor() != null ? solicitud.getTurnoReceptor().getIdTurno() : null;
+            Stream.of(idTurnoDeseado, idTurnoPropio)
+                    .filter(Objects::nonNull)
+                    .sorted()
+                    .forEach(turnoRepository::findByIdForUpdate);
+        } else if (solicitud.getTurno() != null) {
+            turnoRepository.findByIdForUpdate(solicitud.getTurno().getIdTurno());
+        }
     }
 
     private void rechazarSolicitudesCompetitivas(Long idTurno, Long idSolicitudAprobada, FuncionarioEntity asignador) {

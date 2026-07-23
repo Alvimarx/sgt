@@ -128,7 +128,10 @@ public class OfertaGeneralService {
 
     @Transactional
     public OfertaGeneralEntity seleccionarPostulante(Long idOferta, Long idPostulacion, Long idJefatura) {
-        OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
+        // Lock pesimista: si dos jefaturas seleccionan postulantes distintos para la misma oferta
+        // al mismo tiempo, la segunda espera a que la primera termine (en vez de leer el estado
+        // ABIERTA en paralelo) y luego relee con datos frescos gracias al propio lock.
+        OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.ABIERTA) {
@@ -137,6 +140,10 @@ public class OfertaGeneralService {
 
         PostulacionEntity postulacion = postulacionRepository.findById(idPostulacion)
                 .orElseThrow(() -> new RuntimeException("Postulación no existe"));
+
+        if (!postulacion.getOfertaGeneral().getIdOfertaGeneral().equals(idOferta)) {
+            throw new RuntimeException("La postulación no pertenece a esta oferta");
+        }
 
         TurnoEntity turno = oferta.getTurno();
         turno.setFuncionario(postulacion.getPostulante());
