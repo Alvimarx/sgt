@@ -285,23 +285,23 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
         subtitle={`Hola, ${user?.nombre || "Usuario"}`}
         leftSlot={
           <button
+            className="agenda-back-button"
             onClick={onSwitchService}
             aria-label="Volver a selección de servicio"
-            style={{ background: "transparent", border: "none", padding: "4px 8px 4px 0", cursor: "pointer", display: "flex", alignItems: "center" }}
           >
             <SGTIcon name="chevron-left" size={24} color={PA.ink} />
           </button>
         }
         rightSlot={
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div className="agenda-header-actions">
             <IconBtn icon="tray" badge={unreadCount} onClick={onOpenNotifications} aria-label={`Notificaciones${unreadCount > 0 ? `, ${unreadCount} sin leer` : ""}`} />
             <button
+              className="logout-button"
               onClick={onLogout}
               aria-label="Cerrar sesión"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 36, padding: "0 10px", borderRadius: 10, border: `1px solid ${PA.line}`, background: "#fff", color: PA.ink2, fontSize: 12, fontWeight: 800, cursor: "pointer", flexShrink: 0 }}
             >
-              <SGTIcon name="close" size={15} color={PA.ink2} />
-              Salir
+              <SGTIcon name="close" size={17} color={PA.ink2} />
+              <span className="logout-button__label">Salir</span>
             </button>
           </div>
         }
@@ -327,24 +327,25 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
 
       {/* Barra de filtros — scrolleable en horizontal, sin barra visible */}
       <div
+        className="agenda-filters"
         role="tablist"
         aria-label="Filtros de agenda"
-        style={{ display: "flex", gap: 6, padding: "10px 14px 6px", overflowX: "auto", scrollbarWidth: "none" }}
       >
         {FILTERS.map((f) => (
           <button
             key={f.id}
+            className={`agenda-filter ${
+              filter === f.id ? "agenda-filter--active" : ""
+            }`}
             role="tab"
             aria-selected={filter === f.id}
             onClick={() => setFilter(f.id)}
             style={{
               background: filter === f.id ? PA.primary : "#fff",
               color: filter === f.id ? "#fff" : PA.ink2,
-              border: `1.5px solid ${filter === f.id ? PA.primary : PA.line}`,
-              borderRadius: 999, padding: "7px 12px", fontSize: 12.5, fontWeight: 800,
-              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5,
-              whiteSpace: "nowrap", flexShrink: 0,
-              transition: "background 0.15s, color 0.15s, border-color 0.15s",
+              border: `1.5px solid ${
+                filter === f.id ? PA.primary : PA.line
+              }`,
             }}
           >
             {f.label}
@@ -362,7 +363,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       </div>
 
       {/* Lista de días */}
-      <div style={{ flex: 1, overflow: "auto", padding: "6px 14px 80px" }}>
+      <div className="agenda-days-list">
         {loadingAgenda ? (
           <div style={{ padding: 48, textAlign: "center", color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
             <div style={{ marginBottom: 8, fontSize: 22 }}>📅</div>
@@ -447,7 +448,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
 
       {/* Toast flotante — position fixed para funcionar dentro de cualquier contenedor */}
       {selectionToast && (
-        <div style={{ position: "fixed", left: 14, right: 14, bottom: 82, zIndex: 200, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+        <div className="agenda-toast">
           <div style={{ background: "rgba(23,65,108,0.96)", color: "#fff", borderRadius: 999, padding: "10px 16px", fontSize: 12.5, fontWeight: 700, boxShadow: "0 10px 24px rgba(15,23,42,0.2)", maxWidth: 340, textAlign: "center", animation: "sgtFade .2s ease" }}>
             {selectionToast}
           </div>
@@ -477,7 +478,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
   const [expanded, setExpanded] = useState(!!defaultExpanded);
   const hoy = day.key === todayKey;
   const PA = SGT_DATA.PALETTE;
-  const vpad = density === "compact" ? "8px 12px" : "11px 14px";
+  //const vpad = density === "compact" ? "8px 12px" : "11px 14px";
 
   const miShift = shifts.find((s) => s.miTurno) || null;
   const libres = shifts.filter((s) => s.turnoLibre);
@@ -496,24 +497,27 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
 
   return (
     <div
+      className={`day-row ${hoy ? "day-row--today" : ""}`}
       style={{
-        background: "#fff",
-        border: `1.5px solid ${hoy ? PA.primary : PA.line}`,
-        borderRadius: 16,
-        marginBottom: 8,
-        overflow: "hidden",
-        boxShadow: hoy ? "0 4px 16px rgba(23,65,108,0.10)" : "0 1px 3px rgba(0,0,0,0.04)",
-        transition: "box-shadow 0.15s",
+        borderColor: hoy ? PA.primary : PA.line,
       }}
     >
       <button
+        className={`day-header-btn ${
+          density === "compact" ? "day-header-btn--compact" : ""
+        }`}
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
-        aria-label={`${day.dia} ${day.num}${hoy ? ", hoy" : ""}${miShift ? `, turno ${miShift.inicio}–${miShift.fin}` : ", sin turno"}`}
-        style={{ width: "100%", background: "transparent", border: "none", padding: vpad, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 12 }}
+        aria-label={`${day.dia} ${day.num}${
+          hoy ? ", hoy" : ""
+        }${
+          miShift
+            ? `, turno ${miShift.inicio}–${miShift.fin}`
+            : ", sin turno"
+        }`}
       >
         {/* Fecha */}
-        <div style={{ minWidth: 44, textAlign: "center" }}>
+        <div className="day-row__date">
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", color: hoy ? PA.primary : day.findesemana ? PA.ink3 : PA.ink2 }}>
             {day.dia}
           </div>
@@ -528,7 +532,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         </div>
 
         {/* Resumen */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="day-row__summary">
           {miShift ? (() => {
             const tc = getTipoTurnoColor(miShift);
             return (
@@ -561,7 +565,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         </div>
 
         {/* Indicadores */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+        <div className="day-row__indicators">
           {libres.length > 0 && miShift && (
             <span style={{ padding: "2px 7px", borderRadius: 99, background: PA.accentSoft, color: "#B85A60", fontSize: 10, fontWeight: 800, border: "1px solid #F3D2D5", display: "inline-flex", alignItems: "center", gap: 3 }}>
               <SGTIcon name="hand-raised" size={10} color="#B85A60" />
@@ -574,7 +578,10 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
 
       {/* Contenido expandido */}
       {expanded && (
-        <div style={{ padding: "0 14px 12px", borderTop: `1px solid ${PA.line2}` }}>
+        <div
+          className="day-row__expanded"
+          style={{ borderTopColor: PA.line2 }}
+        >
           {shifts.length === 0 ? (
             <p style={{ fontSize: 12, color: PA.ink3, margin: "10px 0 0", fontWeight: 600 }}>No hay turnos este día.</p>
           ) : (

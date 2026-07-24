@@ -8,7 +8,7 @@ import { getToken, clearAuth, isTokenValid } from './tokenManager';
 
 // Configuración base de Axios
 const axiosInstance = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v2',
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v2',
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json',

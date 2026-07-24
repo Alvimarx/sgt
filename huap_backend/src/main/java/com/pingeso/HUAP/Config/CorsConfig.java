@@ -14,7 +14,7 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
+        /* 
         // Permitir solicitudes desde el frontend y load balancer
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost",        // Load balancer local (puerto 80)
@@ -27,6 +27,15 @@ public class CorsConfig {
                 "http://200.30.242.110:5173", // IP pública server demo (legacy)
                 "http://192.168.1.150",    // IP local del servidor
                 "http://192.168.1.150:80"  // IP local puerto 80
+        ));
+        */
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost",
+                "http://localhost:*",
+                "http://200.30.242.110",
+                "http://200.30.242.110:*",
+                "http://192.168.*.*",
+                "http://192.168.*.*:*"
         ));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

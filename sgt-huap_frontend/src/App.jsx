@@ -13,7 +13,7 @@ function App() {
 
     return (
         <Router>
-            <div className="container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#e2e8f0' }}>
+            <div className="app-container">
                 <Routes>
                     {/* Rutas de demostración */}
                     <Route path="/" element={<Prop4 />} />

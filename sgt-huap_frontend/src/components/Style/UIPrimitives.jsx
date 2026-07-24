@@ -88,12 +88,9 @@ export const SGTAvatar = ({ person, size = 28, style = {}, ring = null }) => {
 };
 
 export const PhoneShell = ({ children }) => (
-  <div style={{
-    width: 390, height: 800, background: P().surface2, borderRadius: 36, border: `1px solid ${P().line}`,
-    boxShadow: '0 30px 80px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(15,23,42,0.08)',
-    overflow: 'hidden', fontFamily: "'Raleway', system-ui, sans-serif", color: P().ink,
-    display: 'flex', flexDirection: 'column', position: 'relative',
-  }}>{children}</div>
+  <div className="phone-shell">
+    {children}
+  </div>
 );
 
 export const Sheet = ({ open, onClose, children, title, maxHeight = '85%' }) => {
@@ -117,15 +114,28 @@ export const Sheet = ({ open, onClose, children, title, maxHeight = '85%' }) => 
   );
 };
 
-export const TopHeader = ({ title, subtitle, rightSlot, dense, leftSlot }) => (
-  <div style={{ position: 'relative', padding: dense ? '14px 16px 10px' : '16px 18px 12px', background: '#fff', borderBottom: `1px solid ${P().line2}`, display: 'flex', alignItems: 'center' }}>
-    {leftSlot}
-    <div style={{ position: 'absolute', left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>
-      <div style={{ fontSize: 19, fontWeight: 800, color: P().ink, lineHeight: 1.15, letterSpacing: -0.2 }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: P().ink3, marginTop: 2, fontWeight: 600 }}>{subtitle}</div>}
+export const TopHeader = ({
+  title,
+  subtitle,
+  rightSlot,
+  dense,
+  leftSlot,
+}) => (
+  <div className={`top-header ${dense ? "dense" : "normal"}`}>
+    <div className="top-header__left">
+      {leftSlot}
     </div>
-    <div style={{ flex: 1 }} />
-    {rightSlot}
+
+    <div className="top-header__center">
+      <div className="top-header__title">{title}</div>
+      {subtitle && (
+        <div className="top-header__subtitle">{subtitle}</div>
+      )}
+    </div>
+
+    <div className="top-header__right">
+      {rightSlot}
+    </div>
   </div>
 );
 
