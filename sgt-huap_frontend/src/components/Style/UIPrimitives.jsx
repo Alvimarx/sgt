@@ -40,6 +40,8 @@ export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth =
     case 'sliders':       return <svg {...common}><path d="M4 21V14M4 10V3M12 21V12M12 8V3M20 21V16M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>;
     case 'more':          return <svg {...common}><circle cx="12" cy="12" r="1" fill={color}/><circle cx="19" cy="12" r="1" fill={color}/><circle cx="5" cy="12" r="1" fill={color}/></svg>;
     case 'crown':         return <svg {...common}><path d="M3 18h18M3 8l4 4 5-7 5 7 4-4-2 10H5L3 8z"/></svg>;
+    case 'shield-check':  return <svg {...common}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>;
+    case 'user-gear':     return <svg {...common}><circle cx="10" cy="8" r="4"/><path d="M10.5 15H7a4 4 0 0 0-4 4v1"/><circle cx="18" cy="17" r="2.6"/><path d="M18 13.8v1M18 19.2v1M21.2 17h-1M15.8 17h-1"/></svg>;
     case 'stethoscope':   return <svg {...common}><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>;
     default: return null;
   }
@@ -174,7 +176,7 @@ export const TabBar = ({ active, onChange }) => {
     { id: 'me',       label: 'Perfil',     icon: 'user' },
   ];
   return (
-    <div style={{ display: 'flex', borderTop: `1px solid ${P().line}`, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(8px)', padding: '6px 6px 10px' }}>
+    <div style={{ flexShrink: 0, display: 'flex', borderTop: `1px solid ${P().line}`, background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(8px)', padding: '6px 6px 10px' }}>
       {tabs.map(t => (
         <button key={t.id} onClick={() => onChange && onChange(t.id)} style={{ flex: 1, background: 'transparent', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 2px', cursor: 'pointer', color: active === t.id ? P().primary : P().ink3 }}>
           <SGTIcon name={t.icon} size={20} color={active === t.id ? P().primary : P().ink3} strokeWidth={active === t.id ? 2.4 : 2}/>

@@ -1,7 +1,7 @@
 // ProfileView.jsx
 import React from 'react';
 import { SGT_DATA } from '../Admin2/data';
-import { TopHeader, SGTAvatar, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
+import { SGTAvatar, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
 
 // Exportamos el chip de roles por si lo necesitas en otras vistas
@@ -38,16 +38,16 @@ const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPerso
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
-      <TopHeader title="Mi Perfil" dense />
-
-      {/* Nuevo Header con botón Volver */}
+      {/* Header con botón Volver */}
       <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
           <SGTIcon name="chevron-left" size={24} color={PA.ink} />
         </button>
         <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Mi Perfil</div>
       </div>
-      
+
+      {/* Contenedor con scroll propio: evita que el contenido comprima el TabBar inferior */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <SGTAvatar person={me} size={80} style={{ fontSize: 32 }} />
         <div style={{ textAlign: 'center' }}>
@@ -129,6 +129,7 @@ const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPerso
             <SGTIcon name="chevron-right" size={16} color={PA.warn} strokeWidth={2.5}/>
           </button>
         )}
+      </div>
       </div>
     </div>
   );
