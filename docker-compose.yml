@@ -47,11 +47,14 @@ services:
     expose:
       - "8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://${DB_HOST:-host.docker.internal}:${DB_PORT:-3306}/${DB_NAME:-innhosp2}
-      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-root}
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:?define DB_PASSWORD en el archivo .env}
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=${DDL_AUTO:-update}
+      - DB_URL=${DB_URL:?define DB_URL en el archivo .env}
+      - DB_USERNAME=${DB_USERNAME:?define DB_USERNAME en el archivo .env}
+      - DB_PASSWORD=${DB_PASSWORD:?define DB_PASSWORD en el archivo .env}
+      - DDL_AUTO=${DDL_AUTO:-validate}
       - JWT_SECRET=${JWT_SECRET:?define JWT_SECRET en el archivo .env}
+      - HOSPITAL_DB_URL=${HOSPITAL_DB_URL:?define HOSPITAL_DB_URL en el archivo .env}
+      - HOSPITAL_DB_USERNAME=${HOSPITAL_DB_USERNAME:?define HOSPITAL_DB_USERNAME en el archivo .env}
+      - HOSPITAL_DB_PASSWORD=${HOSPITAL_DB_PASSWORD:?define HOSPITAL_DB_PASSWORD en el archivo .env}
       - SWAGGER_ENABLED=false
       - SERVER_ID=backend-1
     networks:
@@ -78,11 +81,14 @@ services:
     expose:
       - "8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://${DB_HOST:-host.docker.internal}:${DB_PORT:-3306}/${DB_NAME:-innhosp2}
-      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-root}
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:?define DB_PASSWORD en el archivo .env}
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=${DDL_AUTO:-update}
+      - DB_URL=${DB_URL:?define DB_URL en el archivo .env}
+      - DB_USERNAME=${DB_USERNAME:?define DB_USERNAME en el archivo .env}
+      - DB_PASSWORD=${DB_PASSWORD:?define DB_PASSWORD en el archivo .env}
+      - DDL_AUTO=${DDL_AUTO:-validate}
       - JWT_SECRET=${JWT_SECRET:?define JWT_SECRET en el archivo .env}
+      - HOSPITAL_DB_URL=${HOSPITAL_DB_URL:?define HOSPITAL_DB_URL en el archivo .env}
+      - HOSPITAL_DB_USERNAME=${HOSPITAL_DB_USERNAME:?define HOSPITAL_DB_USERNAME en el archivo .env}
+      - HOSPITAL_DB_PASSWORD=${HOSPITAL_DB_PASSWORD:?define HOSPITAL_DB_PASSWORD en el archivo .env}
       - SWAGGER_ENABLED=false
       - SERVER_ID=backend-2
     networks:
@@ -109,11 +115,14 @@ services:
     expose:
       - "8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://${DB_HOST:-host.docker.internal}:${DB_PORT:-3306}/${DB_NAME:-innhosp2}
-      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-root}
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:?define DB_PASSWORD en el archivo .env}
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=${DDL_AUTO:-update}
+      - DB_URL=${DB_URL:?define DB_URL en el archivo .env}
+      - DB_USERNAME=${DB_USERNAME:?define DB_USERNAME en el archivo .env}
+      - DB_PASSWORD=${DB_PASSWORD:?define DB_PASSWORD en el archivo .env}
+      - DDL_AUTO=${DDL_AUTO:-validate}
       - JWT_SECRET=${JWT_SECRET:?define JWT_SECRET en el archivo .env}
+      - HOSPITAL_DB_URL=${HOSPITAL_DB_URL:?define HOSPITAL_DB_URL en el archivo .env}
+      - HOSPITAL_DB_USERNAME=${HOSPITAL_DB_USERNAME:?define HOSPITAL_DB_USERNAME en el archivo .env}
+      - HOSPITAL_DB_PASSWORD=${HOSPITAL_DB_PASSWORD:?define HOSPITAL_DB_PASSWORD en el archivo .env}
       - SWAGGER_ENABLED=false
       - SERVER_ID=backend-3
     networks:

@@ -1,8 +1,11 @@
+-- innhosp · 01 · ESQUEMA (crea la base, tablas de personal y la vista viewPersonal)
+CREATE DATABASE IF NOT EXISTS innhosp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- ==============================================================
--- SETUP PERSONAL AUXILIAR - innhosp2 (modo desarrollo)
+-- SETUP PERSONAL AUXILIAR - innhosp (modo desarrollo)
 -- ==============================================================
 -- Propósito:
---   Crea en innhosp2 las tablas de catálogos del hospital
+--   Crea en innhosp las tablas de catálogos del hospital
 --   (conf_estados, conf_tipocargo, conf_tipocontrato,
 --   conf_tipofuncionario, servicio) y la tabla personalAux,
 --   luego crea la vista viewPersonal apuntando a personalAux.
@@ -29,7 +32,7 @@
 --   y cargarlo aquí antes de crear la vista.
 -- ==============================================================
 
-USE innhosp2;
+USE innhosp;
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -390,7 +393,7 @@ CREATE TABLE `personalAux` (
 -- ==============================================================
 -- 7. VISTA viewPersonal (Opción B — desarrollo)
 -- Fuente: archivos_marcelo/create_view_personal.sql
--- Apunta a personalAux dentro de innhosp2.
+-- Apunta a personalAux dentro de innhosp.
 -- Para producción: reemplazar por Opción A que apunta a innhosp.personal
 -- ==============================================================
 DROP VIEW IF EXISTS viewPersonal;
@@ -414,7 +417,7 @@ SELECT
     p.clave,
     p.estado,
     p.date_added
-FROM innhosp2.personalAux p;
+FROM innhosp.personalAux p;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

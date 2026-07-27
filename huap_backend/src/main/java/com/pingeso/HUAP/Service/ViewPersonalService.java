@@ -1,8 +1,8 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.DTO.ViewPersonalSummaryDTO;
-import com.pingeso.HUAP.Entity.ViewPersonalEntity;
-import com.pingeso.HUAP.Repository.ViewPersonalRepository;
+import com.pingeso.HUAP.hospital.ViewPersonalEntity;
+import com.pingeso.HUAP.hospital.ViewPersonalRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

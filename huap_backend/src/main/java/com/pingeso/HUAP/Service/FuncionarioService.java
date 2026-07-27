@@ -2,6 +2,8 @@ package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.*;
 import com.pingeso.HUAP.Repository.*;
+import com.pingeso.HUAP.hospital.ViewPersonalEntity;
+import com.pingeso.HUAP.hospital.ViewPersonalRepository;
 import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;

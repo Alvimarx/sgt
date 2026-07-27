@@ -18,7 +18,7 @@
 --   para crear la tabla personalAux y la vista viewPersonal.
 -- ============================================================== 
 
-USE innhosp2;
+USE innhosp;
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;

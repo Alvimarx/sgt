@@ -1,24 +1,42 @@
-version: "3.8"
+# ==============================================================
+# DESARROLLO — entorno autocontenido (app + BD con los DOS esquemas).
+# Un solo comando levanta todo:
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# MySQL de dev (puerto 3307 del host) con dos esquemas separados que imitan la
+# topología real de producción:
+#   - gestionturnos : BD propia del SGT (Hibernate crea las tablas al arrancar; db-seeder la puebla).
+#   - innhosp       : stand-in del hospital, con la vista viewPersonal (setup_personal_aux.sql).
+#
+# NOTA: las credenciales de aquí son SOLO de desarrollo local (valores desechables).
+# En producción se usa docker-compose.yml (solo app, secretos por .env, BD reales).
+# ==============================================================
 services:
   db:
     image: mysql:8.0
     container_name: huap-dev-db
+    restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=huap1234
-      - MYSQL_DATABASE=innhosp2
+      - MYSQL_ROOT_PASSWORD=localdev
       - MYSQL_ROOT_HOST=%
+      # Crea la BD de la app vacía; el backend crea sus tablas (ddl-auto) y el seeder la puebla.
+      - MYSQL_DATABASE=gestionturnos
     ports:
       - "3307:3306"
     volumes:
       - huap-dev-db-data:/var/lib/mysql
+      # initdb.d corre en orden alfabético SOLO en la primera inicialización del volumen.
+      # Deja innhosp con sus tablas + la vista viewPersonal + datos de prueba (stand-in del hospital).
+      - ./BaseDatosMySQL/desarrollo/innhosp/01_esquema.sql:/docker-entrypoint-initdb.d/10_innhosp_esquema.sql:ro
+      - ./BaseDatosMySQL/desarrollo/innhosp/02_datos.sql:/docker-entrypoint-initdb.d/20_innhosp_datos.sql:ro
     networks:
       - huap-dev-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-phuap1234"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-plocaldev"]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 40s
 
   backend:
     build:
@@ -29,17 +47,21 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/innhosp2
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=huap1234
-      - SPRING_JPA_HIBERNATE_DDL-AUTO=update
-      - JWT_SECRET=***JWT_SECRET_PURGADO***
+      # BD de la app (gestionturnos) y BD del hospital (innhosp), ambas en el MySQL de dev.
+      - DB_URL=jdbc:mysql://db:3306/gestionturnos
+      - DB_USERNAME=root
+      - DB_PASSWORD=localdev
+      - HOSPITAL_DB_URL=jdbc:mysql://db:3306/innhosp
+      - HOSPITAL_DB_USERNAME=root
+      - HOSPITAL_DB_PASSWORD=localdev
+      - DDL_AUTO=update
+      # Secreto JWT SOLO de desarrollo (desechable).
+      - JWT_SECRET=dev-only-secret-cambia-esto-min-32-caracteres-0123456789
+      - SWAGGER_ENABLED=true
       - SERVER_ID=backend-dev
     depends_on:
       db:
         condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
     networks:
       - huap-dev-network
     healthcheck:
@@ -49,39 +71,7 @@ services:
       retries: 5
       start_period: 90s
 
-  db-init:
-      image: mysql:8.0
-      container_name: huap-dev-db-init
-      restart: "no"
-      volumes:
-        - ./BaseDatosMySQL:/scripts:ro
-      command:
-        - sh
-        - -c
-        - | 
-          echo "1. Esperando a que MySQL acepte conexiones en la red de Docker...";
-          until mysql -h db -uroot -phuap1234 innhosp2 -e "SELECT 1" >/dev/null 2>&1; do
-            sleep 2;
-          done;
-
-          echo "2. Validando si la tabla viewpersonal ya existe y tiene registros...";
-          # Verificamos si la tabla existe y cuántas filas tiene de forma segura
-          COUNT=$$(mysql -h db -uroot -phuap1234 innhosp2 -se "SELECT COUNT(*) FROM viewpersonal" 2>/dev/null || echo 0);
-          
-          if [ "$$COUNT" = "0" ]; then
-            echo "3. La tabla no existe o está vacía. Ejecutando script de poblado...";
-            mysql -h db -uroot -phuap1234 innhosp2 < /scripts/setup_personal_aux.sql &&
-            mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_personal_aux_dev.sql;
-            echo "¡Poblado finalizado con éxito!";
-          else
-            echo "3. Omitiendo seed: La base de datos ya contiene datos ($$COUNT funcionarios).";
-          fi
-      depends_on:
-        db:
-          condition: service_healthy
-      networks:
-        - huap-dev-network
-
+  # Puebla la BD de la app (gestionturnos) DESPUÉS de que el backend crea las tablas (ddl-auto).
   db-seeder:
     image: mysql:8.0
     container_name: huap-dev-seeder
@@ -92,12 +82,13 @@ services:
       - sh
       - -c
       - |
-        COUNT=$$(mysql -h db -uroot -phuap1234 innhosp2 -se 'SELECT COUNT(*) FROM Funcionario' 2>/dev/null || echo 0);
+        COUNT=$$(mysql -h db -uroot -plocaldev gestionturnos -se 'SELECT COUNT(*) FROM Funcionario' 2>/dev/null || echo 0);
         if [ "$$COUNT" = "0" ]; then
-          echo "BD vacia, ejecutando seed...";
-          mysql -h db -uroot -phuap1234 innhosp2 < /scripts/poblar_innhosp2.sql 
+          echo "gestionturnos vacía, ejecutando seed (poblar_innhosp2.sql)...";
+          mysql -h db -uroot -plocaldev < /scripts/desarrollo/gestionturnos/02_datos.sql;
+          echo "Seed finalizado.";
         else
-          echo "BD ya tiene datos ($$COUNT funcionarios), omitiendo seed.";
+          echo "gestionturnos ya tiene datos ($$COUNT funcionarios), omitiendo seed.";
         fi
     depends_on:
       backend:

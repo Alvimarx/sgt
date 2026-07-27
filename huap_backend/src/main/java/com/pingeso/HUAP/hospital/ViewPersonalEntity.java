@@ -1,4 +1,4 @@
-package com.pingeso.HUAP.Entity;
+package com.pingeso.HUAP.hospital;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
@@ -8,8 +8,15 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import org.hibernate.annotations.Immutable;
 
-import java.util.Date;
-
+/**
+ * Vista de personal del hospital (fuente de verdad de RRHH).
+ *
+ * <p>Mapea la vista <b>de solo lectura</b> {@code viewPersonal} de la base de datos del
+ * <b>hospital</b> (no del SGT). Contiene los datos del personal y las credenciales
+ * ({@code clave}, {@code estado}) usados por el login. Es {@code @Immutable}: el SGT
+ * nunca escribe en el hospital; solo consulta a través del datasource de solo lectura
+ * (ver {@code Config/HospitalDataSourceConfig}).
+ */
 @Entity
 @Table(name = "viewPersonal")
 @Immutable
@@ -18,9 +25,6 @@ public class ViewPersonalEntity {
     @Id
     @Column(name = "id_personal", nullable = false)
     private long id_personal;
-
-    //@Column(name = "rol")
-    //private String rol;
 
     @Column(name = "rut")
     private String rut;
@@ -37,17 +41,11 @@ public class ViewPersonalEntity {
     @Column(name = "apel_mat")
     private String apel_mat;
 
-    //@Column(name = "rrhh", nullable = false)
-    //private int rrhh;
-
     @Column(name = "telefono")
     private String telefono;
 
     @Column(name = "emailProfesional")
     private String emailPro;
-
-    //@Column(name = "emailPersonal")
-    //private String emailPersonal;
 
     @Column(name = "profesion")
     private Integer profesion;
@@ -64,9 +62,6 @@ public class ViewPersonalEntity {
 
     @Column(name = "estado")
     private Integer estado;
-
-    //@Column(name = "date_added")
-    //private Date date_added;
 
     protected ViewPersonalEntity () {}
 
