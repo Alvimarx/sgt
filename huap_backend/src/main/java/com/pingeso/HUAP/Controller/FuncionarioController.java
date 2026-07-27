@@ -18,6 +18,12 @@ import com.pingeso.HUAP.Security.JwtTokenProvider;
 import com.pingeso.HUAP.Security.LoginAttemptService;
 import com.pingeso.HUAP.Service.FuncionarioService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +34,9 @@ import org.slf4j.LoggerFactory;
 @RestController
 @RequestMapping("/api/v2/funcionarios")
 @EnableMethodSecurity
+@Tag(name = "Funcionarios y autenticación",
+        description = "Login (JWT en dos pasos: pre-autenticación y selección de servicio), "
+                + "registro y gestión de funcionarios.")
 public class FuncionarioController {
 
         private static final Logger logger = LoggerFactory.getLogger(FuncionarioController.class);
@@ -41,6 +50,18 @@ public class FuncionarioController {
     @Autowired
     private LoginAttemptService loginAttemptService;
 
+    @Operation(summary = "Autenticación (paso 1)",
+            description = "Valida RUT y contraseña. Si el usuario tiene varios servicios, devuelve un "
+                    + "token de pre-autorización y la lista de servicios para elegir en el paso 2. "
+                    + "Incluye bloqueo por intentos fallidos.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Credenciales válidas; retorna token de pre-autorización y servicios disponibles"),
+            @ApiResponse(responseCode = "400", description = "Credenciales incompletas"),
+            @ApiResponse(responseCode = "401", description = "Credenciales inválidas"),
+            @ApiResponse(responseCode = "403", description = "Usuario sin servicios asignados"),
+            @ApiResponse(responseCode = "429", description = "Cuenta bloqueada por demasiados intentos fallidos")
+    })
+    @SecurityRequirements // endpoint público: no requiere token
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
                 logger.info("[LOGIN] Request recibido. rut={}, passwordPresente={}",
@@ -137,6 +158,8 @@ public class FuncionarioController {
      * @param rut RUT del funcionario a consultar.
      * @return ResponseEntity sin cuerpo con el estado de la verificación.
      */
+    @Operation(summary = "Verificar si un funcionario está registrado",
+            description = "Devuelve el ID del funcionario si existe (200), 404 si no, o 401 ante un error controlado.")
     @GetMapping("/status/{rut}")
     public ResponseEntity<Long> checkFuncionario(@PathVariable String rut){
         try {
@@ -154,6 +177,8 @@ public class FuncionarioController {
     }
 
 
+    @Operation(summary = "Resumen de funcionarios",
+            description = "Lista los funcionarios (opcionalmente filtrados por servicio) en formato resumido.")
         @GetMapping("/summary")
     public ResponseEntity<List<FuncionarioSummaryDTO>> getAllSummary(
             @RequestParam(required = false) Long servicioId) {
@@ -162,6 +187,7 @@ public class FuncionarioController {
 
 
 
+    @Operation(summary = "Resumen de un funcionario por ID")
     @GetMapping("/{id}/summary")
     public ResponseEntity<FuncionarioSummaryDTO> getSummary(@PathVariable Long id) {
         FuncionarioSummaryDTO dto = funcionarioService.getUserSummary(id);
@@ -169,11 +195,21 @@ public class FuncionarioController {
         return ResponseEntity.ok(dto);
     }
 
+    @Operation(summary = "Disponibilidad de funcionarios de un servicio")
     @GetMapping("/disponibilidad/{servicioId}")
     public ResponseEntity<Map<String, Object>> getDisponibilidad(@PathVariable Long servicioId) {
         return ResponseEntity.ok(funcionarioService.getAvailabilityByServicio(servicioId));
     }
 
+    @Operation(summary = "Actualizar un funcionario",
+            description = "Un usuario solo puede modificar su propio registro; solo JEFATURA/ADMINISTRADOR "
+                    + "pueden cambiar el rol o el estado de otro funcionario.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Funcionario actualizado"),
+            @ApiResponse(responseCode = "401", description = "No autenticado"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso para modificar a otro funcionario o su rol/estado"),
+            @ApiResponse(responseCode = "404", description = "Funcionario no encontrado")
+    })
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable Long id,
@@ -203,6 +239,14 @@ public class FuncionarioController {
         return ResponseEntity.ok(updated);
     }
 
+    @Operation(summary = "Autenticación (paso 2): seleccionar servicio",
+            description = "Recibe el token de pre-autorización y el servicio elegido, y devuelve el JWT "
+                    + "definitivo (con rol de sistema y rol de servicio) junto con el perfil.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Sesión iniciada; retorna JWT y perfil"),
+            @ApiResponse(responseCode = "401", description = "Token de pre-autorización inválido o expirado")
+    })
+    @SecurityRequirements // endpoint público: usa el token de pre-autorización en el cuerpo
     @PostMapping("/login/select-service")
     public ResponseEntity<?> selectService(@RequestBody SelectServiceRequest request) {
         
@@ -257,6 +301,8 @@ public class FuncionarioController {
         ));
     }
 
+    @Operation(summary = "Cambiar de servicio en la sesión activa",
+            description = "Genera un nuevo JWT para otro servicio al que el funcionario autenticado tenga acceso.")
     @PostMapping("/switch-service")
     public ResponseEntity<?> switchService(@RequestBody SelectServiceRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -310,6 +356,15 @@ public class FuncionarioController {
      * @Param rut Rut del funcionario a consultar
      * @Return
      */
+    @Operation(summary = "Registrar personal como funcionario",
+            description = "Registra en el sistema de turnos a una persona existente en el personal (viewPersonal). "
+                    + "Requiere rol JEFATURA o ADMINISTRADOR.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Funcionario registrado; retorna el nuevo ID"),
+            @ApiResponse(responseCode = "400", description = "RUT inválido o datos faltantes"),
+            @ApiResponse(responseCode = "409", description = "El funcionario ya estaba registrado"),
+            @ApiResponse(responseCode = "500", description = "Error interno")
+    })
     @PostMapping("/register/{rut}")
     @PreAuthorize("hasAnyRole('ROLE_JEFATURA','ROLE_ADMINISTRADOR')") // Spring se encarga del 403/401 automáticamente si no tiene el rol
     public ResponseEntity<Long> registerPersonal(@PathVariable String rut) {

@@ -1,8 +1,20 @@
+/**
+ * notificationService.js
+ * Servicio de notificaciones del usuario: consulta, conteo de no leídas, marcado como
+ * leída y eliminación. Normaliza la forma de las notificaciones que devuelve la API a un
+ * modelo estable para la UI.
+ */
 import axiosInstance from '../utils/axiosConfig';
 import { getUserId as getUserIdFromToken } from '../utils/tokenManager';
 
+/** Obtiene el ID del funcionario autenticado (del token o del storage). @returns {number|string|null} */
 const getUserId = () => getUserIdFromToken() || localStorage.getItem('userId');
 
+/**
+ * Normaliza una notificación cruda de la API a la forma que consume la UI.
+ * @param {Object} notificacion - Notificación tal como llega del backend.
+ * @returns {Object|null} Notificación normalizada, o null si la entrada es vacía.
+ */
 const normalizeNotification = (notificacion) => {
     if (!notificacion) return null;
 
@@ -28,11 +40,22 @@ const normalizeNotification = (notificacion) => {
     };
 };
 
+/**
+ * Normaliza una lista de notificaciones.
+ * @param {Array<Object>} items
+ * @returns {Array<Object>} Lista normalizada (vacía si la entrada no es un array).
+ */
 const normalizeNotificationList = (items) => {
     if (!Array.isArray(items)) return [];
     return items.map(normalizeNotification).filter(Boolean);
 };
 
+/**
+ * Obtiene las notificaciones de un funcionario.
+ * @async
+ * @param {number|null} [funcionarioId] - ID del funcionario; si se omite, se usa el autenticado.
+ * @returns {Promise<{success: boolean, data?: Array<Object>, error?: string}>}
+ */
 export const getNotificacionesUsuario = async (funcionarioId = null) => {
     try {
         const id = Number(funcionarioId || getUserId());
@@ -50,6 +73,12 @@ export const getNotificacionesUsuario = async (funcionarioId = null) => {
     }
 };
 
+/**
+ * Obtiene el número de notificaciones sin leer de un funcionario.
+ * @async
+ * @param {number|null} [funcionarioId] - ID del funcionario; si se omite, se usa el autenticado.
+ * @returns {Promise<{success: boolean, data?: number, error?: string}>}
+ */
 export const getNotificacionesSinLeer = async (funcionarioId = null) => {
     try {
         const id = Number(funcionarioId || getUserId());
@@ -67,6 +96,12 @@ export const getNotificacionesSinLeer = async (funcionarioId = null) => {
     }
 };
 
+/**
+ * Marca una notificación como leída.
+ * @async
+ * @param {number} notificacionId
+ * @returns {Promise<{success: boolean, data?: Object, error?: string}>}
+ */
 export const marcarNotificacionLeida = async (notificacionId) => {
     try {
         if (!notificacionId) throw new Error('notificacionId es requerido');
@@ -80,6 +115,12 @@ export const marcarNotificacionLeida = async (notificacionId) => {
     }
 };
 
+/**
+ * Elimina una notificación.
+ * @async
+ * @param {number} notificacionId
+ * @returns {Promise<{success: boolean, data?: Object, error?: string}>}
+ */
 export const eliminarNotificacion = async (notificacionId) => {
     try {
         if (!notificacionId) throw new Error('notificacionId es requerido');

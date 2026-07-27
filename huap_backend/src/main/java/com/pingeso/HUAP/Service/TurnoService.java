@@ -18,6 +18,14 @@ import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio de turnos.
+ *
+ * <p>CRUD y consultas de {@code Turno}: creación y actualización (validando conflictos de
+ * horario y reglas del servicio), eliminación, y múltiples vistas de consulta —por
+ * calendario de servicio, por puesto, por médico, por mes/año y turnos sin asignar—.
+ * Es la fuente de datos principal de las vistas de agenda y calendario del frontend.
+ */
 @Service
 public class TurnoService {
     private static final Logger logger = LoggerFactory.getLogger(TurnoService.class);

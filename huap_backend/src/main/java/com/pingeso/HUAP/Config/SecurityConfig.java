@@ -90,6 +90,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // --- Públicos (sin token) ---
                         .requestMatchers("/api/v2/health", "/api/v2/info").permitAll()
+                        // Documentación de la API (OpenAPI / Swagger UI)
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login/select-service").permitAll()
                         // Listado de servicios necesario para la pantalla de selección de servicio.

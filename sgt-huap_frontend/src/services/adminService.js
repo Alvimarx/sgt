@@ -1,15 +1,26 @@
-// adminService.js
-// Servicio centralizado para todas las peticiones de administración
-
+/**
+ * adminService.js
+ *
+ * Servicio central de administración: agrupa, en un único módulo, los sub-servicios que
+ * consumen la API v2 por dominio (funcionarios, turnos, solicitudes, ofertas generales,
+ * notificaciones, puestos, bitácora y servicios), además de utilidades de normalización.
+ *
+ * Cada método envuelve una llamada HTTP (Axios) a un endpoint `/api/v2/...`. El comentario
+ * sobre cada método indica el endpoint exacto que invoca. El `servicioId`/`userId` se
+ * resuelven desde el token JWT (con respaldo en localStorage) cuando no se pasan como argumento.
+ */
 import axiosInstance from '../utils/axiosConfig';
 import { getServicioId as getServicioIdFromToken, getUserId as getUserIdFromToken } from '../utils/tokenManager';
 
+/** @returns {number|string|null} Servicio activo del token o del storage. */
 const getServicioId = () => getServicioIdFromToken() || localStorage.getItem('servicioId');
+/** @returns {number|string|null} ID del usuario del token o del storage. */
 const getUserId    = () => getUserIdFromToken()    || localStorage.getItem('userId');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCIONARIOS  →  /api/v2/funcionarios
 // ─────────────────────────────────────────────────────────────────────────────
+/** Funcionarios: consulta, actualización, baja lógica y disponibilidad. → `/api/v2/funcionarios` */
 export const usuariosService = {
 
     // GET /funcionarios/summary?servicioId=
@@ -60,6 +71,11 @@ export const usuariosService = {
     // getHorasStats eliminado — sin equivalente en el backend v2
 };
 
+/**
+ * Traduce la etiqueta de rol de la UI al valor esperado por el backend.
+ * @param {string} rol - Rol tal como se muestra en la interfaz.
+ * @returns {'MEDICO'|'JEFATURA'|'SUBROGANTE'}
+ */
 function mapRolToBackend(rol) {
     if (!rol) return 'MEDICO';
     const r = String(rol).toLowerCase();
@@ -71,6 +87,7 @@ function mapRolToBackend(rol) {
 // ─────────────────────────────────────────────────────────────────────────────
 // TURNOS  →  /api/v2/turnos
 // ─────────────────────────────────────────────────────────────────────────────
+/** Turnos: creación, alteración y múltiples consultas (calendario, por puesto, por médico, estadísticas, cobertura). → `/api/v2/turnos` */
 export const turnosService = {
 
     // POST /turnos
@@ -238,6 +255,7 @@ export const turnosService = {
 // ─────────────────────────────────────────────────────────────────────────────
 // SOLICITUDES  →  /api/v2/solicitudes
 // ─────────────────────────────────────────────────────────────────────────────
+/** Solicitudes: creación (cobertura, permiso, intercambio, oferta), cambio de estado y respuestas. → `/api/v2/solicitudes` */
 export const solicitudesService = {
 
     // GET /solicitudes
@@ -345,6 +363,7 @@ export const solicitudesService = {
 // ─────────────────────────────────────────────────────────────────────────────
 // OFERTAS GENERALES  →  /api/v2/ofertas-generales
 // ─────────────────────────────────────────────────────────────────────────────
+/** Ofertas generales de turnos: publicación, aprobación/rechazo, postulación y selección. → `/api/v2/ofertas-generales` */
 export const ofertasGeneralesService = {
 
     // POST /ofertas-generales
@@ -398,6 +417,7 @@ export const ofertasGeneralesService = {
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICACIONES  →  /api/v2/notificaciones
 // ─────────────────────────────────────────────────────────────────────────────
+/** Notificaciones (variante de administración). → `/api/v2/notificaciones` */
 export const notificacionesService = {
 
     // GET /notificaciones/
@@ -438,6 +458,7 @@ export const notificacionesService = {
 // ─────────────────────────────────────────────────────────────────────────────
 // PISOS  →  /api/v2/puestos
 // ─────────────────────────────────────────────────────────────────────────────
+/** Puestos (antes "pisos"): CRUD y consulta por servicio. → `/api/v2/puestos` */
 export const puestosService = {
 
     getAll: async (servicioId = null) => {
@@ -478,6 +499,7 @@ export const puestosService = {
 // ─────────────────────────────────────────────────────────────────────────────
 // BITÁCORA  →  /api/v2/bitacoras  (era /evento)
 // ─────────────────────────────────────────────────────────────────────────────
+/** Bitácora de auditoría: consulta de eventos por tipo, funcionario, turno o solicitud. → `/api/v2/bitacoras` */
 export const eventosService = {
 
     // GET /bitacoras/
@@ -520,6 +542,7 @@ export const eventosService = {
 // ─────────────────────────────────────────────────────────────────────────────
 // SERVICIOS  →  /api/v2/servicios
 // ─────────────────────────────────────────────────────────────────────────────
+/** Servicios del hospital: CRUD. → `/api/v2/servicios` */
 export const serviciosService = {
 
     getAll: async () => {
@@ -552,6 +575,12 @@ export const serviciosService = {
 // ─────────────────────────────────────────────────────────────────────────────
 // NORMALIZACIÓN  (sin cambios — adapta respuesta del backend al formato UI)
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Adapta una solicitud cruda del backend al formato plano que consume la UI
+ * (aplana solicitante/receptor, turnos origen/destino, fechas y estado).
+ * @param {Object} s - Solicitud tal como llega de la API.
+ * @returns {Object|null} Solicitud normalizada, o null si la entrada es vacía.
+ */
 export const normalizeSolicitud = (s) => {
     if (!s) return null;
 

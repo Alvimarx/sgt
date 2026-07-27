@@ -15,6 +15,14 @@ import com.pingeso.HUAP.Repository.ServiciosFuncionarioRepository;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * Servicio de gestión (alteración) de turnos ya existentes.
+ *
+ * <p>Concentra la operación de {@code alterarTurno}: cambios sobre un turno asignado
+ * (reasignación, liberación o modificación) verificando las reglas y conflictos
+ * correspondientes. Es el punto único de entrada para mutar turnos fuera del flujo de
+ * planificación, de modo que la lógica de validación no quede duplicada en los controllers.
+ */
 @Service
 @RequiredArgsConstructor
 public class GestionTurnoService {

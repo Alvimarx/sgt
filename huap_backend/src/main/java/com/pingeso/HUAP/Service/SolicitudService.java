@@ -14,6 +14,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+/**
+ * Servicio de solicitudes y ofertas de turnos.
+ *
+ * <p>Cubre la creación y el ciclo de vida de las {@code Solicitud} (intercambio de turnos,
+ * oferta particular a un médico y oferta general al servicio), la respuesta de los
+ * receptores (aceptar/rechazar), el cambio de estado y la modificación del motivo.
+ * Al resolverse una solicitud, coordina la reasignación de los turnos implicados.
+ */
 @Service
 @RequiredArgsConstructor
 public class SolicitudService {

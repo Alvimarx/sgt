@@ -22,6 +22,15 @@ import java.util.HexFormat;
 
 import lombok.RequiredArgsConstructor;
 
+/**
+ * Servicio de funcionarios (usuarios del sistema).
+ *
+ * <p>Responsable de la autenticación por RUT y contraseña
+ * ({@link #authenticateWithPassword}), la consulta de servicios y roles del funcionario,
+ * los resúmenes y la disponibilidad por servicio, la actualización de datos/rol/estado y
+ * el registro de personal existente ({@code viewPersonal}) como funcionario del sistema de
+ * turnos. La autorización efectiva se aplica en la capa de seguridad y los controllers.
+ */
 @Service
 @RequiredArgsConstructor
 public class FuncionarioService {

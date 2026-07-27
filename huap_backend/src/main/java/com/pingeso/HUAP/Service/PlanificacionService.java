@@ -38,6 +38,15 @@ import java.util.stream.Collectors;
  * y generación de turnos a partir de él, expandiendo la secuencia real de cada rotativa
  * desde un lunes de inicio.
  */
+/**
+ * Servicio de planificación de turnos.
+ *
+ * <p>Gestiona el ciclo de vida de las {@code Planificacion} de un servicio (creación,
+ * consulta, actualización y eliminación) junto con sus asignaciones
+ * ({@code PlanificacionAsignacion}). A partir de una planificación y una fecha de inicio,
+ * <b>genera los turnos</b> aplicando las reglas de horarios del servicio y
+ * <b>detecta conflictos</b> (solapamientos y choques de asignación) antes de materializarlos.
+ */
 @Service
 @Transactional
 public class PlanificacionService {

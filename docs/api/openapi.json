@@ -1,0 +1,5118 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SGT-HUAP — API de Gestión de Turnos",
+    "description": "API REST del Sistema de Gestión de Turnos del Hospital de Urgencia Asistencia Pública (HUAP). Gestiona funcionarios, servicios, puestos, turnos, planificaciones, rotativas, solicitudes, ofertas, notificaciones, bitácora y estadísticas.\n\nLa autenticación es mediante JWT (Bearer token). Obtén el token en `POST /api/v2/funcionarios/login` y pulsa **Authorize** para probar los endpoints protegidos.",
+    "contact": {
+      "name": "Equipo SGT-HUAP"
+    },
+    "license": {
+      "name": "Uso interno HUAP"
+    },
+    "version": "v2"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Servidor actual"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Funcionarios y autenticación",
+      "description": "Login (JWT en dos pasos: pre-autenticación y selección de servicio), registro y gestión de funcionarios."
+    }
+  ],
+  "paths": {
+    "/api/v2/turnos/{id}": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnoById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "updateTurno",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "deleteTurno",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/tipos-turno/{id}": {
+      "get": {
+        "tags": [
+          "tipo-turno-controller"
+        ],
+        "operationId": "obtenerTipoDeTurno",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoTurnoDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "tipo-turno-controller"
+        ],
+        "operationId": "actualizarTipoDeTurno",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TipoTurnoDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoTurnoDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "tipo-turno-controller"
+        ],
+        "operationId": "eliminarTipoDeTurno",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/{id}/oferta-particular": {
+      "put": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "responderOfertaParticular",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idReceptor",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "respuesta",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/{id}/intercambio": {
+      "put": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "responderIntercambio",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idReceptor",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "respuesta",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/{id}/estado": {
+      "put": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "cambiarEstado",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "nuevoEstado",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDIENTE",
+                "APROBADA",
+                "RECHAZADA"
+              ]
+            }
+          },
+          {
+            "name": "idUsuarioAsignador",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios/{id}": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "getServicioById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "updateServicio",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "deleteServicio",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/rotativas/{id}": {
+      "get": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "obtenerRotativa",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotativaDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "actualizarRotativa",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotativaDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotativaDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "eliminarRotativa",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v2/rotativas/{id}/secuencia": {
+      "get": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "obtenerSecuencia",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RotativaDiaDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "establecerSecuencia",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotativaDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/reglas-servicio/{id}": {
+      "put": {
+        "tags": [
+          "regla-servicio-controller"
+        ],
+        "operationId": "actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReglaServicioDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "regla-servicio-controller"
+        ],
+        "operationId": "eliminar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v2/puestos/{id}": {
+      "get": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "obtenerPuesto",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuestoEntity"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "actualizarPuesto",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "nombre",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuestoEntity"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "eliminarPuesto",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v2/planificaciones/{id}": {
+      "get": {
+        "tags": [
+          "planificacion-controller"
+        ],
+        "operationId": "obtener",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanificacionDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "planificacion-controller"
+        ],
+        "operationId": "actualizar_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanificacionDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanificacionDTO"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "planificacion-controller"
+        ],
+        "operationId": "eliminar_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales/{id}/seleccionar/{idPostulacion}": {
+      "put": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "seleccionar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idPostulacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idJefatura",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfertaGeneralEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales/{id}/rechazar": {
+      "put": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "rechazar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idJefatura",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfertaGeneralEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales/{id}/aprobar": {
+      "put": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "aprobar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idJefatura",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfertaGeneralEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/notificaciones/{id}/leer": {
+      "put": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "marcarLeida",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/{id}": {
+      "put": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Actualizar un funcionario",
+        "description": "Un usuario solo puede modificar su propio registro; solo JEFATURA/ADMINISTRADOR pueden cambiar el rol o el estado de otro funcionario.",
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Funcionario actualizado",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No autenticado",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso para modificar a otro funcionario o su rol/estado",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Funcionario no encontrado",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getAllTurnos",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TurnoEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "createTurno",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/alterar": {
+      "post": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "alterarTurno",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlterarTurnoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/tipos-turno": {
+      "get": {
+        "tags": [
+          "tipo-turno-controller"
+        ],
+        "operationId": "obtenerCatalogo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TipoTurnoDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "tipo-turno-controller"
+        ],
+        "operationId": "crearTipoDeTurno",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TipoTurnoDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TipoTurnoDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes": {
+      "get": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "getAllSolicitud",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "crear",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearSolicitudDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "listServicios",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "createServicio",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/rotativas": {
+      "get": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "obtenerRotativas",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RotativaDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "crearRotativa",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotativaDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotativaDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/rotativas/{id}/duplicar": {
+      "post": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "duplicarRotativa",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotativaDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/reglas-servicio": {
+      "post": {
+        "tags": [
+          "regla-servicio-controller"
+        ],
+        "operationId": "crear_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReglaServicioDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/puestos": {
+      "get": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "obtenerTodosPuestos",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PuestoEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "crearPuesto",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PuestoRequestDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuestoEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/planificaciones": {
+      "post": {
+        "tags": [
+          "planificacion-controller"
+        ],
+        "operationId": "crear_2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanificacionDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanificacionDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/planificaciones/{id}/generar": {
+      "post": {
+        "tags": [
+          "planificacion-controller"
+        ],
+        "operationId": "generar",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/planificaciones/{id}/conflictos": {
+      "post": {
+        "tags": [
+          "planificacion-controller"
+        ],
+        "operationId": "conflictos",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales": {
+      "post": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "crear_3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearOfertaGeneralDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfertaGeneralEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales/{id}/postular": {
+      "post": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "postular",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idFuncionario",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostulacionEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/notificaciones": {
+      "get": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "getAllNotificacion",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificacionEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "crear_4",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearNotificacionDTO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificacionEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/switch-service": {
+      "post": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Cambiar de servicio en la sesión activa",
+        "description": "Genera un nuevo JWT para otro servicio al que el funcionario autenticado tenga acceso.",
+        "operationId": "switchService",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectServiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/register/{rut}": {
+      "post": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Registrar personal como funcionario",
+        "description": "Registra en el sistema de turnos a una persona existente en el personal (viewPersonal). Requiere rol JEFATURA o ADMINISTRADOR.",
+        "operationId": "registerPersonal",
+        "parameters": [
+          {
+            "name": "rut",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Funcionario registrado; retorna el nuevo ID",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "RUT inválido o datos faltantes",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "El funcionario ya estaba registrado",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/login": {
+      "post": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Autenticación (paso 1)",
+        "description": "Valida RUT y contraseña. Si el usuario tiene varios servicios, devuelve un token de pre-autorización y la lista de servicios para elegir en el paso 2. Incluye bloqueo por intentos fallidos.",
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Credenciales válidas; retorna token de pre-autorización y servicios disponibles",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Credenciales incompletas",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales inválidas",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Usuario sin servicios asignados",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Cuenta bloqueada por demasiados intentos fallidos",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v2/funcionarios/login/select-service": {
+      "post": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Autenticación (paso 2): seleccionar servicio",
+        "description": "Recibe el token de pre-autorización y el servicio elegido, y devuelve el JWT definitivo (con rol de sistema y rol de servicio) junto con el perfil.",
+        "operationId": "selectService",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectServiceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión iniciada; retorna JWT y perfil",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token de pre-autorización inválido o expirado",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v2/bitacoras": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getAll",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BitacoraEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BitacoraEntity"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BitacoraEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/{id}/motivo": {
+      "patch": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "modificarMotivo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "motivo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosByServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/todos-detalle": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosDetalleByServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/stats": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosStatsByServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/sin-asignar": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getUnassignedTurnosByServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/sin-asignar/periodo": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getUnassignedTurnosByServicioAndPeriodo",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/funcionarios-stats": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getFuncionariosStatsByServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/funcionarios-detalle": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getFuncionariosConTurnosByServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/dia/{fecha}": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosByServicioAndDia",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fecha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/dia/{fecha}/sin-asignar": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosSinAsignarByDia",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fecha",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/cobertura": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getCoberturaByServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/servicio/{servicioId}/calendario/{year}/{month}": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosCalendario",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "year",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "month",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/puesto/{puestoId}": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosByPuesto",
+        "parameters": [
+          {
+            "name": "puestoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/funcionario/{idFuncionario}": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosByFuncionario",
+        "parameters": [
+          {
+            "name": "idFuncionario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/funcionario/{idFuncionario}/futuros": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosFuturos",
+        "parameters": [
+          {
+            "name": "idFuncionario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/turnos/asignacion": {
+      "get": {
+        "tags": [
+          "turno-controller"
+        ],
+        "operationId": "getTurnosParaAsignacion",
+        "parameters": [
+          {
+            "name": "puestoId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fechaInicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaFin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/tipos-turno/{id}/rotativas-afectadas": {
+      "get": {
+        "tags": [
+          "tipo-turno-controller"
+        ],
+        "operationId": "obtenerRotativasAfectadas",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/tipos-turno/servicio/{servicioId}": {
+      "get": {
+        "tags": [
+          "tipo-turno-controller"
+        ],
+        "operationId": "obtenerTiposDeTurnoPorServicio",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TipoTurnoDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/turno/{id}": {
+      "get": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "getAllSolicitudTurno",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/tipo/{id}": {
+      "get": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "getAllSolicitudByTipo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/receptor/{id}": {
+      "get": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "getAllSolicitudReceptor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/solicitudes/funcionario/{id}": {
+      "get": {
+        "tags": [
+          "solicitud-controller"
+        ],
+        "operationId": "getAllSolicitudFuncionario",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios/{id}/turnos-asociados": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "contarTurnosAsociados",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios/{id}/dependencias": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "contarDependencias",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios/paginado": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "listarServiciosPaginados",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios/nombre/{nombre}": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "getServicioByNombre",
+        "parameters": [
+          {
+            "name": "nombre",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios/inactivos": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "getServiciosInactivos",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ServicioEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/servicios/buscar": {
+      "get": {
+        "tags": [
+          "servicio-controller"
+        ],
+        "operationId": "buscarServicios",
+        "parameters": [
+          {
+            "name": "nombre",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/rotativas/{id}/validar": {
+      "get": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "validarRotativa",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/rotativas/servicio/{idServicio}": {
+      "get": {
+        "tags": [
+          "rotativa-controller"
+        ],
+        "operationId": "obtenerPorServicio",
+        "parameters": [
+          {
+            "name": "idServicio",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RotativaDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/reglas-servicio/servicio/{idServicio}": {
+      "get": {
+        "tags": [
+          "regla-servicio-controller"
+        ],
+        "operationId": "obtenerPorServicio_1",
+        "parameters": [
+          {
+            "name": "idServicio",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReglaServicioDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/puestos/{id}/turnos-asociados": {
+      "get": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "contarTurnosAsociados_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/puestos/servicio/{idServicio}": {
+      "get": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "obtenerPorServicio_2",
+        "parameters": [
+          {
+            "name": "idServicio",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PuestoEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/puestos/nombre/{nombre}": {
+      "get": {
+        "tags": [
+          "puesto-controller"
+        ],
+        "operationId": "obtenerPorNombre",
+        "parameters": [
+          {
+            "name": "nombre",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuestoEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/planificaciones/servicio/{idServicio}": {
+      "get": {
+        "tags": [
+          "planificacion-controller"
+        ],
+        "operationId": "obtenerPorServicio_3",
+        "parameters": [
+          {
+            "name": "idServicio",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlanificacionDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales/servicio/{idServicio}": {
+      "get": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "getByServicio",
+        "parameters": [
+          {
+            "name": "idServicio",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OfertaGeneralEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales/ofertor/{idFuncionario}": {
+      "get": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "getByOfertor",
+        "parameters": [
+          {
+            "name": "idFuncionario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OfertaGeneralEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/notificaciones/{id}": {
+      "get": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "getNotificacion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificacionEntity"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "eliminar_2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/v2/notificaciones/usuario/{idFuncionario}": {
+      "get": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "getBandeja",
+        "parameters": [
+          {
+            "name": "idFuncionario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NotificacionRespuestaDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/notificaciones/solicitud/{id}": {
+      "get": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "getNotificacionSolicitud",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificacionEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/notificaciones/sin-leer/{idFuncionario}": {
+      "get": {
+        "tags": [
+          "notificacion-controller"
+        ],
+        "operationId": "contarSinLeer",
+        "parameters": [
+          {
+            "name": "idFuncionario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/info": {
+      "get": {
+        "tags": [
+          "health-controller"
+        ],
+        "operationId": "serverInfo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/health": {
+      "get": {
+        "tags": [
+          "health-controller"
+        ],
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/{id}/summary": {
+      "get": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Resumen de un funcionario por ID",
+        "operationId": "getSummary",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FuncionarioSummaryDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/summary": {
+      "get": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Resumen de funcionarios",
+        "description": "Lista los funcionarios (opcionalmente filtrados por servicio) en formato resumido.",
+        "operationId": "getAllSummary",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FuncionarioSummaryDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/status/{rut}": {
+      "get": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Verificar si un funcionario está registrado",
+        "description": "Devuelve el ID del funcionario si existe (200), 404 si no, o 401 ante un error controlado.",
+        "operationId": "checkFuncionario",
+        "parameters": [
+          {
+            "name": "rut",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/funcionarios/disponibilidad/{servicioId}": {
+      "get": {
+        "tags": [
+          "Funcionarios y autenticación"
+        ],
+        "summary": "Disponibilidad de funcionarios de un servicio",
+        "operationId": "getDisponibilidad",
+        "parameters": [
+          {
+            "name": "servicioId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/feriados": {
+      "get": {
+        "tags": [
+          "feriado-controller"
+        ],
+        "operationId": "obtener_1",
+        "parameters": [
+          {
+            "name": "desde",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "hasta",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeriadoEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/exportaciones/turnos/csv": {
+      "get": {
+        "tags": [
+          "exportacion-controller"
+        ],
+        "operationId": "exportarTurnosCsv",
+        "parameters": [
+          {
+            "name": "anio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "mes",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "idFuncionario",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idServicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/exportaciones/servicios/{idServicio}/funcionarios/csv": {
+      "get": {
+        "tags": [
+          "exportacion-controller"
+        ],
+        "operationId": "exportarFuncionariosPorServicioCsv",
+        "parameters": [
+          {
+            "name": "idServicio",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/bitacoras/{id}": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BitacoraEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/bitacoras/turno/{idTurno}": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getByTurno",
+        "parameters": [
+          {
+            "name": "idTurno",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BitacoraEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/bitacoras/tipo/{tipo}": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getByTipo",
+        "parameters": [
+          {
+            "name": "tipo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BitacoraEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/bitacoras/solicitud/{idSolicitud}": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getBySolicitud",
+        "parameters": [
+          {
+            "name": "idSolicitud",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BitacoraEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/bitacoras/funcionario/{idFuncionario}": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getByFuncionario",
+        "parameters": [
+          {
+            "name": "idFuncionario",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BitacoraEntity"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/bitacoras/dto": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getAllDTO",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BitacoraResponseDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/bitacoras/dto/{id}": {
+      "get": {
+        "tags": [
+          "bitacora-controller"
+        ],
+        "operationId": "getByIdDTO",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BitacoraResponseDTO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/Personal/summary": {
+      "get": {
+        "tags": [
+          "view-personal-controller"
+        ],
+        "operationId": "getAllPersonal",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ViewPersonalSummaryDTO"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/ofertas-generales/{id}/postular/{idPostulacion}": {
+      "delete": {
+        "tags": [
+          "oferta-general-controller"
+        ],
+        "operationId": "retirarPostulacion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idPostulacion",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "idFuncionario",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TipoTurnoDTO": {
+        "type": "object",
+        "properties": {
+          "idTipoTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "horaTermino": {
+            "type": "string"
+          },
+          "idServicio": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "FuncionarioEntity": {
+        "type": "object",
+        "properties": {
+          "idFuncionario": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apelPat": {
+            "type": "string"
+          },
+          "apelMat": {
+            "type": "string"
+          },
+          "rut": {
+            "type": "string"
+          },
+          "dv": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "eliminado": {
+            "type": "boolean"
+          },
+          "profesion": {
+            "type": "string"
+          },
+          "rolSistema": {
+            "$ref": "#/components/schemas/RolSistemaEntity"
+          }
+        }
+      },
+      "PuestoEntity": {
+        "type": "object",
+        "properties": {
+          "idPuesto": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "eliminado": {
+            "type": "boolean"
+          },
+          "servicio": {
+            "$ref": "#/components/schemas/ServicioEntity"
+          }
+        }
+      },
+      "RolSistemaEntity": {
+        "type": "object",
+        "properties": {
+          "idRolSistema": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreRol": {
+            "type": "string"
+          }
+        }
+      },
+      "RotativaEntity": {
+        "type": "object",
+        "properties": {
+          "idRotativa": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "servicio": {
+            "$ref": "#/components/schemas/ServicioEntity"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "semanas": {
+            "type": "string",
+            "format": "byte"
+          },
+          "eliminado": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ServicioEntity": {
+        "type": "object",
+        "properties": {
+          "idServicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "eliminado": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SolicitudEntity": {
+        "type": "object",
+        "properties": {
+          "idSolicitud": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "funcionario": {
+            "$ref": "#/components/schemas/FuncionarioEntity"
+          },
+          "tipoSolicitud": {
+            "$ref": "#/components/schemas/TipoSolicitudEntity"
+          },
+          "turno": {
+            "$ref": "#/components/schemas/TurnoEntity"
+          },
+          "turnoReceptor": {
+            "$ref": "#/components/schemas/TurnoEntity"
+          },
+          "funcionarioReceptor": {
+            "$ref": "#/components/schemas/FuncionarioEntity"
+          },
+          "aceptadoReceptor": {
+            "type": "boolean"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE",
+              "APROBADA",
+              "RECHAZADA"
+            ]
+          },
+          "fechaCreacion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaInicioPermiso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaTerminoPermiso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        }
+      },
+      "TipoSolicitudEntity": {
+        "type": "object",
+        "properties": {
+          "idTipoSolicitud": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tipo": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "TipoTurnoEntity": {
+        "type": "object",
+        "properties": {
+          "idTipoTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "horaTermino": {
+            "type": "string"
+          },
+          "servicio": {
+            "$ref": "#/components/schemas/ServicioEntity"
+          },
+          "eliminado": {
+            "type": "boolean"
+          }
+        }
+      },
+      "TurnoEntity": {
+        "type": "object",
+        "properties": {
+          "idTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "diaInicioTurno": {
+            "type": "string",
+            "format": "date"
+          },
+          "diaFinalTurno": {
+            "type": "string",
+            "format": "date"
+          },
+          "horaInicio": {
+            "type": "string"
+          },
+          "horaFin": {
+            "type": "string"
+          },
+          "eliminado": {
+            "type": "boolean"
+          },
+          "funcionario": {
+            "$ref": "#/components/schemas/FuncionarioEntity"
+          },
+          "servicio": {
+            "$ref": "#/components/schemas/ServicioEntity"
+          },
+          "puesto": {
+            "$ref": "#/components/schemas/PuestoEntity"
+          },
+          "rotativa": {
+            "$ref": "#/components/schemas/RotativaEntity"
+          },
+          "tipoTurno": {
+            "$ref": "#/components/schemas/TipoTurnoEntity"
+          }
+        }
+      },
+      "RotativaDTO": {
+        "type": "object",
+        "properties": {
+          "idRotativa": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idServicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreServicio": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "semanas": {
+            "type": "string",
+            "format": "byte"
+          },
+          "secuenciaDias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RotativaDiaDTO"
+            }
+          }
+        }
+      },
+      "RotativaDiaDTO": {
+        "type": "object",
+        "properties": {
+          "diaIndex": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "turno": {
+            "$ref": "#/components/schemas/TipoTurnoDTO"
+          }
+        }
+      },
+      "ReglaServicioDTO": {
+        "type": "object",
+        "properties": {
+          "idRegla": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idServicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "aplicaFinDeSemana": {
+            "type": "boolean"
+          },
+          "aplicaFeriado": {
+            "type": "boolean"
+          },
+          "tiempoMinutos": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "idTipoTurnoInicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoTurnoFin": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreTipoTurnoInicio": {
+            "type": "string"
+          },
+          "nombreTipoTurnoFin": {
+            "type": "string"
+          }
+        }
+      },
+      "PlanificacionAsignacionDTO": {
+        "type": "object",
+        "properties": {
+          "idAsignacion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idRotativa": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreRotativa": {
+            "type": "string"
+          },
+          "idFuncionario": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreFuncionario": {
+            "type": "string"
+          },
+          "idPuesto": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombrePuesto": {
+            "type": "string"
+          }
+        }
+      },
+      "PlanificacionDTO": {
+        "type": "object",
+        "properties": {
+          "idPlanificacion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idServicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreServicio": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "asignaciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanificacionAsignacionDTO"
+            }
+          }
+        }
+      },
+      "OfertaGeneralEntity": {
+        "type": "object",
+        "properties": {
+          "idOfertaGeneral": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "turno": {
+            "$ref": "#/components/schemas/TurnoEntity"
+          },
+          "ofertor": {
+            "$ref": "#/components/schemas/FuncionarioEntity"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDIENTE_APROBACION",
+              "ABIERTA",
+              "CERRADA",
+              "RECHAZADA"
+            ]
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "fechaCreacion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "postulaciones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostulacionEntity"
+            }
+          }
+        }
+      },
+      "PostulacionEntity": {
+        "type": "object",
+        "properties": {
+          "idPostulacion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "postulante": {
+            "$ref": "#/components/schemas/FuncionarioEntity"
+          },
+          "fechaPostulacion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "seleccionado": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AlterarTurnoRequest": {
+        "type": "object",
+        "properties": {
+          "idTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accion": {
+            "type": "string"
+          },
+          "idNuevoMedico": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nuevaHoraInicio": {
+            "type": "string"
+          },
+          "nuevaHoraFin": {
+            "type": "string"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "idAdministrador": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CrearSolicitudDTO": {
+        "type": "object",
+        "properties": {
+          "idFuncionario": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idFuncionarioReceptor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTipoSolicitud": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTurnoIntercambio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fechaInicioPermiso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaTerminoPermiso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        }
+      },
+      "PuestoRequestDTO": {
+        "type": "object",
+        "properties": {
+          "idServicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          }
+        }
+      },
+      "CrearOfertaGeneralDTO": {
+        "type": "object",
+        "properties": {
+          "idFuncionario": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "idTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "motivo": {
+            "type": "string"
+          }
+        }
+      },
+      "CrearNotificacionDTO": {
+        "type": "object",
+        "properties": {
+          "idSolicitud": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mensaje": {
+            "type": "string"
+          }
+        }
+      },
+      "NotificacionEntity": {
+        "type": "object",
+        "properties": {
+          "idNotificacion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "fechaEnvio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "solicitud": {
+            "$ref": "#/components/schemas/SolicitudEntity"
+          }
+        }
+      },
+      "SelectServiceRequest": {
+        "type": "object",
+        "properties": {
+          "preAuthToken": {
+            "type": "string"
+          },
+          "servicioId": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "rut": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "BitacoraEntity": {
+        "type": "object",
+        "properties": {
+          "idEvento": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "funcionario": {
+            "$ref": "#/components/schemas/FuncionarioEntity"
+          },
+          "turno": {
+            "$ref": "#/components/schemas/TurnoEntity"
+          },
+          "solicitud": {
+            "$ref": "#/components/schemas/SolicitudEntity"
+          },
+          "tipoEvento": {
+            "type": "string"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "observaciones": {
+            "type": "string"
+          },
+          "fechaInicioAfectada": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaFinAfectada": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaModificacion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activo": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotificacionRespuestaDTO": {
+        "type": "object",
+        "properties": {
+          "idNotificacion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mensaje": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "string"
+          },
+          "fechaEnvio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "idSolicitud": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "FuncionarioSummaryDTO": {
+        "type": "object",
+        "properties": {
+          "idFuncionario": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellidoPaterno": {
+            "type": "string"
+          },
+          "apellidoMaterno": {
+            "type": "string"
+          },
+          "apellidos": {
+            "type": "string"
+          },
+          "rut": {
+            "type": "string"
+          },
+          "dv": {
+            "type": "string"
+          },
+          "rutCompleto": {
+            "type": "string"
+          },
+          "estado": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "profesion": {
+            "type": "string"
+          },
+          "idRolSistema": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "servicios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RolServicioDTO"
+            }
+          }
+        }
+      },
+      "RolServicioDTO": {
+        "type": "object",
+        "properties": {
+          "idServicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreServicio": {
+            "type": "string"
+          },
+          "idRolServicio": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rolServicioNombre": {
+            "type": "string"
+          }
+        }
+      },
+      "FeriadoEntity": {
+        "type": "object",
+        "properties": {
+          "idFeriado": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date"
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        }
+      },
+      "BitacoraResponseDTO": {
+        "type": "object",
+        "properties": {
+          "idEvento": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tipoEvento": {
+            "type": "string"
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "observaciones": {
+            "type": "string"
+          },
+          "fechaModificacion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaInicioAfectada": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaFinAfectada": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "idFuncionario": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreFuncionario": {
+            "type": "string"
+          },
+          "rutFuncionario": {
+            "type": "string"
+          },
+          "idTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "diaInicioTurno": {
+            "type": "string"
+          },
+          "diaFinalTurno": {
+            "type": "string"
+          },
+          "horaInicioTurno": {
+            "type": "string"
+          },
+          "horaFinTurno": {
+            "type": "string"
+          },
+          "nombrePuesto": {
+            "type": "string"
+          },
+          "idFuncionarioTurno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreFuncionarioTurno": {
+            "type": "string"
+          },
+          "idSolicitud": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tipoSolicitud": {
+            "type": "string"
+          },
+          "estadoSolicitud": {
+            "type": "string"
+          },
+          "motivoSolicitud": {
+            "type": "string"
+          },
+          "aceptadoReceptor": {
+            "type": "boolean"
+          },
+          "fechaInicioPermiso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fechaTerminoPermiso": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "idFuncionarioEmisor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreFuncionarioEmisor": {
+            "type": "string"
+          },
+          "idTurnoSolicitud": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "diaInicioTurnoSolicitud": {
+            "type": "string"
+          },
+          "diaFinalTurnoSolicitud": {
+            "type": "string"
+          },
+          "horaInicioTurnoSolicitud": {
+            "type": "string"
+          },
+          "horaFinTurnoSolicitud": {
+            "type": "string"
+          },
+          "nombrePuestoSolicitud": {
+            "type": "string"
+          },
+          "idFuncionarioReceptor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nombreFuncionarioReceptor": {
+            "type": "string"
+          },
+          "idTurnoReceptor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "diaInicioTurnoReceptor": {
+            "type": "string"
+          },
+          "diaFinalTurnoReceptor": {
+            "type": "string"
+          },
+          "horaInicioTurnoReceptor": {
+            "type": "string"
+          },
+          "horaFinTurnoReceptor": {
+            "type": "string"
+          },
+          "nombrePuestoReceptor": {
+            "type": "string"
+          },
+          "nombreOferente": {
+            "type": "string"
+          },
+          "diaInicioTurnoOferta": {
+            "type": "string"
+          },
+          "horaInicioTurnoOferta": {
+            "type": "string"
+          },
+          "horaFinTurnoOferta": {
+            "type": "string"
+          },
+          "nombrePuestoTurnoOferta": {
+            "type": "string"
+          },
+          "nombreAsignado": {
+            "type": "string"
+          }
+        }
+      },
+      "ViewPersonalSummaryDTO": {
+        "type": "object",
+        "properties": {
+          "rut": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "apellidoPaterno": {
+            "type": "string"
+          },
+          "apellidoMaterno": {
+            "type": "string"
+          },
+          "rutCompleto": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "description": "Introduce el token JWT obtenido en el login (sin el prefijo 'Bearer ').",
+        "name": "bearerAuth",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

@@ -14,6 +14,14 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * Servicio de rotativas (patrones cíclicos de turnos).
+ *
+ * <p>Gestiona las {@code Rotativa} de un servicio y su secuencia de días
+ * ({@code RotativaDia}) a lo largo de una o varias semanas: creación, consulta,
+ * actualización, duplicado y definición/lectura de la secuencia. Las rotativas sirven de
+ * plantilla para la generación de turnos dentro de una planificación.
+ */
 @Service
 @Transactional
 public class RotativaService {

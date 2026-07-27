@@ -78,6 +78,13 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- OpenAPI / Swagger UI (documentación interactiva de la API) -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+
         <!-- JWT Dependencies -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -122,6 +129,23 @@
                     <systemPropertyVariables>
                         <huap.concurrencia.lock-pesimista>${huap.concurrencia.lock-pesimista}</huap.concurrencia.lock-pesimista>
                     </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.11.2</version>
+                <configuration>
+                    <!-- No fallar el build por avisos de doclint (Java 21 es estricto) -->
+                    <doclint>none</doclint>
+                    <failOnError>false</failOnError>
+                    <failOnWarnings>false</failOnWarnings>
+                    <encoding>UTF-8</encoding>
+                    <docencoding>UTF-8</docencoding>
+                    <charset>UTF-8</charset>
+                    <quiet>true</quiet>
+                    <doctitle>SGT-HUAP — API de Gestión de Turnos</doctitle>
+                    <windowtitle>SGT-HUAP Javadoc</windowtitle>
                 </configuration>
             </plugin>
             <plugin>
