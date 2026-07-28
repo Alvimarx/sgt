@@ -303,6 +303,10 @@ public class TurnoService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Cuenta cuántos funcionarios del servicio tienen al menos un turno en el rango de fechas,
+     * frente al total de funcionarios asignados al servicio.
+     */
     public Map<String, Object> getFuncionariosStatsServicio(Long servicioId, LocalDate inicio, LocalDate fin) {
         long conTurno = turnoRepository.countDistinctFuncionariosByServicioAndDateRange(servicioId, inicio, fin);
         long total = funcionarioRepository.contarFuncionariosPorServicio(servicioId);

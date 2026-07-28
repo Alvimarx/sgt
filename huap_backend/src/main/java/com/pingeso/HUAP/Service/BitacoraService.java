@@ -20,6 +20,16 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Historial de eventos del sistema (bitácora), usado para auditoría y trazabilidad.
+ *
+ * <p>Los eventos se generan sobre todo desde otros servicios ({@code SolicitudService},
+ * {@code OfertaGeneralService}, planificación) al resolverse una acción; ver
+ * {@link #registrarEvento} y {@link #registrarEventoOferta}. Ambos corren en una transacción
+ * nueva ({@code REQUIRES_NEW}) para no acoplar el registro del log al éxito/fallo de la
+ * transacción que lo dispara, y tragan cualquier excepción para que un fallo al loguear
+ * nunca reviente la operación de negocio real.
+ */
 @Service
 @RequiredArgsConstructor
 public class BitacoraService {
@@ -69,6 +79,7 @@ public class BitacoraService {
 
     // ── DTO methods (no modifican los existentes) ──────────────────────────
 
+    /** Igual que {@link #findAll} pero mapeado a {@link BitacoraResponseDTO} (ver {@link #convertToDTO}). */
     @Transactional(readOnly = true)
     public List<BitacoraResponseDTO> findAllDTO() {
         return bitacoraRepository.findAll().stream()
@@ -81,6 +92,14 @@ public class BitacoraService {
         return bitacoraRepository.findById(id).map(this::convertToDTO);
     }
 
+    /**
+     * Enriquece un evento crudo con los nombres/datos ya resueltos (actor, turno, solicitud
+     * y sus relaciones de emisor/receptor/intercambio) para que el frontend no tenga que hacer
+     * varios llamados. Caso especial: los eventos de oferta general no tienen {@code solicitud}
+     * asociada, sino que codifican el id en {@code motivo} como {@code "idOferta=X"}; ahí se
+     * busca la oferta aparte para resolver oferente, turno ofertado y (si el evento es de cierre)
+     * el postulante seleccionado.
+     */
     @Transactional(readOnly = true)
     public BitacoraResponseDTO convertToDTO(BitacoraEntity e) {
         FuncionarioEntity actor   = e.getFuncionario();
@@ -226,6 +245,11 @@ public class BitacoraService {
         };
     }
 
+    /**
+     * Registra un evento asociado a una oferta general. No hay FK directa a
+     * {@code Oferta_General}: el id se codifica en {@code motivo} como {@code "idOferta=X"}
+     * (ver {@link #convertToDTO}, que lo decodifica para enriquecer la respuesta).
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrarEventoOferta(String tipoEvento, Long idOferta, Long idFuncionario) {
         try {
@@ -245,6 +269,11 @@ public class BitacoraService {
         }
     }
 
+    /**
+     * Registra un evento asociado a una solicitud. Llamar siempre desde un hook
+     * {@code afterCommit} (ver {@code SolicitudService.agendarBitacora}) para evitar conflictos
+     * de lock con la transacción principal, dado que corre en una transacción nueva.
+     */
     // Llamar siempre desde un afterCommit hook para evitar lock conflicts con la TX principal
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrarEvento(String tipoEvento, Long idSolicitud, Long idFuncionario) {

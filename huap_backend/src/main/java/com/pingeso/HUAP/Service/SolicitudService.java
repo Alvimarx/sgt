@@ -37,21 +37,25 @@ public class SolicitudService {
         return solicitudRepository.findAll();
     }
 
+    /** Solicitudes emitidas por el funcionario (el que las crea, no el receptor). */
     @Transactional
     public List<SolicitudEntity> findByFuncionario(Long idFuncionario) {
         return solicitudRepository.findByFuncionario_IdFuncionario(idFuncionario);
     }
 
+    /** Solicitudes donde el funcionario es el receptor (intercambio u oferta particular). */
     @Transactional
     public List<SolicitudEntity> findByFuncionarioReceptor(Long idFuncionario) {
         return solicitudRepository.findByFuncionarioReceptor_IdFuncionario(idFuncionario);
     }
 
+    /** Solicitudes de un tipo (Tipo_Solicitud.tipo: 1=Permiso, 2=Botar turno, 3=Cobertura, 4=Intercambio, 5=Oferta particular). */
     @Transactional
     public List<SolicitudEntity> findByTipoSolicitud(Long idTipoSolicitud) {
         return solicitudRepository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud);
     }
 
+    /** Solicitudes asociadas a un turno (como turno solicitado o como turno propio en un intercambio). */
     @Transactional
     public List<SolicitudEntity> findByTurno(Long idTurno) {
         return solicitudRepository.findByTurno_IdTurno(idTurno);
@@ -61,6 +65,10 @@ public class SolicitudService {
        Modificadores y utilidades
     */
 
+    /**
+     * Crea una solicitud en estado {@code PENDIENTE}. No reasigna ningún turno todavía:
+     * eso solo ocurre al aprobarla en {@link #cambiarEstado}.
+     */
     @Transactional
     public SolicitudEntity crearSolicitud(CrearSolicitudDTO dto) {
         FuncionarioEntity funcionario = funcionarioRepository.findById(dto.getIdFuncionario())
@@ -100,6 +108,11 @@ public class SolicitudService {
         return guardada;
     }
 
+    /**
+     * Registra la respuesta del receptor a una oferta particular. Aceptar solo marca
+     * {@code aceptadoReceptor}; no reasigna el turno (eso lo hace la aprobación de jefatura
+     * en {@link #cambiarEstado}). Rechazar sí resuelve la solicitud directamente (RECHAZADA).
+     */
     @Transactional
     public SolicitudEntity responderOfertaParticular(Long idSolicitud, Long idReceptor, boolean acepta) {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
@@ -126,6 +139,7 @@ public class SolicitudService {
         return guardada;
     }
 
+    /** Igual que {@link #responderOfertaParticular} pero para solicitudes de intercambio. */
     @Transactional
     public SolicitudEntity responderOfertaIntercambio(Long idSolicitud, Long idReceptor, boolean acepta) {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
@@ -152,6 +166,20 @@ public class SolicitudService {
         return guardada;
     }
 
+    /**
+     * Resuelve una solicitud cambiándole el estado. Es aquí donde, al aprobar, se mueven
+     * de verdad los turnos:
+     * <ul>
+     *   <li>Tipo 1/2 (permiso / botar turno): libera el turno (funcionario = null).</li>
+     *   <li>Tipo 3 (cobertura): asigna el funcionario solicitante al turno.</li>
+     *   <li>Tipo 4 (intercambio): intercambia el funcionario entre el turno deseado y el propio.</li>
+     *   <li>Tipo 5 (oferta particular): asigna el funcionario receptor al turno.</li>
+     * </ul>
+     * Antes de tocar nada, bloquea (lock pesimista) el/los turno(s) involucrados para serializar
+     * aprobaciones concurrentes que compitan por el mismo turno, relee la solicitud con lock propio
+     * (por si otra aprobación ya la resolvió mientras se esperaba el lock) y rechaza automáticamente
+     * cualquier otra solicitud PENDIENTE que apunte al mismo turno.
+     */
     @Transactional
     public SolicitudEntity cambiarEstado(Long idSolicitud, SolicitudEntity.EstadoSolicitud nuevoEstado, Long idUsuarioAsignador) {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
@@ -251,6 +279,7 @@ public class SolicitudService {
                 });
     }
 
+    /** Solo permitido mientras la solicitud está {@code PENDIENTE}. */
     @Transactional
     public SolicitudEntity modificarMotivo(Long idSolicitud, String nuevoMotivo) {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)

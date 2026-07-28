@@ -12,6 +12,15 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Ofertas generales de turno: un funcionario ofrece un turno propio para que cualquiera del
+ * servicio se postule, a diferencia de la {@code SolicitudEntity} de intercambio/cobertura que
+ * va dirigida a un receptor específico.
+ *
+ * <p>Ciclo de vida: {@link #crearOferta} (PENDIENTE_APROBACION) → {@link #aprobarOferta} o
+ * {@link #rechazarOferta} → si ABIERTA, {@link #postular} / {@link #retirarPostulacion} →
+ * {@link #seleccionarPostulante} asigna el turno y cierra la oferta (CERRADA).
+ */
 @Service
 @RequiredArgsConstructor
 public class OfertaGeneralService {
@@ -22,6 +31,7 @@ public class OfertaGeneralService {
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
 
+    /** Crea la oferta en estado {@code PENDIENTE_APROBACION}; no queda visible para postular hasta aprobarse. */
     @Transactional
     public OfertaGeneralEntity crearOferta(CrearOfertaGeneralDTO dto) {
         FuncionarioEntity ofertor = funcionarioRepository.findById(dto.getIdFuncionario())
@@ -43,6 +53,7 @@ public class OfertaGeneralService {
         return guardada;
     }
 
+    /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code ABIERTA}, habilitando postulaciones. */
     @Transactional
     public OfertaGeneralEntity aprobarOferta(Long idOferta, Long idJefatura) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
@@ -58,6 +69,7 @@ public class OfertaGeneralService {
         return guardada;
     }
 
+    /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code RECHAZADA}. */
     @Transactional
     public OfertaGeneralEntity rechazarOferta(Long idOferta, Long idJefatura) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
@@ -73,6 +85,10 @@ public class OfertaGeneralService {
         return guardada;
     }
 
+    /**
+     * Postula un funcionario a una oferta {@code ABIERTA}. Rechaza si el ofertor intenta
+     * postularse a su propia oferta o si ya existe una postulación suya para esta oferta.
+     */
     @Transactional
     public PostulacionEntity postular(Long idOferta, Long idFuncionario) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
@@ -105,6 +121,7 @@ public class OfertaGeneralService {
         return guardada;
     }
 
+    /** Solo el propio postulante puede retirarse, y solo mientras la oferta siga {@code ABIERTA}. */
     @Transactional
     public void retirarPostulacion(Long idPostulacion, Long idFuncionario) {
         PostulacionEntity postulacion = postulacionRepository.findById(idPostulacion)
@@ -126,6 +143,12 @@ public class OfertaGeneralService {
         agendarBitacora("POSTULACION_RETIRADA", idOferta, idFuncionario);
     }
 
+    /**
+     * Asigna el turno de la oferta al postulante elegido y cierra la oferta ({@code CERRADA}).
+     * Usa lock pesimista sobre la oferta: si dos jefaturas seleccionan postulantes distintos
+     * para la misma oferta al mismo tiempo, la segunda espera a que la primera termine (en vez
+     * de leer el estado ABIERTA en paralelo) y luego relee con datos frescos gracias al lock.
+     */
     @Transactional
     public OfertaGeneralEntity seleccionarPostulante(Long idOferta, Long idPostulacion, Long idJefatura) {
         // Lock pesimista: si dos jefaturas seleccionan postulantes distintos para la misma oferta

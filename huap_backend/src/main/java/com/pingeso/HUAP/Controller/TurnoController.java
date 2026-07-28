@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 import com.pingeso.HUAP.DTO.AlterarTurnoRequest;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
@@ -175,6 +177,10 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.getUnassignedTurnosByServicioAndPeriodo(servicioId, inicio, fin));
     }
 
+    @Operation(summary = "Estadísticas de cobertura de turnos de un servicio",
+            description = "Total de turnos, asignados, vacantes y porcentaje de cobertura en un rango "
+                    + "de fechas (por defecto, el mes en curso). Pensado para el gráfico de "
+                    + "\"Turnos Asignados vs Vacantes\" del dashboard.")
     @GetMapping("/servicio/{servicioId}/stats")
     public ResponseEntity<Map<String, Object>> getTurnosStatsByServicio(
             @PathVariable Long servicioId,
@@ -208,6 +214,10 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.getFuncionariosConTurnosServicio(servicioId, inicio, fin));
     }
 
+    @Operation(summary = "Estadísticas de funcionarios con turno en un servicio",
+            description = "Cantidad de funcionarios del servicio que tienen al menos un turno en el "
+                    + "rango de fechas (por defecto, el mes en curso) vs. el total de funcionarios "
+                    + "asignados al servicio.")
     @GetMapping("/servicio/{servicioId}/funcionarios-stats")
     public ResponseEntity<Map<String, Object>> getFuncionariosStatsByServicio(
             @PathVariable Long servicioId,
