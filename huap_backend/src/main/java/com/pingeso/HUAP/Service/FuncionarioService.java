@@ -47,38 +47,41 @@ public class FuncionarioService {
     private final ServicioRepository servicioRepository;
     private final RolSistemaRepository rolSistemaRepository;
 
+    // ====================================================================
+    // AUTENTICACIÓN Y VALIDACIÓN DE CREDENCIALES
+    // ====================================================================
+
+    /**
+     * Autentica a un funcionario mediante RUT y contraseña, validando estado activo
+     * y aplicando la normalización necesaria para comparar el hash almacenado.
+     */
     public FuncionarioEntity authenticateWithPassword(String rut, String password){
 
         if (rut == null || rut.isBlank()) throw new IllegalArgumentException("El argumento rut es obligatorio");
 
         if (password == null || password.isBlank()) throw new IllegalArgumentException("El argumento password es obligatorio");
 
-        logger.info("[AUTH] Inicio de autenticación. rutOriginal={}", rut);
 
         FuncionarioEntity funcionarioRetornado;
 
-        // 1. Limpiar el RUT
+        //Limpiar el RUT
         String cleanRut = rut.replaceAll("[^0-9Kk]", "").toUpperCase();
         String rutSinDv = cleanRut.length() > 1 ? cleanRut.substring(0, cleanRut.length() - 1) : cleanRut;
-        logger.info("[AUTH] RUT normalizado. cleanRut={}, rutSinDv={}", cleanRut, rutSinDv);
 
 
         // Buscar al usuario con el rut
         Optional<ViewPersonalEntity> usuario = viewPersonalRepository.findByRut(rutSinDv);
-        logger.info("[AUTH] Resultado búsqueda viewPersonal por rutSinDv. encontrado={}", usuario.isPresent());
 
         // Esto es traido directo de la version legacy, evaluar si se mantiene
         if (usuario.isEmpty()){
             usuario = viewPersonalRepository.findByRut(rut);
             funcionarioRetornado = funcionarioRepository.findByRut(rut);
-            logger.info("[AUTH] Búsqueda alternativa por rut completo. encontrado={}, funcionarioEncontrado={}", usuario.isPresent(), funcionarioRetornado != null);
+
         } else {
             funcionarioRetornado = funcionarioRepository.findByRut(rutSinDv);
-            logger.info("[AUTH] Funcionario asociado al rutSinDv encontrado={}", funcionarioRetornado != null);
         }
         
         if (usuario.isEmpty()){
-            logger.warn("Intento de login fallido: No se encontró registro para el RUT: {}", rut);
             throw new RuntimeException("Credenciales incorrectas");
         }
         ViewPersonalEntity user = usuario.get();
@@ -92,11 +95,9 @@ public class FuncionarioService {
 
     
         String encodedPassword = normalizeEncodedPassword(user.getClave());
-        logger.info("[AUTH] Hash normalizado listo. rut={}, longitudEncoded={}", rut, encodedPassword != null ? encodedPassword.length() : null);
         boolean passwordMatches = passwordEncoder.matches(password, encodedPassword);
-        logger.info("[AUTH] Resultado de passwordEncoder.matches para rut={}: {}", rut, passwordMatches);
+
         if (!passwordMatches){
-            logger.warn("Intento de login fallido: Contraseña incorrecta para RUT: {}", rut);
             throw new RuntimeException("Credenciales incorrectas");
         }
 
@@ -105,6 +106,10 @@ public class FuncionarioService {
     
     }
 
+    /**
+     * Normaliza el hash de contraseña recuperado desde la base de datos para poder compararlo
+     * correctamente con el valor ingresado por el usuario.
+     */
     private String normalizeEncodedPassword(byte[] encodedPassword) {
         // 1. Manejo de nulos o vacíos
         if (encodedPassword == null || encodedPassword.length == 0) {
@@ -166,6 +171,14 @@ public class FuncionarioService {
 
     }
      */
+    // ====================================================================
+    // CONSULTAS Y RESÚMENES DE FUNCIONARIOS
+    // ====================================================================
+
+    /**
+     * Obtiene los funcionarios vigentes de un servicio específico, o el listado global
+     * cuando no se filtra por servicio.
+     */
     public List<FuncionarioEntity> getAllUsersByServicio(Long servicioId) {
         if (servicioId == null) {
             return funcionarioRepository.findByEliminadoFalse();
@@ -173,6 +186,10 @@ public class FuncionarioService {
         return funcionarioRepository.findAllByServicioId(servicioId);
     }
 
+    /**
+     * Transforma una entidad de funcionario en su DTO de resumen, incluyendo servicios
+     * y roles asociados sin exponer los registros eliminados.
+     */
     private FuncionarioSummaryDTO mapToDTO(FuncionarioEntity f) {
         if (f == null) return null;
 
@@ -219,8 +236,7 @@ public class FuncionarioService {
      * Obtiene un resumen de todos los usuarios filtrados por servicio.
      * NOTA PARA V2: Si servicioId es null, los campos 'idServicio', 'idRolServicio' 
      * y 'rolServicioNombre' devolverán una LISTA para soportar la nueva lógica 
-     * de múltiples servicios por funcionario. La Vista de Administrador debe 
-     * estar preparada para iterar estos arreglos.
+     * de múltiples servicios por funcionario.
      * @param servicioId Id del servicio que se quiere obtener los funcionarios
      * @return FuncionarioSummaryDTO
      * 
@@ -233,6 +249,9 @@ public class FuncionarioService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Obtiene el resumen de un funcionario específico por su identificador.
+     */
     public FuncionarioSummaryDTO getUserSummary(Long funcionarioId){
         if (funcionarioId == null) throw new IllegalArgumentException("El parametro de Id es obligatorio");
 
@@ -241,7 +260,10 @@ public class FuncionarioService {
         return mapToDTO(funcionario);
     }
 
-    // Devuelve conteo de usuarios activos/inactivos (y total) para el servicio dado
+    /**
+     * Devuelve métricas de disponibilidad de funcionarios para un servicio, incluyendo
+     * activos, inactivos, total y porcentaje de cobertura activa.
+     */
     public Map<String,Object> getAvailabilityByServicio(Long servicioId) {
         if(servicioId == null) throw new IllegalArgumentException("El id del servicio es obligatorio");
         
@@ -268,7 +290,14 @@ public class FuncionarioService {
         return out;
     }
 
-    // Actualización datos del usuario
+    // ====================================================================
+    // ACTUALIZACIÓN Y GESTIÓN DE RELACIONES
+    // ====================================================================
+
+    /**
+     * Actualiza los datos personales de un funcionario y, cuando se envía, también
+     * gestiona su relación con un servicio y un rol de servicio.
+     */
     @Transactional
     public FuncionarioSummaryDTO updateUser(Long userId, Map<String, Object> payload) {
         if (userId == null) return null;
@@ -344,11 +373,18 @@ public class FuncionarioService {
         return getUserSummary(u.getIdFuncionario());
     }
 
+    /**
+     * Recupera un funcionario por su identificador interno.
+     */
     public FuncionarioEntity findById(Long idFuncionario){
         if (idFuncionario == null) throw new IllegalArgumentException("El id es un campo obligatorio");
 
         return funcionarioRepository.findByIdFuncionario(idFuncionario);
     }
+
+    // ====================================================================
+    // REGISTRO Y VERIFICACIÓN DE PERSONAL
+    // ====================================================================
 
     /**
      * Servicio que verifica si un usuario esta registrado en el sistema de turnos

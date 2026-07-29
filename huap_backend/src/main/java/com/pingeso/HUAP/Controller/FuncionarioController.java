@@ -3,7 +3,7 @@ package com.pingeso.HUAP.Controller;
 import com.pingeso.HUAP.DTO.*;
 import jakarta.persistence.EntityExistsException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.repository.query.Param;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,6 +50,15 @@ public class FuncionarioController {
     @Autowired
     private LoginAttemptService loginAttemptService;
 
+    // ====================================================================
+    // AUTENTICACIÓN Y SESIÓN
+    // ====================================================================
+
+    /**
+     * Autenticación inicial del usuario mediante RUT y contraseña.
+     * Si las credenciales son válidas, devuelve un token de pre-autorización y los
+     * servicios disponibles para completar el segundo paso del login.
+     */
     @Operation(summary = "Autenticación (paso 1)",
             description = "Valida RUT y contraseña. Si el usuario tiene varios servicios, devuelve un "
                     + "token de pre-autorización y la lista de servicios para elegir en el paso 2. "
@@ -150,9 +159,12 @@ public class FuncionarioController {
         ));
     }
 
-    // --- Gestión de funcionarios ---
+    // ====================================================================
+    // CONSULTAS Y GESTIÓN DE FUNCIONARIOS
+    // ====================================================================
+
     /**
-     * Controlador para verificar si existe un funcionario registrado en el sistema de turnos.
+     * Verifica si existe un funcionario registrado en el sistema de turnos.
      * Devuelve 200 OK si existe, 404 NOT FOUND si no, o 401 si ocurre un error controlado.
      *
      * @param rut RUT del funcionario a consultar.
@@ -177,6 +189,9 @@ public class FuncionarioController {
     }
 
 
+    /**
+     * Obtiene el resumen de funcionarios, opcionalmente filtrado por servicio.
+     */
     @Operation(summary = "Resumen de funcionarios",
             description = "Lista los funcionarios (opcionalmente filtrados por servicio) en formato resumido.")
         @GetMapping("/summary")
@@ -187,6 +202,9 @@ public class FuncionarioController {
 
 
 
+    /**
+     * Obtiene el resumen de un funcionario específico por su identificador.
+     */
     @Operation(summary = "Resumen de un funcionario por ID")
     @GetMapping("/{id}/summary")
     public ResponseEntity<FuncionarioSummaryDTO> getSummary(@PathVariable Long id) {
@@ -195,12 +213,19 @@ public class FuncionarioController {
         return ResponseEntity.ok(dto);
     }
 
+    /**
+     * Devuelve métricas de disponibilidad de funcionarios para un servicio.
+     */
     @Operation(summary = "Disponibilidad de funcionarios de un servicio")
     @GetMapping("/disponibilidad/{servicioId}")
     public ResponseEntity<Map<String, Object>> getDisponibilidad(@PathVariable Long servicioId) {
         return ResponseEntity.ok(funcionarioService.getAvailabilityByServicio(servicioId));
     }
 
+    /**
+     * Actualiza los datos de un funcionario, respetando reglas de permisos para modificar
+     * su propio perfil o delegar cambios de rol/estado a usuarios con privilegios.
+     */
     @Operation(summary = "Actualizar un funcionario",
             description = "Un usuario solo puede modificar su propio registro; solo JEFATURA/ADMINISTRADOR "
                     + "pueden cambiar el rol o el estado de otro funcionario.")
@@ -239,6 +264,10 @@ public class FuncionarioController {
         return ResponseEntity.ok(updated);
     }
 
+    /**
+     * Completa la autenticación seleccionando el servicio con el que el usuario desea trabajar,
+     * devolviendo el JWT final con su rol de servicio y rol de sistema.
+     */
     @Operation(summary = "Autenticación (paso 2): seleccionar servicio",
             description = "Recibe el token de pre-autorización y el servicio elegido, y devuelve el JWT "
                     + "definitivo (con rol de sistema y rol de servicio) junto con el perfil.")
@@ -301,6 +330,10 @@ public class FuncionarioController {
         ));
     }
 
+    /**
+     * Cambia el servicio activo de la sesión actual y emite un nuevo JWT con los
+     * permisos correspondientes al nuevo contexto.
+     */
     @Operation(summary = "Cambiar de servicio en la sesión activa",
             description = "Genera un nuevo JWT para otro servicio al que el funcionario autenticado tenga acceso.")
     @PostMapping("/switch-service")
@@ -350,11 +383,13 @@ public class FuncionarioController {
                 perfil));
     }
 
+    // ====================================================================
+    // REGISTRO DE PERSONAL
+    // ====================================================================
+
     /**
-     * Controlador para registrar personal como funcionario en el sistema de turnos
-     *
-     * @Param rut Rut del funcionario a consultar
-     * @Return
+     * Registra a un integrante del personal existente en la vista hospitalaria como
+     * funcionario del sistema de turnos.
      */
     @Operation(summary = "Registrar personal como funcionario",
             description = "Registra en el sistema de turnos a una persona existente en el personal (viewPersonal). "
