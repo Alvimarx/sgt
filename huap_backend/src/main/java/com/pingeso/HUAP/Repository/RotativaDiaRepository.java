@@ -9,12 +9,19 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * Repositorio de {@link RotativaDiaEntity} (días del patrón de una rotativa).
+ *
+ * <p>Además de leer la secuencia de una rotativa, ofrece utilidades usadas al eliminar un tipo de
+ * turno del catálogo: contar/nombrar las rotativas que lo usan y liberar sus referencias.
+ */
 @Repository
 public interface RotativaDiaRepository extends JpaRepository<RotativaDiaEntity, Long> {
 
+    /** Días de una rotativa ordenados por {@code diaIndex} ascendente. */
     List<RotativaDiaEntity> findByRotativa_IdRotativaOrderByDiaIndexAsc(Long idRotativa);
 
-    // Usado antes de eliminar un tipo de turno del catálogo para validar que no esté en uso.
+    /** Cuenta cuántos días del catálogo usan un tipo de turno (para validar antes de eliminarlo). */
     long countByTipoTurno_IdTipoTurno(Long idTipoTurno);
 
     /**

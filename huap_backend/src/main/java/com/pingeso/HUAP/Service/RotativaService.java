@@ -50,6 +50,15 @@ public class RotativaService {
     // CRUD DE ROTATIVA
     // =========================================================
 
+    /**
+     * Crea una rotativa en un servicio. Valida que el servicio exista, que el nombre no se repita
+     * entre las vigentes y que las semanas sean &gt; 0. Si se pasa {@code idsDias}, construye la
+     * secuencia (un id de tipo de turno por día, en orden; {@code null} = día libre) validando que
+     * cada tipo exista, no esté eliminado y pertenezca al servicio, y valida el patrón resultante.
+     * @param idsDias ids de tipo de turno por día en orden, o {@code null} para crear sin secuencia.
+     * @throws RuntimeException si el servicio o algún tipo de turno no existe, el nombre está
+     *         duplicado, las semanas son inválidas o un turno no pertenece al servicio.
+     */
     public RotativaEntity crearRotativa(Long idServicio, String nombre, Byte semanas, List<Long> idsDias) {
         ServicioEntity servicio = servicioRepository.findById(idServicio)
                 .orElseThrow(() -> new RuntimeException("Servicio no encontrado con ID: " + idServicio));
@@ -92,19 +101,29 @@ public class RotativaService {
         return guardada;
     }
 
+    /**
+     * Obtiene una rotativa por su id.
+     * @throws RuntimeException si no existe.
+     */
     public RotativaEntity obtenerRotativa(Long idRotativa) {
         return rotativaRepository.findById(idRotativa)
                 .orElseThrow(() -> new RuntimeException("Rotativa no encontrada"));
     }
 
+    /** Lista todas las rotativas vigentes (no eliminadas). */
     public List<RotativaEntity> obtenerRotativas() {
         return rotativaRepository.findByEliminadoFalse();
     }
 
+    /** Lista las rotativas vigentes de un servicio. */
     public List<RotativaEntity> obtenerRotativasPorServicio(Long idServicio) {
         return rotativaRepository.findByServicio_IdServicioAndEliminadoFalse(idServicio);
     }
 
+    /**
+     * Actualiza el nombre y las semanas de una rotativa.
+     * @throws RuntimeException si la rotativa no existe o las semanas son &le; 0.
+     */
     public RotativaEntity actualizarRotativa(Long idRotativa, String nombre, Byte semanas) {
         RotativaEntity rotativa = obtenerRotativa(idRotativa);
 
@@ -117,6 +136,10 @@ public class RotativaService {
         return rotativaRepository.save(rotativa);
     }
 
+    /**
+     * Elimina una rotativa por soft-delete y la quita de cualquier planificación que la referencie.
+     * @throws RuntimeException si la rotativa no existe.
+     */
     public void eliminarRotativa(Long idRotativa) {
         RotativaEntity rotativa = obtenerRotativa(idRotativa);
 

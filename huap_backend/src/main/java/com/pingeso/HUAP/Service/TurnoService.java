@@ -200,7 +200,6 @@ public class TurnoService {
 
     /**
      * Obtiene los turnos de un servicio para la vista de calendario en un rango de fechas.
-     * getTurnosByServicioAndDiaWithPisoNombre
      */
     public List<Map<String, Object>> getTurnosCalendario(Long servicioId, LocalDate inicio, LocalDate fin) {
         List<TurnoEntity> turnos = turnoRepository.findByServicioIdAndDateRange(servicioId, inicio, fin);
@@ -264,6 +263,10 @@ public class TurnoService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Para cada funcionario del servicio devuelve su nombre, la cantidad de turnos en el rango y el
+     * detalle de esos turnos (tipo, puesto, fecha). Incluye a los funcionarios sin turnos (con 0).
+     */
     public List<Map<String, Object>> getFuncionariosConTurnosServicio(Long servicioId, LocalDate inicio, LocalDate fin) {
         List<TurnoEntity> turnos = turnoRepository.findByServicioIdAndDateRange(servicioId, inicio, fin);
 
@@ -333,8 +336,7 @@ public class TurnoService {
 
 
     /**
-     * Obtiene todos los turnos de un servicio con sus nombres de piso ya resueltos.
-     * getTurnosByServicioWithPisoNombre
+     * Obtiene todos los turnos de un servicio con sus datos (puesto, funcionario, tipo…) ya resueltos.
      */
     public List<Map<String, Object>> getTurnosByServicioConDetalles(Long servicioId) {
         List<TurnoEntity> turnos = turnoRepository.findByServicio_IdServicio(servicioId);
@@ -382,6 +384,10 @@ public class TurnoService {
     // BLOQUE 5: MÉTRICAS, ESTADÍSTICAS Y COBERTURA (DASHBOARDS)
     // ====================================================================
 
+    /**
+     * Detalle plano de todos los turnos de un servicio en un rango (id, tipo, puesto, fecha, horas,
+     * si está asignado y a quién, rotativa), ordenado por fecha de inicio. Para tablas del dashboard.
+     */
     public List<Map<String, Object>> getTurnosDetalleServicio(Long servicioId, LocalDate inicio, LocalDate fin) {
         List<TurnoEntity> turnos = turnoRepository.findByServicioIdAndDateRange(servicioId, inicio, fin);
         return turnos.stream()
@@ -431,9 +437,8 @@ public class TurnoService {
     }
 
     /**
-     * Calcula las horas reales de cobertura para un Puesto específico.
-     * Solo toma en cuenta los turnos que YA tienen un funcionario asignado.
-     * getCoveragePerPuestoLastMonth, getCoveragePerPuestoCurrentMonth, getCoveragePerPuestoByMonth
+     * Calcula las horas reales de cobertura de un puesto en un rango.
+     * Solo considera los turnos que YA tienen un funcionario asignado.
      */
     public Map<String, Object> getCoberturaRealByPuesto(Long puestoId, LocalDate inicio, LocalDate fin) {
         List<TurnoEntity> turnosDelPuesto = turnoRepository.findByPuestoIdAndDateRange(puestoId, inicio, fin);
@@ -528,8 +533,8 @@ public class TurnoService {
     }
 
     /**
-     * Calcula las horas reales de cobertura para
-     * getCoberturaByServicio.
+     * Calcula las horas reales de cobertura de un servicio en un rango (solo turnos con funcionario
+     * asignado, sin contar dobles cuando hay superposición de horarios).
      */
     public Map<String, Object> getCoberturaRealByServicio(Long servicioId, LocalDate inicio, LocalDate fin) {
         // 1. Buscamos TODOS los turnos del servicio en el rango de fechas

@@ -12,14 +12,22 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Repositorio de {@link TurnoEntity}.
+ *
+ * <p>Además del CRUD de Spring Data, ofrece consultas para: turnos vigentes por entidad
+ * (funcionario/servicio/puesto), vacantes (sin funcionario), vistas de calendario por rango de
+ * fechas, detección de conflictos de horario y una consulta optimizada para exportación a CSV.
+ * Salvo los conteos "advisory", todas filtran {@code eliminado = false} (soft-delete).
+ */
 @Repository
 public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
 
     // ====================================================================
-    // BÚSQUEDAS BÁSICAS POR ENTIDAD 
+    // BÚSQUEDAS BÁSICAS POR ENTIDAD
     // ====================================================================
 
-    // Todos los turnos vigentes (no eliminados).
+    /** Todos los turnos vigentes (no eliminados). */
     List<TurnoEntity> findByEliminadoFalse();
 
     /**
@@ -32,44 +40,56 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
     @Query("SELECT t FROM TurnoEntity t WHERE t.idTurno = :id")
     Optional<TurnoEntity> findByIdForUpdate(@Param("id") Long id);
 
+    /** Turnos vigentes de un funcionario. */
     @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario.idFuncionario = ?1 AND t.eliminado = false")
     List<TurnoEntity> findByFuncionario_IdFuncionario(Long idFuncionario);
 
+    /** Turnos vigentes de un servicio. */
     @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.idServicio = ?1 AND t.eliminado = false")
     List<TurnoEntity> findByServicio_IdServicio(Long idServicio);
 
+    /** Turnos vigentes de un puesto. */
     @Query("SELECT t FROM TurnoEntity t WHERE t.puesto.idPuesto = ?1 AND t.eliminado = false")
     List<TurnoEntity> findByPuesto_IdPuesto(Long idPuesto);
 
-    // Conteos informativos (advisory). Incluyen histórico; no filtran eliminado.
+    // Conteos informativos (advisory). Incluyen histórico; NO filtran eliminado.
+
+    /** Cuenta (histórico, incl. eliminados) los turnos de un puesto. */
     long countByPuesto_IdPuesto(Long idPuesto);
 
+    /** Cuenta (histórico, incl. eliminados) los turnos de un tipo de turno. */
     long countByTipoTurno_IdTipoTurno(Long idTipoTurno);
 
+    /** Cuenta (histórico, incl. eliminados) los turnos de un servicio. */
     long countByServicio_IdServicio(Long idServicio);
 
     // ====================================================================
     // BÚSQUEDA DE TURNOS VACANTES (SIN ASIGNAR)
     // ====================================================================
 
+    /** Todos los turnos vacantes (sin funcionario). */
     @Query("SELECT t FROM TurnoEntity t WHERE t.funcionario IS NULL AND t.eliminado = false")
     List<TurnoEntity> findByFuncionarioIsNull();
 
+    /** Turnos vacantes que inician en una fecha concreta. */
     @Query("SELECT t FROM TurnoEntity t WHERE t.diaInicioTurno = ?1 AND t.funcionario IS NULL AND t.eliminado = false")
     List<TurnoEntity> findByDiaInicioTurnoAndFuncionarioIsNull(LocalDate dia);
 
+    /** Turnos vacantes de un servicio que inician en una fecha concreta. */
     @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.idServicio = ?1 AND t.diaInicioTurno = ?2 AND t.funcionario IS NULL AND t.eliminado = false")
     List<TurnoEntity> findByServicio_IdServicioAndDiaInicioTurnoAndFuncionarioIsNull(
             Long servicioId,
             LocalDate dia
     );
 
+    /** Turnos de un servicio (asignados o no) que inician en una fecha concreta. */
     @Query("SELECT t FROM TurnoEntity t WHERE t.servicio.idServicio = ?1 AND t.diaInicioTurno = ?2 AND t.eliminado = false")
     List<TurnoEntity> findByServicio_IdServicioAndDiaInicioTurno(
             Long servicioId,
             LocalDate dia
     );
 
+    /** Todos los turnos vacantes de un servicio. */
     @Query("""
            SELECT t
            FROM TurnoEntity t
@@ -81,6 +101,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("servicioId") Long servicioId
     );
 
+    /** Turnos vacantes de un servicio que solapan un rango de fechas, ordenados por inicio. */
     @Query("""
            SELECT t
            FROM TurnoEntity t
@@ -97,6 +118,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
+    /** Cuenta cuántos funcionarios distintos tienen turno en un servicio dentro de un rango. */
     @Query("""
            SELECT COUNT(DISTINCT t.funcionario.idFuncionario)
            FROM TurnoEntity t
@@ -116,7 +138,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
     // VISTAS DE CALENDARIO Y RANGOS DE FECHAS
     // ====================================================================
 
-    // Cobertura general de un Servicio en un rango de fechas
+    /** Turnos de un servicio que solapan un rango de fechas (cobertura general / calendario). */
     @Query("""
            SELECT t
            FROM TurnoEntity t
@@ -131,7 +153,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
-    // Turnos de un Funcionario específico por mes/rango
+    /** Turnos de un funcionario que solapan un rango de fechas (vista "mis turnos"). */
     @Query("""
            SELECT t
            FROM TurnoEntity t
@@ -150,7 +172,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
     // RESOLUCIÓN DE CONFLICTOS Y VALIDACIONES
     // ====================================================================
 
-    // Conflicto de Funcionario (un turno eliminado no genera conflicto)
+    /** Turnos de un funcionario que solapan un rango (para detectar doble-reserva). */
     @Query("""
            SELECT t
            FROM TurnoEntity t
@@ -165,8 +187,10 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
-    // Variante en bloque de findConflictosByFuncionario: trae los conflictos de varios
-    // funcionarios en una sola consulta (usado para precargar antes de una generación masiva).
+    /**
+     * Variante en bloque de {@link #findConflictosByFuncionario}: trae los conflictos de varios
+     * funcionarios en una sola consulta (para precargar antes de una generación masiva).
+     */
     @Query("""
            SELECT t
            FROM TurnoEntity t
@@ -181,7 +205,7 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
-    // Búsqueda en un Puesto específico
+    /** Turnos de un puesto que solapan un rango de fechas. */
     @Query("""
            SELECT t
            FROM TurnoEntity t
@@ -196,7 +220,12 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
-    //Prueba de exportación de turnos a CSV
+    /**
+     * Consulta optimizada para exportación a CSV: trae los turnos de un rango con las relaciones
+     * ya cargadas ({@code JOIN FETCH}) y filtros opcionales por funcionario y servicio.
+     * @param idFuncionario filtro opcional (o {@code null} para todos).
+     * @param idServicio filtro opcional (o {@code null} para todos).
+     */
     @Query("""
         SELECT t
         FROM TurnoEntity t

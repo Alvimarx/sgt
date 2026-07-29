@@ -28,7 +28,7 @@ class TipoTurnoServiceTest {
     private final TurnoRepository turnoRepository = mock(TurnoRepository.class);
 
     private final TipoTurnoService service =
-            new TipoTurnoService(tipoTurnoRepository, rotativaDiaRepository, servicioRepository, turnoRepository);
+            new TipoTurnoService(tipoTurnoRepository, rotativaDiaRepository, servicioRepository);
 
     private static ServicioEntity servicio(long id) {
         return ServicioEntity.builder().idServicio(id).nombre("Urgencias").build();
