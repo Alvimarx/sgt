@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import com.pingeso.HUAP.DTO.FuncionarioSummaryDTO;
 import com.pingeso.HUAP.DTO.RolServicioDTO;
+import com.pingeso.HUAP.DTO.ServicioDisponibleDTO;
 
 import jakarta.transaction.Transactional;
 
@@ -213,11 +214,33 @@ public class FuncionarioService {
         dto.setProfesion(f.getProfesion());
         dto.setIdRolSistema(f.getRolSistema() != null ? f.getRolSistema().getIdRolSistema() : null);
 
-        // Mapeo de la lista de servicios
-        if (f.getServiciosFuncionario() != null) {
-            // Excluye los servicios eliminados (soft-delete) para que no aparezcan en la
-            // selección/cambio de servicio del frontend.
-            List<RolServicioDTO> serviciosList = f.getServiciosFuncionario().stream()
+        // Mapeo de la lista de servicios.
+        // Un ADMINISTRADOR ve TODOS los servicios vigentes (rol JEFATURA donde no es miembro),
+        // para poder cambiar a cualquiera desde el selector del frontend aunque no tenga asignación.
+        // El resto solo ve sus servicios asignados vigentes (excluye eliminados por soft-delete).
+        List<RolServicioDTO> serviciosList;
+        if (esAdministrador(f)) {
+            Map<Long, RolServicioEntity> rolPorServicio = (f.getServiciosFuncionario() != null)
+                ? f.getServiciosFuncionario().stream()
+                    .filter(sf -> sf.getServicio() != null && sf.getRolServicio() != null)
+                    .collect(Collectors.toMap(
+                        sf -> sf.getServicio().getIdServicio(),
+                        ServiciosFuncionarioEntity::getRolServicio,
+                        (a, b) -> a))
+                : Map.of();
+
+            serviciosList = servicioRepository.findByEliminadoFalse().stream()
+                .map(s -> {
+                    RolServicioEntity rol = rolPorServicio.get(s.getIdServicio());
+                    return new RolServicioDTO(
+                        s.getIdServicio(),
+                        s.getNombre(),
+                        rol != null ? rol.getIdRolServicio() : null,
+                        rol != null ? rol.getNombreRol() : ROL_SERVICIO_ADMIN);
+                })
+                .collect(Collectors.toList());
+        } else if (f.getServiciosFuncionario() != null) {
+            serviciosList = f.getServiciosFuncionario().stream()
                 .filter(sf -> sf.getServicio() != null && !sf.getServicio().isEliminado())
                 .map(sf -> new RolServicioDTO(
                     sf.getServicio().getIdServicio(),
@@ -225,9 +248,10 @@ public class FuncionarioService {
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getIdRolServicio() : null,
                     (sf.getRolServicio() != null) ? sf.getRolServicio().getNombreRol() : null
                 )).collect(Collectors.toList());
-
-            dto.setServicios(serviciosList);
+        } else {
+            serviciosList = new ArrayList<>();
         }
+        dto.setServicios(serviciosList);
 
         return dto;
     }
@@ -380,6 +404,95 @@ public class FuncionarioService {
         if (idFuncionario == null) throw new IllegalArgumentException("El id es un campo obligatorio");
 
         return funcionarioRepository.findByIdFuncionario(idFuncionario);
+    }
+
+    // =========================================================
+    // ACCESO A SERVICIOS (selección de servicio en el login)
+    // =========================================================
+
+    private static final String ROL_SISTEMA_ADMIN = "ADMINISTRADOR";
+    /** Rol de servicio por defecto de un ADMINISTRADOR en un servicio donde no es miembro. */
+    private static final String ROL_SERVICIO_ADMIN = "JEFATURA";
+    /** Rol de servicio por defecto cuando una asignación no tiene rol explícito. */
+    private static final String ROL_SERVICIO_DEFECTO = "MEDICO";
+
+    /** ¿El funcionario tiene rol de sistema ADMINISTRADOR (super-admin global)? */
+    public boolean esAdministrador(FuncionarioEntity usuario) {
+        return usuario != null
+                && usuario.getRolSistema() != null
+                && ROL_SISTEMA_ADMIN.equals(usuario.getRolSistema().getNombreRol());
+    }
+
+    /**
+     * Servicios que el funcionario puede elegir al iniciar sesión.
+     *
+     * <p>Un {@code ADMINISTRADOR} ve <b>todos</b> los servicios vigentes aunque no sea miembro
+     * (rol efectivo {@code JEFATURA} en los que no tiene asignación explícita); el resto solo ve
+     * sus servicios asignados vigentes.
+     */
+    public List<ServicioDisponibleDTO> getServiciosDisponibles(FuncionarioEntity usuario) {
+        if (esAdministrador(usuario)) {
+            // Rol propio por servicio donde el admin SÍ es miembro (respeta su asignación explícita).
+            Map<Long, String> rolPorServicio = usuario.getServiciosFuncionario().stream()
+                    .filter(sf -> sf.getServicio() != null && sf.getRolServicio() != null)
+                    .collect(Collectors.toMap(
+                            sf -> sf.getServicio().getIdServicio(),
+                            sf -> sf.getRolServicio().getNombreRol(),
+                            (a, b) -> a));
+
+            return servicioRepository.findByEliminadoFalse().stream()
+                    .map(s -> new ServicioDisponibleDTO(
+                            s.getIdServicio(),
+                            s.getNombre(),
+                            rolPorServicio.getOrDefault(s.getIdServicio(), ROL_SERVICIO_ADMIN)))
+                    .collect(Collectors.toList());
+        }
+
+        return usuario.getServiciosFuncionario().stream()
+                .filter(sf -> sf.getServicio() != null && !sf.getServicio().isEliminado())
+                .map(sf -> new ServicioDisponibleDTO(
+                        sf.getServicio().getIdServicio(),
+                        sf.getServicio().getNombre(),
+                        sf.getRolServicio() != null ? sf.getRolServicio().getNombreRol() : ROL_SERVICIO_DEFECTO))
+                .collect(Collectors.toList());
+    }
+
+    /** Resultado de resolver el acceso a un servicio: el servicio y el rol efectivo del usuario en él. */
+    public record AccesoServicio(ServicioEntity servicio, String rolServicio) {}
+
+    /**
+     * Resuelve el acceso de un funcionario a un servicio y su rol efectivo en él.
+     *
+     * <p>Si es miembro del servicio (asignación vigente), usa su rol asignado. Si <b>no</b> es
+     * miembro pero es {@code ADMINISTRADOR}, se le concede acceso con rol efectivo {@code JEFATURA}.
+     * En cualquier otro caso lanza una excepción (acceso denegado).
+     *
+     * @throws RuntimeException si el usuario no tiene acceso al servicio o el servicio no existe/está inactivo.
+     */
+    public AccesoServicio resolverAccesoServicio(FuncionarioEntity usuario, Long idServicio) {
+        ServiciosFuncionarioEntity relacion = usuario.getServiciosFuncionario().stream()
+                .filter(sf -> sf.getServicio() != null
+                        && !sf.getServicio().isEliminado()
+                        && sf.getServicio().getIdServicio().equals(idServicio))
+                .findFirst()
+                .orElse(null);
+
+        if (relacion != null) {
+            String rol = relacion.getRolServicio() != null
+                    ? relacion.getRolServicio().getNombreRol()
+                    : ROL_SERVICIO_DEFECTO;
+            return new AccesoServicio(relacion.getServicio(), rol);
+        }
+
+        // No es miembro: solo el ADMINISTRADOR puede entrar a cualquier servicio vigente.
+        if (esAdministrador(usuario)) {
+            ServicioEntity servicio = servicioRepository.findById(idServicio)
+                    .filter(s -> !s.isEliminado())
+                    .orElseThrow(() -> new RuntimeException("Servicio no encontrado o inactivo"));
+            return new AccesoServicio(servicio, ROL_SERVICIO_ADMIN);
+        }
+
+        throw new RuntimeException("Acceso denegado al servicio indicado");
     }
 
     // ====================================================================

@@ -137,7 +137,7 @@ INSERT INTO feriados (fecha, descripcion) VALUES
 INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA) VALUES
 -- === Medicina Interna ===
 -- Jefatura → ADMINISTRADOR (1)
-(1,  'Álvaro',     'López',       '',           '22222222', '2', 1, 0, 'Médico Urgenciólogo',  1),
+(1,  'Álvaro',     'López',       '',           '17599096', '8', 1, 0, 'Médico Urgenciólogo',  1),
 -- Médicos → USUARIO (2)
 (2,  'Fernando',   'Roman',       '',           '22222223', '3', 1, 0, 'Médico Internista',    2),
 (3,  'Sergio',     'González',    '',           '22222224', '4', 1, 0, 'Médico Internista',    2),
@@ -190,7 +190,7 @@ INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Es
 (302, 'Mauricio', 'Muñoz', '', '30000003', '3', 1, 0, 'Médico Urgenciólogo', 1),
 (303, 'Eugenio', 'Donaire', '', '30000004', '4', 1, 0, 'Médico Urgenciólogo', 1),
 (304, 'Mario', 'Galarce', '', '30000005', '5', 1, 0, 'Médico Urgenciólogo', 1),
-(305, 'Flavio', 'Ayala', '', '30000006', '6', 1, 0, 'Médico Urgenciólogo', 1),
+(305, 'Flavio', 'Ayala', '', '30000006', '6', 1, 0, 'Médico Urgenciólogo', 2), -- Flavio: solo JEFATURA de servicio; ya NO es ADMINISTRADOR de sistema
 -- Urgenciólogos y Médicos Generales → USUARIO (rol_sistema=2)
 (306, 'Carolina', 'Millacura', '', '30000007', '7', 1, 0, 'Médico Urgenciólogo', 2),
 (307, 'Augusto', 'Araya', '', '30000008', '8', 1, 0, 'Médico Urgenciólogo', 2),
@@ -274,7 +274,7 @@ INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Es
 -- ==============================================================
 INSERT INTO Servicios_Funcionario (ID_FUNCIONARIO, id_servicio, id_rol_servicio) VALUES
 -- Medicina Interna (id_servicio = 1)
-(1,  1, 1),  -- Álvaro López        → JEFATURA
+(1,  1, 1),  -- Álvaro López        → JEFATURA (ADMINISTRADOR: accede al resto de servicios por código, sin membresía)
 (2,  1, 3),
 (3,  1, 3),
 (4,  1, 3),

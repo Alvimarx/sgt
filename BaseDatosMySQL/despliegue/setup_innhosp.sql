@@ -509,7 +509,7 @@ INSERT INTO personalAux (
 ) VALUES
 -- === Medicina Interna ===
 -- Jefatura (ID_ROL_SISTEMA 1)
-(11,  'JEFATURA', '22222222', '2', 'Álvaro',     'López',       '',         1, '912345001', 'alvaro.lopez@huap.cl',        'alvaro.lopez@gmail.com',        31, NULL, 'Médico', @dev_password_hash, 1, NOW()),
+(11,  'JEFATURA', '17599096', '8', 'Álvaro',     'López',       '',         1, '912345001', 'alvaro.lopez@huap.cl',        'alvaro.lopez@gmail.com',        31, NULL, 'Médico', @dev_password_hash, 1, NOW()),
 -- Médicos (ID_ROL_SISTEMA 2)
 (12,  'USUARIO',  '22222223', '3', 'Fernando',   'Roman',       '',         1, '912345002', 'fernando.roman@huap.cl',      'fernando.roman@gmail.com',      31, NULL, 'Médico', @dev_password_hash, 1, NOW()),
 (13,  'USUARIO',  '22222224', '4', 'Sergio',     'González',    '',         1, '912345003', 'sergio.gonzalez@huap.cl',     'sergio.gonzalez@gmail.com',     31, NULL, 'Médico', @dev_password_hash, 1, NOW()),

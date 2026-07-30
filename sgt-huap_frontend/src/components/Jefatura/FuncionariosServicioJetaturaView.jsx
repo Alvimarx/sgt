@@ -147,7 +147,7 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
                       {u.nombre} {u.apellidoPaterno} {u.apellidoMaterno}
                     </div>
                     <div style={{ fontSize: 12, color: PA.ink3, fontWeight: 600, marginTop: 2 }}>
-                      {u.profesion || 'Médico'} · <span style={{ fontSize: 11 }}>{u.rutCompleto || u.rut}</span>
+                      {u.profesion || 'No especificada'} · <span style={{ fontSize: 11 }}>{u.rutCompleto || u.rut}</span>
                     </div>
                   </div>
 

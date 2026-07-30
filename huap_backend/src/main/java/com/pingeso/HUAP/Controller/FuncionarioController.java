@@ -130,15 +130,9 @@ public class FuncionarioController {
             ));
         }
                 logger.info("[LOGIN] Autenticación exitosa para rut={}, idFuncionario={}", rut, usuario.getIdFuncionario());
-        // 2. Mapear los servicios a los que tiene acceso el funcionario
-        List<ServicioDisponibleDTO> opciones = usuario.getServiciosFuncionario().stream()
-                .filter(sf -> sf.getServicio() != null && !sf.getServicio().isEliminado())
-                .map(sf -> new ServicioDisponibleDTO(
-                        sf.getServicio().getIdServicio(),
-                        sf.getServicio().getNombre(),
-                        sf.getRolServicio() != null ? sf.getRolServicio().getNombreRol() : "MEDICO"
-                ))
-                .toList();
+        // 2. Servicios a los que el funcionario puede acceder.
+        //    Un ADMINISTRADOR ve todos los servicios vigentes aunque no sea miembro (rol efectivo JEFATURA).
+        List<ServicioDisponibleDTO> opciones = funcionarioService.getServiciosDisponibles(usuario);
 
         if (opciones.isEmpty()) {
                         logger.warn("[LOGIN] Usuario autenticado sin servicios asignados. rut={}, idFuncionario={}", rut, usuario.getIdFuncionario());
@@ -294,19 +288,17 @@ public class FuncionarioController {
                     .body(Map.of("error", "Usuario no encontrado"));
         }
 
-        // Buscar la relación con el servicio elegido
+        // Resolver el acceso al servicio elegido (un ADMINISTRADOR puede entrar aunque no sea miembro).
         Long idServicioElegido = request.getServicioId();
-        
-        ServiciosFuncionarioEntity relacion = usuario.getServiciosFuncionario().stream()
-                .filter(sf -> sf.getServicio() != null
-                        && !sf.getServicio().isEliminado()
-                        && sf.getServicio().getIdServicio().equals(idServicioElegido))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Acceso denegado al servicio indicado"));
 
-        String rolFinal = (relacion.getRolServicio() != null)
-                ? relacion.getRolServicio().getNombreRol()
-                : "MEDICO";
+        FuncionarioService.AccesoServicio acceso;
+        try {
+            acceso = funcionarioService.resolverAccesoServicio(usuario, idServicioElegido);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        }
+
+        String rolFinal = acceso.rolServicio();
 
         String rolSistema = (usuario.getRolSistema() != null)
                 ? usuario.getRolSistema().getNombreRol()
@@ -317,14 +309,14 @@ public class FuncionarioController {
                 usuario.getRut(),
                 rolFinal,
                 rolSistema,
-                relacion.getServicio().getIdServicio()
+                acceso.servicio().getIdServicio()
         );
 
         FuncionarioSummaryDTO perfil = funcionarioService.getUserSummary(usuario.getIdFuncionario());
 
         return ResponseEntity.ok(new SesionDTO(
                 finalToken,
-                relacion.getServicio().getIdServicio(),
+                acceso.servicio().getIdServicio(),
                 rolFinal,
                 perfil
         ));
@@ -347,21 +339,15 @@ public class FuncionarioController {
                     .body(Map.of("error", "Usuario no encontrado"));
         }
 
-        ServiciosFuncionarioEntity relacion = usuario.getServiciosFuncionario().stream()
-                .filter(sf -> sf.getServicio() != null
-                        && !sf.getServicio().isEliminado()
-                        && sf.getServicio().getIdServicio().equals(request.getServicioId()))
-                .findFirst()
-                .orElse(null);
-
-        if (relacion == null) {
+        FuncionarioService.AccesoServicio acceso;
+        try {
+            acceso = funcionarioService.resolverAccesoServicio(usuario, request.getServicioId());
+        } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "No tienes acceso al servicio indicado"));
+                    .body(Map.of("error", e.getMessage()));
         }
 
-        String rolFinal = (relacion.getRolServicio() != null)
-                ? relacion.getRolServicio().getNombreRol()
-                : "MEDICO";
+        String rolFinal = acceso.rolServicio();
 
         String rolSistema = (usuario.getRolSistema() != null)
                 ? usuario.getRolSistema().getNombreRol()
@@ -372,13 +358,13 @@ public class FuncionarioController {
                 usuario.getRut(),
                 rolFinal,
                 rolSistema,
-                relacion.getServicio().getIdServicio());
+                acceso.servicio().getIdServicio());
 
         FuncionarioSummaryDTO perfil = funcionarioService.getUserSummary(usuario.getIdFuncionario());
 
         return ResponseEntity.ok(new SesionDTO(
                 nuevoToken,
-                relacion.getServicio().getIdServicio(),
+                acceso.servicio().getIdServicio(),
                 rolFinal,
                 perfil));
     }
