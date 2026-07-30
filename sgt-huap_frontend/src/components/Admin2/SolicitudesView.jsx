@@ -60,6 +60,16 @@ function btnStyle(tone) {
     background: PA.accentSoft, color: '#B85A60', border: '1px solid #F3D2D5',
     borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
   };
+  if (tone === 'success') return {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    background: PA.success, color: '#fff', border: 'none',
+    borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+  };
+  if (tone === 'danger') return {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    background: '#D14343', color: '#fff', border: 'none',
+    borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+  };
   return {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
     background: '#fff', color: PA.ink2, border: `1px solid ${PA.line}`,
@@ -154,10 +164,10 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       {/* Acciones jefatura/subrogante */}
       {canDecideThis && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={() => onRechazar(solicitud.idSolicitud)} style={btnStyle('accent')}>
-            <SGTIcon name="close" size={13} color="#B85A60" /> Rechazar
+          <button onClick={() => onRechazar(solicitud.idSolicitud)} style={btnStyle('danger')}>
+            <SGTIcon name="close" size={13} color="#fff" /> Rechazar
           </button>
-          <button onClick={() => onAprobar(solicitud.idSolicitud)} style={{ ...btnStyle('primary'), flex: 1 }}>
+          <button onClick={() => onAprobar(solicitud.idSolicitud)} style={{ ...btnStyle('success'), flex: 1 }}>
             <SGTIcon name="check" size={13} color="#fff" /> Aprobar
           </button>
         </div>
@@ -166,10 +176,10 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       {/* Acciones receptor intercambio (tipo 4) */}
       {canRespond && tipo === 4 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={() => onResponderIntercambio(solicitud.idSolicitud, false)} style={btnStyle('accent')}>
-            <SGTIcon name="close" size={13} color="#B85A60" /> Rechazar
+          <button onClick={() => onResponderIntercambio(solicitud.idSolicitud, false)} style={btnStyle('danger')}>
+            <SGTIcon name="close" size={13} color="#fff" /> Rechazar
           </button>
-          <button onClick={() => onResponderIntercambio(solicitud.idSolicitud, true)} style={{ ...btnStyle('primary'), flex: 1 }}>
+          <button onClick={() => onResponderIntercambio(solicitud.idSolicitud, true)} style={{ ...btnStyle('success'), flex: 1 }}>
             <SGTIcon name="check" size={13} color="#fff" /> Aceptar
           </button>
         </div>
@@ -178,10 +188,10 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       {/* Acciones receptor oferta particular (tipo 5) */}
       {canRespond && tipo === 5 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={() => onResponderOfertaParticular(solicitud.idSolicitud, false)} style={btnStyle('accent')}>
-            <SGTIcon name="close" size={13} color="#B85A60" /> Rechazar
+          <button onClick={() => onResponderOfertaParticular(solicitud.idSolicitud, false)} style={btnStyle('danger')}>
+            <SGTIcon name="close" size={13} color="#fff" /> Rechazar
           </button>
-          <button onClick={() => onResponderOfertaParticular(solicitud.idSolicitud, true)} style={{ ...btnStyle('primary'), flex: 1 }}>
+          <button onClick={() => onResponderOfertaParticular(solicitud.idSolicitud, true)} style={{ ...btnStyle('success'), flex: 1 }}>
             <SGTIcon name="check" size={13} color="#fff" /> Aceptar
           </button>
         </div>
@@ -244,10 +254,10 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
       {/* Jefatura: aprobar/rechazar si pendiente */}
       {canDecide && estado === 'PENDIENTE_APROBACION' && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={() => onRechazar(oferta.idOfertaGeneral)} style={btnStyle('accent')}>
-            <SGTIcon name="close" size={13} color="#B85A60" /> Rechazar
+          <button onClick={() => onRechazar(oferta.idOfertaGeneral)} style={btnStyle('danger')}>
+            <SGTIcon name="close" size={13} color="#fff" /> Rechazar
           </button>
-          <button onClick={() => onAprobar(oferta.idOfertaGeneral)} style={{ ...btnStyle('primary'), flex: 1 }}>
+          <button onClick={() => onAprobar(oferta.idOfertaGeneral)} style={{ ...btnStyle('success'), flex: 1 }}>
             <SGTIcon name="check" size={13} color="#fff" /> Aprobar
           </button>
         </div>
