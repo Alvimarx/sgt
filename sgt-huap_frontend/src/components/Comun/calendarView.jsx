@@ -155,6 +155,10 @@ const CalendarView = ({
     const [exportScope, setExportScope] = useState('mios');
     const [exporting, setExporting] = useState(false);
     const [exportError, setExportError] = useState('');
+    const [exportSuccess, setExportSuccess] = useState(false);
+    const [exportShake, setExportShake] = useState(false);
+    const exportShakeTimerRef = useRef(null);
+    const exportSuccessTimerRef = useRef(null);
 
     const [exchangeSelection, setExchangeSelection] = useState({ ownTurn: null, targetTurn: null, targetFuncionario: null });
     const [selectionToast, setSelectionToast] = useState(null);
@@ -166,7 +170,11 @@ const CalendarView = ({
         toastTimerRef.current = setTimeout(() => setSelectionToast(null), 2500);
     };
 
-    useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+    useEffect(() => () => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        if (exportShakeTimerRef.current) clearTimeout(exportShakeTimerRef.current);
+        if (exportSuccessTimerRef.current) clearTimeout(exportSuccessTimerRef.current);
+    }, []);
 
     // Carga al cambiar mes
     useEffect(() => {
@@ -270,14 +278,20 @@ const CalendarView = ({
         return arr;
     }, [viewYear, viewMonth]);
 
+    const triggerExportShake = () => {
+        setExportShake(true);
+        if (exportShakeTimerRef.current) clearTimeout(exportShakeTimerRef.current);
+        exportShakeTimerRef.current = setTimeout(() => setExportShake(false), 400);
+    };
+
     const handleExportCsv = async () => {
         setExportError('');
-        if (!servicioIdActivo) { setExportError('No hay servicio seleccionado.'); return; }
-        if (!exportMonthValue) { setExportError('Selecciona un mes.'); return; }
+        if (!servicioIdActivo) { setExportError('No hay servicio seleccionado.'); triggerExportShake(); return; }
+        if (!exportMonthValue) { setExportError('Selecciona un mes.'); triggerExportShake(); return; }
         const [anioStr, mesStr] = exportMonthValue.split('-');
         const anio = Number(anioStr);
         const mes = Number(mesStr);
-        if (!Number.isFinite(anio) || !Number.isFinite(mes)) { setExportError('Mes inválido.'); return; }
+        if (!Number.isFinite(anio) || !Number.isFinite(mes)) { setExportError('Mes inválido.'); triggerExportShake(); return; }
         const exportarSoloMios = !puedeExportarServicioCompleto || exportScope === 'mios';
         setExporting(true);
         const result = await exportarTurnosCsv({
@@ -288,9 +302,15 @@ const CalendarView = ({
         if (!result.success) {
             // No exponemos el error técnico (OWASP A09)
             setExportError('No se pudo exportar. Intenta de nuevo.');
+            triggerExportShake();
             return;
         }
-        setExportSheetOpen(false);
+        // Mismo pequeño efecto de éxito que en Login/Selección de servicio.
+        setExportSuccess(true);
+        exportSuccessTimerRef.current = setTimeout(() => {
+            setExportSuccess(false);
+            setExportSheetOpen(false);
+        }, 500);
     };
 
     const today = todayKey();
@@ -308,7 +328,7 @@ const CalendarView = ({
     // RENDER
     // ---------------------------------------------------------------------------
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, overflow: 'hidden', animation: 'sgtFade .3s ease' }}>
 
             {/* Header */}
             <div style={{ padding: '14px 16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -526,7 +546,7 @@ const CalendarView = ({
 
             {/* Sheet de exportación CSV */}
             <Sheet open={exportSheetOpen} onClose={() => !exporting && setExportSheetOpen(false)} title="Exportar turnos CSV" maxHeight="60%">
-                <div style={{ padding: '8px 16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className={exportShake ? 'login-shake' : ''} style={{ padding: '8px 16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
                         <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: PA.ink2, marginBottom: 8 }}>
                             Mes a exportar
@@ -568,8 +588,33 @@ const CalendarView = ({
                         </div>
                     )}
 
-                    <button type="button" onClick={handleExportCsv} disabled={exporting} style={{ width: '100%', border: 'none', background: exporting ? PA.ink3 : PA.primary, color: '#fff', borderRadius: 14, padding: '13px 14px', fontSize: 13.5, fontWeight: 900, cursor: exporting ? 'not-allowed' : 'pointer' }}>
-                        {exporting ? 'Exportando…' : 'Descargar CSV'}
+                    <button
+                        type="button"
+                        onClick={handleExportCsv}
+                        disabled={exporting || exportSuccess}
+                        style={{
+                            width: '100%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                            background: exportSuccess ? PA.success : exporting ? PA.ink3 : PA.primary, color: '#fff',
+                            borderRadius: 14, padding: '13px 14px', fontSize: 13.5, fontWeight: 900,
+                            cursor: (exporting || exportSuccess) ? 'not-allowed' : 'pointer',
+                            transition: 'background 0.25s ease',
+                        }}
+                    >
+                        {exportSuccess ? (
+                            <>
+                                <span className="login-check-pop" style={{ display: 'inline-flex' }}>
+                                    <SGTIcon name="check-circle" size={16} color="#fff" />
+                                </span>
+                                ¡Descargado!
+                            </>
+                        ) : exporting ? (
+                            <>
+                                <span className="login-spinner" aria-hidden="true" />
+                                Exportando…
+                            </>
+                        ) : (
+                            'Descargar CSV'
+                        )}
                     </button>
                 </div>
             </Sheet>

@@ -23,6 +23,68 @@
 @keyframes sgtFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sgtSlideUp { from { transform: translateY(40px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
 
+/* Login — fondo con degradado animado, formas flotantes, entrada del formulario */
+@keyframes sgtGradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes sgtFloat {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-14px) translateX(6px); }
+}
+@keyframes sgtLoginCardIn {
+  from { opacity: 0; transform: translateY(28px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sgtLogoPop {
+  0% { opacity: 0; transform: scale(0.6) rotate(-8deg); }
+  60% { opacity: 1; transform: scale(1.08) rotate(2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes sgtShake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+@keyframes sgtSpin { to { transform: rotate(360deg); } }
+@keyframes sgtCheckPop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.login-gradient-bg {
+  background: linear-gradient(120deg, #17416C 0%, #3E6FA1 35%, #2E7D57 70%, #17416C 100%);
+  background-size: 260% 260%;
+  animation: sgtGradientShift 14s ease infinite;
+}
+.login-blob {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  animation: sgtFloat 7s ease-in-out infinite;
+  pointer-events: none;
+}
+.login-logo-pop { animation: sgtLogoPop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.login-card-in { animation: sgtLoginCardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.login-shake { animation: sgtShake 0.4s ease; }
+.login-spinner {
+  width: 18px; height: 18px; border-radius: 999px;
+  border: 2.5px solid rgba(255,255,255,0.35); border-top-color: #fff;
+  animation: sgtSpin 0.7s linear infinite;
+}
+.login-check-pop { animation: sgtCheckPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+.sgt-login-input {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.sgt-login-input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(23, 65, 108, 0.14);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
