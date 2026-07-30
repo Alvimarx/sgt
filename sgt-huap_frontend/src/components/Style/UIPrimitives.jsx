@@ -31,6 +31,7 @@ export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth =
     case 'check':         return <svg {...common}><path d="M20 6L9 17l-5-5"/></svg>;
     case 'check-circle':  return <svg {...common}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>;
     case 'alert':         return <svg {...common}><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>;
+    case 'exclamation-circle': return <svg {...common}><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>;
     case 'history':       return <svg {...common}><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>;
     case 'calendar':      return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>;
     case 'briefcase':     return <svg {...common}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
@@ -153,15 +154,18 @@ export const IconBtn = ({ icon, onClick, badge }) => (
 export const AlertBanner = ({ pendientes, collapsed, onToggle }) => {
   if (!pendientes || pendientes.length === 0) return null;
   const critical = pendientes.filter(p => p.urgencia === 'alta' || p.urgencia === 'media').length;
+  const tone = critical > 0
+    ? { bg: P().accentSoft, border: '#F3D2D5', bubble: P().accent, ink: '#8C3F44' }
+    : { bg: P().primarySoft, border: '#CFDCEA', bubble: P().primary, ink: P().primary };
   return (
-    <div style={{ margin: '10px 14px 0', background: critical > 0 ? P().accentSoft : P().primarySoft, border: `1px solid ${'#906767'}`, borderRadius: 14, overflow: 'hidden' }}>
+    <div style={{ margin: '10px 14px 0', background: tone.bg, border: `1px solid ${tone.border}`, borderRadius: 14, overflow: 'hidden' }}>
       <button onClick={onToggle} style={{ width: '100%', background: 'transparent', border: 'none', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
-        <div style={{ width: 28, height: 28, borderRadius: 999, background: '#b41313' , color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}><SGTIcon name="bell" size={14} color="#fff"/></div>
+        <div style={{ width: 28, height: 28, borderRadius: 999, background: tone.bubble, color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}><SGTIcon name="bell" size={14} color="#fff"/></div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#481111' }}>{pendientes.length} novedades en tu agenda</div>
-          {collapsed && <div style={{ fontSize: 12, color: '#321618', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pendientes.map(p => p.titulo).join(' · ')}</div>}
+          <div style={{ fontSize: 13, fontWeight: 800, color: tone.ink }}>{pendientes.length} novedades en tu agenda</div>
+          {collapsed && <div style={{ fontSize: 12, color: P().ink3, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pendientes.map(p => p.titulo).join(' · ')}</div>}
         </div>
-        <SGTIcon name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={'#8C3F44'}/>
+        <SGTIcon name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={tone.ink}/>
       </button>
     </div>
   );

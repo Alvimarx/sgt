@@ -1,0 +1,4 @@
+# Credenciales/config local — nunca versionar.
+.env
+.env.*.local
+docker-compose.hospital-real.yml

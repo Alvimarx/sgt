@@ -56,6 +56,8 @@ services:
       - HOSPITAL_DB_USERNAME=${HOSPITAL_DB_USERNAME:?define HOSPITAL_DB_USERNAME en el archivo .env}
       - HOSPITAL_DB_PASSWORD=${HOSPITAL_DB_PASSWORD:?define HOSPITAL_DB_PASSWORD en el archivo .env}
       - SWAGGER_ENABLED=false
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:?define CORS_ALLOWED_ORIGINS en el archivo .env}
+      - LOGIN_LOCK_DURATION_MS=${LOGIN_LOCK_DURATION_MS:-900000}
       - SERVER_ID=backend-1
     networks:
       - huap-network
@@ -90,6 +92,8 @@ services:
       - HOSPITAL_DB_USERNAME=${HOSPITAL_DB_USERNAME:?define HOSPITAL_DB_USERNAME en el archivo .env}
       - HOSPITAL_DB_PASSWORD=${HOSPITAL_DB_PASSWORD:?define HOSPITAL_DB_PASSWORD en el archivo .env}
       - SWAGGER_ENABLED=false
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:?define CORS_ALLOWED_ORIGINS en el archivo .env}
+      - LOGIN_LOCK_DURATION_MS=${LOGIN_LOCK_DURATION_MS:-900000}
       - SERVER_ID=backend-2
     networks:
       - huap-network
@@ -124,6 +128,8 @@ services:
       - HOSPITAL_DB_USERNAME=${HOSPITAL_DB_USERNAME:?define HOSPITAL_DB_USERNAME en el archivo .env}
       - HOSPITAL_DB_PASSWORD=${HOSPITAL_DB_PASSWORD:?define HOSPITAL_DB_PASSWORD en el archivo .env}
       - SWAGGER_ENABLED=false
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:?define CORS_ALLOWED_ORIGINS en el archivo .env}
+      - LOGIN_LOCK_DURATION_MS=${LOGIN_LOCK_DURATION_MS:-900000}
       - SERVER_ID=backend-3
     networks:
       - huap-network

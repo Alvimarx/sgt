@@ -65,6 +65,20 @@ export const planificacionService = {
         const res = await axiosInstance.post(`${API_BASE}/${id}/generar`, { fechaInicio, idsReglas }, { timeout: 120000 });
         return res.data;
     },
+
+    /**
+     * DELETE /planificaciones/{id}/turnos?fechaInicio=&fechaFin= — deshace una generación:
+     * soft-delete de los turnos que este molde generó (por sus rotativas) dentro del rango.
+     * Útil para corregir una generación duplicada (p. ej. "Generar" pulsado dos veces sobre
+     * el mismo mes). No borra turnos de otros moldes ni fuera del rango.
+     * @returns {{ eliminados: number }}
+     */
+    eliminarTurnosGenerados: async (id, fechaInicio, fechaFin) => {
+        const res = await axiosInstance.delete(`${API_BASE}/${id}/turnos`, {
+            params: { fechaInicio, fechaFin },
+        });
+        return res.data;
+    },
 };
 
 export default planificacionService;

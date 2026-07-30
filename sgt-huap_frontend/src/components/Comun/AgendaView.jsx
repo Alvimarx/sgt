@@ -318,7 +318,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       {agendaError && !loadingAgenda && (
         <div
           role="alert"
-          style={{ margin: "8px 14px 0", padding: "10px 12px", borderRadius: 12, background: "#FFF4F5", color: "#8C3F44", border: "1px solid #F3D2D5", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}
+          style={{ margin: "8px 14px 0", padding: "10px 12px", borderRadius: 12, background: PA.accentSoft, color: "#8C3F44", border: "1px solid #F3D2D5", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}
         >
           <SGTIcon name="exclamation-circle" size={15} color="#8C3F44" />
           {agendaError}
@@ -366,7 +366,9 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       <div className="agenda-days-list">
         {loadingAgenda ? (
           <div style={{ padding: 48, textAlign: "center", color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-            <div style={{ marginBottom: 8, fontSize: 22 }}>📅</div>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+              <SGTIcon name="calendar" size={22} color={PA.ink3} />
+            </div>
             Cargando agenda…
           </div>
         ) : (
@@ -399,7 +401,9 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
             })}
             {visibleDays.length === 0 && !loadingAgenda && (
               <div style={{ padding: 48, textAlign: "center", color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                <div style={{ marginBottom: 8, fontSize: 22 }}>🗓</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                  <SGTIcon name="calendar" size={22} color={PA.ink3} />
+                </div>
                 Sin turnos en esta categoría.
               </div>
             )}
@@ -482,6 +486,10 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
 
   const miShift = shifts.find((s) => s.miTurno) || null;
   const libres = shifts.filter((s) => s.turnoLibre);
+  const tc = miShift ? getTipoTurnoColor(miShift) : null;
+  const miTeam = miShift ? getAgendaTeam(miShift) : null;
+  const soloLibres = !miShift && libres.length > 0;
+  const vacio = !miShift && libres.length === 0;
 
   const dayTeams = useMemo(() => {
     const seen = new Map();
@@ -500,6 +508,10 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
       className={`day-row ${hoy ? "day-row--today" : ""}`}
       style={{
         borderColor: hoy ? PA.primary : PA.line,
+        borderStyle: !hoy && vacio ? "dashed" : "solid",
+        borderLeftWidth: 4,
+        borderLeftColor: hoy ? PA.primary : tc ? tc.ink : soloLibres ? PA.accent : PA.line,
+        opacity: !hoy && vacio ? 0.75 : 1,
       }}
     >
       <button
@@ -517,11 +529,18 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         }`}
       >
         {/* Fecha */}
-        <div className="day-row__date">
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", color: hoy ? PA.primary : day.findesemana ? PA.ink3 : PA.ink2 }}>
+        <div
+          className="day-row__date"
+          style={
+            !hoy && miShift ? { background: tc.bg, borderRadius: 10, padding: "4px 2px" }
+            : !hoy && soloLibres ? { background: PA.accentSoft, borderRadius: 10, padding: "4px 2px" }
+            : undefined
+          }
+        >
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", color: hoy ? PA.primary : miShift ? tc.ink : soloLibres ? "#B85A60" : day.findesemana ? PA.ink3 : PA.ink2 }}>
             {day.dia}
           </div>
-          <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1, marginTop: 1, color: hoy ? PA.primary : day.findesemana ? PA.ink3 : PA.ink }}>
+          <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1, marginTop: 1, color: hoy ? PA.primary : miShift ? tc.ink : soloLibres ? "#B85A60" : day.findesemana ? PA.ink3 : PA.ink }}>
             {day.num}
           </div>
           {hoy && (
@@ -533,9 +552,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
 
         {/* Resumen */}
         <div className="day-row__summary">
-          {miShift ? (() => {
-            const tc = getTipoTurnoColor(miShift);
-            return (
+          {miShift ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <div style={{ padding: "3px 9px", borderRadius: 99, background: tc.bg, color: tc.ink, fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -550,9 +567,23 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                   {miShift.cambioAprobado && <SGTBadge tone="success" size="xs">✓ Aprobado</SGTBadge>}
                   {miShift.solicitudPendiente && !miShift.cambioAprobado && <SGTBadge tone="warn" size="xs">Pendiente</SGTBadge>}
                 </div>
+                {miTeam && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, background: PA.surface2, borderRadius: 8, padding: "4px 6px", marginTop: 1 }}>
+                    <SGTAvatar person={miTeam.jefe} size={20} ring="#E9D9C2" />
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: PA.ink, flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {miTeam.jefe.nombre.split(" ").slice(0, 2).join(" ")}
+                    </span>
+                    <div style={{ display: "flex" }}>
+                      {miTeam.urgenciologos?.slice(0, 2).map((p, i) => (
+                        <div key={p.id} style={{ marginLeft: i === 0 ? 0 : -5 }}>
+                          <SGTAvatar person={p} size={18} ring="#fff" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            );
-          })() : (
+          ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={{ fontSize: 13, color: PA.ink2, fontWeight: 700 }}>Sin turno asignado</span>
               {libres.length > 0 && (

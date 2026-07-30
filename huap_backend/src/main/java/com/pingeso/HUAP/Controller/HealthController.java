@@ -41,21 +41,21 @@ public class HealthController {
     }
 
     /**
-     * Endpoint de información del servidor
-     * Útil para debugging y verificar qué instancia respondió
+     * Endpoint de información del servidor.
+     * Útil para debugging y verificar qué instancia respondió el balanceador.
+     *
+     * <p>SEC-011: es público (sin autenticación) por diseño, para permitir verificar
+     * el balanceo desde afuera; por eso NO debe incluir detalles del entorno de
+     * ejecución (versión de Java, SO, memoria) que faciliten el fingerprinting del
+     * servidor a un atacante anónimo. Esos detalles ya no se exponen aquí.
      */
     @GetMapping("/info")
     public ResponseEntity<Map<String, Object>> serverInfo() {
         Map<String, Object> info = new HashMap<>();
         info.put("serverId", serverId);
         info.put("application", applicationName);
-        info.put("javaVersion", System.getProperty("java.version"));
-        info.put("osName", System.getProperty("os.name"));
-        info.put("availableProcessors", Runtime.getRuntime().availableProcessors());
-        info.put("maxMemory", Runtime.getRuntime().maxMemory() / (1024 * 1024) + " MB");
-        info.put("freeMemory", Runtime.getRuntime().freeMemory() / (1024 * 1024) + " MB");
         info.put("timestamp", Instant.now().toString());
-        
+
         return ResponseEntity.ok(info);
     }
 }

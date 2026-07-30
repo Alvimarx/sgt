@@ -8,5 +8,10 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jdk-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
+
+# SEC-008: correr como usuario sin privilegios, no como root.
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

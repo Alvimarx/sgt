@@ -434,6 +434,61 @@ function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,load
   );
 }
 
+/* ─── EliminarTurnosSheet (deshacer una generación por rango de fechas) ─────── */
+function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
+  const[fechaInicio,setFechaInicio]=useState('');
+  const[fechaFin,setFechaFin]=useState('');
+  const[err,setErr]=useState('');
+  const[confirmando,setConfirmando]=useState(false);
+  useEffect(()=>{ if(open){ setFechaInicio(''); setFechaFin(''); setErr(''); setConfirmando(false); } },[open]);
+  if(!open)return null;
+  const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
+  const inputSt={width:'100%',padding:'12px 13px',borderRadius:10,border:'1.5px solid var(--line)',fontSize:14,fontWeight:700,color:'var(--ink)',background:'#fff',fontFamily:'inherit',outline:'none'};
+
+  const handle=()=>{
+    if(!fechaInicio||!fechaFin)return setErr('Indica fecha de inicio y fecha de fin.');
+    if(fechaFin<fechaInicio)return setErr('La fecha de fin no puede ser anterior a la de inicio.');
+    setErr(''); setConfirmando(true);
+  };
+
+  return(
+    <Sheet open={open} onClose={()=>!eliminando&&onClose()} title="Eliminar turnos generados" maxHeight="80%">
+      <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{fontSize:12.5,color:'var(--ink3)',fontWeight:600,lineHeight:1.4}}>
+          Borra (deja fuera de la agenda) los turnos que <strong style={{color:'var(--ink)'}}>{nombreMolde||'este molde'}</strong> generó dentro del rango de fechas indicado. Útil para deshacer una generación duplicada. No afecta otros moldes ni turnos fuera del rango.
+        </div>
+        {err&&<div style={{display:'flex',alignItems:'center',gap:6,background:'var(--warn-soft)',color:'var(--warn)',borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:700}}><SGTIcon name="alert" size={14}/>{err}</div>}
+        <div>
+          <span style={lbl}>Desde</span>
+          <input type="date" value={fechaInicio} onChange={e=>setFechaInicio(e.target.value)} style={inputSt}/>
+        </div>
+        <div>
+          <span style={lbl}>Hasta</span>
+          <input type="date" value={fechaFin} onChange={e=>setFechaFin(e.target.value)} style={inputSt}/>
+        </div>
+        <button onClick={handle} style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:12,background:'var(--warn)',color:'#fff',border:'none',fontSize:14.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
+          <SGTIcon name="trash" size={16} color="#fff"/> Eliminar turnos del rango
+        </button>
+      </div>
+
+      {confirmando&&(
+        <div onClick={()=>!eliminando&&setConfirmando(false)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.4)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:300}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'8px 20px 32px',width:'100%',maxWidth:480,boxShadow:'0 -8px 40px rgba(0,0,0,0.18)'}}>
+            <div style={{display:'flex',justifyContent:'center',paddingBottom:14}}><div style={{width:40,height:4,background:'var(--line)',borderRadius:99}}/></div>
+            <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><div style={{width:56,height:56,borderRadius:16,background:'var(--warn-soft)',display:'grid',placeItems:'center'}}><SGTIcon name="trash" size={26} color="var(--warn)"/></div></div>
+            <div style={{fontWeight:800,fontSize:18,color:'var(--ink)',textAlign:'center',marginBottom:10}}>¿Eliminar estos turnos?</div>
+            <p style={{fontSize:14,color:'var(--ink2)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center'}}>Se eliminarán los turnos generados por este molde entre el <strong style={{color:'var(--ink)'}}>{fechaInicio}</strong> y el <strong style={{color:'var(--ink)'}}>{fechaFin}</strong>. Esta acción no se puede deshacer desde la app.</p>
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>setConfirmando(false)} disabled={eliminando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'1.5px solid var(--line)',background:'none',color:'var(--ink2)',fontSize:15,fontWeight:700,cursor:eliminando?'not-allowed':'pointer',fontFamily:'inherit'}}>Cancelar</button>
+              <button onClick={()=>onConfirm(fechaInicio,fechaFin)} disabled={eliminando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--warn)',color:'#fff',fontSize:15,fontWeight:700,cursor:eliminando?'not-allowed':'pointer',opacity:eliminando?0.7:1,fontFamily:'inherit'}}>{eliminando?'Eliminando…':'Sí, eliminar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
 /* ─── DetalleDiaSheet (Semana X · Día, agrupado por tipo real) ─────────────── */
 function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssignInstance}){
   if(!open||diaIndex==null)return null;
@@ -857,6 +912,8 @@ function PlanGuardarBase({onBack}){
   const[moldesOpen,setMoldesOpen]=useState(false);
   const[generarOpen,setGenerarOpen]=useState(false);
   const[generando,setGenerando]=useState(false);
+  const[eliminarOpen,setEliminarOpen]=useState(false);
+  const[eliminandoTurnos,setEliminandoTurnos]=useState(false);
   const[assignInstance,setAssignInstance]=useState(null);
   const[detailDia,setDetailDia]=useState(null);
   const[toast,setToast]=useState('');
@@ -943,6 +1000,18 @@ function PlanGuardarBase({onBack}){
     finally{ setGenerando(false); }
   };
 
+  const onEliminarTurnos=async(fechaInicio,fechaFin)=>{
+    setEliminandoTurnos(true);
+    try{
+      const res=await planificacionService.eliminarTurnosGenerados(planActualId,fechaInicio,fechaFin);
+      setEliminarOpen(false);
+      flash(`${res?.eliminados||0} turnos eliminados`);
+    }catch(e){ setError(e?.response?.data?.error||e.message||'Error al eliminar turnos.'); }
+    finally{ setEliminandoTurnos(false); }
+  };
+
+  const abrirEliminarTurnos=()=>{ if(!planActualId){ flash('Guarda el molde antes de eliminar turnos generados.'); return; } setEliminarOpen(true); };
+
   const openMoldes=()=>{ cargarMoldes(); setMoldesOpen(true); };
   const nuevoMolde=()=>{ reset(); setPlanActualId(null); setPlanNombre(null); flash('Molde nuevo'); };
 
@@ -971,6 +1040,7 @@ function PlanGuardarBase({onBack}){
         rightSlot={
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <button onClick={nuevoMolde} title="Molde nuevo" style={ghostBtnGB}><SGTIcon name="plus" size={16} color="var(--ink2)"/></button>
+            <button onClick={abrirEliminarTurnos} title="Eliminar turnos generados por este molde" style={ghostBtnGB}><SGTIcon name="trash" size={15} color="var(--warn)"/></button>
             <button onClick={()=>setInjectOpen(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'8px 12px',borderRadius:10,background:'var(--primary)',color:'#fff',border:'none',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}><SGTIcon name="plus" size={14} color="#fff"/> Agregar</button>
           </div>
         }
@@ -1008,6 +1078,7 @@ function PlanGuardarBase({onBack}){
 
       <InyectarSheet open={injectOpen} onClose={()=>setInjectOpen(false)} onInject={onInject} plantillas={plantillas} puestos={puestos}/>
       <MoldesSheet open={moldesOpen} onClose={()=>setMoldesOpen(false)} onSave={onSave} onLoad={onLoad} onDelete={onDeleteMolde} instancias={instancias} moldes={moldes} loading={cargandoMoldes} nombreInicial={planNombre} planActualId={planActualId}/>
+      <EliminarTurnosSheet open={eliminarOpen} onClose={()=>setEliminarOpen(false)} onConfirm={onEliminarTurnos} eliminando={eliminandoTurnos} nombreMolde={planNombre}/>
       <AsignarFuncionarioSheet open={!!assignInstance} onClose={()=>setAssignInstance(null)} instancia={assignInstance?instancias.find(i=>i.id===assignInstance.id):null} instancias={instancias} funcionarios={funcionarios} onAssign={onAssign} onUnassign={(id)=>{ unassign(id); flash('Asignación retirada'); }} onRemove={(id)=>{ removeInstancia(id); flash('Rotativa quitada'); }}/>
       <DetalleDiaSheet open={detailDia!=null} onClose={()=>setDetailDia(null)} diaIndex={detailDia} entradasDelDia={dayEntradas} tipoColor={tipoColor} onAssignInstance={(inst)=>{ setDetailDia(null); setTimeout(()=>setAssignInstance(inst),220); }}/>
     </div>

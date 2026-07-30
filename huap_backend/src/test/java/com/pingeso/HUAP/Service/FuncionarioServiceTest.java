@@ -86,6 +86,23 @@ class FuncionarioServiceTest {
     }
 
     @Test
+    void authenticateWithPassword_rutNoExiste_igualInvocaPasswordEncoder_paraEvitarEnumeracionPorTiempo() {
+        // SEC-013: si el RUT no existe, el servicio debe igual invocar passwordEncoder.matches()
+        // contra un hash señuelo antes de lanzar la excepción, para que esta rama no responda
+        // notablemente más rápido que la de "RUT existe, contraseña incorrecta" (lo que
+        // permitiría enumerar RUTs válidos midiendo el tiempo de respuesta).
+        String rut = "99.999.999-9";
+
+        when(viewPersonalRepository.findByRut(anyString())).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> funcionarioService.authenticateWithPassword(rut, "cualquierPassword"));
+
+        assertEquals("Credenciales incorrectas", ex.getMessage());
+        verify(passwordEncoder).matches(eq("cualquierPassword"), anyString());
+    }
+
+    @Test
     void authenticateWithPassword_inactivo_lanzaExcepcion() {
         String rut = "12.345.678-9";
         ViewPersonalEntity personal = viewPersonal("12345678", 5, new byte[64]);

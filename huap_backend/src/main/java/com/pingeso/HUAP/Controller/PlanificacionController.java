@@ -90,6 +90,25 @@ public class PlanificacionController {
         return ids;
     }
 
+    // Deshace una generación: soft-delete de los turnos generados por esta planificación
+    // (por sus rotativas) dentro de un rango de fechas. Requiere rol ADMINISTRADOR
+    // (mismo requisito que el resto de /api/v2/planificaciones/**, ver SecurityConfig).
+    // Params: fechaInicio, fechaFin (YYYY-MM-DD).
+    @DeleteMapping("/{id}/turnos")
+    public ResponseEntity<?> eliminarTurnosGenerados(
+            @PathVariable Long id,
+            @RequestParam String fechaInicio,
+            @RequestParam String fechaFin) {
+        try {
+            LocalDate inicio = LocalDate.parse(fechaInicio);
+            LocalDate fin = LocalDate.parse(fechaFin);
+            int eliminados = planificacionService.eliminarTurnosGenerados(id, inicio, fin);
+            return ResponseEntity.ok(Map.of("eliminados", eliminados));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // Pre-chequeo de choques de horario (no crea turnos). Body: { "fechaInicio": "YYYY-MM-DD" }
     @PostMapping("/{id}/conflictos")
     public ResponseEntity<?> conflictos(@PathVariable Long id, @RequestBody Map<String, Object> payload) {

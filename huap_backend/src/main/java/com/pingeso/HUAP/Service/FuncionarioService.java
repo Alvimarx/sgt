@@ -48,6 +48,13 @@ public class FuncionarioService {
     private final ServicioRepository servicioRepository;
     private final RolSistemaRepository rolSistemaRepository;
 
+    // SEC-013: hash BCrypt señuelo, de formato válido pero sin usuario real asociado.
+    // Se compara contra él cuando el RUT no existe, para que esa rama tome un tiempo
+    // similar al de "RUT existe, contraseña incorrecta" y no se pueda distinguir por
+    // temporización si un RUT está o no registrado. No cambia ningún mensaje ni resultado.
+    private static final String DUMMY_BCRYPT_HASH =
+            "{bcrypt}$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     // ====================================================================
     // AUTENTICACIÓN Y VALIDACIÓN DE CREDENCIALES
     // ====================================================================
@@ -83,6 +90,10 @@ public class FuncionarioService {
         }
         
         if (usuario.isEmpty()){
+            // SEC-013: se ejecuta igual una comparación de hash (contra un valor señuelo)
+            // para que esta rama no responda notablemente más rápido que la de
+            // "contraseña incorrecta" y así evitar enumerar RUTs válidos por temporización.
+            passwordEncoder.matches(password, DUMMY_BCRYPT_HASH);
             throw new RuntimeException("Credenciales incorrectas");
         }
         ViewPersonalEntity user = usuario.get();

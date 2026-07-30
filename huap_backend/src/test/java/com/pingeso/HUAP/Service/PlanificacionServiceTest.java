@@ -310,4 +310,49 @@ class PlanificacionServiceTest {
 
         assertTrue(service.detectarConflictos(PLAN_ID, LUNES).isEmpty());
     }
+
+    // ============================ eliminarTurnosGenerados ============================
+
+    @Test
+    void eliminarTurnosGenerados_delegaEnRepositorioConRotativasDeLaPlanificacion() {
+        ServicioEntity servicio = servicio(SERVICIO_ID, "Urgencias");
+        RotativaEntity rotativa = rotativa(servicio);
+        FuncionarioEntity funcionario = func(FUNC_ID, false);
+        LocalDate fin = LUNES.plusDays(6);
+
+        when(planificacionRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan(servicio, rotativa, funcionario)));
+        when(turnoRepository.softDeleteByRotativasAndRango(List.of(ROTATIVA_ID), LUNES, fin)).thenReturn(14);
+
+        int eliminados = service.eliminarTurnosGenerados(PLAN_ID, LUNES, fin);
+
+        assertEquals(14, eliminados);
+        verify(turnoRepository).softDeleteByRotativasAndRango(List.of(ROTATIVA_ID), LUNES, fin);
+    }
+
+    @Test
+    void eliminarTurnosGenerados_finAntesDeInicio_lanza() {
+        ServicioEntity servicio = servicio(SERVICIO_ID, "Urgencias");
+        RotativaEntity rotativa = rotativa(servicio);
+        FuncionarioEntity funcionario = func(FUNC_ID, false);
+
+        when(planificacionRepository.findById(PLAN_ID)).thenReturn(Optional.of(plan(servicio, rotativa, funcionario)));
+
+        assertThrows(RuntimeException.class,
+                () -> service.eliminarTurnosGenerados(PLAN_ID, LUNES, LUNES.minusDays(1)));
+        verifyNoInteractions(turnoRepository);
+    }
+
+    @Test
+    void eliminarTurnosGenerados_sinAsignaciones_noConsultaRepositorioYDevuelveCero() {
+        ServicioEntity servicio = servicio(SERVICIO_ID, "Urgencias");
+        PlanificacionEntity planSinAsignaciones = new PlanificacionEntity(servicio, "Plan vacío");
+        planSinAsignaciones.setIdPlanificacion(PLAN_ID);
+
+        when(planificacionRepository.findById(PLAN_ID)).thenReturn(Optional.of(planSinAsignaciones));
+
+        int eliminados = service.eliminarTurnosGenerados(PLAN_ID, LUNES, LUNES.plusDays(6));
+
+        assertEquals(0, eliminados);
+        verifyNoInteractions(turnoRepository);
+    }
 }

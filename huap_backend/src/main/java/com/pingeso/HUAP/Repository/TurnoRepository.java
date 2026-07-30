@@ -4,6 +4,7 @@ import com.pingeso.HUAP.Entity.TurnoEntity;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -247,6 +248,27 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin,
             @Param("idFuncionario") Long idFuncionario,
             @Param("idServicio") Long idServicio
+    );
+
+    /**
+     * Soft-delete en bloque de los turnos generados a partir de alguna de las rotativas dadas
+     * (típicamente, todas las de una planificación) cuyo día de inicio cae dentro del rango.
+     * Se usa para deshacer una generación de turnos hecha por error o duplicada.
+     * @return cantidad de turnos marcados como eliminados.
+     */
+    @Modifying
+    @Query("""
+           UPDATE TurnoEntity t
+           SET t.eliminado = true
+           WHERE t.eliminado = false
+           AND t.rotativa.idRotativa IN :idsRotativas
+           AND t.diaInicioTurno >= :fechaInicio
+           AND t.diaInicioTurno <= :fechaFin
+           """)
+    int softDeleteByRotativasAndRango(
+            @Param("idsRotativas") List<Long> idsRotativas,
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin
     );
 
 }

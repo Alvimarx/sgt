@@ -318,7 +318,7 @@ const CalendarView = ({
                 <button onClick={goToPrevMonth} aria-label="Mes anterior" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
                     <SGTIcon name="chevron-left" size={17} color={PA.ink2} />
                 </button>
-                <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 900, color: PA.ink }}>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 900, letterSpacing: -0.2, color: PA.ink }}>
                     {modoAsignacionAdmin ? 'Asignación de turnos · ' : ''}{MONTH_NAMES[viewMonth - 1]} {viewYear}
                 </div>
                 <button onClick={goToNextMonth} aria-label="Mes siguiente" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
@@ -330,7 +330,7 @@ const CalendarView = ({
 
                 {/* Error — lenguaje humano (Nielsen #9, OWASP A09) */}
                 {error && !loading && (
-                    <div role="alert" style={{ margin: '10px 14px 0', padding: '10px 12px', borderRadius: 12, background: '#FFF4F5', color: '#8C3F44', border: '1px solid #F3D2D5', fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div role="alert" style={{ margin: '10px 14px 0', padding: '10px 12px', borderRadius: 12, background: PA.accentSoft, color: '#8C3F44', border: '1px solid #F3D2D5', fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                         <SGTIcon name="exclamation-circle" size={15} color="#8C3F44" />
                         {error}
                     </div>
@@ -348,7 +348,9 @@ const CalendarView = ({
 
                     {loading ? (
                         <div style={{ padding: '40px 0', textAlign: 'center', color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                            <div style={{ fontSize: 20, marginBottom: 8 }}>📅</div>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+                                <SGTIcon name="calendar" size={20} color={PA.ink3} />
+                            </div>
                             Cargando…
                         </div>
                     ) : (
@@ -376,8 +378,10 @@ const CalendarView = ({
                                             all: 'unset',
                                             textAlign: 'center', padding: '6px 2px', borderRadius: 10,
                                             cursor: tappable ? 'pointer' : 'default',
-                                            background: isToday ? PA.primary : isSel ? PA.primarySoft : 'transparent',
-                                            transition: 'background 0.15s',
+                                            background: isToday ? PA.primary : isSel ? PA.primarySoft : tappable ? '#fff' : 'transparent',
+                                            border: isSel && !isToday ? `1.5px solid ${PA.primary}` : '1.5px solid transparent',
+                                            boxSizing: 'border-box',
+                                            transition: 'background 0.15s, border-color 0.15s',
                                             display: 'block',
                                         }}
                                     >
@@ -392,7 +396,7 @@ const CalendarView = ({
                                         <div style={{ display: 'flex', justifyContent: 'center', gap: 2, minHeight: 6 }}>
                                             {miShift && <Dot color={isToday ? 'rgba(255,255,255,0.9)' : PA.primary} />}
                                             {hasLibre && <Dot color={isToday ? 'rgba(255,255,255,0.65)' : PA.accent} />}
-                                            {hasAjeno && <Dot color={isToday ? 'rgba(255,255,255,0.5)' : 'rgba(240,178,43,0.9)'} />}
+                                            {hasAjeno && <Dot color={isToday ? 'rgba(255,255,255,0.5)' : PA.warn} />}
                                         </div>
                                     </button>
                                 );
@@ -405,7 +409,7 @@ const CalendarView = ({
                 <div style={{ display: 'flex', gap: 14, padding: '12px 16px 8px', borderTop: `1px solid ${PA.line2}`, marginTop: 12, flexWrap: 'wrap' }}>
                     <LegendDot color={PA.primary} label="Mi turno" />
                     <LegendDot color={PA.accent} label="Cupo libre" />
-                    <LegendDot color="rgba(240,178,43,0.9)" label="Turno del servicio" />
+                    <LegendDot color={PA.warn} label="Turno del servicio" />
                 </div>
 
                 {/* Botón de exportación */}
@@ -599,7 +603,7 @@ const DayDetailOverview = ({ stats, onOpen }) => {
                                     {group.inicio && group.fin ? `${group.inicio}–${group.fin}` : 'Horario no definido'}
                                 </div>
                             </div>
-                            <span style={{ background: 'rgba(255,255,255,0.78)', borderRadius: 999, padding: '4px 8px', fontSize: 11, fontWeight: 900, color: group.vacantes > 0 ? '#9A3412' : '#166534', flexShrink: 0 }}>
+                            <span style={{ background: 'rgba(255,255,255,0.78)', borderRadius: 999, padding: '4px 8px', fontSize: 11, fontWeight: 900, color: group.vacantes > 0 ? PA.warn : PA.success, flexShrink: 0 }}>
                                 {group.asignados}/{group.total}
                             </span>
                         </div>
@@ -641,8 +645,8 @@ const DayDetailOverview = ({ stats, onOpen }) => {
 
                             {/* Vacantes */}
                             {vacantes.length > 0 && (
-                                <div style={{ background: '#FFF7ED', border: '1px solid #FDBA74', borderRadius: 10, padding: '8px 10px' }}>
-                                    <div style={{ fontSize: 10.5, fontWeight: 800, color: '#9A3412', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
+                                <div style={{ background: PA.warnSoft, border: `1px solid ${PA.warn}`, borderRadius: 10, padding: '8px 10px' }}>
+                                    <div style={{ fontSize: 10.5, fontWeight: 800, color: PA.warn, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
                                         {vacantes.length} vacante{vacantes.length > 1 ? 's' : ''} por cubrir
                                     </div>
                                     {vacantes.map(turno => (
@@ -653,18 +657,18 @@ const DayDetailOverview = ({ stats, onOpen }) => {
                                             aria-label={`Cupo libre: ${turno.nombrePuesto || 'Sin posición'}`}
                                             style={{ width: '100%', border: 'none', background: 'transparent', padding: '6px 0', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', textAlign: 'left' }}
                                         >
-                                            <div style={{ width: 28, height: 28, borderRadius: 99, border: '1.5px dashed #FDBA74', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <SGTIcon name="plus" size={13} color="#9A3412" />
+                                            <div style={{ width: 28, height: 28, borderRadius: 99, border: `1.5px dashed ${PA.warn}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <SGTIcon name="plus" size={13} color={PA.warn} />
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#9A3412' }}>
+                                                <div style={{ fontSize: 12.5, fontWeight: 800, color: PA.warn }}>
                                                     {turno.nombrePuesto || 'Posición sin asignar'}
                                                 </div>
-                                                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#C2460A' }}>
+                                                <div style={{ fontSize: 10.5, fontWeight: 600, color: PA.warn }}>
                                                     Cupo libre disponible
                                                 </div>
                                             </div>
-                                            <SGTIcon name="chevron-right" size={13} color="#9A3412" />
+                                            <SGTIcon name="chevron-right" size={13} color={PA.warn} />
                                         </button>
                                     ))}
                                 </div>
@@ -684,9 +688,9 @@ const DayDetailOverview = ({ stats, onOpen }) => {
 const MiniStat = ({ label, value, danger = false }) => {
     const PA = SGT_DATA.PALETTE;
     return (
-        <div style={{ background: danger ? '#FFF7ED' : PA.surface2, border: `1px solid ${danger ? '#FDBA74' : PA.line2}`, borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
+        <div style={{ background: danger ? PA.warnSoft : PA.surface2, border: `1px solid ${danger ? PA.warn : PA.line2}`, borderRadius: 10, padding: '8px 6px', textAlign: 'center' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: PA.ink3, marginBottom: 3, textTransform: 'uppercase' }}>{label}</div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: danger ? '#9A3412' : PA.ink }}>{value}</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: danger ? PA.warn : PA.ink }}>{value}</div>
         </div>
     );
 };

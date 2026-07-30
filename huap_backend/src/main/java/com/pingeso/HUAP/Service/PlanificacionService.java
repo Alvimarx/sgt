@@ -151,6 +151,39 @@ public class PlanificacionService {
         planificacionRepository.delete(obtenerPlanificacion(idPlanificacion));
     }
 
+    /**
+     * Deshace una generación: soft-delete de los turnos que esta planificación generó
+     * (identificados por las rotativas de sus asignaciones) dentro de un rango de fechas.
+     * Pensado para corregir una generación duplicada (p. ej. "pegar" dos veces el mismo mes)
+     * sin afectar turnos de otras planificaciones ni el historial fuera del rango indicado.
+     *
+     * <p>Nota: si dos planificaciones distintas del mismo servicio comparten una rotativa,
+     * esto borraría también los turnos de esa rotativa generados por la otra planificación
+     * dentro del mismo rango — un caso raro en la práctica, pero a tener en cuenta.
+     *
+     * @return cantidad de turnos eliminados.
+     */
+    public int eliminarTurnosGenerados(Long idPlanificacion, LocalDate fechaInicio, LocalDate fechaFin) {
+        PlanificacionEntity plan = obtenerPlanificacion(idPlanificacion);
+
+        if (fechaInicio == null || fechaFin == null) {
+            throw new RuntimeException("Debe indicar fecha de inicio y fecha de fin.");
+        }
+        if (fechaFin.isBefore(fechaInicio)) {
+            throw new RuntimeException("La fecha de fin no puede ser anterior a la fecha de inicio.");
+        }
+
+        List<Long> idsRotativas = plan.getAsignaciones().stream()
+                .map(a -> a.getRotativa().getIdRotativa())
+                .distinct()
+                .toList();
+        if (idsRotativas.isEmpty()) {
+            return 0;
+        }
+
+        return turnoRepository.softDeleteByRotativasAndRango(idsRotativas, fechaInicio, fechaFin);
+    }
+
     // =========================================================
     // GENERACIÓN DE TURNOS
     // =========================================================

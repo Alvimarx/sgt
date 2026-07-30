@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -7,17 +8,24 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Control simple de intentos de login (en memoria) para mitigar fuerza bruta.
  * Tras MAX_ATTEMPTS fallos consecutivos para una misma clave (RUT), se bloquea
- * durante LOCK_TIME_MS. Un login exitoso limpia el contador.
+ * durante la ventana configurada. Un login exitoso limpia el contador.
  *
- * Nota: es por instancia. En despliegues multi-nodo conviene respaldarlo en un
- * almacén compartido (Redis) o aplicar rate limiting en el reverse proxy/WAF.
+ * Nota (SEC-009): es por instancia. Con varias réplicas de backend detrás del
+ * balanceador, el conteo NO se comparte entre ellas — un atacante distribuido
+ * a través de las réplicas puede multiplicar los intentos efectivos antes de
+ * agotar el límite en todas. Para cerrar esto por completo se requiere un
+ * almacén compartido (Redis) o rate limiting en el reverse proxy/WAF.
  */
 @Service
 public class LoginAttemptService {
 
     private static final int MAX_ATTEMPTS = 5;
-    // Pruebas: 1 minuto. Producción recomendada: 15 * 60 * 1000L (15 min).
-    private static final long LOCK_TIME_MS = 60 * 1000L; // 1 minuto
+
+    // SEC-009: antes hardcodeado a 1 minuto ("valor de pruebas"); ahora configurable
+    // vía app.security.login.lock-duration-ms (env LOGIN_LOCK_DURATION_MS),
+    // con 15 minutos por defecto (el valor que el propio código ya recomendaba para producción).
+    @Value("${app.security.login.lock-duration-ms:900000}")
+    private long lockTimeMs;
 
     private static final class Attempt {
         int count;
@@ -42,7 +50,7 @@ public class LoginAttemptService {
         synchronized (a) {
             a.count++;
             if (a.count >= MAX_ATTEMPTS) {
-                a.lockedUntil = System.currentTimeMillis() + LOCK_TIME_MS;
+                a.lockedUntil = System.currentTimeMillis() + lockTimeMs;
                 a.count = 0;
             }
         }
