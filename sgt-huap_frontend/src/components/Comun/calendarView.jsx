@@ -366,11 +366,20 @@ const CalendarView = ({
                                 const isSel = selectedDay === day;
                                 const isWknd = idx % 7 >= 5;
                                 const tappable = shifts.length > 0;
+                                const miShiftColor = miShift ? getTipoTurnoColor(miShift) : null;
+
+                                const cellClass = [
+                                    'cal-day-cell',
+                                    isToday && 'cal-day-cell--today',
+                                    !isToday && isSel && 'cal-day-cell--selected',
+                                    !isToday && !isSel && tappable && 'cal-day-cell--has-shift',
+                                ].filter(Boolean).join(' ');
 
                                 return (
                                     <button
                                         key={idx}
                                         type="button"
+                                        className={cellClass}
                                         aria-label={`${day} de ${MONTH_NAMES[viewMonth - 1]}${miShift ? ', tienes turno' : ''}${hasLibre ? ', cupo libre' : ''}`}
                                         aria-pressed={isSel}
                                         onClick={() => tappable && setSelectedDay(isSel ? null : day)}
@@ -378,7 +387,11 @@ const CalendarView = ({
                                             all: 'unset',
                                             textAlign: 'center', padding: '6px 2px', borderRadius: 10,
                                             cursor: tappable ? 'pointer' : 'default',
-                                            background: isToday ? PA.primary : isSel ? PA.primarySoft : tappable ? '#fff' : 'transparent',
+                                            background: isToday
+                                                ? `linear-gradient(150deg, ${PA.primary}, #0F2E4D)`
+                                                : isSel
+                                                    ? `linear-gradient(150deg, ${PA.primarySoft}, #fff)`
+                                                    : tappable ? '#fff' : 'transparent',
                                             border: isSel && !isToday ? `1.5px solid ${PA.primary}` : '1.5px solid transparent',
                                             boxSizing: 'border-box',
                                             transition: 'background 0.15s, border-color 0.15s',
@@ -394,7 +407,7 @@ const CalendarView = ({
                                             {day}
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'center', gap: 2, minHeight: 6 }}>
-                                            {miShift && <Dot color={isToday ? 'rgba(255,255,255,0.9)' : PA.primary} />}
+                                            {miShift && <Dot color={isToday ? 'rgba(255,255,255,0.9)' : miShiftColor.ink} />}
                                             {hasLibre && <Dot color={isToday ? 'rgba(255,255,255,0.65)' : PA.accent} />}
                                             {hasAjeno && <Dot color={isToday ? 'rgba(255,255,255,0.5)' : PA.warn} />}
                                         </div>
@@ -591,7 +604,7 @@ const DayDetailOverview = ({ stats, onOpen }) => {
                 const vacantes = group.turnos.filter(t => t.idFuncionario == null || t.turnoLibre);
 
                 return (
-                    <div key={group.key} style={{ background: color.bg, border: `1.5px solid ${color.soft}`, borderRadius: 14, padding: 12 }}>
+                    <div key={group.key} style={{ background: color.bg, border: `1.5px solid ${color.soft}`, borderRadius: 14, padding: 12, boxShadow: '0 3px 8px rgba(15, 23, 42, 0.06)' }}>
                         {/* Header del grupo */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                             <SGTIcon name={group.tipo === 'noche' ? 'moon' : 'sun'} size={15} color={color.ink} />
