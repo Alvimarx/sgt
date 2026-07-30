@@ -6,7 +6,9 @@ export const SGT_PALETTE = {
   equipoB: { bg: 'oklch(0.94 0.04 150)', ink: 'oklch(0.35 0.08 150)', soft: 'oklch(0.97 0.02 150)' },
   equipoC: { bg: 'oklch(0.94 0.04 30)',  ink: 'oklch(0.4 0.09 30)',   soft: 'oklch(0.97 0.02 30)' },
   equipoD: { bg: 'oklch(0.94 0.04 85)',  ink: 'oklch(0.38 0.08 85)',  soft: 'oklch(0.97 0.02 85)' },
-  
+  equipoE: { bg: 'oklch(0.94 0.04 300)', ink: 'oklch(0.38 0.08 300)', soft: 'oklch(0.97 0.02 300)' },
+  equipoF: { bg: 'oklch(0.94 0.04 190)', ink: 'oklch(0.35 0.08 190)', soft: 'oklch(0.97 0.02 190)' },
+
   // Referencias a variables CSS para que UIPrimitives no falle
   primary: 'var(--primary)',
   primarySoft: 'var(--primary-soft)',
@@ -52,6 +54,8 @@ export const TEAMS = {
   B: { key: 'B', ...SGT_PALETTE.equipoB, nombre: 'Equipo Turno B' },
   C: { key: 'C', ...SGT_PALETTE.equipoC, nombre: 'Equipo Turno C' },
   D: { key: 'D', ...SGT_PALETTE.equipoD, nombre: 'Equipo Turno D' },
+  E: { key: 'E', ...SGT_PALETTE.equipoE, nombre: 'Equipo Turno E' },
+  F: { key: 'F', ...SGT_PALETTE.equipoF, nombre: 'Equipo Turno F' },
 };
 
 function team(jefe, urgs, meds) {

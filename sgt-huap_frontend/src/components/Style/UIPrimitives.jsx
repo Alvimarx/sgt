@@ -151,6 +151,12 @@ export const IconBtn = ({ icon, onClick, badge }) => (
   </button>
 );
 
+const alertDotColor = (urgencia) => {
+  if (urgencia === 'alta' || urgencia === 'media') return P().warn;
+  if (urgencia === 'baja') return P().primary;
+  return P().success;
+};
+
 export const AlertBanner = ({ pendientes, collapsed, onToggle }) => {
   if (!pendientes || pendientes.length === 0) return null;
   const critical = pendientes.filter(p => p.urgencia === 'alta' || p.urgencia === 'media').length;
@@ -167,6 +173,20 @@ export const AlertBanner = ({ pendientes, collapsed, onToggle }) => {
         </div>
         <SGTIcon name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={tone.ink}/>
       </button>
+      {!collapsed && (
+        <div>
+          {pendientes.map((p, i) => (
+            <div key={p.id ?? i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderTop: `1px solid ${tone.border}` }}>
+              <SGTIcon name="dot" size={8} color={alertDotColor(p.urgencia)} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: P().ink }}>{p.titulo}</div>
+                {p.sub && <div style={{ fontSize: 11, color: P().ink3, marginTop: 1 }}>{p.sub}</div>}
+              </div>
+              <SGTIcon name="chevron-right" size={14} color={P().ink3} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

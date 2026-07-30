@@ -33,6 +33,14 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
+// Formato corto "Vie 20 nov" para subtítulos de la bandeja de novedades — solo presentación.
+const formatFechaCorta = (fechaISO) => {
+  if (!fechaISO) return "";
+  const d = new Date(`${fechaISO}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return fechaISO;
+  return d.toLocaleDateString("es-CL", { weekday: "short", day: "numeric", month: "short" }).replace(".", "");
+};
+
 // ---------------------------------------------------------------------------
 // AGENDAVIEW — componente raíz de la vista
 // Props:
@@ -85,17 +93,30 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     [agendaData.turnos]
   );
 
+  // Cambios de turno propios en curso (misTurnos con solicitud pendiente o ya aprobada),
+  // sourced de los mismos datos ya cargados para la agenda — sin llamadas ni reglas nuevas.
+  const misCambiosPendientes = useMemo(
+    () => (agendaData.turnos || []).filter((t) => t.miTurno && t.solicitudPendiente && !t.cambioAprobado),
+    [agendaData.turnos]
+  );
+  const misCambiosAprobados = useMemo(
+    () => (agendaData.turnos || []).filter((t) => t.miTurno && t.cambioAprobado),
+    [agendaData.turnos]
+  );
+
   const pendientes = useMemo(() => {
     const items = [];
-    if (unreadCount > 0) {
+
+    misCambiosPendientes.forEach((t) => {
       items.push({
-        id: "notificaciones-sin-leer",
-        tipo: "notificacion",
-        titulo: `${unreadCount} notificacion${unreadCount > 1 ? "es" : ""} sin leer`,
-        sub: "Revisa tu bandeja",
-        urgencia: "info",
+        id: `cambio-pendiente-${t.id}`,
+        tipo: "cambio_pendiente",
+        titulo: t.solicitudCon ? `Cambio pendiente con ${t.solicitudCon}` : "Cambio de turno pendiente",
+        sub: `${formatFechaCorta(t.fecha)} · Esperando respuesta`,
+        urgencia: "media",
       });
-    }
+    });
+
     if (canSeeFreeTurnsInBanner && freeTurnsCount > 0) {
       items.push({
         id: "turnos-libres",
@@ -105,8 +126,29 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
         urgencia: "baja",
       });
     }
+
+    misCambiosAprobados.forEach((t) => {
+      items.push({
+        id: `cambio-aprobado-${t.id}`,
+        tipo: "cambio_aprobado",
+        titulo: "Cambio aprobado",
+        sub: t.cambioAprobadoCon ? `${formatFechaCorta(t.fecha)} · con ${t.cambioAprobadoCon}` : formatFechaCorta(t.fecha),
+        urgencia: "info",
+      });
+    });
+
+    if (unreadCount > 0) {
+      items.push({
+        id: "notificaciones-sin-leer",
+        tipo: "notificacion",
+        titulo: `${unreadCount} notificacion${unreadCount > 1 ? "es" : ""} sin leer`,
+        sub: "Revisa tu bandeja",
+        urgencia: "info",
+      });
+    }
+
     return items;
-  }, [unreadCount, canSeeFreeTurnsInBanner, freeTurnsCount]);
+  }, [unreadCount, canSeeFreeTurnsInBanner, freeTurnsCount, misCambiosPendientes, misCambiosAprobados]);
 
   const getShifts = (dayKey) => shiftsByDay[dayKey] || [];
 
@@ -553,16 +595,24 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
         {/* Resumen */}
         <div className="day-row__summary">
           {miShift ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  <div style={{ padding: "3px 9px", borderRadius: 99, background: tc.bg, color: tc.ink, fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <SGTIcon name={miShift.tipo === "dia" ? "sun" : "moon"} size={11} color={tc.ink} />
-                    {miShift.tipo === "dia" ? "Día" : "Noche"}
-                  </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                  <SGTIcon name={miShift.tipo === "dia" ? "sun" : "moon"} size={14} color={tc.ink} />
+                  <span style={{ fontSize: 13.5, fontWeight: 800, color: PA.ink }}>
+                    {miShift.inicio || "--:--"} – {miShift.fin || "--:--"}
+                  </span>
+                  {miShift.horas != null && (
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: PA.ink3 }}>· {miShift.horas}h</span>
+                  )}
                   {day.resumen?.tieneMultiplesTurnos && (
                     <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 700 }}>+{day.resumen.misTurnos.length - 1} más</span>
                   )}
                 </div>
+                {miShift.nombreTipoTurno && (
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: tc.ink }}>
+                    Equipo {miShift.nombreTipoTurno}
+                  </div>
+                )}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   {miShift.cambioAprobado && <SGTBadge tone="success" size="xs">✓ Aprobado</SGTBadge>}
                   {miShift.solicitudPendiente && !miShift.cambioAprobado && <SGTBadge tone="warn" size="xs">Pendiente</SGTBadge>}

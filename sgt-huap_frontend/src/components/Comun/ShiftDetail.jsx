@@ -10,14 +10,23 @@ import { SGTAvatar, SGTBadge, SGTIcon } from "../Style/UIPrimitives";
 // HELPERS
 // ---------------------------------------------------------------------------
 
-// Colores estándar por tipo de turno (constantes en toda la app: Agenda, Calendario y Detalle).
-const TIPO_TURNO_COLORS = {
-    dia:   { bg: "rgb(245,223,188)", soft: "#F5E0B7", ink: "#6B4D15" },  // ámbar cálido (sol)
-    noche: { bg: "#b0baee",          soft: "#D7E2FF", ink: "#183b6b" },  // azul (luna)
+// Color por identidad de tipo de turno (no por día/noche): cada tipo de turno (idTipoTurno)
+// recibe siempre el mismo color de la paleta de equipos, consistente en Agenda, Calendario y Detalle.
+const TEAM_COLOR_LIST = Object.values(SGT_DATA.TEAMS);
+
+const colorIndexForKey = (value) => {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return Math.abs(Math.trunc(numeric)) % TEAM_COLOR_LIST.length;
+    const str = String(value ?? "");
+    let acc = 0;
+    for (let i = 0; i < str.length; i++) acc = (acc + str.charCodeAt(i) * (i + 1)) % 997;
+    return acc % TEAM_COLOR_LIST.length;
 };
 
-export const getTipoTurnoColor = (shift) =>
-    TIPO_TURNO_COLORS[shift?.tipo === "noche" ? "noche" : "dia"];
+export const getTipoTurnoColor = (shift) => {
+    const key = shift?.idTipoTurno ?? shift?.nombreTipoTurno ?? shift?.tipo ?? "sin-tipo";
+    return TEAM_COLOR_LIST[colorIndexForKey(key)];
+};
 
 const buildInitials = (name = "") =>
     String(name || "?")
