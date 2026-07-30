@@ -3,7 +3,7 @@
 # Un solo comando levanta todo:
 #   docker compose -f docker-compose.dev.yml up --build
 #
-# MySQL de dev (puerto 3307 del host) con dos esquemas separados que imitan la
+# MySQL de dev (puerto 13307 del host) con dos esquemas separados que imitan la
 # topología real de producción:
 #   - gestionturnos : BD propia del SGT (Hibernate crea las tablas al arrancar; db-seeder la puebla).
 #   - innhosp       : stand-in del hospital, con la vista viewPersonal (setup_personal_aux.sql).
@@ -22,7 +22,7 @@ services:
       # Crea la BD de la app vacía; el backend crea sus tablas (ddl-auto) y el seeder la puebla.
       - MYSQL_DATABASE=gestionturnos
     ports:
-      - "3307:3306"
+      - "13307:3306"
     volumes:
       - huap-dev-db-data:/var/lib/mysql
       # initdb.d corre en orden alfabético SOLO en la primera inicialización del volumen.
@@ -101,11 +101,17 @@ services:
       context: ./sgt-huap_frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_BASE_URL=http://localhost:8080/api/v2
+        # Relativa: el proxy de abajo reenvía /api/v2 al backend, así funciona
+        # tanto por localhost como por la IP de la LAN (celular, otra PC, etc.).
+        - VITE_API_BASE_URL=/api/v2
     container_name: huap-frontend
     restart: always
     ports:
       - "5173:80"
+    volumes:
+      # Agrega proxy reverso /api/v2 -> backend:8080 sobre la conf base del
+      # httpd.conf que genera el Dockerfile del frontend (ver apache/dev/httpd.conf).
+      - ./apache/dev/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
     depends_on:
       - backend
     networks:
