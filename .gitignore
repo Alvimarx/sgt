@@ -2,3 +2,4 @@
 .env
 .env.*.local
 docker-compose.hospital-real.yml
+docker-compose.external-db.yml
