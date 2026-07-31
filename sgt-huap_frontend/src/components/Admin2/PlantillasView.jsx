@@ -5,6 +5,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { plantillasService, tiposTurnoService, formatHora } from '../../services/rotativasService';
 import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import { SGT_DATA } from './data';
 
 // ─── Paleta compartida con el resto de la app ──────────────────────────────
@@ -593,7 +594,7 @@ function PlantillaCard({ plantilla, onEdit, onDelete }) {
     const pct = total > 0 ? Math.round((diasConTurno / total) * 100) : 0;
 
     return (
-        <div style={{
+        <div className="sgt-list-row" style={{
             background: PA.surface, border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
             borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
         }}>
@@ -699,7 +700,7 @@ export default function PlantillasView({ onBack }) {
     // Modo editor abierto
     if (editing !== null) {
         return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
+            <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
                 <TopHeader
                     title={editing === 'new' ? 'Nueva rotativa' : `Editar: ${editing.nombre}`}
                     leftSlot={
@@ -732,7 +733,7 @@ export default function PlantillasView({ onBack }) {
 
     // Vista de lista
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
+        <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
             {/* Header */}
             <TopHeader
@@ -774,29 +775,25 @@ export default function PlantillasView({ onBack }) {
                 )}
 
                 {loading ? (
-                    <div style={{ padding: 48, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
-                        Cargando…
-                    </div>
+                    <LoadingState label="Cargando rotativas…" />
                 ) : plantillas.length === 0 ? (
-                    <div style={{
-                        background: PA.surface, border: `1px solid ${PA.line}`, borderRadius: 14,
-                        padding: 48, textAlign: 'center',
-                    }}>
-                        <CalendarDays size={40} style={{ color: PA.ink3, marginBottom: 14 }} />
-                        <p style={{ margin: '0 0 16px', color: PA.ink3, fontSize: 14 }}>
-                            No hay rotativas en este servicio.
-                        </p>
-                        <button
-                            onClick={() => setEditing('new')}
-                            style={{
-                                padding: '9px 20px', borderRadius: 10,
-                                background: PA.primary, color: '#fff', border: 'none',
-                                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                            }}
-                        >
-                            Crear la primera rotativa
-                        </button>
-                    </div>
+                    <ListEmptyState
+                        icon="rotate" theme="red"
+                        title="Sin rotativas"
+                        message="No hay rotativas definidas en este servicio."
+                        action={
+                            <button
+                                onClick={() => setEditing('new')}
+                                style={{
+                                    padding: '9px 20px', borderRadius: 10, marginTop: 4,
+                                    background: PA.primary, color: '#fff', border: 'none',
+                                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                                }}
+                            >
+                                Crear la primera rotativa
+                            </button>
+                        }
+                    />
                 ) : (
                     plantillas.map(p => (
                         <PlantillaCard
