@@ -218,6 +218,15 @@
   filter: brightness(0.97);
 }
 
+@keyframes sgtSkeletonShimmer {
+  0%   { opacity: 0.6; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+.sgt-skeleton-row {
+  animation: sgtSkeletonShimmer 1.3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
