@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { SGTBadge, SGTIcon, TopHeader, ConfirmDialog } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import { reglasServicioService } from '../../services/reglasServicioService';
 import { tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/rotativasService';
 
@@ -184,7 +185,7 @@ const ReglasServicioView = ({ onBack }) => {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
       {/* Header */}
       <TopHeader
         title="Reglas de Horario del Servicio"
@@ -283,14 +284,16 @@ const ReglasServicioView = ({ onBack }) => {
 
         {/* Lista */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 30, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Cargando…</div>
+          <LoadingState label="Cargando reglas…" />
         ) : reglas.length === 0 && !formOpen ? (
-          <div style={{ textAlign: 'center', padding: 30, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-            Aún no hay reglas configuradas.
-          </div>
+          <ListEmptyState
+            icon="sliders" theme="green"
+            title="Sin reglas configuradas"
+            message="Crea una regla para ajustar automáticamente las horas en fines de semana y feriados."
+          />
         ) : (
           reglas.map(r => (
-            <div key={r.idRegla} style={{ background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div key={r.idRegla} className="sgt-list-row" style={{ background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink, flex: 1 }}>{r.nombre}</span>
               </div>
@@ -317,23 +320,17 @@ const ReglasServicioView = ({ onBack }) => {
       </div>
 
       {/* Confirmación de borrado */}
-      {confirmDel && (
-        <div onClick={() => !eliminando && setConfirmDel(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px 20px 0 0', padding: '8px 20px 32px', width: '100%', maxWidth: 480, boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 16 }}>
-              <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
-            </div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: PA.ink, marginBottom: 8 }}>Eliminar regla</div>
-            <p style={{ fontSize: 13.5, color: PA.ink3, fontWeight: 600, margin: '0 0 20px', lineHeight: 1.5 }}>
-              La regla "{confirmDel.nombre}" dejará de aplicarse en las próximas generaciones. Los turnos ya creados no se modifican.
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirmDel(null)} disabled={eliminando} style={{ flex: 1, padding: '13px 0', borderRadius: 12, background: '#fff', color: PA.ink2, border: `1.5px solid ${PA.line}`, fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-              <button onClick={eliminar} disabled={eliminando} style={{ flex: 1, padding: '13px 0', borderRadius: 12, background: '#B85A60', color: '#fff', border: 'none', fontSize: 14, fontWeight: 800, cursor: eliminando ? 'not-allowed' : 'pointer', opacity: eliminando ? 0.7 : 1, fontFamily: 'inherit' }}>{eliminando ? 'Eliminando…' : 'Eliminar'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!confirmDel}
+        icon="alert" tone="danger"
+        title="Eliminar regla"
+        busy={eliminando}
+        confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar'}
+        onConfirm={eliminar}
+        onCancel={() => setConfirmDel(null)}
+      >
+        La regla "{confirmDel?.nombre}" dejará de aplicarse en las próximas generaciones. Los turnos ya creados no se modifican.
+      </ConfirmDialog>
     </div>
   );
 };
