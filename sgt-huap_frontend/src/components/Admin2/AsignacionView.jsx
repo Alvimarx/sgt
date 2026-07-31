@@ -1,7 +1,7 @@
 // AsignacionView.jsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SGT_DATA } from './data';
-import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader, ConfirmDialog } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 import { getCurrentUser } from '../../services/authService'
@@ -47,83 +47,6 @@ const maskRut = (rut = '') => {
     const clean = rut.replace(/[^0-9kK\-]/g, '');
     if (clean.length < 5) return '***';
     return `***${clean.slice(-5)}`;
-};
-
-// ---------------------------------------------------------------------------
-// COMPONENTE DE CONFIRMACIÓN
-// Muestra un resumen antes de ejecutar la acción de asignación.
-// ---------------------------------------------------------------------------
-const ConfirmDialog = ({ funcionario, servicio, onConfirm, onCancel, guardando }) => {
-    const PA = SGT_DATA.PALETTE;
-    return (
-        <div style={{ 
-            position: 'fixed', 
-            inset: 0, 
-            zIndex: 100, 
-            display: 'flex', 
-            alignItems: 'center',       // Centrado vertical
-            justifyContent: 'center',   // Centrado horizontal
-            padding: '20px',            // Margen de seguridad para pantallas muy pequeñas
-            background: 'rgba(15,23,42,0.4)' 
-        }}>
-            <div style={{ 
-                width: '100%', 
-                maxWidth: '340px',          // Ancho máximo estándar de alerta móvil
-                background: '#fff', 
-                borderRadius: '20px',       // Bordes redondeados en todas las esquinas
-                padding: '24px',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' 
-            }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: PA.ink, marginBottom: 12, textAlign: 'center' }}>
-                    Confirmar asignación
-                </div>
-                
-                <p style={{ fontSize: 14, color: PA.ink2, fontWeight: 500, marginBottom: 24, lineHeight: 1.5, textAlign: 'center' }}>
-                    ¿Deseas asignar a <strong style={{ color: PA.ink }}>{getNombreCompleto(funcionario)}</strong> al servicio{' '}
-                    <strong style={{ color: PA.ink }}>{servicio?.nombreServicio || servicio?.nombre}</strong>?
-                </p>
-                
-                <div style={{ display: 'flex', gap: 12 }}>
-                    <button
-                        onClick={onCancel}
-                        disabled={guardando}
-                        style={{ 
-                            flex: 1, 
-                            padding: '12px', 
-                            borderRadius: '12px', 
-                            border: `1px solid ${PA.line}`, 
-                            background: '#fff', 
-                            fontSize: 15, 
-                            fontWeight: 700, 
-                            color: PA.ink2, 
-                            cursor: guardando ? 'not-allowed' : 'pointer',
-                            opacity: guardando ? 0.7 : 1
-                        }}
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        disabled={guardando}
-                        style={{ 
-                            flex: 1, 
-                            padding: '12px', 
-                            borderRadius: '12px', 
-                            border: 'none', 
-                            background: PA.primary, 
-                            fontSize: 15, 
-                            fontWeight: 800, 
-                            color: '#fff', 
-                            cursor: guardando ? 'not-allowed' : 'pointer', 
-                            opacity: guardando ? 0.7 : 1 
-                        }}
-                    >
-                        {guardando ? 'Guardando...' : 'Confirmar'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
 };
 
 // ---------------------------------------------------------------------------
@@ -334,11 +257,11 @@ const AsignacionView = ({ onBack }) => {
     // RENDER
     // ---------------------------------------------------------------------------
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
+        <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease' }}>
 
             {/* Header */}
             <TopHeader
-                title="Asignación"
+                title="Asignación de Funcionarios"
                 leftSlot={
                     <button
                         onClick={onBack}
@@ -550,15 +473,18 @@ const AsignacionView = ({ onBack }) => {
             </div>
 
             {/* Diálogo de confirmación  */}
-            {showConfirm && servicioSeleccionado && (
-                <ConfirmDialog
-                    funcionario={selectedUser}
-                    servicio={servicioSeleccionado}
-                    onConfirm={handleConfirmar}
-                    onCancel={() => setShowConfirm(false)}
-                    guardando={guardando}
-                />
-            )}
+            <ConfirmDialog
+                open={showConfirm && !!servicioSeleccionado}
+                icon="users" tone="primary"
+                title="Confirmar asignación"
+                busy={guardando}
+                confirmLabel={guardando ? 'Guardando...' : 'Confirmar'}
+                onConfirm={handleConfirmar}
+                onCancel={() => setShowConfirm(false)}
+            >
+                ¿Deseas asignar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> al servicio{' '}
+                <strong style={{ color: PA.ink }}>{servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre}</strong>?
+            </ConfirmDialog>
         </div>
     );
 };
