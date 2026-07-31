@@ -3,6 +3,7 @@ import { Clock, Plus, Pencil, Trash2, X, Check, AlertCircle } from 'lucide-react
 import { useAuth } from '../../context/AuthContext';
 import { tiposTurnoService, formatHora } from '../../services/rotativasService';
 import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import { SGT_DATA } from './data';
 
 // ─── Paleta de colores compartida con el resto de la app ───────────────────
@@ -23,7 +24,7 @@ const turnoColor = (index) => {
 function TurnoCard({ turno, index, onEdit, onDelete }) {
     const c = turnoColor(index);
     return (
-        <div style={{
+        <div className="sgt-list-row" style={{
             background: '#fff', borderRadius: 16,
             border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', overflow: 'hidden',
         }}>
@@ -362,7 +363,7 @@ export default function TiposTurnoView({ onBack }) {
     const closeForm  = () => { setEditing(null); setShowForm(false); };
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
+        <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
             {/* Header con botón volver */}
             <TopHeader
@@ -416,29 +417,25 @@ export default function TiposTurnoView({ onBack }) {
 
                 {/* Lista de tipos de turno */}
                 {loading ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
-                        Cargando…
-                    </div>
+                    <LoadingState label="Cargando tipos de turno…" />
                 ) : tipos.length === 0 ? (
-                    <div style={{
-                        background: '#fff', borderRadius: 16, border: 'none',
-                        boxShadow: '0 2px 10px rgba(15,23,42,0.06)', padding: 48, textAlign: 'center',
-                    }}>
-                        <Clock size={36} style={{ color: PA.ink3, marginBottom: 12 }} />
-                        <p style={{ margin: '0 0 14px', color: PA.ink3, fontSize: 14 }}>
-                            No hay tipos de turno definidos para este servicio.
-                        </p>
-                        <button
-                            onClick={openCreate}
-                            style={{
-                                padding: '9px 20px', borderRadius: 10,
-                                background: PA.primary, color: '#fff', border: 'none',
-                                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                            }}
-                        >
-                            Crear el primero
-                        </button>
-                    </div>
+                    <ListEmptyState
+                        icon="clock" theme="teal"
+                        title="Sin tipos de turno"
+                        message="No hay tipos de turno definidos para este servicio."
+                        action={
+                            <button
+                                onClick={openCreate}
+                                style={{
+                                    padding: '9px 20px', borderRadius: 10, marginTop: 4,
+                                    background: PA.primary, color: '#fff', border: 'none',
+                                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                                }}
+                            >
+                                Crear el primero
+                            </button>
+                        }
+                    />
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {tipos.map((t, i) => (
