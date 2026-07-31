@@ -48,6 +48,7 @@ export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth =
     case 'org-chart':     return <svg {...common}><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v4M12 11H5v6M12 11h7v6"/></svg>;
     case 'rotate':        return <svg {...common}><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/></svg>;
     case 'shield-search': return <svg {...common}><path d="M12 21c-3.6-1.3-7-4-7-9V6l7-3 7 3v6c0 1-.14 1.9-.4 2.7"/><circle cx="15.5" cy="15.5" r="3"/><path d="M19 19l2 2"/></svg>;
+    case 'download':      return <svg {...common}><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>;
     default: return null;
   }
 };

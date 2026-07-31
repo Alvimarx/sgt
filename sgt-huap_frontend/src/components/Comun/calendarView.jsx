@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon, Sheet } from '../Style/UIPrimitives';
+import { LoadingState } from '../Style/ListControls';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
 import ShiftDetail, { getTipoTurnoColor, formatShiftLabel } from '../Comun/ShiftDetail';
@@ -328,20 +329,20 @@ const CalendarView = ({
     // RENDER
     // ---------------------------------------------------------------------------
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, overflow: 'hidden', animation: 'sgtFade .3s ease' }}>
+        <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'sgtFade .3s ease' }}>
 
             {/* Header */}
             <div style={{ padding: '14px 16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={onBack} aria-label="Volver" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
+                <button onClick={onBack} aria-label="Volver" className="sgt-nav-arrow" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
                     <SGTIcon name="chevron-left" size={22} color={PA.ink} />
                 </button>
-                <button onClick={goToPrevMonth} aria-label="Mes anterior" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
+                <button onClick={goToPrevMonth} aria-label="Mes anterior" className="sgt-nav-arrow" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
                     <SGTIcon name="chevron-left" size={17} color={PA.ink2} />
                 </button>
                 <div style={{ flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 900, letterSpacing: -0.2, color: PA.ink }}>
                     {modoAsignacionAdmin ? 'Asignación de turnos · ' : ''}{MONTH_NAMES[viewMonth - 1]} {viewYear}
                 </div>
-                <button onClick={goToNextMonth} aria-label="Mes siguiente" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
+                <button onClick={goToNextMonth} aria-label="Mes siguiente" className="sgt-nav-arrow" style={{ background: 'transparent', border: 'none', padding: 6, cursor: 'pointer', display: 'flex', borderRadius: 8 }}>
                     <SGTIcon name="chevron-right" size={17} color={PA.ink2} />
                 </button>
             </div>
@@ -367,12 +368,7 @@ const CalendarView = ({
                     </div>
 
                     {loading ? (
-                        <div style={{ padding: '40px 0', textAlign: 'center', color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-                                <SGTIcon name="calendar" size={20} color={PA.ink3} />
-                            </div>
-                            Cargando…
-                        </div>
+                        <LoadingState label="Cargando turnos del mes…" />
                     ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px 2px' }}>
                             {cells.map((day, idx) => {
@@ -449,6 +445,7 @@ const CalendarView = ({
                 <div style={{ padding: '4px 14px 12px' }}>
                     <button
                         type="button"
+                        className="sgt-list-row"
                         onClick={() => { setExportMonthValue(`${viewYear}-${String(viewMonth).padStart(2, '0')}`); setExportScope('mios'); setExportError(''); setExportSheetOpen(true); }}
                         style={{ width: '100%', border: `1px solid ${PA.line2}`, background: '#fff', color: PA.ink, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                     >
