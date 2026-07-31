@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data'; // Ajusta la ruta según tu estructura
 import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 
 const AVATAR_THEME = DASHBOARD_ICON_THEMES.green;
 import { getFuncionariosSummary } from '../../services/funcionarioService';
@@ -61,8 +62,8 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
-      
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
+
       {/* Cabecera */}
       <TopHeader
         title="Personal del Servicio"
@@ -112,9 +113,7 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
         {/* Lista de Doctores / Funcionarios */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
-              Cargando nómina de personal...
-            </div>
+            <LoadingState label="Cargando nómina de personal..." />
           ) : personalFiltrado.length > 0 ? (
             personalFiltrado.map((u, i) => {
               
@@ -132,7 +131,7 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
               else if (esSubrogante) { badgeBg = PA.primarySoft; badgeColor = PA.primary; }
 
               return (
-                <div key={u.idFuncionario || `f_${i}`} style={{
+                <div key={u.idFuncionario || `f_${i}`} className="sgt-list-row" style={{
                   background: '#fff', border: 'none', borderRadius: 16,
                   padding: '14px', display: 'flex', alignItems: 'center', gap: 12,
                   boxShadow: '0 2px 10px rgba(15,23,42,0.06)'
@@ -168,9 +167,11 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
               );
             })
           ) : (
-            <div style={{ textAlign: 'center', padding: '40px 16px', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
-              No se encontraron funcionarios asignados a este servicio.
-            </div>
+            <ListEmptyState
+              icon="search" theme="slate"
+              title="Sin resultados"
+              message="No se encontraron funcionarios asignados a este servicio."
+            />
           )}
         </div>
       </div>
