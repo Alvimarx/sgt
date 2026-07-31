@@ -1,6 +1,6 @@
 // src/components/AgendaMockup/UIPrimitives.jsx
 import React from 'react';
-import { SGT_DATA, DASHBOARD_ICON_THEMES, STATUS_TONE_MAP } from '../Admin2/data';
+import { SGT_DATA, DASHBOARD_ICON_THEMES, DASHBOARD_CARD_THEME_BY_TITLE, STATUS_TONE_MAP } from '../Admin2/data';
 
 const P = () => SGT_DATA.PALETTE;
 
@@ -147,6 +147,38 @@ export const IconBadge3D = ({ icon, theme = 'blue', size = 44, iconSize, radius 
     }}>
       <SGTIcon name={icon} size={iconSize || Math.round(size * 0.5)} color="#fff" strokeWidth={2.2} />
     </div>
+  );
+};
+
+// Tarjeta de menú de los paneles de Administración/Jefatura/Subrogante:
+// icono 3D + título + descripción. El tema de color se resuelve por
+// título vía DASHBOARD_CARD_THEME_BY_TITLE, así que el mismo módulo
+// mantiene su color sin importar desde qué panel se entra.
+export const DashboardCard = ({ icon, title, desc, onClick, delay = 0 }) => {
+  const PA = P();
+  const theme = DASHBOARD_ICON_THEMES[DASHBOARD_CARD_THEME_BY_TITLE[title]] || DASHBOARD_ICON_THEMES.blue;
+
+  return (
+    <button
+      className="sgt-list-row"
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 14, background: '#fff', border: 'none',
+        borderRadius: 16, padding: 16, cursor: 'pointer', textAlign: 'left', boxShadow: '0 4px 16px rgba(15,23,42,0.08)',
+        animation: `sgtCardIn .4s cubic-bezier(.22,1,.36,1) ${delay}s both`,
+      }}
+    >
+      <div style={{
+        width: 44, height: 44, borderRadius: 14, background: theme.grad, display: 'grid', placeItems: 'center', flexShrink: 0,
+        boxShadow: `0 6px 14px ${theme.glow}, inset 0 1.5px 0 rgba(255,255,255,0.55), inset 0 -3px 5px rgba(0,0,0,0.18)`,
+      }}>
+        <SGTIcon name={icon} size={22} color="#fff" strokeWidth={2.2} />
+      </div>
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: PA.ink }}>{title}</div>
+        <div style={{ fontSize: 13, color: PA.ink3, fontWeight: 600, marginTop: 4, lineHeight: 1.4 }}>{desc}</div>
+      </div>
+    </button>
   );
 };
 
