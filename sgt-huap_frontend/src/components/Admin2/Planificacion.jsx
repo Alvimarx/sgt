@@ -734,7 +734,7 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
   };
 
   return(
-    <div style={{flex:1,display:'flex',flexDirection:'column',background:'var(--surface2)',animation:'sgtSlideLeft .3s ease',overflow:'hidden'}}>
+    <div className="dash-page-bg" style={{flex:1,display:'flex',flexDirection:'column',animation:'sgtSlideLeft .3s ease',overflow:'hidden'}}>
       <TopHeader title="Generar planificación" subtitle="Elige el lunes de inicio" dense leftSlot={<button onClick={onCancel} style={{background:'transparent',border:'none',padding:4,cursor:'pointer',display:'flex'}}><SGTIcon name="chevron-left" size={24} color="var(--ink)"/></button>}/>
       <div style={{flex:1,overflow:'auto'}}>
         <div style={{background:'#fff',padding:'14px',borderBottom:'1px solid var(--line2)'}}>
@@ -1031,7 +1031,7 @@ function PlanGuardarBase({onBack}){
   }
 
   return(
-    <div style={{flex:1,display:'flex',flexDirection:'column',background:'var(--surface2)',animation:'sgtSlideLeft .3s ease',overflow:'hidden',position:'relative'}}>
+    <div className="dash-page-bg" style={{flex:1,display:'flex',flexDirection:'column',animation:'sgtSlideLeft .3s ease',overflow:'hidden',position:'relative'}}>
       <TopHeader
         title="Planificación"
         subtitle={planNombre||'Molde de rotativas · por semanas'}
