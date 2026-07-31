@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 // Get backend URL from environment or use default
-const SOCKET_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8080';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8080';
 
 let socket = null;
 

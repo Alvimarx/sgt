@@ -1,43 +1,18 @@
 # ==============================================================
-# DESARROLLO — entorno autocontenido (app + BD con los DOS esquemas).
-# Un solo comando levanta todo:
-#   docker compose -f docker-compose.dev.yml up --build
+# DESARROLLO — backend conectado a las DOS BASES DE DATOS EXTERNAS reales
+# (no levanta MySQL local). Un solo comando levanta todo:
 #
-# MySQL de dev (puerto 13307 del host) con dos esquemas separados que imitan la
-# topología real de producción:
-#   - gestionturnos : BD propia del SGT (Hibernate crea las tablas al arrancar; db-seeder la puebla).
-#   - innhosp       : stand-in del hospital, con la vista viewPersonal (setup_personal_aux.sql).
+#   docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 #
-# NOTA: las credenciales de aquí son SOLO de desarrollo local (valores desechables).
-# En producción se usa docker-compose.yml (solo app, secretos por .env, BD reales).
+# Variables reales en .env.dev (no versionado, ver .env.example para la plantilla):
+#   - DB_*          : BD propia del SGT (gestionturnos), externa.
+#   - HOSPITAL_DB_* : BD del hospital (viewPersonal, solo lectura), externa.
+#
+# NOTA: ambas BD son compartidas/reales. DDL_AUTO=validate en .env.dev evita
+# que Hibernate altere su esquema. Ver docs/AMBIENTE_DEV.md para más detalle
+# y troubleshooting de conectividad.
 # ==============================================================
 services:
-  db:
-    image: mysql:8.0
-    container_name: huap-dev-db
-    restart: unless-stopped
-    environment:
-      - MYSQL_ROOT_PASSWORD=localdev
-      - MYSQL_ROOT_HOST=%
-      # Crea la BD de la app vacía; el backend crea sus tablas (ddl-auto) y el seeder la puebla.
-      - MYSQL_DATABASE=gestionturnos
-    ports:
-      - "13307:3306"
-    volumes:
-      - huap-dev-db-data:/var/lib/mysql
-      # initdb.d corre en orden alfabético SOLO en la primera inicialización del volumen.
-      # Deja innhosp con sus tablas + la vista viewPersonal + datos de prueba (stand-in del hospital).
-      - ./BaseDatosMySQL/desarrollo/innhosp/01_esquema.sql:/docker-entrypoint-initdb.d/10_innhosp_esquema.sql:ro
-      - ./BaseDatosMySQL/desarrollo/innhosp/02_datos.sql:/docker-entrypoint-initdb.d/20_innhosp_datos.sql:ro
-    networks:
-      - huap-dev-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-plocaldev"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 40s
-
   backend:
     build:
       context: ./huap_backend
@@ -46,22 +21,8 @@ services:
     restart: always
     ports:
       - "8080:8080"
-    environment:
-      # BD de la app (gestionturnos) y BD del hospital (innhosp), ambas en el MySQL de dev.
-      - DB_URL=jdbc:mysql://db:3306/gestionturnos
-      - DB_USERNAME=root
-      - DB_PASSWORD=localdev
-      - HOSPITAL_DB_URL=jdbc:mysql://db:3306/innhosp
-      - HOSPITAL_DB_USERNAME=root
-      - HOSPITAL_DB_PASSWORD=localdev
-      - DDL_AUTO=update
-      # Secreto JWT SOLO de desarrollo (desechable).
-      - JWT_SECRET=dev-only-secret-cambia-esto-min-32-caracteres-0123456789
-      - SWAGGER_ENABLED=true
-      - SERVER_ID=backend-dev
-    depends_on:
-      db:
-        condition: service_healthy
+    env_file:
+      - .env.dev
     networks:
       - huap-dev-network
     healthcheck:
@@ -70,31 +31,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 90s
-
-  # Puebla la BD de la app (gestionturnos) DESPUÉS de que el backend crea las tablas (ddl-auto).
-  db-seeder:
-    image: mysql:8.0
-    container_name: huap-dev-seeder
-    restart: "no"
-    volumes:
-      - ./BaseDatosMySQL:/scripts:ro
-    command:
-      - sh
-      - -c
-      - |
-        COUNT=$$(mysql -h db -uroot -plocaldev gestionturnos -se 'SELECT COUNT(*) FROM Funcionario' 2>/dev/null || echo 0);
-        if [ "$$COUNT" = "0" ]; then
-          echo "gestionturnos vacía, ejecutando seed (poblar_innhosp2.sql)...";
-          mysql -h db -uroot -plocaldev < /scripts/desarrollo/gestionturnos/02_datos.sql;
-          echo "Seed finalizado.";
-        else
-          echo "gestionturnos ya tiene datos ($$COUNT funcionarios), omitiendo seed.";
-        fi
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - huap-dev-network
 
   frontend:
     build:
@@ -120,6 +56,3 @@ services:
 networks:
   huap-dev-network:
     driver: bridge
-
-volumes:
-  huap-dev-db-data:

@@ -66,24 +66,24 @@ Cliente ──▶ Apache LB (:5173) ──┬──▶ Frontend ×3 (Apache http
 
 ## Inicio rápido (desarrollo)
 
-El flujo recomendado para levantar todo el sistema (incluida una base de datos MySQL con datos de prueba) es el compose de desarrollo, que es **autocontenido**:
+El backend se conecta a las **dos bases de datos externas reales** (no se levanta ninguna BD local). Necesitas un archivo `.env.dev` con las credenciales reales (no versionado — pide una copia a tu equipo o generá una a partir de `.env.example`):
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+cp .env.example .env.dev   # y completa los valores reales
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
 ```
 
 Esto levanta:
-- **MySQL 8** (`huap-dev-db`) en el puerto `3307` del host, con **dos esquemas** que imitan la topología real: `gestionturnos` (BD de la app; Hibernate crea las tablas al arrancar y el *seeder* la puebla) e `innhosp` (stand-in del hospital, con la vista `viewPersonal` y usuarios de prueba).
-- **Backend** en `http://localhost:8080` (API bajo `/api/v2`; Swagger UI habilitado en dev en `/swagger-ui.html`).
+- **Backend** en `http://localhost:8080` (API bajo `/api/v2`; Swagger UI habilitado en dev en `/swagger-ui.html`), conectado a la BD `gestionturnos` externa y a la vista `viewPersonal` del hospital (externa, solo lectura).
 - **Frontend** en `http://localhost:5173`.
-
-> Usuarios de prueba: la contraseña de todos es `huap2025` (ver `BaseDatosMySQL/desarrollo/innhosp/02_datos.sql`).
 
 Verifica el backend:
 
 ```bash
 curl http://localhost:8080/api/v2/health
 ```
+
+Detalle completo (arquitectura, variables, troubleshooting de conectividad): [`docs/AMBIENTE_DEV.md`](docs/AMBIENTE_DEV.md).
 
 ## Despliegue (producción)
 
@@ -129,7 +129,7 @@ export DDL_AUTO="update" JWT_SECRET="secreto-largo-de-desarrollo-min-32-chars"
 ./mvnw spring-boot:run
 ```
 
-Para desarrollo lo más simple es usar el compose de dev, que ya deja los dos esquemas listos (ver [Inicio rápido](#inicio-rápido-desarrollo)). Detalle de variables en [Configuración](#configuración).
+Para desarrollo lo más simple es usar el compose de dev, que ya apunta a las BD externas reales (ver [Inicio rápido](#inicio-rápido-desarrollo)). Si necesitas trabajar sin conectividad a esas BD, puedes levantar tu propio MySQL local con los scripts de `BaseDatosMySQL/desarrollo/` (ya no se orquesta automáticamente vía Docker) y apuntar `DB_URL`/`HOSPITAL_DB_URL` a él. Detalle de variables en [Configuración](#configuración).
 
 **Frontend**:
 
@@ -149,7 +149,7 @@ La configuración del backend está en [`huap_backend/src/main/resources/applica
 | `DB_USERNAME` / `DB_PASSWORD` | Credenciales de la BD de la app | Sí |
 | `HOSPITAL_DB_URL` | URL JDBC de la BD del hospital (vista `viewPersonal`), solo lectura | Sí |
 | `HOSPITAL_DB_USERNAME` / `HOSPITAL_DB_PASSWORD` | Credenciales del hospital (usuario con solo `SELECT`) | Sí |
-| `DDL_AUTO` | Estrategia de esquema de Hibernate (`update` en dev, `validate` en prod) | Sí |
+| `DDL_AUTO` | Estrategia de esquema de Hibernate — `validate` tanto en dev como en prod (ambas BD son externas/compartidas; `update` solo si se apunta a una BD local desechable) | Sí |
 | `JWT_SECRET` | Secreto de firma de los JWT (≥ 32 caracteres, aleatorio) | Sí |
 | `SWAGGER_ENABLED` | Expone Swagger UI y la spec OpenAPI (`true` en dev, `false` en prod) | No (por defecto `false`) |
 | `SERVER_ID` | Identificador de la instancia (para health/info) | No |
@@ -175,7 +175,7 @@ La documentación sigue un modelo por **capas**:
 | **Código** | Qué hace cada clase/función | Javadoc (`./mvnw javadoc:javadoc` → `target/reports/apidocs/`) y JSDoc en el frontend |
 | **Manuales de usuario** | Cómo usar el sistema | [docs/manuales-usuario/](docs/manuales-usuario/) |
 
-Documento adicional: [INFORME_PROYECTO.md](docs/INFORME_PROYECTO.md) (informe técnico histórico).
+Documentos adicionales: [docs/AMBIENTE_DEV.md](docs/AMBIENTE_DEV.md) (guía completa del ambiente de desarrollo) e [INFORME_PROYECTO.md](docs/INFORME_PROYECTO.md) (informe técnico histórico).
 
 ## Estructura del repositorio
 
@@ -190,8 +190,9 @@ Documento adicional: [INFORME_PROYECTO.md](docs/INFORME_PROYECTO.md) (informe t�
 ├── apache/                # Configuración del balanceador Apache (en uso)
 ├── nginx/                 # Configuración Nginx alternativa (histórica, no usada por el compose)
 ├── BaseDatosMySQL/        # Scripts SQL: desarrollo/ (fuente) y despliegue/ (generados)
-├── docs/                  # Documentación (API/OpenAPI, manuales, informe técnico)
-├── .env.example           # Plantilla de variables para docker-compose.yml (producción)
-├── docker-compose.yml     # Despliegue producción (3+3 + LB, solo app; BDs por .env)
-└── docker-compose.dev.yml # Desarrollo autocontenido (MySQL con gestionturnos + innhosp + seed)
+├── docs/                  # Documentación (API/OpenAPI, manuales, informe técnico, AMBIENTE_DEV.md)
+├── .env.example           # Plantilla de variables (base de .env y .env.dev), sin secretos
+├── .env.dev               # Variables reales de DEV (NO versionado, ver .gitignore)
+├── docker-compose.yml     # Despliegue producción (3+3 + LB, solo app; BDs externas por .env)
+└── docker-compose.dev.yml # Desarrollo (solo app; BDs externas reales por .env.dev)
 ```
