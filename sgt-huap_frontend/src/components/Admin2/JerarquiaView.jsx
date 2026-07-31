@@ -1,7 +1,7 @@
 // JerarquiaView.jsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SGT_DATA } from './data';
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getFuncionariosSummary, asignarRolJerarquia } from '../../services/funcionarioService';
 
@@ -261,12 +261,14 @@ const JerarquiaView = ({ onBack }) => {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
       
       {/* Header */}
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} aria-label="Volver" style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Jerarquía</div>
-      </div>
+      <TopHeader
+        title="Jerarquía"
+        leftSlot={
+          <button onClick={onBack} aria-label="Volver" style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
         <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600, lineHeight: 1.5 }}>
@@ -424,13 +426,13 @@ const JerarquiaView = ({ onBack }) => {
           onClick={handleGuardarClick} 
           title={!selectedUser ? 'Selecciona un funcionario primero' : !selectedServicioId ? 'Selecciona un servicio primero' : ''}
           style={{
-            width: '100%', padding: '16px', 
-            background: canSubmit ? PA.ink : PA.line, 
-            color: canSubmit ? '#fff' : PA.ink3, 
-            border: 'none', borderRadius: 14, 
-            fontSize: 16, fontWeight: 800, 
+            width: '100%', padding: '16px',
+            background: canSubmit ? PA.primary : PA.line,
+            color: canSubmit ? '#fff' : PA.ink3,
+            border: 'none', borderRadius: 14,
+            fontSize: 16, fontWeight: 800,
             cursor: canSubmit ? 'pointer' : 'not-allowed',
-            boxShadow: canSubmit ? '0 4px 12px rgba(15,23,42,0.15)' : 'none',
+            boxShadow: canSubmit ? '0 4px 12px rgba(23,65,108,0.25)' : 'none',
             transition: 'all 0.2s'
           }}>
           {guardando ? 'Guardando...' : 'Designar Autoridad'}

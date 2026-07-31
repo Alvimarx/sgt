@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SGT_DATA } from '../Admin2/data'; 
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
 import { getCurrentUser } from '../../services/authService'
@@ -281,12 +281,14 @@ const AsignacionJerarquiaView = ({ onBack }) => {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Asignación</div>
-      </div>
+      <TopHeader
+        title="Asignación"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
         <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600 }}>

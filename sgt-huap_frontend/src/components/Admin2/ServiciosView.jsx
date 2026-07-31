@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
 import { SGT_DATA } from './data';
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader, IconBadge3D } from '../Style/UIPrimitives';
 import { 
     getServicios, 
     getServiciosInactivos,
@@ -201,12 +201,14 @@ const ServiciosView = ({ onBack }) => {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
       
       {/* Header */}
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Servicios</div>
-      </div>
+      <TopHeader
+        title="Servicios"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
         <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600 }}>
@@ -253,10 +255,8 @@ const ServiciosView = ({ onBack }) => {
                   const isEditing = editingId === id;
 
                   return (
-                    <div key={id} style={{ padding: '12px 14px', background: '#fff', borderRadius: 12, border: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: PA.surface2, display: 'grid', placeItems: 'center' }}>
-                          <Building2 size={18} color={PA.primary} />
-                      </div>
+                    <div key={id} style={{ padding: '12px 14px', background: '#fff', borderRadius: 16, border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <IconBadge3D icon="briefcase" theme="blue" size={38} radius={10} />
 
                       {isEditing ? (
                         <>

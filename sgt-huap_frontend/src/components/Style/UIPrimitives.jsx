@@ -1,6 +1,6 @@
 // src/components/AgendaMockup/UIPrimitives.jsx
 import React from 'react';
-import { SGT_DATA } from '../Admin2/data';
+import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data';
 
 const P = () => SGT_DATA.PALETTE;
 
@@ -87,6 +87,26 @@ export const SGTAvatar = ({ person, size = 28, style = {}, ring = null }) => {
       boxShadow: ring ? `0 0 0 2px ${ring}` : 'none',
       ...style,
     }}>{person.iniciales}</div>
+  );
+};
+
+// Badge de ícono con relieve tipo "3D" (gradiente + brillo superior + sombra
+// inferior + sombra de color proyectada), mismo tratamiento que Perfil/Dashboards.
+// `theme` acepta una clave de DASHBOARD_ICON_THEMES ("blue","amber","green",
+// "magenta","violet","teal","red","slate") o un objeto {grad, glow} propio.
+export const IconBadge3D = ({ icon, theme = 'blue', size = 44, iconSize, radius = 14, className = '', style = {} }) => {
+  const t = typeof theme === 'string' ? (DASHBOARD_ICON_THEMES[theme] || DASHBOARD_ICON_THEMES.blue) : theme;
+  return (
+    <div className={className} style={{
+      width: size, height: size, borderRadius: radius, flexShrink: 0,
+      background: t.grad,
+      display: 'grid', placeItems: 'center',
+      boxShadow: `0 6px 14px ${t.glow}, inset 0 1.5px 0 rgba(255,255,255,0.55), inset 0 -3px 5px rgba(0,0,0,0.18)`,
+      transition: 'transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease',
+      ...style,
+    }}>
+      <SGTIcon name={icon} size={iconSize || Math.round(size * 0.5)} color="#fff" strokeWidth={2.2} />
+    </div>
   );
 };
 

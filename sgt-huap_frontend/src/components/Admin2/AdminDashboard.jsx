@@ -1,21 +1,22 @@
 // AdminDashboard.jsx
 import React from 'react';
-import { SGT_DATA } from './data';
+import { SGT_DATA, DASHBOARD_ICON_THEMES, DASHBOARD_CARD_THEME_BY_TITLE } from './data';
 import { SGTIcon } from '../Style/UIPrimitives';
 
-const AdminCard = ({ icon, title, desc, tone, onClick }) => {
+const AdminCard = ({ icon, title, desc, onClick }) => {
   const PA = SGT_DATA.PALETTE;
-  const isPrimary = tone === 'primary';
-  const color = isPrimary ? PA.primary : '#B85A60';
-  const bg = isPrimary ? PA.primarySoft : PA.accentSoft;
+  const theme = DASHBOARD_ICON_THEMES[DASHBOARD_CARD_THEME_BY_TITLE[title]] || DASHBOARD_ICON_THEMES.blue;
 
   return (
     <button onClick={onClick} style={{
-      display: 'flex', alignItems: 'flex-start', gap: 14, background: '#fff', border: `1px solid ${PA.line}`,
-      borderRadius: 14, padding: 16, cursor: 'pointer', textAlign: 'left'
+      display: 'flex', alignItems: 'flex-start', gap: 14, background: '#fff', border: 'none',
+      borderRadius: 16, padding: 16, cursor: 'pointer', textAlign: 'left', boxShadow: '0 4px 16px rgba(15,23,42,0.08)',
     }}>
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: 'grid', placeItems: 'center', color: color, flexShrink: 0 }}>
-        <SGTIcon name={icon} size={22} />
+      <div style={{
+        width: 44, height: 44, borderRadius: 14, background: theme.grad, display: 'grid', placeItems: 'center', flexShrink: 0,
+        boxShadow: `0 6px 14px ${theme.glow}, inset 0 1.5px 0 rgba(255,255,255,0.55), inset 0 -3px 5px rgba(0,0,0,0.18)`,
+      }}>
+        <SGTIcon name={icon} size={22} color="#fff" strokeWidth={2.2} />
       </div>
       <div>
         <div style={{ fontSize: 16, fontWeight: 800, color: PA.ink }}>{title}</div>

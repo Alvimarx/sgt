@@ -3,8 +3,8 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
-import { SGT_DATA } from '../Admin2/data';
-import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data';
+import { SGTBadge, SGTIcon, TopHeader, IconBadge3D } from '../Style/UIPrimitives';
 import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
 
 dayjs.locale('es');
@@ -13,22 +13,22 @@ dayjs.locale('es');
 // Subcomponentes
 // ──────────────────────────────────────────────
 
+const STAT_TONE_THEME = {
+  primary: 'blue',
+  accent:  'red',
+  success: 'green',
+  warn:    'amber',
+};
+
 const StatCard = ({ icon, label, value, tone }) => {
   const PA = SGT_DATA.PALETTE;
-  const toneMap = {
-    primary: { bg: PA.primarySoft, color: PA.primary },
-    accent:  { bg: PA.accentSoft,  color: '#B85A60' },
-    success: { bg: PA.successSoft, color: PA.success },
-    warn:    { bg: PA.warnSoft,    color: PA.warn },
-  };
-  const t = toneMap[tone] || toneMap.primary;
   return (
     <div style={{
-      background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14,
+      background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16,
       padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1,
     }}>
-      <div style={{ width: 34, height: 34, borderRadius: 10, background: t.bg, display: 'grid', placeItems: 'center', alignSelf: 'center' }}>
-        <SGTIcon name={icon} size={18} color={t.color} />
+      <div style={{ alignSelf: 'center' }}>
+        <IconBadge3D icon={icon} theme={STAT_TONE_THEME[tone] || 'blue'} size={34} radius={10} iconSize={17} />
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, color: PA.ink, lineHeight: 1 }}>{value}</div>
       <div style={{ fontSize: 11, fontWeight: 700, color: PA.ink3 }}>{label}</div>
@@ -42,11 +42,9 @@ const TurnoLibreItem = ({ turno }) => {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12, padding: '10px 12px',
+      background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: '10px 12px',
     }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: PA.accentSoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-        <SGTIcon name="calendar" size={16} color="#B85A60" />
-      </div>
+      <IconBadge3D icon="calendar" theme="red" size={36} radius={10} iconSize={16} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>{fecha}</div>
         <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 1 }}>
@@ -150,7 +148,8 @@ const AdminStats = ({ onBack }) => {
     return mesLabel;
   })();
 
-  const avatarColores = [PA.primary, '#B85A60', PA.success, PA.warn, '#7C6FCD', '#2E9E8A'];
+  // Colores literales (no var(--...)) porque más abajo se les concatena un sufijo de alpha ("18").
+  const avatarColores = ['#17416C', '#B85A60', '#2E7D57', '#C88700', '#7C6FCD', '#2E9E8A'];
   const getAvatarColor = (idx) => avatarColores[idx % avatarColores.length];
   const getInitials = (nombre) => {
     const parts = nombre.trim().split(' ').filter(Boolean);
@@ -222,12 +221,14 @@ const AdminStats = ({ onBack }) => {
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden', position: 'relative' }}>
 
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Estadísticas del Servicio</div>
-      </div>
+      <TopHeader
+        title="Estadísticas del Servicio"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -252,7 +253,7 @@ const AdminStats = ({ onBack }) => {
           <>
             <div
               onClick={handleAbrirCobertura}
-              style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 16, cursor: 'pointer' }}
+              style={{ background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: 16, cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Cobertura de turnos</span>
@@ -278,7 +279,7 @@ const AdminStats = ({ onBack }) => {
             {funcsStats && (
               <div
                 onClick={handleAbrirDetalle}
-                style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 16, cursor: 'pointer' }}
+                style={{ background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: 16, cursor: 'pointer' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Funcionarios con turno</span>

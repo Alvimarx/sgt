@@ -3,7 +3,7 @@ import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import { SGTBadge, SGTIcon, TopHeader } from '../Style/UIPrimitives';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -35,15 +35,16 @@ const TurnoAuditoriaItem = ({ turno }) => {
   const fecha    = turno.diaInicioTurno ? dayjs(turno.diaInicioTurno).format('ddd D MMM') : '—';
   const horas    = `${(turno.horaInicio || '?').slice(0,5)} – ${(turno.horaFin || '?').slice(0,5)}`;
   const colorBorde = asignado ? PA.success : '#D9626A';
-  const bgTinte    = asignado ? `${PA.success}10` : '#FDF2F3';
+  const bgTinte    = asignado ? PA.successSoft : '#FDF2F3';
 
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       background: bgTinte,
-      border: `1px solid ${PA.line}`,
+      border: 'none',
       borderLeft: `4px solid ${colorBorde}`,
       borderRadius: 14, padding: '10px 12px',
+      boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         {turno.nombre && (
@@ -106,12 +107,14 @@ const AuditoriaView = ({ onBack }) => {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Auditoría de Asistencia</div>
-      </div>
+      <TopHeader
+        title="Auditoría de Asistencia"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       {/* Selector de mes */}
       <div style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, overflowX: 'auto', display: 'flex', gap: 6 }}>
@@ -146,7 +149,7 @@ const AuditoriaView = ({ onBack }) => {
             {turnosFiltrados.length > 0 && (
               <div style={{ display: 'flex', gap: 10 }}>
                 <div style={{
-                  flex: 1, background: PA.successSoft, border: `1px solid ${PA.success}20`,
+                  flex: 1, background: PA.successSoft, border: '1px solid #CDE9D8',
                   borderRadius: 12, padding: '10px 14px', textAlign: 'center',
                 }}>
                   <div style={{ fontSize: 22, fontWeight: 800, color: PA.success }}>{totalAsignados}</div>

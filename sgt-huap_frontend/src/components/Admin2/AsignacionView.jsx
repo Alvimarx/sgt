@@ -1,7 +1,7 @@
 // AsignacionView.jsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SGT_DATA } from './data';
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 import { getCurrentUser } from '../../services/authService'
@@ -337,16 +337,18 @@ const AsignacionView = ({ onBack }) => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
 
             {/* Header */}
-            <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button
-                    onClick={onBack}
-                    aria-label="Volver"
-                    style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}
-                >
-                    <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-                </button>
-                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Asignación</div>
-            </div>
+            <TopHeader
+                title="Asignación"
+                leftSlot={
+                    <button
+                        onClick={onBack}
+                        aria-label="Volver"
+                        style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}
+                    >
+                        <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                    </button>
+                }
+            />
 
             <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
                 <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600, lineHeight: 1.5 }}>

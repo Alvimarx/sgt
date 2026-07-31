@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { eventosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import { SGTBadge, SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
 
 // ──────────────────────────────────────────────
@@ -361,7 +361,7 @@ const EventoItem = ({ evento }) => {
   }, [expandido]);
 
   return (
-    <div style={{ background: '#fff', border: `1px solid ${p.line}`, borderRadius: 12 }}>
+    <div style={{ background: '#fff', border: 'none', borderRadius: 16, boxShadow: '0 2px 10px rgba(15,23,42,0.06)' }}>
       {/* Cabecera colapsada — siempre visible */}
       <div
         onClick={() => setExpandido(e => !e)}
@@ -510,12 +510,14 @@ const BitacoraView = ({ onBack }) => {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: p.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
       {/* Header */}
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${p.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={p.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: p.ink }}>Bitácora de Cambios</div>
-      </div>
+      <TopHeader
+        title="Bitácora de Cambios"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={p.ink} />
+          </button>
+        }
+      />
 
       {/* Selector de período */}
       <div style={{ padding: '10px 14px', background: '#fff', borderBottom: `1px solid ${p.line2}` }}>
@@ -527,7 +529,7 @@ const BitacoraView = ({ onBack }) => {
 
       {/* Panel de filtros */}
       {!loading && !error && (
-        <div style={{ background: '#fff', borderBottom: `2px solid #b0b8c4` }}>
+        <div style={{ background: '#fff', borderBottom: `1px solid ${p.line2}` }}>
           <button
             onClick={() => setFiltrosOpen(o => !o)}
             style={{

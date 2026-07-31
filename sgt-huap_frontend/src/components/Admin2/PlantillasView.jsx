@@ -4,18 +4,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { plantillasService, tiposTurnoService, formatHora } from '../../services/rotativasService';
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { SGT_DATA } from './data';
 
-// ─── Paleta ─────────────────────────────────────────────────────────────────
-const PA = {
-    primary: 'var(--primary)', primarySoft: 'var(--primary-soft)',
-    accent:  'var(--accent)',  accentSoft:  'var(--accent-soft)',
-    warn:    'var(--warn)',    warnSoft:    'var(--warn-soft)',
-    success: 'var(--success)',
-    ink: 'var(--ink)', ink2: 'var(--ink2)', ink3: 'var(--ink3)',
-    line: 'var(--line)', line2: 'var(--line2)',
-    surface: 'var(--surface)', surface2: 'var(--surface2)',
-};
+// ─── Paleta compartida con el resto de la app ──────────────────────────────
+const PA = SGT_DATA.PALETTE;
 
 // Paleta de colores por tipo de turno (asignada por índice en la lista)
 const HUES = [250, 150, 30, 85, 320, 200, 45, 170];
@@ -601,8 +594,8 @@ function PlantillaCard({ plantilla, onEdit, onDelete }) {
 
     return (
         <div style={{
-            background: PA.surface, border: `1px solid ${PA.line}`,
-            borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
+            background: PA.surface, border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)',
+            borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', gap: 10,
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
@@ -707,14 +700,14 @@ export default function PlantillasView({ onBack }) {
     if (editing !== null) {
         return (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
-                <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button onClick={() => setEditing(null)} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-                        <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-                    </button>
-                    <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {editing === 'new' ? 'Nueva rotativa' : `Editar: ${editing.nombre}`}
-                    </div>
-                </div>
+                <TopHeader
+                    title={editing === 'new' ? 'Nueva rotativa' : `Editar: ${editing.nombre}`}
+                    leftSlot={
+                        <button onClick={() => setEditing(null)} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                        </button>
+                    }
+                />
                 <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {tipos.length === 0 && (
                         <div style={{
@@ -742,23 +735,27 @@ export default function PlantillasView({ onBack }) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
             {/* Header */}
-            <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-                    <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-                </button>
-                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink, flex: 1 }}>Rotativas</div>
-                <button
-                    onClick={() => setEditing('new')}
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '9px 16px', borderRadius: 10,
-                        background: PA.primary, color: '#fff', border: 'none',
-                        fontSize: 14, fontWeight: 600, cursor: 'pointer', flexShrink: 0,
-                    }}
-                >
-                    <Plus size={16} /> Nueva
-                </button>
-            </div>
+            <TopHeader
+                title="Rotativas"
+                leftSlot={
+                    <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                        <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                    </button>
+                }
+                rightSlot={
+                    <button
+                        onClick={() => setEditing('new')}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '9px 14px', borderRadius: 10,
+                            background: PA.primary, color: '#fff', border: 'none',
+                            fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+                        }}
+                    >
+                        <Plus size={15} /> Nueva
+                    </button>
+                }
+            />
 
             {/* Contenido scrollable */}
             <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
