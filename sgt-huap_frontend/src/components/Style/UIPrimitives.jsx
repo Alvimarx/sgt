@@ -181,7 +181,7 @@ export const Sheet = ({ open, onClose, children, title, maxHeight = '85%' }) => 
 // o contenido más rico (ej. lista de elementos afectados). `tone='danger'`
 // tiñe el botón de confirmar en rojo, para acciones destructivas.
 export const ConfirmDialog = ({
-  open, title, tone = 'primary',
+  open, title, tone = 'primary', icon, iconTheme,
   onConfirm, onCancel, busy = false,
   confirmLabel = 'Confirmar', cancelLabel = 'Cancelar',
   children,
@@ -189,12 +189,18 @@ export const ConfirmDialog = ({
   if (!open) return null;
   const PA = P();
   const confirmBg = tone === 'danger' ? PA.accent : PA.primary;
+  const resolvedIconTheme = iconTheme || (tone === 'danger' ? 'red' : 'blue');
   return (
     <div className="confirm-overlay">
       <div className="confirm-overlay__backdrop" onClick={busy ? undefined : onCancel} />
       <div className="confirm-card">
-        {title && <div style={{ fontSize: 16, fontWeight: 800, color: PA.ink, marginBottom: 8 }}>{title}</div>}
-        {children && <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>{children}</div>}
+        {icon && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+            <IconBadge3D icon={icon} theme={resolvedIconTheme} size={56} iconSize={26} radius={16} />
+          </div>
+        )}
+        {title && <div style={{ fontSize: 16, fontWeight: 800, color: PA.ink, marginBottom: 8, textAlign: icon ? 'center' : 'left' }}>{title}</div>}
+        {children && <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5, textAlign: icon ? 'center' : 'left' }}>{children}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button
             onClick={onCancel} disabled={busy}

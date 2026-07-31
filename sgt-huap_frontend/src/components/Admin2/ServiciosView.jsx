@@ -1,9 +1,10 @@
 // ServiciosView.jsx
 import React, { useState, useEffect } from 'react';
-import { Building2, Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
+import { Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
 import { SGT_DATA } from './data';
-import { SGTIcon, TopHeader, IconBadge3D } from '../Style/UIPrimitives';
-import { 
+import { SGTIcon, TopHeader, IconBadge3D, StatusBadge, ConfirmDialog } from '../Style/UIPrimitives';
+import { usePagination, PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
+import {
     getServicios, 
     getServiciosInactivos,
     createServicio, 
@@ -11,8 +12,6 @@ import {
     eliminarServicio,
     getDependenciasServicio 
 } from '../../services/servicioService'; 
-
-const ITEMS_PER_PAGE = 3;
 
 const ServiciosView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
@@ -36,10 +35,6 @@ const ServiciosView = ({ onBack }) => {
   const [dependencias, setDependencias] = useState(0); 
   const [loadingImpacto, setLoadingImpacto] = useState(false);
   const [eliminando, setEliminando] = useState(false);
-
-  // Estado para Paginación
-  const [pageActivos, setPageActivos] = useState(1);
-  const [pageInactivos, setPageInactivos] = useState(1);
 
   // Funciones auxiliares
   const srvId = (srv) => srv.idServicio || srv.id;
@@ -84,7 +79,7 @@ const ServiciosView = ({ onBack }) => {
     if (result.success) {
       setServicios([...servicios, { ...result.data, eliminado: false }]);
       setNuevoServicio('');
-      setPageActivos(1); 
+      activosPg.setPage(1);
       setConfirmCrear(null);
     } else { 
       setError(result.error);
@@ -154,42 +149,8 @@ const ServiciosView = ({ onBack }) => {
   const activos = servicios.filter(s => s.eliminado === false);
   const inactivos = servicios.filter(s => s.eliminado === true);
 
-  const totalPagesActivos = Math.max(1, Math.ceil(activos.length / ITEMS_PER_PAGE));
-  const totalPagesInactivos = Math.max(1, Math.ceil(inactivos.length / ITEMS_PER_PAGE));
-
-  useEffect(() => {
-    if (pageActivos > totalPagesActivos) setPageActivos(totalPagesActivos);
-  }, [totalPagesActivos, pageActivos]);
-
-  useEffect(() => {
-    if (pageInactivos > totalPagesInactivos) setPageInactivos(totalPagesInactivos);
-  }, [totalPagesInactivos, pageInactivos]);
-
-  const paginatedActivos = activos.slice((pageActivos - 1) * ITEMS_PER_PAGE, pageActivos * ITEMS_PER_PAGE);
-  const paginatedInactivos = inactivos.slice((pageInactivos - 1) * ITEMS_PER_PAGE, pageInactivos * ITEMS_PER_PAGE);
-
-  const PaginationControls = ({ page, totalPages, setPage }) => {
-    if (totalPages <= 1) return null;
-    return (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-        <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            style={{ background: '#fff', border: `1px solid ${PA.line2}`, padding: '6px 12px', borderRadius: 8, color: page === 1 ? PA.ink3 : PA.ink, cursor: page === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12 }}
-        >
-            Anterior
-        </button>
-        <span style={{ fontSize: 12, fontWeight: 700, color: PA.ink3 }}>Página {page} de {totalPages}</span>
-        <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            style={{ background: '#fff', border: `1px solid ${PA.line2}`, padding: '6px 12px', borderRadius: 8, color: page === totalPages ? PA.ink3 : PA.ink, cursor: page === totalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12 }}
-        >
-            Siguiente
-        </button>
-      </div>
-    );
-  };
+  const activosPg = usePagination(activos, 3);
+  const inactivosPg = usePagination(inactivos, 3);
 
   const inputStyle = {
       flex: 1, padding: '14px', borderRadius: 12, border: `1px solid ${PA.line}`,
@@ -198,8 +159,8 @@ const ServiciosView = ({ onBack }) => {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
-      
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
+
       {/* Header */}
       <TopHeader
         title="Servicios"
@@ -244,19 +205,19 @@ const ServiciosView = ({ onBack }) => {
         <div style={{ marginBottom: 24 }}>
           <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, marginBottom: 8, display: 'block' }}>Servicios Activos ({activos.length})</label>
           {loading ? (
-             <div style={{ padding: '16px', textAlign: 'center', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>Cargando datos…</div>
+             <LoadingState label="Cargando datos…" />
           ) : activos.length === 0 ? (
-             <div style={{ padding: '16px', textAlign: 'center', background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12, color: PA.ink3, fontWeight: 600, fontSize: 14 }}>No hay servicios activos.</div>
+             <ListEmptyState icon="building" theme="slate" title="No hay servicios activos" message="Agrega el primero desde el formulario de arriba." />
           ) : (
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {paginatedActivos.map((srv) => {
+                {activosPg.pageItems.map((srv) => {
                   const id = srvId(srv);
                   const isEditing = editingId === id;
 
                   return (
-                    <div key={id} style={{ padding: '12px 14px', background: '#fff', borderRadius: 16, border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <IconBadge3D icon="briefcase" theme="blue" size={38} radius={10} />
+                    <div key={id} className="sgt-list-row" style={{ padding: '12px 14px', background: '#fff', borderRadius: 16, border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <IconBadge3D icon="building" theme="blue" size={38} radius={10} />
 
                       {isEditing ? (
                         <>
@@ -279,7 +240,7 @@ const ServiciosView = ({ onBack }) => {
                   );
                 })}
               </div>
-              <PaginationControls page={pageActivos} totalPages={totalPagesActivos} setPage={setPageActivos} />
+              <PaginationControls page={activosPg.page} totalPages={activosPg.totalPages} onChange={activosPg.setPage} />
             </>
           )}
         </div>
@@ -289,126 +250,62 @@ const ServiciosView = ({ onBack }) => {
           <div>
             <label style={{ fontSize: 13, fontWeight: 800, color: PA.ink3, marginBottom: 8, display: 'block' }}>Servicios Inactivos ({inactivos.length})</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {paginatedInactivos.map((srv) => {
+              {inactivosPg.pageItems.map((srv) => {
                 const id = srvId(srv);
                 return (
                   <div key={id} style={{ padding: '12px 14px', background: 'transparent', borderRadius: 12, border: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 10, opacity: 0.7 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: PA.line, display: 'grid', placeItems: 'center' }}><Building2 size={18} color={PA.ink3} /></div>
+                    <IconBadge3D icon="building" theme="slate" size={38} radius={10} />
                     <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: PA.ink3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{srvNombre(srv)}</div>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, background: PA.line, padding: '4px 8px', borderRadius: 6 }}>Inactivo</div>
+                    <StatusBadge status="INACTIVO" />
                   </div>
                 );
               })}
             </div>
-            <PaginationControls page={pageInactivos} totalPages={totalPagesInactivos} setPage={setPageInactivos} />
+            <PaginationControls page={inactivosPg.page} totalPages={inactivosPg.totalPages} onChange={inactivosPg.setPage} />
           </div>
         )}
       </div>
 
       {/* Modales de Confirmación */}
-      {confirmCrear && (
-          <ConfirmCreateServicio
-              PA={PA}
-              nombre={confirmCrear}
-              creando={creando}
-              onConfirm={ejecutarCrear}
-              onCancel={() => setConfirmCrear(null)}
-          />
-      )}
+      <ConfirmDialog
+        open={!!confirmCrear}
+        icon="building" tone="primary"
+        title="¿Agregar nuevo servicio?"
+        busy={creando}
+        confirmLabel={creando ? 'Agregando…' : 'Sí, agregar'}
+        onConfirm={ejecutarCrear}
+        onCancel={() => setConfirmCrear(null)}
+      >
+        Estás a punto de registrar el servicio <strong style={{ color: PA.ink }}>{confirmCrear}</strong>.
+      </ConfirmDialog>
 
-      {confirmDel && (
-          <ConfirmDeleteServicio
-              PA={PA}
-              nombre={srvNombre(confirmDel)}
-              dependencias={dependencias} 
-              loadingImpacto={loadingImpacto}
-              eliminando={eliminando}
-              onConfirm={handleEliminar}
-              onCancel={() => setConfirmDel(null)}
-          />
-      )}
+      <ConfirmDialog
+        open={!!confirmDel}
+        icon="alert" tone="danger"
+        title="¿Desactivar servicio?"
+        busy={eliminando || loadingImpacto}
+        confirmLabel={eliminando ? 'Desactivando…' : 'Sí, desactivar'}
+        onConfirm={handleEliminar}
+        onCancel={() => setConfirmDel(null)}
+      >
+        <div style={{ marginBottom: 8 }}>
+          Estás a punto de desactivar <strong style={{ color: PA.ink }}>{confirmDel ? srvNombre(confirmDel) : ''}</strong>.
+        </div>
+        {loadingImpacto ? (
+          <div style={{ fontSize: 12.5, color: PA.ink3 }}>Verificando registros asociados…</div>
+        ) : dependencias > 0 ? (
+          <div style={{ background: PA.warnSoft, borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8, textAlign: 'left' }}>
+            <AlertCircle size={16} color={PA.warn} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 12.5, color: PA.ink2, lineHeight: 1.5 }}>
+              El servicio tiene <strong style={{ color: PA.ink }}>{dependencias} registro(s)</strong> asociados. Se ocultará de la gestión, pero los datos históricos se conservan.
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 12.5, color: PA.ink3 }}>No tiene registros asociados. Dejará de aparecer en la gestión activa.</div>
+        )}
+      </ConfirmDialog>
     </div>
   );
 };
-
-// ─── Bottom-sheet de confirmación de Creación ───────────────────────────────
-function ConfirmCreateServicio({ PA, nombre, creando, onConfirm, onCancel }) {
-    const primarySoft = PA.primarySoft || '#E0F2FE';
-
-    return (
-        <div onClick={!creando ? onCancel : undefined} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px 20px 0 0', padding: '8px 20px 36px', width: '100%', maxWidth: 480, boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 16 }}>
-                    <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 16, background: primarySoft, display: 'grid', placeItems: 'center' }}>
-                        <Plus size={26} color={PA.primary} />
-                    </div>
-                </div>
-                <div style={{ fontWeight: 800, fontSize: 18, color: PA.ink, textAlign: 'center', marginBottom: 10 }}>
-                  ¿Agregar nuevo servicio?
-                </div>
-                <p style={{ fontSize: 14, color: PA.ink2, margin: '0 0 24px', lineHeight: 1.55, textAlign: 'center' }}>
-                    Estás a punto de registrar el servicio <strong style={{ color: PA.ink }}>{nombre}</strong>.
-                </p>
-                <div style={{ display: 'flex', gap: 10 }}>
-                    <button onClick={onCancel} disabled={creando} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: `1.5px solid ${PA.line}`, background: 'none', color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: creando ? 'not-allowed' : 'pointer', opacity: creando ? 0.7 : 1 }}>
-                        Cancelar
-                    </button>
-                    <button onClick={onConfirm} disabled={creando} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: 'none', background: PA.primary, color: '#fff', fontSize: 15, fontWeight: 700, cursor: creando ? 'not-allowed' : 'pointer', opacity: creando ? 0.7 : 1 }}>
-                        {creando ? 'Agregando…' : 'Sí, agregar'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── Bottom-sheet de confirmación de Eliminación ────────────────────────────
-function ConfirmDeleteServicio({ PA, nombre, dependencias, loadingImpacto, eliminando, onConfirm, onCancel }) {
-    const tieneDependencias = dependencias > 0;
-    const warn = PA.warn || '#DC2626';
-    const warnSoft = PA.warnSoft || '#FEF2F2';
-
-    return (
-        <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px 20px 0 0', padding: '8px 20px 36px', width: '100%', maxWidth: 480, boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 16 }}>
-                    <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 16, background: warnSoft, display: 'grid', placeItems: 'center' }}>
-                        <Trash2 size={26} color={warn} />
-                    </div>
-                </div>
-                <div style={{ fontWeight: 800, fontSize: 18, color: PA.ink, textAlign: 'center', marginBottom: 10 }}>
-                  ¿Desactivar servicio?
-                </div>
-                <p style={{ fontSize: 14, color: PA.ink2, margin: '0 0 6px', lineHeight: 1.55, textAlign: 'center' }}>
-                    Estás a punto de desactivar <strong style={{ color: PA.ink }}>{nombre}</strong>.
-                </p>
-                {loadingImpacto ? (
-                    <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>Verificando registros asociados…</p>
-                ) : tieneDependencias ? (
-                    <div style={{ background: warnSoft, borderRadius: 12, padding: '12px 14px', margin: '4px 0 22px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <AlertCircle size={16} color={warn} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>
-                            El servicio tiene <strong style={{ color: PA.ink }}>{dependencias} registro(s)</strong> asociados. Se ocultará de la gestión, pero los datos históricos se conservan.
-                        </div>
-                    </div>
-                ) : (
-                    <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>No tiene registros asociados. Dejará de aparecer en la gestión activa.</p>
-                )}
-                <div style={{ display: 'flex', gap: 10 }}>
-                    <button onClick={onCancel} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: `1.5px solid ${PA.line}`, background: 'none', color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
-                    <button onClick={onConfirm} disabled={eliminando || loadingImpacto} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: 'none', background: warn, color: '#fff', fontSize: 15, fontWeight: 700, cursor: (eliminando || loadingImpacto) ? 'not-allowed' : 'pointer', opacity: (eliminando || loadingImpacto) ? 0.7 : 1 }}>
-                        {eliminando ? 'Desactivando…' : 'Sí, desactivar'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 export default ServiciosView;
