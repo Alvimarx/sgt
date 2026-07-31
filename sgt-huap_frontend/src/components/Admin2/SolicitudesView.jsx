@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
 import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import '../Style/style.css';
 
 const PA = SGT_DATA.PALETTE;
@@ -109,7 +110,7 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
   }
 
   return (
-    <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderLeft: `4px solid ${TIPO_COLOR[tipo] || PA.line}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+    <div className="sgt-list-row" style={{ background: '#fff', border: `1px solid ${PA.line}`, borderLeft: `4px solid ${TIPO_COLOR[tipo] || PA.line}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
@@ -223,7 +224,7 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
   const [confirmando, setConfirmando] = useState(null); // { idPostulacion, nombrePostulante }
 
   return (
-    <div style={{ background: '#fff', border: `1px solid ${COLOR_OFERTA}`, borderLeft: `4px solid ${COLOR_OFERTA}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+    <div className="sgt-list-row" style={{ background: '#fff', border: `1px solid ${COLOR_OFERTA}`, borderLeft: `4px solid ${COLOR_OFERTA}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: COLOR_OFERTA_SOFT, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
@@ -579,9 +580,9 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
             <button onClick={() => { setStep(2); setPickerKey(null); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', color: PA.ink2, fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: '0 0 8px' }}>
               <SGTIcon name="chevron-left" size={16} color={PA.ink2} /> Volver
             </button>
-            {loadingData && <div style={{ textAlign: 'center', padding: 24, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Cargando...</div>}
+            {loadingData && <LoadingState label="Cargando..." rows={2} />}
             {!loadingData && activePicker.items.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 32, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Sin opciones disponibles.</div>
+              <ListEmptyState icon="search" theme="slate" title="Sin opciones" message="No hay opciones disponibles." />
             )}
             {!loadingData && activePicker.items.map(item => (
               <button key={activePicker.keyFn(item)} onClick={() => { activePicker.onSel(item); setStep(2); setPickerKey(null); }} style={{ display: 'flex', alignItems: 'flex-start', background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
@@ -896,7 +897,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
       ];
 
   return (
-    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
+    <div className="dash-page-bg" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease' }}>
       <TopHeader
         title="Solicitudes"
         leftSlot={
@@ -969,9 +970,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
 
       {/* Lista */}
       <div className="sgt-no-scrollbar" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 14px 24px' }}>
-        {loading && (
-          <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Cargando...</div>
-        )}
+        {loading && <LoadingState label="Cargando solicitudes..." />}
         {!loading && error && (
           <div style={{ background: PA.accentSoft, color: '#B85A60', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{error}</div>
         )}
@@ -986,10 +985,11 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
               </div>
             </div>
             {ofertas.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 48, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                <SGTIcon name="check-circle" size={32} color={PA.line} />
-                <div style={{ marginTop: 10 }}>Sin ofertas en este servicio.</div>
-              </div>
+              <ListEmptyState
+                icon="check-circle" theme="slate"
+                title="Sin ofertas"
+                message="No hay ofertas generales en este servicio."
+              />
             )}
             {ofertas.map(o => (
               <OfertaGeneralCard
@@ -1009,10 +1009,11 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
 
         {/* Tabs de solicitudes normales */}
         {!loading && tab !== 'ofertas' && !error && currentList.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 48, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-            <SGTIcon name="check-circle" size={32} color={PA.line} />
-            <div style={{ marginTop: 10 }}>Sin solicitudes aquí.</div>
-          </div>
+          <ListEmptyState
+            icon="check-circle" theme="slate"
+            title="Sin solicitudes"
+            message="No hay solicitudes aquí por el momento."
+          />
         )}
         {!loading && tab !== 'ofertas' && currentList.map(s => (
           <SolicitudCard
