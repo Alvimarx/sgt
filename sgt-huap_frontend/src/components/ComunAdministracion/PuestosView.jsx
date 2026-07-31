@@ -1,8 +1,9 @@
 // PuestosView.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { Building2, Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
+import { Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
 import { SGT_DATA } from '../Admin2/data';
-import { SGTIcon, TopHeader, IconBadge3D } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader, IconBadge3D, ConfirmDialog } from '../Style/UIPrimitives';
+import { usePagination, PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
 import { useAuth } from '../../context/AuthContext';
 import {
     getPuestosPorServicio,
@@ -12,8 +13,6 @@ import {
     getTurnosAsociados,
 } from '../../services/puestosService';
 
-const ITEMS_PER_PAGE = 6;
-
 const PuestosView = ({ onBack }) => {
     const PA = SGT_DATA.PALETTE;
     const { user } = useAuth();
@@ -22,9 +21,6 @@ const PuestosView = ({ onBack }) => {
     const [puestos, setPuestos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-
-    // Estado para Paginación
-    const [page, setPage] = useState(1);
 
     // Estado para creación y confirmación
     const [nuevoPuesto, setNuevoPuesto] = useState('');
@@ -63,37 +59,7 @@ const PuestosView = ({ onBack }) => {
     useEffect(() => { cargarPuestos(); }, [cargarPuestos]);
 
     // ─── Paginación ──────────────────────────────────────────────────────────
-    const totalPages = Math.max(1, Math.ceil(puestos.length / ITEMS_PER_PAGE));
-
-    // Ajustar la página si el elemento actual desaparece
-    useEffect(() => {
-        if (page > totalPages) setPage(totalPages);
-    }, [totalPages, page]);
-
-    const paginatedPuestos = puestos.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-
-    const PaginationControls = () => {
-        if (totalPages <= 1) return null;
-        return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    style={{ background: '#fff', border: `1px solid ${PA.line2}`, padding: '6px 12px', borderRadius: 8, color: page === 1 ? PA.ink3 : PA.ink, cursor: page === 1 ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12 }}
-                >
-                    Anterior
-                </button>
-                <span style={{ fontSize: 12, fontWeight: 700, color: PA.ink3 }}>Página {page} de {totalPages}</span>
-                <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    style={{ background: '#fff', border: `1px solid ${PA.line2}`, padding: '6px 12px', borderRadius: 8, color: page === totalPages ? PA.ink3 : PA.ink, cursor: page === totalPages ? 'not-allowed' : 'pointer', fontWeight: 700, fontSize: 12 }}
-                >
-                    Siguiente
-                </button>
-            </div>
-        );
-    };
+    const puestosPg = usePagination(puestos, 6);
 
     // ─── Crear ───────────────────────────────────────────────────────────────
     const handleCrear = (e) => {
@@ -111,7 +77,7 @@ const PuestosView = ({ onBack }) => {
             setPuestos((prev) => [...prev, result.data]);
             setNuevoPuesto('');
             setConfirmCrear(null);
-            setPage(1); // Volver a la primera página al crear
+            puestosPg.setPage(1); // Volver a la primera página al crear
         } else {
             setError(result.error);
             setConfirmCrear(null);
@@ -172,7 +138,7 @@ const PuestosView = ({ onBack }) => {
     };
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
+        <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
             {/* Header */}
             <TopHeader
                 title="Puestos del Servicio"
@@ -219,17 +185,17 @@ const PuestosView = ({ onBack }) => {
                     </label>
 
                     {loading ? (
-                        <div style={{ padding: '16px', textAlign: 'center', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>Cargando datos…</div>
+                        <LoadingState label="Cargando datos…" />
                     ) : puestos.length === 0 ? (
-                        <div style={{ padding: '16px', textAlign: 'center', background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12, color: PA.ink3, fontWeight: 600, fontSize: 14 }}>No hay puestos registrados en este servicio.</div>
+                        <ListEmptyState icon="home" theme="slate" title="No hay puestos registrados" message="Agrega el primero desde el formulario de arriba." />
                     ) : (
                         <>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {paginatedPuestos.map((puesto) => {
+                                {puestosPg.pageItems.map((puesto) => {
                                     const pId = puestoId(puesto);
                                     const enEdicion = editId === pId;
                                     return (
-                                        <div key={pId} style={{ padding: '12px 14px', background: '#fff', borderRadius: 16, border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <div key={pId} className="sgt-list-row" style={{ padding: '12px 14px', background: '#fff', borderRadius: 16, border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
                                             <IconBadge3D icon="home" theme="amber" size={38} radius={10} />
 
                                             {enEdicion ? (
@@ -253,116 +219,52 @@ const PuestosView = ({ onBack }) => {
                                     );
                                 })}
                             </div>
-                            <PaginationControls />
+                            <PaginationControls page={puestosPg.page} totalPages={puestosPg.totalPages} onChange={puestosPg.setPage} />
                         </>
                     )}
                 </div>
             </div>
 
             {/* Modales de confirmación */}
-            {confirmCrear && (
-                <ConfirmCreatePuesto
-                    PA={PA}
-                    nombre={confirmCrear}
-                    creando={creando}
-                    onConfirm={ejecutarCrear}
-                    onCancel={() => setConfirmCrear(null)}
-                />
-            )}
+            <ConfirmDialog
+                open={!!confirmCrear}
+                icon="home" tone="primary"
+                title="¿Agregar nuevo puesto?"
+                busy={creando}
+                confirmLabel={creando ? 'Agregando…' : 'Sí, agregar'}
+                onConfirm={ejecutarCrear}
+                onCancel={() => setConfirmCrear(null)}
+            >
+                Estás a punto de registrar el puesto <strong style={{ color: PA.ink }}>{confirmCrear}</strong>.
+            </ConfirmDialog>
 
-            {confirmDel && (
-                <ConfirmDeletePuesto
-                    PA={PA}
-                    nombre={puestoNombre(confirmDel)}
-                    turnos={turnosAsociados}
-                    loadingImpacto={loadingImpacto}
-                    eliminando={eliminando}
-                    onConfirm={handleEliminar}
-                    onCancel={() => setConfirmDel(null)}
-                />
-            )}
-        </div>
-    );
-};
-
-// ─── Bottom-sheet de confirmación de Creación ───────────────────────────────
-function ConfirmCreatePuesto({ PA, nombre, creando, onConfirm, onCancel }) {
-    const primarySoft = PA.primarySoft || '#E0F2FE';
-
-    return (
-        <div onClick={!creando ? onCancel : undefined} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px 20px 0 0', padding: '8px 20px 36px', width: '100%', maxWidth: 480, boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 16 }}>
-                    <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
+            <ConfirmDialog
+                open={!!confirmDel}
+                icon="alert" tone="danger"
+                title="¿Eliminar puesto?"
+                busy={eliminando || loadingImpacto}
+                confirmLabel={eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+                onConfirm={handleEliminar}
+                onCancel={() => setConfirmDel(null)}
+            >
+                <div style={{ marginBottom: 8 }}>
+                    Estás a punto de eliminar <strong style={{ color: PA.ink }}>{confirmDel ? puestoNombre(confirmDel) : ''}</strong>.
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 16, background: primarySoft, display: 'grid', placeItems: 'center' }}>
-                        <Plus size={26} color={PA.primary} />
-                    </div>
-                </div>
-                <div style={{ fontWeight: 800, fontSize: 18, color: PA.ink, textAlign: 'center', marginBottom: 10 }}>
-                    ¿Agregar nuevo puesto?
-                </div>
-                <p style={{ fontSize: 14, color: PA.ink2, margin: '0 0 24px', lineHeight: 1.55, textAlign: 'center' }}>
-                    Estás a punto de registrar el puesto <strong style={{ color: PA.ink }}>{nombre}</strong>.
-                </p>
-                <div style={{ display: 'flex', gap: 10 }}>
-                    <button onClick={onCancel} disabled={creando} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: `1.5px solid ${PA.line}`, background: 'none', color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: creando ? 'not-allowed' : 'pointer', opacity: creando ? 0.7 : 1 }}>
-                        Cancelar
-                    </button>
-                    <button onClick={onConfirm} disabled={creando} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: 'none', background: PA.primary, color: '#fff', fontSize: 15, fontWeight: 700, cursor: creando ? 'not-allowed' : 'pointer', opacity: creando ? 0.7 : 1 }}>
-                        {creando ? 'Agregando…' : 'Sí, agregar'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ─── Bottom-sheet de confirmación de Eliminación ────────────────────────────
-function ConfirmDeletePuesto({ PA, nombre, turnos, loadingImpacto, eliminando, onConfirm, onCancel }) {
-    const tieneTurnos = turnos > 0;
-    const warn = PA.warn || '#DC2626';
-    const warnSoft = PA.warnSoft || '#FEF2F2';
-
-    return (
-        <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 1000 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '20px 20px 0 0', padding: '8px 20px 36px', width: '100%', maxWidth: 480, boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 16 }}>
-                    <div style={{ width: 40, height: 4, background: PA.line, borderRadius: 99 }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 16, background: warnSoft, display: 'grid', placeItems: 'center' }}>
-                        <Trash2 size={26} color={warn} />
-                    </div>
-                </div>
-                <div style={{ fontWeight: 800, fontSize: 18, color: PA.ink, textAlign: 'center', marginBottom: 10 }}>
-                    ¿Eliminar puesto?
-                </div>
-                <p style={{ fontSize: 14, color: PA.ink2, margin: '0 0 6px', lineHeight: 1.55, textAlign: 'center' }}>
-                    Estás a punto de eliminar <strong style={{ color: PA.ink }}>{nombre}</strong>.
-                </p>
                 {loadingImpacto ? (
-                    <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>Verificando turnos asociados…</p>
-                ) : tieneTurnos ? (
-                    <div style={{ background: warnSoft, borderRadius: 12, padding: '12px 14px', margin: '4px 0 22px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <AlertCircle size={16} color={warn} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>
-                            Este puesto está asociado a <strong style={{ color: PA.ink }}>{turnos} turno{turnos === 1 ? '' : 's'}</strong>. Se ocultará de la gestión, pero los turnos históricos se conservan.
+                    <div style={{ fontSize: 12.5, color: PA.ink3 }}>Verificando turnos asociados…</div>
+                ) : turnosAsociados > 0 ? (
+                    <div style={{ background: PA.warnSoft, borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8, textAlign: 'left' }}>
+                        <AlertCircle size={16} color={PA.warn} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <div style={{ fontSize: 12.5, color: PA.ink2, lineHeight: 1.5 }}>
+                            Este puesto está asociado a <strong style={{ color: PA.ink }}>{turnosAsociados} turno{turnosAsociados === 1 ? '' : 's'}</strong>. Se ocultará de la gestión, pero los turnos históricos se conservan.
                         </div>
                     </div>
                 ) : (
-                    <p style={{ fontSize: 13, color: PA.ink3, margin: '0 0 24px', lineHeight: 1.5, textAlign: 'center' }}>No tiene turnos asociados. Dejará de aparecer en la gestión.</p>
+                    <div style={{ fontSize: 12.5, color: PA.ink3 }}>No tiene turnos asociados. Dejará de aparecer en la gestión.</div>
                 )}
-                <div style={{ display: 'flex', gap: 10 }}>
-                    <button onClick={onCancel} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: `1.5px solid ${PA.line}`, background: 'none', color: PA.ink2, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
-                    <button onClick={onConfirm} disabled={eliminando || loadingImpacto} style={{ flex: 1, padding: '13px 0', borderRadius: 12, border: 'none', background: warn, color: '#fff', fontSize: 15, fontWeight: 700, cursor: (eliminando || loadingImpacto) ? 'not-allowed' : 'pointer', opacity: (eliminando || loadingImpacto) ? 0.7 : 1 }}>
-                        {eliminando ? 'Eliminando…' : 'Sí, eliminar'}
-                    </button>
-                </div>
-            </div>
+            </ConfirmDialog>
         </div>
     );
-}
+};
 
 export default PuestosView;
