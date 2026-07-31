@@ -168,6 +168,56 @@
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
 }
 
+/* Admin/Jefatura — modal de confirmación, filas de lista y filtros compartidos */
+@keyframes sgtDialogPop {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.confirm-overlay {
+  position: absolute; inset: 0; z-index: 120;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.confirm-overlay__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  animation: sgtFade .18s ease;
+}
+.confirm-card {
+  position: relative;
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+  animation: sgtDialogPop .22s cubic-bezier(.22,1,.36,1);
+}
+
+.sgt-list-row {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.sgt-list-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.07);
+}
+.sgt-list-row:active {
+  transform: translateY(0) scale(0.995);
+}
+
+.sgt-filter-row {
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.sgt-filter-chip {
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+.sgt-filter-chip:hover {
+  filter: brightness(0.97);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

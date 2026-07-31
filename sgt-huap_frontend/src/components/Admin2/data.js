@@ -60,6 +60,22 @@ export const DASHBOARD_CARD_THEME_BY_TITLE = {
   'Auditoría de Asistencia': 'teal',
 };
 
+// Mapea cada estado textual del sistema a uno de los 6 tonos ya existentes
+// en SGTBadge (neutral/primary/accent/warn/success/libre) — un único
+// vocabulario de color para todos los badges de estado del sistema.
+export const STATUS_TONE_MAP = {
+  ACTIVO: 'success',
+  INACTIVO: 'neutral',
+  PENDIENTE: 'warn',
+  APROBADO: 'success',
+  RECHAZADO: 'accent',
+  PROGRAMADO: 'primary',
+  COMPLETADO: 'success',
+  AUSENTE: 'accent',
+  CUBIERTO: 'success',
+  'SIN COBERTURA': 'accent',
+};
+
 const PEOPLE = {
   me:    { id: 'me', nombre: 'Jorge Muñoz',     rol: 'MEDICO',        iniciales: 'JM', esYo: true },
   j1:    { id: 'j1', nombre: 'Carmen Valdés',   rol: 'JEFATURA',      iniciales: 'CV' },

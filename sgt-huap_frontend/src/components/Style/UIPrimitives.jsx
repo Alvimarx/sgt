@@ -1,6 +1,6 @@
 // src/components/AgendaMockup/UIPrimitives.jsx
 import React from 'react';
-import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data';
+import { SGT_DATA, DASHBOARD_ICON_THEMES, STATUS_TONE_MAP } from '../Admin2/data';
 
 const P = () => SGT_DATA.PALETTE;
 
@@ -44,6 +44,10 @@ export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth =
     case 'shield-check':  return <svg {...common}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>;
     case 'user-gear':     return <svg {...common}><circle cx="10" cy="8" r="4"/><path d="M10.5 15H7a4 4 0 0 0-4 4v1"/><circle cx="18" cy="17" r="2.6"/><path d="M18 13.8v1M18 19.2v1M21.2 17h-1M15.8 17h-1"/></svg>;
     case 'stethoscope':   return <svg {...common}><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>;
+    case 'building':      return <svg {...common}><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4M8 6h1M15 6h1M8 10h1M15 10h1M8 14h1M15 14h1"/></svg>;
+    case 'org-chart':     return <svg {...common}><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v4M12 11H5v6M12 11h7v6"/></svg>;
+    case 'rotate':        return <svg {...common}><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/></svg>;
+    case 'shield-search': return <svg {...common}><path d="M12 21c-3.6-1.3-7-4-7-9V6l7-3 7 3v6c0 1-.14 1.9-.4 2.7"/><circle cx="15.5" cy="15.5" r="3"/><path d="M19 19l2 2"/></svg>;
     default: return null;
   }
 };
@@ -68,6 +72,41 @@ export const SGTBadge = ({ children, tone = 'neutral', size = 'sm' }) => {
       letterSpacing: 0.2, textTransform: 'uppercase',
       whiteSpace: 'nowrap',
     }}>{children}</span>
+  );
+};
+
+// Badge de estado unificado: envuelve SGTBadge, mapeando el texto de estado
+// a un tono consistente en todo el sistema vía STATUS_TONE_MAP (data.js).
+export const StatusBadge = ({ status, size = 'sm' }) => (
+  <SGTBadge tone={STATUS_TONE_MAP[status] || 'neutral'} size={size}>{status}</SGTBadge>
+);
+
+const COVERAGE_TONE_THEME = { primary: 'blue', success: 'green', warn: 'amber', danger: 'red' };
+
+// Barra de progreso CSS-only (sin librería de gráficos), mismo tratamiento
+// de degradado + brillo que la carga horaria de Mi Dashboard. `tone` acepta
+// 'primary'|'success'|'warn'|'danger'.
+export const CoverageBar = ({ value, max, label, tone = 'primary', showPercent = true }) => {
+  const PA = P();
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  const theme = DASHBOARD_ICON_THEMES[COVERAGE_TONE_THEME[tone] || 'blue'];
+  return (
+    <div>
+      {label && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: PA.ink2 }}>{label}</span>
+          <span style={{ fontSize: 12.5, fontWeight: 800, color: PA.ink }}>{value}/{max}</span>
+        </div>
+      )}
+      <div className="sgt-progress-track" style={{ height: 8, background: PA.line2, borderRadius: 99 }}>
+        <div className="sgt-progress-fill" style={{
+          height: '100%', borderRadius: 99, background: theme.grad,
+          boxShadow: `0 0 10px ${theme.glow}`, width: `${pct}%`,
+          transition: 'width .5s cubic-bezier(.22,1,.36,1)',
+        }} />
+      </div>
+      {showPercent && <div style={{ fontSize: 11, fontWeight: 700, color: PA.ink3, marginTop: 4 }}>{pct}%</div>}
+    </div>
   );
 };
 
@@ -132,6 +171,44 @@ export const Sheet = ({ open, onClose, children, title, maxHeight = '85%' }) => 
           </div>
         )}
         <div style={{ overflow: 'auto', flex: 1 }}>{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// Modal de confirmación centrado, compartido por los ~7 usos que antes cada
+// archivo reimplementaba por su cuenta. `children` es libre: un mensaje simple
+// o contenido más rico (ej. lista de elementos afectados). `tone='danger'`
+// tiñe el botón de confirmar en rojo, para acciones destructivas.
+export const ConfirmDialog = ({
+  open, title, tone = 'primary',
+  onConfirm, onCancel, busy = false,
+  confirmLabel = 'Confirmar', cancelLabel = 'Cancelar',
+  children,
+}) => {
+  if (!open) return null;
+  const PA = P();
+  const confirmBg = tone === 'danger' ? PA.accent : PA.primary;
+  return (
+    <div className="confirm-overlay">
+      <div className="confirm-overlay__backdrop" onClick={busy ? undefined : onCancel} />
+      <div className="confirm-card">
+        {title && <div style={{ fontSize: 16, fontWeight: 800, color: PA.ink, marginBottom: 8 }}>{title}</div>}
+        {children && <div style={{ fontSize: 13, color: PA.ink2, lineHeight: 1.5 }}>{children}</div>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button
+            onClick={onCancel} disabled={busy}
+            style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: `1px solid ${PA.line}`, background: '#fff', color: PA.ink2, fontWeight: 700, fontSize: 13.5, cursor: busy ? 'default' : 'pointer' }}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            onClick={onConfirm} disabled={busy}
+            style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: 'none', background: confirmBg, color: '#fff', fontWeight: 700, fontSize: 13.5, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.7 : 1 }}
+          >
+            {busy ? '…' : confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
