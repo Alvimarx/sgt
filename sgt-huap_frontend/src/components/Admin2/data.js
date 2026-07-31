@@ -27,6 +27,57 @@ export const SGT_PALETTE = {
   surface2: 'var(--surface2)'
 };
 
+// Temas vivos con relieve 3D (degradado + brillo + sombra) para las tarjetas de
+// los paneles de Administración/Jefatura/Subrogante — mismo tratamiento que Perfil.
+export const DASHBOARD_ICON_THEMES = {
+  blue:    { grad: 'linear-gradient(150deg, #6C8BFF 0%, #2B3FA0 100%)', glow: 'rgba(43,63,160,0.35)' },
+  amber:   { grad: 'linear-gradient(150deg, #FFC24B 0%, #D97706 100%)', glow: 'rgba(217,119,6,0.32)' },
+  green:   { grad: 'linear-gradient(150deg, #34D399 0%, #0F7A45 100%)', glow: 'rgba(15,122,69,0.32)' },
+  magenta: { grad: 'linear-gradient(150deg, #F472B6 0%, #A21CAF 100%)', glow: 'rgba(162,28,175,0.32)' },
+  violet:  { grad: 'linear-gradient(150deg, #A78BFA 0%, #6D28D9 100%)', glow: 'rgba(109,40,217,0.32)' },
+  teal:    { grad: 'linear-gradient(150deg, #2DD4BF 0%, #0F766E 100%)', glow: 'rgba(15,118,110,0.32)' },
+  red:     { grad: 'linear-gradient(150deg, #FB7185 0%, #BE123C 100%)', glow: 'rgba(190,18,60,0.32)' },
+  slate:   { grad: 'linear-gradient(150deg, #94A3B8 0%, #475569 100%)', glow: 'rgba(71,85,105,0.32)' },
+};
+
+// Mismo módulo → mismo color en Admin/Jefatura/Subrogante, para que el color
+// tenga significado consistente sin importar desde qué panel se entra.
+export const DASHBOARD_CARD_THEME_BY_TITLE = {
+  'Crear Servicio': 'blue',
+  'Asignación de Funcionarios': 'amber',
+  'Personal del Sistema': 'green',
+  'Personal del Servicio': 'green',
+  'Asignación de turnos': 'magenta',
+  'Jerarquía de Funcionarios': 'violet',
+  'Crear tipo de Turno': 'teal',
+  'Crear Rotativa': 'red',
+  'Crear Planificación Mensual': 'slate',
+  'Evaluar Solicitudes': 'blue',
+  'Gestionar Puestos': 'amber',
+  'Reglas de Horario del Servicio': 'green',
+  'Estadísticas del Servicio': 'magenta',
+  'Bitácora de Cambios': 'violet',
+  'Auditoría de Asistencia': 'teal',
+};
+
+// Mapea cada estado textual del sistema a uno de los 6 tonos ya existentes
+// en SGTBadge (neutral/primary/accent/warn/success/libre) — un único
+// vocabulario de color para todos los badges de estado del sistema.
+export const STATUS_TONE_MAP = {
+  ACTIVO: 'success',
+  INACTIVO: 'neutral',
+  PENDIENTE: 'warn',
+  APROBADO: 'success',
+  APROBADA: 'success',
+  RECHAZADO: 'accent',
+  RECHAZADA: 'accent',
+  PROGRAMADO: 'primary',
+  COMPLETADO: 'success',
+  AUSENTE: 'accent',
+  CUBIERTO: 'success',
+  'SIN COBERTURA': 'accent',
+};
+
 const PEOPLE = {
   me:    { id: 'me', nombre: 'Jorge Muñoz',     rol: 'MEDICO',        iniciales: 'JM', esYo: true },
   j1:    { id: 'j1', nombre: 'Carmen Valdés',   rol: 'JEFATURA',      iniciales: 'CV' },

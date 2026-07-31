@@ -1,7 +1,7 @@
 // JerarquiaJefaturaView.jsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SGT_DATA } from '../Admin2/data';
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader, IconBadge3D, ConfirmDialog } from '../Style/UIPrimitives';
 import { getFuncionariosSummary, asignarRolJerarquia } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
 
@@ -32,64 +32,53 @@ const maskRut = (rut = '') => {
 };
 
 // ---------------------------------------------------------------------------
-// COMPONENTE DE CONFIRMACIÓN
+// VISTA PREVIA DE JERARQUÍA
+// Agrupación puramente presentacional de la misma lista de funcionarios ya
+// obtenida (getFuncionariosSummary): no hay una nueva llamada ni un campo
+// nuevo, solo se agrupan por el rol que cada uno ya tiene en este servicio
+// (mismo criterio que usa "Personal del Servicio" para sus badges de rol).
 // ---------------------------------------------------------------------------
-const ConfirmDialog = ({ funcionario, servicioNombre, rol, onConfirm, onCancel, guardando }) => {
-    const PA = SGT_DATA.PALETTE;
-    const nombreRol = rol === 'jefe' ? 'Jefatura' : 'Subrogante';
+const JerarquiaPreview = ({ jefe, subrogantes, totalFuncionarios, PA }) => (
+    <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 16, padding: 16, marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+            Jerarquía actual del servicio
+        </div>
 
-    return (
-        <div style={{ 
-            position: 'fixed', inset: 0, zIndex: 100, display: 'flex', 
-            alignItems: 'center', justifyContent: 'center', padding: '20px', 
-            background: 'rgba(15,23,42,0.4)' 
-        }}>
-            <div style={{ 
-                width: '100%', maxWidth: '340px', background: '#fff', 
-                borderRadius: '20px', padding: '24px',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' 
-            }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: PA.ink, marginBottom: 12, textAlign: 'center' }}>
-                    Confirmar jerarquía
-                </div>
-                
-                <p style={{ fontSize: 14, color: PA.ink2, fontWeight: 500, marginBottom: 24, lineHeight: 1.5, textAlign: 'center' }}>
-                    ¿Deseas designar a <strong style={{ color: PA.ink }}>{getNombreCompleto(funcionario)}</strong> como <strong style={{ color: PA.ink }}>{nombreRol}</strong> de{' '}
-                    <strong style={{ color: PA.ink }}>{servicioNombre}</strong>?
-                </p>
-                
-                <div style={{ display: 'flex', gap: 12 }}>
-                    <button
-                        onClick={onCancel}
-                        disabled={guardando}
-                        style={{ 
-                            flex: 1, padding: '12px', borderRadius: '12px', 
-                            border: `1px solid ${PA.line}`, background: '#fff', 
-                            fontSize: 15, fontWeight: 700, color: PA.ink2, 
-                            cursor: guardando ? 'not-allowed' : 'pointer',
-                            opacity: guardando ? 0.7 : 1
-                        }}
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        disabled={guardando}
-                        style={{ 
-                            flex: 1, padding: '12px', borderRadius: '12px', 
-                            border: 'none', background: PA.primary, 
-                            fontSize: 15, fontWeight: 800, color: '#fff', 
-                            cursor: guardando ? 'not-allowed' : 'pointer', 
-                            opacity: guardando ? 0.7 : 1 
-                        }}
-                    >
-                        {guardando ? 'Guardando...' : 'Confirmar'}
-                    </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <IconBadge3D icon="crown" theme="amber" size={36} iconSize={17} radius={10} />
+            <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>Jefatura</div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {jefe ? getNombreCompleto(jefe) : 'Sin jefatura designada'}
                 </div>
             </div>
         </div>
-    );
-};
+
+        <div style={{ marginLeft: 17, width: 1, height: 16, background: PA.line }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <IconBadge3D icon="shield-check" theme="blue" size={36} iconSize={17} radius={10} />
+            <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>
+                    Subrogante{subrogantes.length !== 1 ? 's' : ''}
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {subrogantes.length > 0 ? subrogantes.map(getNombreCompleto).join(', ') : 'Sin subrogante designado'}
+                </div>
+            </div>
+        </div>
+
+        <div style={{ marginLeft: 17, width: 1, height: 16, background: PA.line }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <IconBadge3D icon="users" theme="green" size={36} iconSize={17} radius={10} />
+            <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>Funcionarios</div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: PA.ink }}>{totalFuncionarios} en el servicio</div>
+            </div>
+        </div>
+    </div>
+);
 
 // ---------------------------------------------------------------------------
 // VISTA PRINCIPAL
@@ -191,6 +180,16 @@ const JerarquiaJefaturaView = ({ onBack }) => {
   const resultados = filteredUsers();
   const dropdownVisible = showDropdown && searchQuery.length >= 2;
 
+  // Rol de cada funcionario en el servicio activo (mismo criterio que
+  // "Personal del Servicio" usa para sus badges de rol) — solo para
+  // agrupar visualmente, no dispara ninguna llamada nueva.
+  const rolEnServicioActivo = (u) => {
+    const rel = u.servicios?.find(s => Number(s.idServicio) === Number(servicioActivoId));
+    return (rel?.rolServicioNombre || '').toLowerCase();
+  };
+  const jefeActual = funcionarios.find(u => rolEnServicioActivo(u).includes('jefe'));
+  const subrogantesActuales = funcionarios.filter(u => rolEnServicioActivo(u).includes('subrogante'));
+
   // ---------------------------------------------------------------------------
   // HANDLERS
   // ---------------------------------------------------------------------------
@@ -246,15 +245,17 @@ const JerarquiaJefaturaView = ({ onBack }) => {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>
-      
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease' }}>
+
       {/* Header */}
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} aria-label="Volver" style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Jerarquía</div>
-      </div>
+      <TopHeader
+        title="Jerarquía de Funcionarios"
+        leftSlot={
+          <button onClick={onBack} aria-label="Volver" style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
         <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600, lineHeight: 1.5 }}>
@@ -285,6 +286,16 @@ const JerarquiaJefaturaView = ({ onBack }) => {
             />
             {mensaje.texto}
           </div>
+        )}
+
+        {/* Vista previa de la jerarquía actual */}
+        {!loadingDatos && !errorCarga && servicioActivoId && (
+          <JerarquiaPreview
+            jefe={jefeActual}
+            subrogantes={subrogantesActuales}
+            totalFuncionarios={funcionarios.length}
+            PA={PA}
+          />
         )}
 
         {/* 1. SERVICIO ACTUAL (Vista solo lectura) */}
@@ -392,13 +403,13 @@ const JerarquiaJefaturaView = ({ onBack }) => {
           onClick={handleGuardarClick} 
           title={!selectedUser ? 'Selecciona un funcionario primero' : !servicioActivoId ? 'Debes tener un servicio activo' : ''}
           style={{
-            width: '100%', padding: '16px', 
-            background: canSubmit ? PA.ink : PA.line, 
-            color: canSubmit ? '#fff' : PA.ink3, 
-            border: 'none', borderRadius: 14, 
-            fontSize: 16, fontWeight: 800, 
+            width: '100%', padding: '16px',
+            background: canSubmit ? PA.primary : PA.line,
+            color: canSubmit ? '#fff' : PA.ink3,
+            border: 'none', borderRadius: 14,
+            fontSize: 16, fontWeight: 800,
             cursor: canSubmit ? 'pointer' : 'not-allowed',
-            boxShadow: canSubmit ? '0 4px 12px rgba(15,23,42,0.15)' : 'none',
+            boxShadow: canSubmit ? '0 4px 12px rgba(23,65,108,0.25)' : 'none',
             transition: 'all 0.2s'
           }}>
           {guardando ? 'Guardando...' : 'Designar Autoridad'}
@@ -406,16 +417,19 @@ const JerarquiaJefaturaView = ({ onBack }) => {
       </div>
 
       {/* Diálogo de confirmación  */}
-      {showConfirm && selectedUser && (
-        <ConfirmDialog
-            funcionario={selectedUser}
-            servicioNombre={servicioActivoNombre}
-            rol={selectedRole}
-            onConfirm={handleConfirmar}
-            onCancel={() => setShowConfirm(false)}
-            guardando={guardando}
-        />
-      )}
+      <ConfirmDialog
+        open={showConfirm && !!selectedUser}
+        icon="org-chart" tone="primary"
+        title="Confirmar jerarquía"
+        busy={guardando}
+        confirmLabel={guardando ? 'Guardando...' : 'Confirmar'}
+        onConfirm={handleConfirmar}
+        onCancel={() => setShowConfirm(false)}
+      >
+        ¿Deseas designar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> como{' '}
+        <strong style={{ color: PA.ink }}>{selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante'}</strong> de{' '}
+        <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
+      </ConfirmDialog>
     </div>
   );
 };

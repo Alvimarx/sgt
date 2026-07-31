@@ -3,8 +3,9 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
-import { SGT_DATA } from '../Admin2/data';
-import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data';
+import { SGTBadge, SGTIcon, TopHeader, IconBadge3D, CoverageBar } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
 
 dayjs.locale('es');
@@ -13,22 +14,22 @@ dayjs.locale('es');
 // Subcomponentes
 // ──────────────────────────────────────────────
 
+const STAT_TONE_THEME = {
+  primary: 'blue',
+  accent:  'red',
+  success: 'green',
+  warn:    'amber',
+};
+
 const StatCard = ({ icon, label, value, tone }) => {
   const PA = SGT_DATA.PALETTE;
-  const toneMap = {
-    primary: { bg: PA.primarySoft, color: PA.primary },
-    accent:  { bg: PA.accentSoft,  color: '#B85A60' },
-    success: { bg: PA.successSoft, color: PA.success },
-    warn:    { bg: PA.warnSoft,    color: PA.warn },
-  };
-  const t = toneMap[tone] || toneMap.primary;
   return (
-    <div style={{
-      background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14,
+    <div className="sgt-list-row" style={{
+      background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16,
       padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 6, flex: 1,
     }}>
-      <div style={{ width: 34, height: 34, borderRadius: 10, background: t.bg, display: 'grid', placeItems: 'center', alignSelf: 'center' }}>
-        <SGTIcon name={icon} size={18} color={t.color} />
+      <div style={{ alignSelf: 'center' }}>
+        <IconBadge3D icon={icon} theme={STAT_TONE_THEME[tone] || 'blue'} size={34} radius={10} iconSize={17} />
       </div>
       <div style={{ fontSize: 22, fontWeight: 800, color: PA.ink, lineHeight: 1 }}>{value}</div>
       <div style={{ fontSize: 11, fontWeight: 700, color: PA.ink3 }}>{label}</div>
@@ -40,13 +41,11 @@ const TurnoLibreItem = ({ turno }) => {
   const PA = SGT_DATA.PALETTE;
   const fecha = turno.diaInicioTurno ? dayjs(turno.diaInicioTurno).format('ddd D MMM') : '—';
   return (
-    <div style={{
+    <div className="sgt-list-row" style={{
       display: 'flex', alignItems: 'center', gap: 10,
-      background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 12, padding: '10px 12px',
+      background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: '10px 12px',
     }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: PA.accentSoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-        <SGTIcon name="calendar" size={16} color="#B85A60" />
-      </div>
+      <IconBadge3D icon="calendar" theme="red" size={36} radius={10} iconSize={16} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: PA.ink }}>{fecha}</div>
         <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600, marginTop: 1 }}>
@@ -150,7 +149,8 @@ const AdminStats = ({ onBack }) => {
     return mesLabel;
   })();
 
-  const avatarColores = [PA.primary, '#B85A60', PA.success, PA.warn, '#7C6FCD', '#2E9E8A'];
+  // Colores literales (no var(--...)) porque más abajo se les concatena un sufijo de alpha ("18").
+  const avatarColores = ['#17416C', '#B85A60', '#2E7D57', '#C88700', '#7C6FCD', '#2E9E8A'];
   const getAvatarColor = (idx) => avatarColores[idx % avatarColores.length];
   const getInitials = (nombre) => {
     const parts = nombre.trim().split(' ').filter(Boolean);
@@ -220,14 +220,16 @@ const AdminStats = ({ onBack }) => {
   }, [todosDetalle]);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden', position: 'relative' }}>
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden', position: 'relative' }}>
 
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Estadísticas del Servicio</div>
-      </div>
+      <TopHeader
+        title="Estadísticas del Servicio"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -236,11 +238,7 @@ const AdminStats = ({ onBack }) => {
           semanaKey={semanaKey} setSemanaKey={setSemanaKey}
         />
 
-        {loading && (
-          <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-            Cargando estadísticas...
-          </div>
-        )}
+        {loading && <LoadingState label="Cargando estadísticas..." />}
 
         {error && (
           <div style={{ background: PA.accentSoft, border: `1px solid #F3D2D5`, borderRadius: 12, padding: 14, fontSize: 13, color: '#8C3F44', fontWeight: 700 }}>
@@ -251,8 +249,9 @@ const AdminStats = ({ onBack }) => {
         {!loading && !error && stats && (
           <>
             <div
+              className="sgt-list-row"
               onClick={handleAbrirCobertura}
-              style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 16, cursor: 'pointer' }}
+              style={{ background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: 16, cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Cobertura de turnos</span>
@@ -260,13 +259,11 @@ const AdminStats = ({ onBack }) => {
                   {pct}%
                 </span>
               </div>
-              <div style={{ height: 10, background: PA.line2, borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 99, transition: 'width .5s ease',
-                  background: pct >= 80 ? PA.success : pct >= 50 ? PA.warn : PA.accent,
-                  width: `${Math.min(100, pct)}%`,
-                }} />
-              </div>
+              <CoverageBar
+                value={stats.turnosAsignados ?? 0} max={stats.totalTurnos ?? 0}
+                tone={pct >= 80 ? 'success' : pct >= 50 ? 'warn' : 'danger'}
+                showPercent={false}
+              />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                 <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
                   {stats.turnosAsignados ?? '—'} asignados de {stats.totalTurnos ?? '—'} totales
@@ -277,8 +274,9 @@ const AdminStats = ({ onBack }) => {
 
             {funcsStats && (
               <div
+                className="sgt-list-row"
                 onClick={handleAbrirDetalle}
-                style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 16, cursor: 'pointer' }}
+                style={{ background: '#fff', border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', borderRadius: 16, padding: 16, cursor: 'pointer' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                   <span style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Funcionarios con turno</span>
@@ -286,15 +284,10 @@ const AdminStats = ({ onBack }) => {
                     {funcsStats.funcionariosConTurno ?? '—'} / {funcsStats.totalFuncionarios ?? '—'}
                   </span>
                 </div>
-                <div style={{ height: 10, background: PA.line2, borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 99, transition: 'width .5s ease',
-                    background: PA.primary,
-                    width: funcsStats.totalFuncionarios > 0
-                      ? `${Math.min(100, (funcsStats.funcionariosConTurno / funcsStats.totalFuncionarios) * 100)}%`
-                      : '0%',
-                  }} />
-                </div>
+                <CoverageBar
+                  value={funcsStats.funcionariosConTurno ?? 0} max={funcsStats.totalFuncionarios ?? 0}
+                  tone="primary" showPercent={false}
+                />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                   <span style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
                     {funcsStats.totalFuncionarios > 0
@@ -325,9 +318,11 @@ const AdminStats = ({ onBack }) => {
             )}
 
             {vacantes.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '16px 0', color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                Sin turnos vacantes en este período.
-              </div>
+              <ListEmptyState
+                icon="calendar" theme="slate"
+                title="Sin turnos vacantes"
+                message="No hay turnos vacantes en este período."
+              />
             )}
           </>
         )}
@@ -458,9 +453,11 @@ const AdminStats = ({ onBack }) => {
 
               <div style={{ height: 1, background: PA.line2, marginTop: 10 }} />
 
-              {loadingTodos && <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Cargando...</div>}
+              {loadingTodos && <div style={{ padding: '16px 16px 0' }}><LoadingState label="Cargando..." /></div>}
               {!loadingTodos && turnosFiltrados.length === 0 && (
-                <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>Sin turnos para este filtro.</div>
+                <div style={{ padding: '16px 16px 0' }}>
+                  <ListEmptyState icon="search" theme="slate" title="Sin resultados" message="No hay turnos para este filtro." />
+                </div>
               )}
               {!loadingTodos && turnosFiltrados.map((t, idx) => (
                 <div key={t.idTurno ?? idx} style={{ display: 'flex', alignItems: 'center', padding: '11px 16px', gap: 12, borderBottom: `1px solid ${PA.line2}` }}>
@@ -547,13 +544,11 @@ const AdminStats = ({ onBack }) => {
           {/* Body */}
           <div className="sgt-scroll-clean" style={{ flex: 1, overflowY: 'auto' }}>
             {loadingDetalle && (
-              <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                Cargando...
-              </div>
+              <div style={{ padding: '16px 16px 0' }}><LoadingState label="Cargando..." /></div>
             )}
             {!loadingDetalle && (!detalle || detalle.length === 0) && (
-              <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                Sin funcionarios en este servicio.
+              <div style={{ padding: '16px 16px 0' }}>
+                <ListEmptyState icon="user" theme="slate" title="Sin funcionarios" message="No hay funcionarios en este servicio." />
               </div>
             )}
             {!loadingDetalle && detalle?.map((func, idx) => {

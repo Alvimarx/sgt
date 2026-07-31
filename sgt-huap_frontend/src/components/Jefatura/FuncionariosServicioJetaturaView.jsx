@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { SGT_DATA } from '../Admin2/data'; // Ajusta la ruta según tu estructura
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data'; // Ajusta la ruta según tu estructura
+import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
+
+const AVATAR_THEME = DASHBOARD_ICON_THEMES.green;
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
 
@@ -59,15 +62,17 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
-      
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>
+
       {/* Cabecera */}
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Personal del Servicio</div>
-      </div>
+      <TopHeader
+        title="Personal del Servicio"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       <div style={{ flex: 1, padding: '16px', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
         
@@ -108,9 +113,7 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
         {/* Lista de Doctores / Funcionarios */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
-              Cargando nómina de personal...
-            </div>
+            <LoadingState label="Cargando nómina de personal..." />
           ) : personalFiltrado.length > 0 ? (
             personalFiltrado.map((u, i) => {
               
@@ -128,15 +131,16 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
               else if (esSubrogante) { badgeBg = PA.primarySoft; badgeColor = PA.primary; }
 
               return (
-                <div key={u.idFuncionario || `f_${i}`} style={{
-                  background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14,
+                <div key={u.idFuncionario || `f_${i}`} className="sgt-list-row" style={{
+                  background: '#fff', border: 'none', borderRadius: 16,
                   padding: '14px', display: 'flex', alignItems: 'center', gap: 12,
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                  boxShadow: '0 2px 10px rgba(15,23,42,0.06)'
                 }}>
                   {/* Avatar */}
-                  <div style={{ 
-                    width: 40, height: 40, borderRadius: 12, background: PA.primarySoft, 
-                    color: PA.primary, display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 800 
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 12, background: AVATAR_THEME.grad,
+                    color: '#fff', display: 'grid', placeItems: 'center', fontSize: 14, fontWeight: 800, flexShrink: 0,
+                    boxShadow: `0 6px 14px ${AVATAR_THEME.glow}, inset 0 1.5px 0 rgba(255,255,255,0.55), inset 0 -3px 5px rgba(0,0,0,0.18)`,
                   }}>
                     {(u.nombre || 'U').charAt(0)}{(u.apellidoPaterno || '').charAt(0)}
                   </div>
@@ -163,9 +167,11 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
               );
             })
           ) : (
-            <div style={{ textAlign: 'center', padding: '40px 16px', color: PA.ink3, fontWeight: 600, fontSize: 14 }}>
-              No se encontraron funcionarios asignados a este servicio.
-            </div>
+            <ListEmptyState
+              icon="search" theme="slate"
+              title="Sin resultados"
+              message="No se encontraron funcionarios asignados a este servicio."
+            />
           )}
         </div>
       </div>

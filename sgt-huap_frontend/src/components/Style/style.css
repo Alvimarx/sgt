@@ -85,6 +85,148 @@
   box-shadow: 0 0 0 3px rgba(23, 65, 108, 0.14);
 }
 
+/* Mi Dashboard — tarjetas KPI, progreso y estados */
+@keyframes sgtCardIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes sgtMonthIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes sgtProgressShimmer {
+  0%   { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes sgtPulseSoft {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+.dash-page-bg {
+  background:
+    radial-gradient(120% 160px at 15% 0%, rgba(108,139,255,0.10), transparent 70%),
+    linear-gradient(180deg, #F3F7FC 0%, #EEF3FA 60%, #EDF2F9 100%);
+}
+
+.kpi-card {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  will-change: transform;
+}
+.kpi-card:hover,
+.kpi-card:focus-within {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
+}
+.kpi-card:hover .kpi-icon-wrap {
+  transform: scale(1.08) rotate(-2deg);
+}
+.kpi-card:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+.sgt-progress-track {
+  position: relative;
+  overflow: hidden;
+}
+.sgt-progress-fill {
+  position: relative;
+  background-size: 200% 100%;
+  animation: sgtProgressShimmer 2.6s linear infinite;
+}
+
+.sgt-week-pill {
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.15s ease;
+}
+.sgt-week-pill:hover {
+  transform: translateY(-1px);
+}
+.sgt-week-pill:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.sgt-nav-arrow {
+  transition: background 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+.sgt-nav-arrow:hover:not(:disabled) {
+  background: var(--primary-soft);
+  transform: translateY(-1px);
+}
+.sgt-nav-arrow:active:not(:disabled) {
+  transform: translateY(0) scale(0.92);
+}
+
+.sgt-empty-icon {
+  animation: sgtPulseSoft 2.8s ease-in-out infinite;
+}
+
+.turno-proximo-item {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.turno-proximo-item:hover {
+  transform: translateX(2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+/* Admin/Jefatura — modal de confirmación, filas de lista y filtros compartidos */
+@keyframes sgtDialogPop {
+  from { opacity: 0; transform: scale(0.96) translateY(6px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.confirm-overlay {
+  position: absolute; inset: 0; z-index: 120;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.confirm-overlay__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  animation: sgtFade .18s ease;
+}
+.confirm-card {
+  position: relative;
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  width: 100%;
+  max-width: 340px;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+  animation: sgtDialogPop .22s cubic-bezier(.22,1,.36,1);
+}
+
+.sgt-list-row {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.sgt-list-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.07);
+}
+.sgt-list-row:active {
+  transform: translateY(0) scale(0.995);
+}
+
+.sgt-filter-row {
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.sgt-filter-chip {
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+.sgt-filter-chip:hover {
+  filter: brightness(0.97);
+}
+
+@keyframes sgtSkeletonShimmer {
+  0%   { opacity: 0.6; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+.sgt-skeleton-row {
+  animation: sgtSkeletonShimmer 1.3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

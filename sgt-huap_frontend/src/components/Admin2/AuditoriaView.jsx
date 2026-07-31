@@ -3,7 +3,8 @@ import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import { SGTBadge, SGTIcon, TopHeader, IconBadge3D } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -35,15 +36,16 @@ const TurnoAuditoriaItem = ({ turno }) => {
   const fecha    = turno.diaInicioTurno ? dayjs(turno.diaInicioTurno).format('ddd D MMM') : '—';
   const horas    = `${(turno.horaInicio || '?').slice(0,5)} – ${(turno.horaFin || '?').slice(0,5)}`;
   const colorBorde = asignado ? PA.success : '#D9626A';
-  const bgTinte    = asignado ? `${PA.success}10` : '#FDF2F3';
+  const bgTinte    = asignado ? PA.successSoft : '#FDF2F3';
 
   return (
-    <div style={{
+    <div className="sgt-list-row" style={{
       display: 'flex', alignItems: 'center', gap: 12,
       background: bgTinte,
-      border: `1px solid ${PA.line}`,
+      border: 'none',
       borderLeft: `4px solid ${colorBorde}`,
       borderRadius: 14, padding: '10px 12px',
+      boxShadow: '0 2px 8px rgba(15,23,42,0.06)',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         {turno.nombre && (
@@ -105,34 +107,36 @@ const AuditoriaView = ({ onBack }) => {
   const totalVacantes  = turnosFiltrados.filter(t => t.idFuncionario == null).length;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink }}>Auditoría de Asistencia</div>
-      </div>
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
+      <TopHeader
+        title="Auditoría de Asistencia"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+          </button>
+        }
+      />
 
       {/* Selector de mes */}
       <div style={{ padding: '10px 14px 8px', background: '#fff', borderBottom: `1px solid ${PA.line2}`, overflowX: 'auto', display: 'flex', gap: 6 }}>
-        {opcionesMes.map(m => (
-          <button key={m.value} onClick={() => setMesSeleccionado(m)} style={{
-            background: mesSeleccionado.value === m.value ? PA.primary : '#fff',
-            color: mesSeleccionado.value === m.value ? '#fff' : PA.ink2,
-            border: `1px solid ${mesSeleccionado.value === m.value ? PA.primary : PA.line}`,
-            borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 800,
-            cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-            textTransform: 'capitalize',
-          }}>{m.label}</button>
-        ))}
+        {opcionesMes.map(m => {
+          const activo = mesSeleccionado.value === m.value;
+          return (
+            <button key={m.value} className="sgt-week-pill" onClick={() => setMesSeleccionado(m)} style={{
+              background: activo ? 'linear-gradient(150deg, #6C8BFF 0%, #2B3FA0 100%)' : '#fff',
+              color: activo ? '#fff' : PA.ink2,
+              border: activo ? 'none' : `1px solid ${PA.line}`,
+              borderRadius: 999, padding: '6px 14px', fontSize: 12, fontWeight: 800,
+              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              textTransform: 'capitalize',
+              boxShadow: activo ? '0 4px 12px rgba(43,63,160,0.28)' : 'none',
+            }}>{m.label}</button>
+          );
+        })}
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {loading && (
-          <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-            Cargando turnos...
-          </div>
-        )}
+        {loading && <LoadingState label="Cargando turnos..." />}
 
         {error && (
           <div style={{ background: PA.accentSoft, border: `1px solid #F3D2D5`, borderRadius: 12, padding: 14, fontSize: 13, color: '#8C3F44', fontWeight: 700 }}>
@@ -145,35 +149,44 @@ const AuditoriaView = ({ onBack }) => {
             {/* Resumen del mes */}
             {turnosFiltrados.length > 0 && (
               <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{
-                  flex: 1, background: PA.successSoft, border: `1px solid ${PA.success}20`,
-                  borderRadius: 12, padding: '10px 14px', textAlign: 'center',
+                <div className="sgt-list-row" style={{
+                  flex: 1, background: '#fff', border: `1px solid ${PA.line}`,
+                  borderRadius: 14, padding: '12px 10px', textAlign: 'center',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                 }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: PA.success }}>{totalAsignados}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: PA.success }}>Asignados</div>
+                  <IconBadge3D icon="check-circle" theme="green" size={32} iconSize={16} radius={10} />
+                  <div style={{ fontSize: 20, fontWeight: 900, color: PA.ink, lineHeight: 1 }}>{totalAsignados}</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: PA.ink3 }}>Asignados</div>
                 </div>
-                <div style={{
-                  flex: 1, background: PA.accentSoft, border: `1px solid #F3D2D5`,
-                  borderRadius: 12, padding: '10px 14px', textAlign: 'center',
+                <div className="sgt-list-row" style={{
+                  flex: 1, background: '#fff', border: `1px solid ${PA.line}`,
+                  borderRadius: 14, padding: '12px 10px', textAlign: 'center',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                 }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: '#B85A60' }}>{totalVacantes}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#B85A60' }}>Vacantes</div>
+                  <IconBadge3D icon="alert" theme="red" size={32} iconSize={16} radius={10} />
+                  <div style={{ fontSize: 20, fontWeight: 900, color: PA.ink, lineHeight: 1 }}>{totalVacantes}</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: PA.ink3 }}>Vacantes</div>
                 </div>
-                <div style={{
-                  flex: 1, background: PA.primarySoft, border: `1px solid #CFDCEA`,
-                  borderRadius: 12, padding: '10px 14px', textAlign: 'center',
+                <div className="sgt-list-row" style={{
+                  flex: 1, background: '#fff', border: `1px solid ${PA.line}`,
+                  borderRadius: 14, padding: '12px 10px', textAlign: 'center',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
                 }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: PA.primary }}>{turnosFiltrados.length}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: PA.primary }}>Total</div>
+                  <IconBadge3D icon="calendar" theme="blue" size={32} iconSize={16} radius={10} />
+                  <div style={{ fontSize: 20, fontWeight: 900, color: PA.ink, lineHeight: 1 }}>{turnosFiltrados.length}</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: PA.ink3 }}>Total</div>
                 </div>
               </div>
             )}
 
             {/* Lista de turnos */}
             {turnosFiltrados.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: PA.ink3, fontSize: 13, fontWeight: 600 }}>
-                Sin turnos pasados en {mesSeleccionado.label}.
-              </div>
+              <ListEmptyState
+                icon="shield-search"
+                theme="slate"
+                title="Sin turnos pasados"
+                message={`No se encontraron turnos en ${mesSeleccionado.label}.`}
+              />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {turnosFiltrados.map(t => <TurnoAuditoriaItem key={t.id} turno={t} />)}

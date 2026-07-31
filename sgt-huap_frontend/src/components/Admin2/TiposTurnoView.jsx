@@ -2,46 +2,39 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Clock, Plus, Pencil, Trash2, X, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { tiposTurnoService, formatHora } from '../../services/rotativasService';
-import { SGTIcon } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
+import { SGT_DATA } from './data';
 
-// ─── Paleta de colores reutilizable ────────────────────────────────────────
-const PA = {
-    primary:     'var(--primary)',
-    primarySoft: 'var(--primary-soft)',
-    accent:      'var(--accent)',
-    accentSoft:  'var(--accent-soft)',
-    warn:        'var(--warn)',
-    warnSoft:    'var(--warn-soft)',
-    success:     'var(--success)',
-    ink:         'var(--ink)',
-    ink2:        'var(--ink2)',
-    ink3:        'var(--ink3)',
-    line:        'var(--line)',
-    surface:     'var(--surface)',
-    surface2:    'var(--surface2)',
-};
+// ─── Paleta de colores compartida con el resto de la app ───────────────────
+const PA = SGT_DATA.PALETTE;
 
 // Asigna un color distinto a cada tipo de turno según su posición en la lista
 const HUES = [250, 150, 30, 85, 320, 200, 45, 170];
 const turnoColor = (index) => {
     const h = HUES[index % HUES.length];
-    return { bg: `oklch(0.93 0.05 ${h})`, ink: `oklch(0.30 0.10 ${h})`, border: `oklch(0.80 0.08 ${h})` };
+    return {
+        bg: `oklch(0.93 0.05 ${h})`, ink: `oklch(0.30 0.10 ${h})`, border: `oklch(0.80 0.08 ${h})`,
+        grad: `linear-gradient(150deg, oklch(0.72 0.12 ${h}) 0%, oklch(0.42 0.12 ${h}) 100%)`,
+        glow: `oklch(0.55 0.12 ${h} / 0.35)`,
+    };
 };
 
 // ─── Sub-componente: card de tipo de turno ──────────────────────────────────
 function TurnoCard({ turno, index, onEdit, onDelete }) {
     const c = turnoColor(index);
     return (
-        <div style={{
-            background: '#fff', borderRadius: 14,
-            border: `1px solid ${PA.line}`, overflow: 'hidden',
+        <div className="sgt-list-row" style={{
+            background: '#fff', borderRadius: 16,
+            border: 'none', boxShadow: '0 2px 10px rgba(15,23,42,0.06)', overflow: 'hidden',
         }}>
             <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                     width: 44, height: 44, borderRadius: 12,
-                    background: c.bg, display: 'grid', placeItems: 'center', flexShrink: 0,
+                    background: c.grad, display: 'grid', placeItems: 'center', flexShrink: 0,
+                    boxShadow: `0 6px 14px ${c.glow}, inset 0 1.5px 0 rgba(255,255,255,0.55), inset 0 -3px 5px rgba(0,0,0,0.18)`,
                 }}>
-                    <Clock size={20} color={c.ink} />
+                    <Clock size={20} color="#fff" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: c.ink, marginBottom: 4 }}>
@@ -370,26 +363,30 @@ export default function TiposTurnoView({ onBack }) {
     const closeForm  = () => { setEditing(null); setShowForm(false); };
 
     return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
+        <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
             {/* Header con botón volver */}
-            <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${PA.line}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-                    <SGTIcon name="chevron-left" size={24} color={PA.ink} />
-                </button>
-                <div style={{ fontSize: 19, fontWeight: 800, color: PA.ink, flex: 1 }}>Tipos de Turno</div>
-                <button
-                    onClick={openCreate}
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '9px 18px', borderRadius: 10,
-                        background: PA.primary, color: '#fff', border: 'none',
-                        fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                    }}
-                >
-                    <Plus size={16} /> Nuevo tipo
-                </button>
-            </div>
+            <TopHeader
+                title="Tipos de Turno"
+                leftSlot={
+                    <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+                        <SGTIcon name="chevron-left" size={24} color={PA.ink} />
+                    </button>
+                }
+                rightSlot={
+                    <button
+                        onClick={openCreate}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '9px 14px', borderRadius: 10,
+                            background: PA.primary, color: '#fff', border: 'none',
+                            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        }}
+                    >
+                        <Plus size={15} /> Nuevo
+                    </button>
+                }
+            />
 
             {/* Contenido scrollable */}
             <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -420,29 +417,25 @@ export default function TiposTurnoView({ onBack }) {
 
                 {/* Lista de tipos de turno */}
                 {loading ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: PA.ink3, fontSize: 14 }}>
-                        Cargando…
-                    </div>
+                    <LoadingState label="Cargando tipos de turno…" />
                 ) : tipos.length === 0 ? (
-                    <div style={{
-                        background: '#fff', borderRadius: 14, border: `1px solid ${PA.line}`,
-                        padding: 48, textAlign: 'center',
-                    }}>
-                        <Clock size={36} style={{ color: PA.ink3, marginBottom: 12 }} />
-                        <p style={{ margin: '0 0 14px', color: PA.ink3, fontSize: 14 }}>
-                            No hay tipos de turno definidos para este servicio.
-                        </p>
-                        <button
-                            onClick={openCreate}
-                            style={{
-                                padding: '9px 20px', borderRadius: 10,
-                                background: PA.primary, color: '#fff', border: 'none',
-                                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                            }}
-                        >
-                            Crear el primero
-                        </button>
-                    </div>
+                    <ListEmptyState
+                        icon="clock" theme="teal"
+                        title="Sin tipos de turno"
+                        message="No hay tipos de turno definidos para este servicio."
+                        action={
+                            <button
+                                onClick={openCreate}
+                                style={{
+                                    padding: '9px 20px', borderRadius: 10, marginTop: 4,
+                                    background: PA.primary, color: '#fff', border: 'none',
+                                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                                }}
+                            >
+                                Crear el primero
+                            </button>
+                        }
+                    />
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                         {tipos.map((t, i) => (

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { eventosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
-import { SGTBadge, SGTIcon } from '../Style/UIPrimitives';
+import { SGTBadge, SGTIcon, TopHeader, StatusBadge } from '../Style/UIPrimitives';
+import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
 
 // ──────────────────────────────────────────────
@@ -298,7 +299,7 @@ const FilaFiltro = ({ label, opciones, valor, onSelect }) => {
   const todasOpciones = [{ value: null, label: 'Todo' }, ...opciones];
 
   return (
-    <div style={{ borderBottom: `1px solid ${p.line2}` }}>
+    <div className="sgt-filter-row" style={{ borderBottom: `1px solid ${p.line2}` }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{
@@ -318,13 +319,13 @@ const FilaFiltro = ({ label, opciones, valor, onSelect }) => {
             return (
               <button
                 key={op.value ?? '__todo__'}
+                className="sgt-filter-chip"
                 onClick={() => { onSelect(op.value); setOpen(false); }}
                 style={{
                   padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
                   border: `1.5px solid ${activo ? p.primary : p.line}`,
-                  background: activo ? p.primary : '#fff',
+                  background: activo ? 'linear-gradient(150deg, #6C8BFF 0%, #2B3FA0 100%)' : '#fff',
                   color: activo ? '#fff' : p.ink2,
-                  cursor: 'pointer',
                 }}
               >
                 {op.label}
@@ -361,7 +362,7 @@ const EventoItem = ({ evento }) => {
   }, [expandido]);
 
   return (
-    <div style={{ background: '#fff', border: `1px solid ${p.line}`, borderRadius: 12 }}>
+    <div className="sgt-list-row" style={{ background: '#fff', border: 'none', borderRadius: 16, boxShadow: '0 2px 10px rgba(15,23,42,0.06)' }}>
       {/* Cabecera colapsada — siempre visible */}
       <div
         onClick={() => setExpandido(e => !e)}
@@ -381,9 +382,9 @@ const EventoItem = ({ evento }) => {
           <SGTIcon name={expandido ? 'chevron-up' : 'chevron-down'} size={14} color={p.ink3} />
         </div>
         {estado && (
-          <span style={{ fontSize: 12, color: p.ink2, fontWeight: 700, textAlign: 'left' }}>
-            {estado}
-          </span>
+          <div style={{ alignSelf: 'flex-start' }}>
+            <StatusBadge status={estado} size="xs" />
+          </div>
         )}
         {solicitante && (
           <span style={{ fontSize: 12, color: p.ink3, fontWeight: 600, textAlign: 'left' }}>
@@ -507,15 +508,17 @@ const BitacoraView = ({ onBack }) => {
   const filtrosActivos = [filtroCategoria, filtroTipoSolicitud, filtroEstado, filtroEncargado].filter(Boolean).length;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: p.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
+    <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
 
       {/* Header */}
-      <div style={{ padding: '16px', background: '#fff', borderBottom: `1px solid ${p.line2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
-          <SGTIcon name="chevron-left" size={24} color={p.ink} />
-        </button>
-        <div style={{ fontSize: 19, fontWeight: 800, color: p.ink }}>Bitácora de Cambios</div>
-      </div>
+      <TopHeader
+        title="Bitácora de Cambios"
+        leftSlot={
+          <button onClick={onBack} style={{ background: 'transparent', border: 'none', padding: 4, cursor: 'pointer', display: 'flex' }}>
+            <SGTIcon name="chevron-left" size={24} color={p.ink} />
+          </button>
+        }
+      />
 
       {/* Selector de período */}
       <div style={{ padding: '10px 14px', background: '#fff', borderBottom: `1px solid ${p.line2}` }}>
@@ -527,7 +530,7 @@ const BitacoraView = ({ onBack }) => {
 
       {/* Panel de filtros */}
       {!loading && !error && (
-        <div style={{ background: '#fff', borderBottom: `2px solid #b0b8c4` }}>
+        <div style={{ background: '#fff', borderBottom: `1px solid ${p.line2}` }}>
           <button
             onClick={() => setFiltrosOpen(o => !o)}
             style={{
@@ -581,20 +584,18 @@ const BitacoraView = ({ onBack }) => {
 
       {/* Lista de eventos */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {loading && (
-          <div style={{ textAlign: 'center', padding: 40, color: p.ink3, fontSize: 13, fontWeight: 600 }}>
-            Cargando bitácora...
-          </div>
-        )}
+        {loading && <LoadingState label="Cargando bitácora..." />}
         {error && (
           <div style={{ background: p.accentSoft, border: '1px solid #F3D2D5', borderRadius: 12, padding: 14, fontSize: 13, color: '#8C3F44', fontWeight: 700 }}>
             {error}
           </div>
         )}
         {!loading && !error && eventosFiltrados.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 40, color: p.ink3, fontSize: 13, fontWeight: 600 }}>
-            Sin registros para mostrar.
-          </div>
+          <ListEmptyState
+            icon="history" theme="slate"
+            title="Sin registros"
+            message="No hay eventos para mostrar con los filtros seleccionados."
+          />
         )}
         {!loading && !error && eventosFiltrados.map(ev => (
           <EventoItem key={ev.idEvento} evento={ev} />

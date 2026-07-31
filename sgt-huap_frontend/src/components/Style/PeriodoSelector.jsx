@@ -51,51 +51,75 @@ const PeriodoSelector = ({ mesOffset, setMesOffset, semanaKey, setSemanaKey }) =
   const handleMesAdelante = () => { setMesOffset(o => o - 1); setSemanaKey(null); };
 
   return (
-    <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 4px' }}>
+    <div style={{
+      background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 18, overflow: 'hidden', flexShrink: 0,
+      boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 8px' }}>
         <button
+          className="sgt-nav-arrow"
           onClick={puedeIrAtras ? handleMesAtras : undefined}
-          style={{ background: 'none', border: 'none', cursor: puedeIrAtras ? 'pointer' : 'default', display: 'flex', alignItems: 'center', padding: '4px 10px', opacity: puedeIrAtras ? 1 : 0.2 }}
+          disabled={!puedeIrAtras}
+          style={{
+            background: 'none', border: 'none', borderRadius: 10, cursor: puedeIrAtras ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34,
+            opacity: puedeIrAtras ? 1 : 0.25,
+          }}
         >
-          <SGTIcon name="chevron-left" size={18} color={PA.ink} />
+          <SGTIcon name="chevron-left" size={18} color={PA.primary} strokeWidth={2.4} />
         </button>
-        <span style={{ fontSize: 15, fontWeight: 800, color: PA.ink, textTransform: 'capitalize' }}>
+        <span key={mesActual.format('YYYY-MM')} style={{
+          fontSize: 17, fontWeight: 900, color: PA.ink, textTransform: 'capitalize', letterSpacing: -0.2,
+          animation: 'sgtMonthIn .25s ease',
+        }}>
           {mesActual.format('MMMM YYYY')}
         </span>
         <button
+          className="sgt-nav-arrow"
           onClick={puedeIrAdelante ? handleMesAdelante : undefined}
-          style={{ background: 'none', border: 'none', cursor: puedeIrAdelante ? 'pointer' : 'default', display: 'flex', alignItems: 'center', padding: '4px 10px', opacity: puedeIrAdelante ? 1 : 0.2 }}
+          disabled={!puedeIrAdelante}
+          style={{
+            background: 'none', border: 'none', borderRadius: 10, cursor: puedeIrAdelante ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34,
+            opacity: puedeIrAdelante ? 1 : 0.25,
+          }}
         >
-          <SGTIcon name="chevron-right" size={18} color={PA.ink} />
+          <SGTIcon name="chevron-right" size={18} color={PA.primary} strokeWidth={2.4} />
         </button>
       </div>
 
       <div style={{ height: 1, background: PA.line2, margin: '0 12px' }} />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 12px' }}>
-        {[{ key: null, label: 'Todo', dias: 'mes' }, ...semanas].map((s, i) => {
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4, padding: '10px', overflowX: 'auto',
+        background: PA.surface2,
+      }}>
+        {[{ key: null, label: 'Todo', dias: 'mes' }, ...semanas].map((s) => {
           const activa = s.key === null ? !semanaKey : semanaKey === s.key;
           return (
-            <React.Fragment key={s.key ?? '__todo__'}>
-              {i > 0 && <span style={{ color: PA.line, fontSize: 12, userSelect: 'none' }}>·</span>}
-              <button
-                onClick={() => setSemanaKey(s.key === null ? null : (activa ? null : s.key))}
-                style={{
-                  background: activa ? PA.primary : 'none', border: 'none', borderRadius: 8,
-                  padding: '4px 8px', cursor: 'pointer', transition: 'background .15s, color .15s',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-                }}
-              >
-                <span style={{ fontSize: 12, fontWeight: 800, color: activa ? '#fff' : PA.ink2, lineHeight: 1 }}>
-                  {s.key ?? 'Todo'}
+            <button
+              key={s.key ?? '__todo__'}
+              className="sgt-week-pill"
+              onClick={() => setSemanaKey(s.key === null ? null : (activa ? null : s.key))}
+              style={{
+                background: activa ? 'linear-gradient(150deg, #6C8BFF 0%, #2B3FA0 100%)' : 'transparent',
+                border: activa ? 'none' : `1px solid ${PA.line}`,
+                borderRadius: 10, flex: s.key === null ? '0 0 auto' : '1 1 0',
+                padding: '7px 12px', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                boxShadow: activa ? '0 4px 12px rgba(43,63,160,0.32)' : 'none',
+                minWidth: s.key === null ? 52 : 40,
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 800, color: activa ? '#fff' : PA.ink2, lineHeight: 1 }}>
+                {s.key ?? 'Todo'}
+              </span>
+              {s.key !== null && (
+                <span style={{ fontSize: 9.5, fontWeight: 600, color: activa ? 'rgba(255,255,255,0.85)' : PA.ink3, lineHeight: 1 }}>
+                  {s.dias}
                 </span>
-                {s.key !== null && (
-                  <span style={{ fontSize: 10, fontWeight: 600, color: activa ? 'rgba(255,255,255,0.8)' : PA.ink3, lineHeight: 1 }}>
-                    {s.dias}
-                  </span>
-                )}
-              </button>
-            </React.Fragment>
+              )}
+            </button>
           );
         })}
       </div>
