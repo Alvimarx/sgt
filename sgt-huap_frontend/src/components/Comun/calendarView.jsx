@@ -7,6 +7,7 @@ import { getTurnosCalendario } from '../../services/turnosService';
 import ShiftDetail, { getTipoTurnoColor, formatShiftLabel } from '../Comun/ShiftDetail';
 import AsignarTurnoLibreSheet from './AsignarTurnoLibreSheet';
 import { exportarTurnosCsv } from '../../services/exportacionService';
+import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS DE PRESENTACIÓN
@@ -23,7 +24,9 @@ const firstDayOfMonth = (year, month) => {
     return d === 0 ? 6 : d - 1;
 };
 const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
-const todayKey = () => new Date().toISOString().slice(0, 10);
+// Centralizado en dateUtils (zona horaria del hospital, no UTC) para que "hoy" no se calcule
+// distinto en cada pantalla — ver corrección funcional "Inicio no debe mostrar fechas pasadas".
+const todayKey = () => hoyISOEnZonaHospital();
 const dateKey = (year, month, day) =>
     `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 

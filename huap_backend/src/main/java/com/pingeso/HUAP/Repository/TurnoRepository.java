@@ -271,4 +271,44 @@ public interface TurnoRepository extends JpaRepository<TurnoEntity, Long> {
             @Param("fechaFin") LocalDate fechaFin
     );
 
+    // ====================================================================
+    // ORIGEN POR EJECUCIÓN DE PLANIFICACIÓN
+    // ====================================================================
+
+    /** Turnos vigentes generados por una ejecución concreta (origen inequívoco). */
+    @Query("SELECT t FROM TurnoEntity t WHERE t.ejecucion.idEjecucion = :idEjecucion AND t.eliminado = false")
+    List<TurnoEntity> findByEjecucion_IdEjecucion(@Param("idEjecucion") Long idEjecucion);
+
+    /**
+     * Soft-delete de los turnos vigentes de una ejecución concreta cuyo día de inicio sea igual o
+     * posterior a la fecha dada. Usado para truncar/anular una ejecución al editar una planificación
+     * desde una fecha, o al acortar su vigencia — nunca afecta turnos de otra ejecución ni turnos
+     * manuales/legado (sin ejecución asociada).
+     * @return cantidad de turnos marcados como eliminados.
+     */
+    @Modifying
+    @Query("""
+           UPDATE TurnoEntity t
+           SET t.eliminado = true
+           WHERE t.eliminado = false
+           AND t.ejecucion.idEjecucion = :idEjecucion
+           AND t.diaInicioTurno >= :fechaDesde
+           """)
+    int softDeleteByEjecucionDesde(
+            @Param("idEjecucion") Long idEjecucion,
+            @Param("fechaDesde") LocalDate fechaDesde
+    );
+
+    /** Cuenta los turnos vigentes de una ejecución cuyo día de inicio sea posterior a la fecha dada (para advertencias de "acortar"). */
+    @Query("""
+           SELECT COUNT(t) FROM TurnoEntity t
+           WHERE t.eliminado = false
+           AND t.ejecucion.idEjecucion = :idEjecucion
+           AND t.diaInicioTurno > :fecha
+           """)
+    long countByEjecucionDespuesDe(
+            @Param("idEjecucion") Long idEjecucion,
+            @Param("fecha") LocalDate fecha
+    );
+
 }

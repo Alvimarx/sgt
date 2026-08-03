@@ -24,6 +24,9 @@ public interface SolicitudRepository extends JpaRepository<SolicitudEntity, Long
 
     List<SolicitudEntity> findByTurno_IdTurno(Long idTurno);
 
+    /** Cuenta solicitudes en un estado dado que apunten a alguno de los turnos indicados (advisory, para advertencias de UI). */
+    long countByTurno_IdTurnoInAndEstado(List<Long> idsTurno, SolicitudEntity.EstadoSolicitud estado);
+
     /**
      * Lock pesimista (SELECT ... FOR UPDATE) sobre la fila de la solicitud. Se usa en
      * {@code cambiarEstado} para releer su estado con datos frescos (no la foto de antes de

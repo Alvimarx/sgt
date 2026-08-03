@@ -20,6 +20,11 @@ import java.util.List;
  * <p>Ciclo de vida: {@link #crearOferta} (PENDIENTE_APROBACION) → {@link #aprobarOferta} o
  * {@link #rechazarOferta} → si ABIERTA, {@link #postular} / {@link #retirarPostulacion} →
  * {@link #seleccionarPostulante} asigna el turno y cierra la oferta (CERRADA).
+ *
+ * <p>Antes de asignar el turno al postulante ganador, {@link #seleccionarPostulante} valida con
+ * {@link ValidadorAsignacionTurnoService} que su calendario resultante no quede con turnos
+ * superpuestos ni con una secuencia incompatible de dos turnos de 12 horas consecutivos sin
+ * descanso (corrección funcional "turnos de 12 horas", ver {@code Archivo de funcionalidades.md}).
  */
 @Service
 @RequiredArgsConstructor
@@ -30,6 +35,7 @@ public class OfertaGeneralService {
     private final FuncionarioRepository funcionarioRepository;
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
+    private final ValidadorAsignacionTurnoService validadorAsignacion;
 
     /** Crea la oferta en estado {@code PENDIENTE_APROBACION}; no queda visible para postular hasta aprobarse. */
     @Transactional
@@ -169,7 +175,10 @@ public class OfertaGeneralService {
         }
 
         TurnoEntity turno = oferta.getTurno();
-        turno.setFuncionario(postulacion.getPostulante());
+        FuncionarioEntity postulante = postulacion.getPostulante();
+        validarConflictoPostulante(postulante, turno);
+
+        turno.setFuncionario(postulante);
         turnoRepository.save(turno);
 
         postulacion.setSeleccionado(true);
@@ -180,6 +189,23 @@ public class OfertaGeneralService {
 
         agendarBitacora("OFERTA_GENERAL_CERRADA", guardada.getIdOfertaGeneral(), idJefatura);
         return guardada;
+    }
+
+    /**
+     * Valida que el turno de la oferta pueda asignarse al postulante elegido, contra su calendario
+     * vigente (cualquier servicio). Si los datos del turno están incompletos (p. ej. en pruebas
+     * unitarias sin fecha/hora), no hay base temporal para validar y se omite.
+     */
+    private void validarConflictoPostulante(FuncionarioEntity postulante, TurnoEntity turno) {
+        if (turno.getDiaInicioTurno() == null || turno.getHoraInicio() == null
+                || turno.getDiaFinalTurno() == null || turno.getHoraFin() == null) {
+            return;
+        }
+        List<TurnoEntity> vigentes = turnoRepository.findByFuncionario_IdFuncionario(postulante.getIdFuncionario());
+        LocalDateTime nuevoInicio = turno.getDiaInicioTurno().atTime(turno.getHoraInicio());
+        LocalDateTime nuevoFin = turno.getDiaFinalTurno().atTime(turno.getHoraFin());
+        String nombre = (postulante.getNombre() + (postulante.getApelPat() != null ? " " + postulante.getApelPat() : "")).trim();
+        validadorAsignacion.validarAsignacion(nombre, nuevoInicio, nuevoFin, turno.getIdTurno(), vigentes);
     }
 
     @Transactional

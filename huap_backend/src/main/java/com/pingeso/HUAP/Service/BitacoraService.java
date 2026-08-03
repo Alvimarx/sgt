@@ -233,6 +233,24 @@ public class BitacoraService {
         bitacoraRepository.save(log);
     }
 
+    /**
+     * Registra un evento a nivel de planificación (generación de una vigencia, edición desde
+     * fecha, extensión, acortamiento, anulación de ejecución). A diferencia de
+     * {@link #registrarTurnoGenerado} (uno por turno), este es un único evento resumen de la
+     * operación, sin turno ni solicitud asociados.
+     */
+    @Transactional
+    public void registrarEventoPlanificacion(String tipoEvento, FuncionarioEntity actor, String observaciones) {
+        BitacoraEntity log = BitacoraEntity.builder()
+                .tipoEvento(tipoEvento)
+                .funcionario(actor)
+                .observaciones(observaciones)
+                .fechaModificacion(LocalDateTime.now())
+                .activo(true)
+                .build();
+        bitacoraRepository.save(log);
+    }
+
     private String tipoSolicitudLabel(Integer tipo) {
         if (tipo == null) return null;
         return switch (tipo) {

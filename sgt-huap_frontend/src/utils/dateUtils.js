@@ -1,6 +1,31 @@
 // dateUtils.js
 // Helpers para mostrar fechas en la UI de forma consistente
 
+// Zona horaria del hospital. Centraliza aquí el cálculo de "hoy" para que ningún componente
+// calcule su propia fecha actual con new Date().toISOString() (eso convierte a UTC primero y
+// puede desfasar el día cerca de la medianoche en Chile). Ver corrección funcional "Inicio no
+// debe mostrar fechas pasadas".
+export const ZONA_HORARIA_HOSPITAL = 'America/Santiago';
+
+/**
+ * Fecha (YYYY-MM-DD) de un instante dado, tal como se ve en la zona horaria del hospital.
+ * Usa Intl.DateTimeFormat (locale 'en-CA' produce el formato YYYY-MM-DD de forma nativa) en vez de
+ * convertir a UTC, que es la causa de que "hoy" pudiera calcularse mal cerca de medianoche.
+ */
+export function fechaISOEnZonaHospital(instante = new Date()) {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: ZONA_HORARIA_HOSPITAL,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(instante);
+}
+
+/** Atajo: la fecha de hoy (YYYY-MM-DD) en la zona horaria del hospital. */
+export function hoyISOEnZonaHospital() {
+    return fechaISOEnZonaHospital(new Date());
+}
+
 export function formatDisplayDate(input, { locale = 'es-CL', withTime = false } = {}) {
     if (!input) return null
     // Si ya es un número (timestamp) o Date, convertirlo
@@ -31,4 +56,4 @@ export function formatDisplayDate(input, { locale = 'es-CL', withTime = false } 
     }
 }
 
-export default { formatDisplayDate }
+export default { formatDisplayDate, fechaISOEnZonaHospital, hoyISOEnZonaHospital, ZONA_HORARIA_HOSPITAL }

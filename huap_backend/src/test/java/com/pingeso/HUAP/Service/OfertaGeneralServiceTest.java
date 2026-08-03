@@ -11,6 +11,9 @@ import com.pingeso.HUAP.Repository.PostulacionRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,9 +33,11 @@ class OfertaGeneralServiceTest {
     private final FuncionarioRepository funcionarioRepository = mock(FuncionarioRepository.class);
     private final TurnoRepository turnoRepository = mock(TurnoRepository.class);
     private final BitacoraService bitacoraService = mock(BitacoraService.class);
+    private final ValidadorAsignacionTurnoService validadorAsignacion = new ValidadorAsignacionTurnoService();
 
     private final OfertaGeneralService service = new OfertaGeneralService(
-            ofertaGeneralRepository, postulacionRepository, funcionarioRepository, turnoRepository, bitacoraService);
+            ofertaGeneralRepository, postulacionRepository, funcionarioRepository, turnoRepository, bitacoraService,
+            validadorAsignacion);
 
     private static FuncionarioEntity funcionario(long id) {
         return FuncionarioEntity.builder().idFuncionario(id).nombre("Func" + id).build();
@@ -40,6 +45,16 @@ class OfertaGeneralServiceTest {
 
     private static TurnoEntity turno(long id) {
         return TurnoEntity.builder().idTurno(id).build();
+    }
+
+    private static final LocalDate LUNES = LocalDate.of(2026, 6, 8);
+
+    private static TurnoEntity turnoConHorario(long id, LocalDate dia, LocalTime horaInicio, int duracionHoras) {
+        LocalDateTime fin = dia.atTime(horaInicio).plusHours(duracionHoras);
+        return TurnoEntity.builder()
+                .idTurno(id).diaInicioTurno(dia).horaInicio(horaInicio)
+                .diaFinalTurno(fin.toLocalDate()).horaFin(fin.toLocalTime())
+                .build();
     }
 
     private static OfertaGeneralEntity oferta(long id, FuncionarioEntity ofertor, TurnoEntity turno,
@@ -335,6 +350,27 @@ class OfertaGeneralServiceTest {
 
         assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 99L, 9L));
         assertNull(turnoDeEstaOferta.getFuncionario());
+        verify(turnoRepository, never()).save(any());
+        verify(ofertaGeneralRepository, never()).save(any());
+    }
+
+    @Test
+    void seleccionarPostulante_conConflicto12hParaElPostulante_lanzaYNoAsignaNiCierra() {
+        TurnoEntity turnoOfrecido = turnoConHorario(1L, LUNES.plusDays(1), LocalTime.of(8, 0), 12);
+        OfertaGeneralEntity o = oferta(1L, funcionario(1L), turnoOfrecido, ABIERTA);
+        FuncionarioEntity postulante = funcionario(2L);
+        PostulacionEntity postulacion = PostulacionEntity.builder()
+                .idPostulacion(5L).ofertaGeneral(o).postulante(postulante).seleccionado(false).build();
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        when(postulacionRepository.findById(5L)).thenReturn(Optional.of(postulacion));
+        // El postulante ya tiene un nocturno de 12h que termina justo cuando empezaría el turno ofrecido.
+        TurnoEntity chocaConPostulante = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 12);
+        when(turnoRepository.findByFuncionario_IdFuncionario(2L)).thenReturn(List.of(chocaConPostulante));
+
+        assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> service.seleccionarPostulante(1L, 5L, 9L));
+        assertNull(turnoOfrecido.getFuncionario(), "no debe asignarse el turno si hay conflicto");
+        assertFalse(postulacion.getSeleccionado());
         verify(turnoRepository, never()).save(any());
         verify(ofertaGeneralRepository, never()).save(any());
     }

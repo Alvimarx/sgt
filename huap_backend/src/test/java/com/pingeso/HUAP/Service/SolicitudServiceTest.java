@@ -11,7 +11,9 @@ import com.pingeso.HUAP.Repository.TipoSolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,9 +40,11 @@ class SolicitudServiceTest {
     private final TipoSolicitudRepository tipoSolicitudRepository = mock(TipoSolicitudRepository.class);
     private final TurnoRepository turnoRepository = mock(TurnoRepository.class);
     private final BitacoraService bitacoraService = mock(BitacoraService.class);
+    private final ValidadorAsignacionTurnoService validadorAsignacion = new ValidadorAsignacionTurnoService();
 
     private final SolicitudService service = new SolicitudService(
-            solicitudRepository, funcionarioRepository, tipoSolicitudRepository, turnoRepository, bitacoraService);
+            solicitudRepository, funcionarioRepository, tipoSolicitudRepository, turnoRepository, bitacoraService,
+            validadorAsignacion);
 
     private static FuncionarioEntity funcionario(long id) {
         return FuncionarioEntity.builder().idFuncionario(id).nombre("Func" + id).build();
@@ -48,6 +52,17 @@ class SolicitudServiceTest {
 
     private static TurnoEntity turno(long id) {
         return TurnoEntity.builder().idTurno(id).build();
+    }
+
+    private static final LocalDate LUNES = LocalDate.of(2026, 6, 8);
+
+    /** Turno con horario real, de la duración indicada, para activar las validaciones de calendario. */
+    private static TurnoEntity turnoConHorario(long id, LocalDate dia, LocalTime horaInicio, int duracionHoras) {
+        LocalDateTime fin = dia.atTime(horaInicio).plusHours(duracionHoras);
+        return TurnoEntity.builder()
+                .idTurno(id).diaInicioTurno(dia).horaInicio(horaInicio)
+                .diaFinalTurno(fin.toLocalDate()).horaFin(fin.toLocalTime())
+                .build();
     }
 
     private static TipoSolicitudEntity tipoSolicitud(long id, int tipo) {
@@ -714,5 +729,101 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
 
         assertEquals(List.of(solicitud), service.findByTurno(1L));
+    }
+
+    // ============================ Validación de turnos de 12 horas consecutivos (corrección funcional) ============================
+
+    @Test
+    void crear_tipoCobertura_conConflicto12hParaElEmisor_lanzaYNoGuarda() {
+        mockFuncionarioYTipo(3);
+        // El emisor (ID_FUNCIONARIO) ya tiene un nocturno de 12h que termina justo cuando empezaría el turno a cubrir.
+        TurnoEntity turnoACubrir = turnoConHorario(60L, LUNES.plusDays(1), LocalTime.of(8, 0), 12);
+        TurnoEntity nocturnoExistente = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 12);
+        when(turnoRepository.findById(60L)).thenReturn(Optional.of(turnoACubrir));
+        when(turnoRepository.findByFuncionario_IdFuncionario(ID_FUNCIONARIO)).thenReturn(List.of(nocturnoExistente));
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(60L);
+
+        assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class, () -> service.crearSolicitud(dto));
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_tipoCobertura_sinConflicto_seCreaNormalmente() {
+        mockFuncionarioYTipo(3);
+        TurnoEntity turnoACubrir = turnoConHorario(60L, LUNES, LocalTime.of(8, 0), 12);
+        when(turnoRepository.findById(60L)).thenReturn(Optional.of(turnoACubrir));
+        when(turnoRepository.findByFuncionario_IdFuncionario(ID_FUNCIONARIO)).thenReturn(List.of());
+        saveAsignaId();
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(60L);
+
+        assertDoesNotThrow(() -> service.crearSolicitud(dto));
+    }
+
+    @Test
+    void cambiarEstado_tipoCobertura_revalidaConCalendarioActual_rechazaSiAhoraHayConflicto() {
+        // La solicitud se creó cuando no había conflicto, pero al aprobarla el funcionario ya tomó
+        // un turno de 12h que ahora choca (revalidación obligatoria y definitiva, corrección 6).
+        TurnoEntity turno = turnoConHorario(1L, LUNES.plusDays(1), LocalTime.of(8, 0), 12);
+        FuncionarioEntity emisor = funcionario(5L);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 3))
+                .funcionario(emisor).turno(turno).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
+        TurnoEntity nocturnoNuevo = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 12);
+        when(turnoRepository.findByFuncionario_IdFuncionario(5L)).thenReturn(List.of(nocturnoNuevo));
+
+        assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> service.cambiarEstado(1L, APROBADA, 9L));
+        verify(turnoRepository, never()).save(any());
+        // No debe haber rechazado solicitudes competidoras: la validación aborta ANTES de tocar nada.
+        verify(solicitudRepository, never()).findByTurno_IdTurno(any());
+    }
+
+    @Test
+    void cambiarEstado_tipoIntercambio_conConflicto12hParaElReceptor_lanzaYNoIntercambiaNada() {
+        TurnoEntity turnoDeseado = turnoConHorario(1L, LUNES, LocalTime.of(8, 0), 12);   // pasará al emisor
+        TurnoEntity turnoPropio = turnoConHorario(2L, LUNES.plusDays(5), LocalTime.of(20, 0), 12); // pasará al receptor
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(emisor).funcionarioReceptor(receptor)
+                .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
+        // El emisor no tiene otros turnos (queda libre tras entregar turnoPropio) -> sin conflicto para él.
+        when(turnoRepository.findByFuncionario_IdFuncionario(5L)).thenReturn(List.of(turnoPropio));
+        // El receptor ya tiene un turno de 12h inmediatamente adyacente al que recibiría (turnoPropio).
+        TurnoEntity chocaConReceptor = turnoConHorario(70L, LUNES.plusDays(6), LocalTime.of(8, 0), 12);
+        when(turnoRepository.findByFuncionario_IdFuncionario(6L)).thenReturn(List.of(turnoDeseado, chocaConReceptor));
+
+        assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> service.cambiarEstado(1L, APROBADA, 9L));
+        verify(turnoRepository, never()).save(any());
+    }
+
+    @Test
+    void responderOfertaParticular_acepta_conConflicto12h_lanzaYNoMarcaAceptado() {
+        FuncionarioEntity receptor = funcionario(6L);
+        TurnoEntity turnoOfrecido = turnoConHorario(1L, LUNES.plusDays(1), LocalTime.of(8, 0), 12);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).funcionarioReceptor(receptor).turno(turnoOfrecido)
+                .tipoSolicitud(tipoSolicitud(10L, 5)).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(6L)).thenReturn(Optional.of(receptor));
+        TurnoEntity chocaConReceptor = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 12);
+        when(turnoRepository.findByFuncionario_IdFuncionario(6L)).thenReturn(List.of(chocaConReceptor));
+
+        assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> service.responderOfertaParticular(1L, 6L, true));
+        assertNull(solicitud.getAceptadoReceptor(), "no debe marcarse aceptado si hay conflicto");
+        verify(solicitudRepository, never()).save(any());
     }
 }

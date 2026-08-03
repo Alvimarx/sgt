@@ -1,9 +1,13 @@
 package com.pingeso.HUAP.Controller;
 
+import com.pingeso.HUAP.DTO.GenerarPlanificacionRequest;
 import com.pingeso.HUAP.DTO.PlanificacionAsignacionDTO;
 import com.pingeso.HUAP.DTO.PlanificacionDTO;
+import com.pingeso.HUAP.DTO.PlanificacionEjecucionDTO;
 import com.pingeso.HUAP.Entity.PlanificacionAsignacionEntity;
+import com.pingeso.HUAP.Entity.PlanificacionEjecucionEntity;
 import com.pingeso.HUAP.Entity.PlanificacionEntity;
+import com.pingeso.HUAP.Repository.PlanificacionEjecucionRepository;
 import com.pingeso.HUAP.Service.PlanificacionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -19,9 +23,12 @@ import java.util.Map;
 public class PlanificacionController {
 
     private final PlanificacionService planificacionService;
+    private final PlanificacionEjecucionRepository ejecucionRepository;
 
-    public PlanificacionController(PlanificacionService planificacionService) {
+    public PlanificacionController(PlanificacionService planificacionService,
+                                    PlanificacionEjecucionRepository ejecucionRepository) {
         this.planificacionService = planificacionService;
+        this.ejecucionRepository = ejecucionRepository;
     }
 
     @PostMapping
@@ -63,37 +70,107 @@ public class PlanificacionController {
         return ResponseEntity.noContent().build();
     }
 
-    // Genera los turnos del molde desde un lunes.
-    // Body: { "fechaInicio": "YYYY-MM-DD", "idsReglas": [..] (opcional) }
+    // Genera los turnos del molde para un rango efectivo (de longitud arbitraria), anclado a un
+    // lunes. Body: { fechaInicioRotativa, fechaInicioEfectiva, fechaFinEfectiva, idsReglas? }
     @PostMapping("/{id}/generar")
-    public ResponseEntity<?> generar(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> generar(@PathVariable Long id, @RequestBody GenerarPlanificacionRequest body) {
         try {
-            LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            Long actorId = (auth != null && auth.getPrincipal() instanceof Long)
-                    ? (Long) auth.getPrincipal() : null;
-            List<Long> idsReglas = parseIdsReglas(payload.get("idsReglas"));
-            return ResponseEntity.ok(planificacionService.generarTurnos(id, fechaInicio, actorId, idsReglas));
+            Long actorId = actorIdActual();
+            List<Long> idsReglas = body.getIdsReglas() != null ? body.getIdsReglas() : List.of();
+            return ResponseEntity.ok(planificacionService.generarTurnos(
+                    id, body.getFechaInicioRotativa(), body.getFechaInicioEfectiva(), body.getFechaFinEfectiva(),
+                    actorId, idsReglas));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    /** Convierte el campo idsReglas del body (lista JSON) a List<Long>; ausente/null → vacía. */
-    private List<Long> parseIdsReglas(Object raw) {
-        List<Long> ids = new java.util.ArrayList<>();
-        if (raw instanceof List<?> lista) {
-            for (Object o : lista) {
-                if (o != null) ids.add(Long.valueOf(o.toString()));
-            }
+    // Pre-chequeo de choques de horario (no crea turnos); mismo cuerpo que /generar, para que la
+    // vista previa nunca pueda diferir de la generación final.
+    @PostMapping("/{id}/conflictos")
+    public ResponseEntity<?> conflictos(@PathVariable Long id, @RequestBody GenerarPlanificacionRequest body) {
+        try {
+            return ResponseEntity.ok(planificacionService.detectarConflictos(
+                    id, body.getFechaInicioRotativa(), body.getFechaInicioEfectiva(), body.getFechaFinEfectiva()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
-        return ids;
     }
 
-    // Deshace una generación: soft-delete de los turnos generados por esta planificación
-    // (por sus rotativas) dentro de un rango de fechas. Requiere rol ADMINISTRADOR
-    // (mismo requisito que el resto de /api/v2/planificaciones/**, ver SecurityConfig).
-    // Params: fechaInicio, fechaFin (YYYY-MM-DD).
+    // Extiende la vigencia activa más reciente del servicio de esta planificación.
+    // Body: { fechaFinEfectiva, idsReglas? }
+    @PostMapping("/{id}/extender")
+    public ResponseEntity<?> extender(@PathVariable Long id, @RequestBody GenerarPlanificacionRequest body) {
+        try {
+            List<Long> idsReglas = body.getIdsReglas() != null ? body.getIdsReglas() : List.of();
+            return ResponseEntity.ok(planificacionService.extenderPlanificacion(
+                    id, body.getFechaFinEfectiva(), actorIdActual(), idsReglas));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Edita la planificación desde una fecha determinada: trunca/anula la vigencia actual y genera
+    // una nueva desde esa fecha, preservando el ancla de rotativa y el historial previo.
+    // Body: { fechaInicioEfectiva (= fechaDesde), fechaFinEfectiva, asignaciones?, idsReglas? }
+    @PostMapping("/{id}/editar-desde")
+    public ResponseEntity<?> editarDesde(@PathVariable Long id, @RequestBody EditarDesdeRequest body) {
+        try {
+            return ResponseEntity.ok(planificacionService.editarPlanificacionDesde(
+                    id, body.getFechaDesde(), body.getFechaFinEfectiva(), body.getAsignaciones(),
+                    actorIdActual(), body.getIdsReglas() != null ? body.getIdsReglas() : List.of()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Lista las ejecuciones (vigencias/versiones) de esta planificación, más recientes primero.
+    @GetMapping("/{id}/ejecuciones")
+    public ResponseEntity<List<PlanificacionEjecucionDTO>> ejecuciones(@PathVariable Long id) {
+        List<PlanificacionEjecucionDTO> respuesta = ejecucionRepository.findByPlanificacion_IdPlanificacion(id).stream()
+                .sorted((a, b) -> b.getFechaInicioEfectiva().compareTo(a.getFechaInicioEfectiva()))
+                .map(this::convertEjecucionToDTO)
+                .toList();
+        return ResponseEntity.ok(respuesta);
+    }
+
+    // Todas las vigencias del SERVICIO (de cualquier molde), para poder seleccionar y actuar sobre
+    // cualquier planificación vigente sin depender de tener cargado el molde que la generó.
+    @GetMapping("/servicio/{idServicio}/ejecuciones")
+    public ResponseEntity<List<PlanificacionEjecucionDTO>> ejecucionesPorServicio(@PathVariable Long idServicio) {
+        List<PlanificacionEjecucionDTO> respuesta = planificacionService.obtenerEjecucionesPorServicio(idServicio).stream()
+                .map(this::convertEjecucionToDTO)
+                .toList();
+        return ResponseEntity.ok(respuesta);
+    }
+
+    // Elimina los turnos de una vigencia desde una fecha en adelante (acorta su fin efectivo al día
+    // anterior). Rechaza fechas retroactivas. Body: { fechaDesde }
+    @PutMapping("/ejecuciones/{idEjecucion}/acortar")
+    public ResponseEntity<?> acortar(@PathVariable Long idEjecucion, @RequestBody Map<String, Object> payload) {
+        try {
+            LocalDate fechaDesde = LocalDate.parse(payload.get("fechaDesde").toString());
+            return ResponseEntity.ok(planificacionService.acortarPlanificacion(idEjecucion, fechaDesde, actorIdActual()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Anula por completo una ejecución (deshacer generación), identificada de forma inequívoca —
+    // nunca afecta turnos de otra ejecución, planificación o turnos manuales/legado.
+    @DeleteMapping("/ejecuciones/{idEjecucion}")
+    public ResponseEntity<?> anularEjecucion(@PathVariable Long idEjecucion) {
+        try {
+            int eliminados = planificacionService.anularEjecucion(idEjecucion, actorIdActual());
+            return ResponseEntity.ok(Map.of("eliminados", eliminados));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Deshace una generación LEGADA (turnos sin ejecución asociada, identificados por rotativa
+    // compartida). Se conserva por compatibilidad histórica; para generaciones nuevas usar
+    // DELETE /ejecuciones/{idEjecucion}. Params: fechaInicio, fechaFin (YYYY-MM-DD).
     @DeleteMapping("/{id}/turnos")
     public ResponseEntity<?> eliminarTurnosGenerados(
             @PathVariable Long id,
@@ -109,15 +186,9 @@ public class PlanificacionController {
         }
     }
 
-    // Pre-chequeo de choques de horario (no crea turnos). Body: { "fechaInicio": "YYYY-MM-DD" }
-    @PostMapping("/{id}/conflictos")
-    public ResponseEntity<?> conflictos(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
-        try {
-            LocalDate fechaInicio = LocalDate.parse(payload.get("fechaInicio").toString());
-            return ResponseEntity.ok(planificacionService.detectarConflictos(id, fechaInicio));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+    private Long actorIdActual() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return (auth != null && auth.getPrincipal() instanceof Long) ? (Long) auth.getPrincipal() : null;
     }
 
     // =========================================================================
@@ -163,5 +234,36 @@ public class PlanificacionController {
         }
 
         return dto;
+    }
+
+    private PlanificacionEjecucionDTO convertEjecucionToDTO(PlanificacionEjecucionEntity e) {
+        return new PlanificacionEjecucionDTO(
+                e.getIdEjecucion(),
+                e.getPlanificacion().getIdPlanificacion(),
+                e.getPlanificacion().getNombre(),
+                e.getFechaInicioRotativa(),
+                e.getFechaInicioEfectiva(),
+                e.getFechaFinEfectiva(),
+                e.getFechaGeneracion(),
+                e.getEstado().name(),
+                e.getActor() != null ? (e.getActor().getNombre() + " " + e.getActor().getApelPat()) : null
+        );
+    }
+
+    /** Cuerpo de la petición de "editar desde fecha" (ver {@link PlanificacionService#editarPlanificacionDesde}). */
+    public static class EditarDesdeRequest {
+        private LocalDate fechaDesde;
+        private LocalDate fechaFinEfectiva;
+        private List<PlanificacionAsignacionDTO> asignaciones;
+        private List<Long> idsReglas;
+
+        public LocalDate getFechaDesde() { return fechaDesde; }
+        public void setFechaDesde(LocalDate fechaDesde) { this.fechaDesde = fechaDesde; }
+        public LocalDate getFechaFinEfectiva() { return fechaFinEfectiva; }
+        public void setFechaFinEfectiva(LocalDate fechaFinEfectiva) { this.fechaFinEfectiva = fechaFinEfectiva; }
+        public List<PlanificacionAsignacionDTO> getAsignaciones() { return asignaciones; }
+        public void setAsignaciones(List<PlanificacionAsignacionDTO> asignaciones) { this.asignaciones = asignaciones; }
+        public List<Long> getIdsReglas() { return idsReglas; }
+        public void setIdsReglas(List<Long> idsReglas) { this.idsReglas = idsReglas; }
     }
 }

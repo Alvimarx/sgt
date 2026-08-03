@@ -80,4 +80,13 @@ public class TurnoEntity {
     @JoinColumn(name = "id_tipo_turno")
     private TipoTurnoEntity tipoTurno;
 
+    /**
+     * Ejecución de planificación que generó este turno, o {@code null} si es un turno manual o fue
+     * generado antes de introducirse este campo (origen "legado" — nunca se toca automáticamente
+     * al deshacer/editar una ejecución posterior, ver {@link PlanificacionEjecucionEntity}).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_ejecucion")
+    private PlanificacionEjecucionEntity ejecucion;
+
 }

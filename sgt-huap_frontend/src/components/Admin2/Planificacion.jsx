@@ -489,6 +489,132 @@ function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
   );
 }
 
+/* ─── VigenciasSheet (historial de vigencias: acortar / anular / editar desde fecha) ── */
+function VigenciasSheet({open,onClose,ejecuciones,cargando,onAcortar,onAnular,onEditarDesde,procesando,moldeActualId,nombreMoldeActual}){
+  const[confirmAnular,setConfirmAnular]=useState(null);
+  const[acortarId,setAcortarId]=useState(null);
+  const[fechaEliminarDesde,setFechaEliminarDesde]=useState('');
+  const[editDesde,setEditDesde]=useState('');
+  const[editHasta,setEditHasta]=useState('');
+  const[errEdit,setErrEdit]=useState('');
+
+  useEffect(()=>{
+    if(!open){ setConfirmAnular(null); setAcortarId(null); setFechaEliminarDesde(''); setEditDesde(''); setEditHasta(''); setErrEdit(''); }
+  },[open]);
+  if(!open)return null;
+
+  const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
+  const inputSt={width:'100%',padding:'11px 12px',borderRadius:9,border:'1.5px solid var(--line)',fontSize:13.5,fontWeight:700,color:'var(--ink)',background:'#fff',fontFamily:'inherit',outline:'none',boxSizing:'border-box'};
+  const hoyStr=toDateStr(new Date());
+  const hayActivaDelMoldeActual=(ejecuciones||[]).some(e=>e.estado==='ACTIVA'&&e.idPlanificacion===moldeActualId);
+
+  const confirmarEditar=()=>{
+    if(!editDesde||!editHasta)return setErrEdit('Indica ambas fechas.');
+    if(editDesde<hoyStr)return setErrEdit('La fecha desde no puede ser anterior a hoy.');
+    if(editHasta<editDesde)return setErrEdit('La fecha de término debe ser igual o posterior a la fecha desde.');
+    setErrEdit('');
+    onEditarDesde(editDesde,editHasta);
+  };
+
+  return(
+    <Sheet open={open} onClose={()=>!procesando&&onClose()} title="Vigencias del servicio" maxHeight="88%">
+      <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{fontSize:12.5,color:'var(--ink3)',fontWeight:600,lineHeight:1.4}}>
+          Todas las planificaciones vigentes o históricas de <strong style={{color:'var(--ink)'}}>este servicio</strong> (de cualquier molde). Solo puede haber una vigencia <strong style={{color:'var(--ink)'}}>activa</strong> a la vez por servicio; eliminar o anular una nunca afecta a otra.
+        </div>
+
+        {cargando?(
+          <div style={{textAlign:'center',padding:20,color:'var(--ink3)',fontSize:12.5,fontWeight:600}}>Cargando vigencias…</div>
+        ):(ejecuciones||[]).length===0?(
+          <div style={{textAlign:'center',padding:20,color:'var(--ink3)',fontSize:12.5,fontWeight:600}}>Aún no se ha generado ninguna vigencia para este servicio.</div>
+        ):(
+          <div style={{display:'flex',flexDirection:'column',gap:10}}>
+            {ejecuciones.map(e=>{
+              const activa=e.estado==='ACTIVA';
+              const enModoAcortar=acortarId===e.idEjecucion;
+              const minEliminar=toDateStr(new Date(Math.max(parseLocalDate(e.fechaInicioEfectiva).getTime()+86400000,parseLocalDate(hoyStr).getTime())));
+              return(
+                <div key={e.idEjecucion} style={{background:'#fff',border:`1.5px solid ${activa?'var(--primary-soft)':'var(--line2)'}`,borderRadius:12,padding:'12px 14px',opacity:activa?1:0.65}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap'}}>
+                    <SGTBadge tone={activa?'success':'neutral'} size="xs">{activa?'Activa':'Anulada'}</SGTBadge>
+                    <span style={{fontSize:13,fontWeight:800,color:'var(--ink)'}}>{e.nombrePlanificacion||'(molde eliminado)'}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:'var(--ink3)'}}>{e.fechaInicioEfectiva} → {e.fechaFinEfectiva}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--ink3)',fontWeight:600}}>
+                    Ancla de rotativa: {e.fechaInicioRotativa}{e.fechaGeneracion?` · Generada: ${String(e.fechaGeneracion).slice(0,16).replace('T',' ')}`:''}{e.nombreActor?` · ${e.nombreActor}`:''}
+                  </div>
+
+                  {activa&&!enModoAcortar&&(
+                    <div style={{display:'flex',gap:8,marginTop:10}}>
+                      <button onClick={()=>{setAcortarId(e.idEjecucion);setFechaEliminarDesde(minEliminar);}} disabled={procesando} style={{flex:1,padding:'9px 0',borderRadius:9,border:'1.5px solid var(--line)',background:'#fff',color:'var(--ink2)',fontSize:12.5,fontWeight:800,cursor:procesando?'not-allowed':'pointer',fontFamily:'inherit'}}>Eliminar desde fecha</button>
+                      <button onClick={()=>setConfirmAnular(e.idEjecucion)} disabled={procesando} style={{flex:1,padding:'9px 0',borderRadius:9,border:'1.5px solid var(--warn)',background:'var(--warn-soft)',color:'var(--warn)',fontSize:12.5,fontWeight:800,cursor:procesando?'not-allowed':'pointer',fontFamily:'inherit'}}>Anular todo</button>
+                    </div>
+                  )}
+
+                  {activa&&enModoAcortar&&(
+                    <div style={{marginTop:10}}>
+                      <div style={{display:'flex',gap:8,alignItems:'flex-end',flexWrap:'wrap'}}>
+                        <div style={{flex:'1 1 160px'}}>
+                          <span style={lbl}>Eliminar turnos desde</span>
+                          <input type="date" value={fechaEliminarDesde} min={minEliminar} max={e.fechaFinEfectiva} onChange={ev=>setFechaEliminarDesde(ev.target.value)} style={inputSt}/>
+                        </div>
+                        <button onClick={()=>setAcortarId(null)} disabled={procesando} style={{padding:'11px 12px',borderRadius:9,border:'1.5px solid var(--line)',background:'#fff',color:'var(--ink2)',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Cancelar</button>
+                        <button onClick={()=>{onAcortar(e.idEjecucion,fechaEliminarDesde);setAcortarId(null);}} disabled={procesando||!fechaEliminarDesde} style={{padding:'11px 14px',borderRadius:9,border:'none',background:'var(--warn)',color:'#fff',fontSize:12.5,fontWeight:800,cursor:procesando?'not-allowed':'pointer',fontFamily:'inherit'}}>Confirmar</button>
+                      </div>
+                      <div style={{fontSize:10.5,color:'var(--ink3)',fontWeight:600,marginTop:6}}>Se eliminarán los turnos desde esa fecha en adelante (no antes de hoy). Los anteriores quedan intactos.</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {moldeActualId&&hayActivaDelMoldeActual&&(
+          <div style={{background:'var(--surface2)',borderRadius:12,padding:14,display:'flex',flexDirection:'column',gap:10,marginTop:4}}>
+            <div style={{fontSize:12.5,fontWeight:800,color:'var(--ink)'}}>Editar "{nombreMoldeActual}" desde una fecha</div>
+            <div style={{fontSize:11.5,color:'var(--ink3)',fontWeight:600,lineHeight:1.4}}>
+              Aplica <strong style={{color:'var(--ink)'}}>las asignaciones actuales del molde cargado</strong> (las que ves ahora en la pantalla principal) desde la fecha que elijas en adelante. La vigencia activa del servicio se acorta o anula automáticamente hasta el día anterior, conservando el mismo ancla de rotativa; los turnos anteriores a esa fecha no se tocan.
+            </div>
+            {errEdit&&<div style={{display:'flex',alignItems:'center',gap:6,background:'var(--warn-soft)',color:'var(--warn)',borderRadius:10,padding:'9px 11px',fontSize:12,fontWeight:700}}><SGTIcon name="alert" size={13}/>{errEdit}</div>}
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <div style={{flex:'1 1 140px'}}>
+                <span style={lbl}>Desde</span>
+                <input type="date" value={editDesde} min={hoyStr} onChange={e=>setEditDesde(e.target.value)} style={inputSt}/>
+              </div>
+              <div style={{flex:'1 1 140px'}}>
+                <span style={lbl}>Hasta (nuevo fin efectivo)</span>
+                <input type="date" value={editHasta} min={editDesde||hoyStr} onChange={e=>setEditHasta(e.target.value)} style={inputSt}/>
+              </div>
+            </div>
+            <button onClick={confirmarEditar} disabled={procesando} style={{padding:13,borderRadius:11,border:'none',background:'var(--primary)',color:'#fff',fontSize:13.5,fontWeight:800,cursor:procesando?'not-allowed':'pointer',fontFamily:'inherit'}}>{procesando?'Aplicando…':'Aplicar cambios desde esta fecha'}</button>
+          </div>
+        )}
+        {moldeActualId&&!hayActivaDelMoldeActual&&(
+          <div style={{fontSize:11.5,color:'var(--ink3)',fontWeight:600,lineHeight:1.4,textAlign:'center',padding:'4px 8px'}}>
+            "{nombreMoldeActual}" no tiene una vigencia activa todavía — usa "Generar" para crear la primera.
+          </div>
+        )}
+      </div>
+
+      {confirmAnular!=null&&(
+        <div onClick={()=>!procesando&&setConfirmAnular(null)} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.4)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:320}}>
+          <div onClick={ev=>ev.stopPropagation()} style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'8px 20px 32px',width:'100%',maxWidth:480,boxShadow:'0 -8px 40px rgba(0,0,0,0.18)'}}>
+            <div style={{display:'flex',justifyContent:'center',paddingBottom:14}}><div style={{width:40,height:4,background:'var(--line)',borderRadius:99}}/></div>
+            <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><div style={{width:56,height:56,borderRadius:16,background:'var(--warn-soft)',display:'grid',placeItems:'center'}}><SGTIcon name="alert" size={26} color="var(--warn)"/></div></div>
+            <div style={{fontWeight:800,fontSize:18,color:'var(--ink)',textAlign:'center',marginBottom:10}}>¿Anular esta vigencia?</div>
+            <p style={{fontSize:14,color:'var(--ink2)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center'}}>Se eliminarán (soft-delete) todos los turnos que esta vigencia generó. No afecta otras vigencias, otras planificaciones ni turnos manuales. Esta acción no se puede deshacer desde la app.</p>
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={()=>setConfirmAnular(null)} disabled={procesando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'1.5px solid var(--line)',background:'none',color:'var(--ink2)',fontSize:15,fontWeight:700,cursor:procesando?'not-allowed':'pointer',fontFamily:'inherit'}}>Cancelar</button>
+              <button onClick={()=>{onAnular(confirmAnular);setConfirmAnular(null);}} disabled={procesando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--warn)',color:'#fff',fontSize:15,fontWeight:700,cursor:procesando?'not-allowed':'pointer',opacity:procesando?0.7:1,fontFamily:'inherit'}}>{procesando?'Anulando…':'Sí, anular'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
 /* ─── DetalleDiaSheet (Semana X · Día, agrupado por tipo real) ─────────────── */
 function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssignInstance}){
   if(!open||diaIndex==null)return null;
@@ -632,15 +758,54 @@ const ghostBtnGB={width:30,height:30,borderRadius:8,background:'var(--surface2)'
 
 /* ─── GenerarView (elegir lunes + previsualización) ──────────────────────────── */
 function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId,onCancel,onConfirm,generando,planActualId}){
-  const[fecha,setFecha]=useState('');
+  const[fecha,setFecha]=useState(''); // ancla de la rotativa (lunes): fija la fase del ciclo
+  // Vigencia efectiva: el día en que la planificación realmente empieza y termina a regir. Por
+  // defecto igual al ancla (el caso más común), pero siempre editable de forma independiente —
+  // p. ej. anclar la rotativa un lunes y hacerla efectiva recién semanas después, conservando la
+  // fase (corrección funcional "separar ancla de vigencia efectiva").
+  const[inicioEfectiva,setInicioEfectiva]=useState('');
+  const[inicioEditadoManualmente,setInicioEditadoManualmente]=useState(false);
+  // Fecha efectiva de término: por defecto, un solo ciclo de la rotativa (comportamiento previo),
+  // pero editable a cualquier fecha posterior — permite generar rangos de varios meses en una sola
+  // operación (corrección funcional "generar más de un mes").
+  const[finEfectiva,setFinEfectiva]=useState('');
+  const[finEditadoManualmente,setFinEditadoManualmente]=useState(false);
   const[pickSeed,setPickSeed]=useState(toDateStr(new Date()));
   const[confirmando,setConfirmando]=useState(false);
   const[conflictos,setConflictos]=useState([]);
   const[cargandoConf,setCargandoConf]=useState(false);
   const{weeks,year,month}=useMemo(()=>buildMonthGrid(pickSeed),[pickSeed]);
-  const start=fecha?parseLocalDate(fecha):null;
+  const start=fecha?parseLocalDate(fecha):null; // ancla, como Date — usado solo para la vista previa del patrón
   const semanas=Math.max(1,maxSemanas||0);
-  const totalTurnos=instancias.reduce((a,i)=>a+(i.secuencia||[]).reduce((s,d)=>s+d.length,0),0);
+  const totalTurnosPorCiclo=instancias.reduce((a,i)=>a+(i.secuencia||[]).reduce((s,d)=>s+d.length,0),0);
+
+  // Al elegir/cambiar el ancla, si el usuario no ha tocado manualmente el inicio efectivo, se
+  // propone por defecto el mismo día (caso más común: la vigencia empieza junto con el ancla).
+  useEffect(()=>{
+    if(!fecha||inicioEditadoManualmente)return;
+    setInicioEfectiva(fecha);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[fecha]);
+
+  const inicioEfectivaDt=inicioEfectiva?parseLocalDate(inicioEfectiva):null;
+
+  // Al elegir/cambiar el inicio efectivo, si el usuario no ha tocado manualmente el fin efectivo,
+  // se propone por defecto el fin de un solo ciclo contado desde el inicio efectivo.
+  useEffect(()=>{
+    if(!inicioEfectiva||finEditadoManualmente)return;
+    const dt=parseLocalDate(inicioEfectiva); const fin=new Date(dt); fin.setDate(dt.getDate()+semanas*7-1);
+    setFinEfectiva(toDateStr(fin));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[inicioEfectiva,semanas]);
+
+  const finEfectivaDt=finEfectiva?parseLocalDate(finEfectiva):null;
+  const anclaValida=!start||!inicioEfectivaDt||inicioEfectivaDt>=start; // el inicio efectivo no puede ser anterior al ancla
+  const rangoValido=start&&inicioEfectivaDt&&finEfectivaDt&&finEfectivaDt>=inicioEfectivaDt&&anclaValida;
+  const diasTotalesRango=rangoValido?Math.round((finEfectivaDt-inicioEfectivaDt)/86400000)+1:0;
+  const cantidadCiclos=diasTotalesRango&&semanas?Math.ceil(diasTotalesRango/(semanas*7)):0;
+  // Estimación (no exacta): un rango que no calza en ciclos completos puede generar menos turnos
+  // en el último ciclo parcial; se muestra como aproximación, el conteo real lo confirma el backend.
+  const totalTurnosEstimado=Math.round(totalTurnosPorCiclo*(diasTotalesRango/(semanas*7||1)));
 
   const fechaReal=(rel)=>{ const dt=new Date(start); dt.setDate(start.getDate()+rel); return dt; };
   let minD=null,maxD=null;
@@ -649,17 +814,19 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
   const stepLbl={fontSize:11,fontWeight:800,color:'var(--primary)',textTransform:'uppercase',letterSpacing:0.4,marginBottom:10,display:'flex',alignItems:'center',gap:6};
   const stepNum=(n)=><span style={{width:18,height:18,borderRadius:99,background:'var(--primary)',color:'#fff',fontSize:11,fontWeight:900,display:'grid',placeItems:'center'}}>{n}</span>;
 
-  // Pre-chequeo de conflictos contra turnos existentes (requiere molde guardado).
+  // Pre-chequeo de conflictos contra turnos existentes (requiere molde guardado). Usa exactamente
+  // el mismo rango (ancla + inicio/fin efectivo) que la generación real, para que la previsualización
+  // nunca pueda diferir del resultado final.
   useEffect(()=>{
     let activo=true;
-    if(!fecha||!planActualId){ setConflictos([]); return; }
+    if(!fecha||!inicioEfectiva||!finEfectiva||!planActualId||!rangoValido){ setConflictos([]); return; }
     setCargandoConf(true);
-    planificacionService.conflictos(planActualId,fecha)
+    planificacionService.conflictos(planActualId,fecha,inicioEfectiva,finEfectiva)
       .then(list=>{ if(activo)setConflictos(Array.isArray(list)?list:[]); })
       .catch(()=>{ if(activo)setConflictos([]); })
       .finally(()=>{ if(activo)setCargandoConf(false); });
     return()=>{ activo=false; };
-  },[fecha,planActualId]);
+  },[fecha,inicioEfectiva,finEfectiva,planActualId,rangoValido]);
 
   // Claves "fecha|HH:MM" para resaltar los bloques en conflicto del calendario.
   const conflictoKeys=useMemo(()=>{ const s=new Set(); conflictos.forEach(c=>s.add(`${c.fecha}|${formatHora(c.horaInicio)}`)); return s; },[conflictos]);
@@ -750,16 +917,38 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
               <button key={ds} disabled={!selectable} onClick={()=>setFecha(ds)} style={{aspectRatio:'1',minWidth:0,borderRadius:9,border:sel?'2px solid var(--primary)':selectable?'1.5px solid var(--primary-soft)':'1px solid transparent',background:sel?'var(--primary)':selectable?'var(--primary-soft)':'transparent',color:sel?'#fff':!inMonth?'var(--ink3)':selectable?'var(--primary)':'var(--ink3)',opacity:inMonth?(selectable||sel?1:0.4):0.25,fontSize:13,fontWeight:selectable||sel?800:600,cursor:selectable?'pointer':'default',display:'grid',placeItems:'center',fontFamily:'inherit'}}>{date.getDate()}</button>
             );})}
           </div>
-          <div style={{fontSize:11,color:'var(--ink3)',fontWeight:600,marginTop:8,display:'flex',alignItems:'center',gap:5}}><SGTIcon name="calendar" size={12} color="var(--ink3)"/>Solo puedes iniciar un <strong style={{color:'var(--ink)'}}>lunes</strong> (resaltados).</div>
+          <div style={{fontSize:11,color:'var(--ink3)',fontWeight:600,marginTop:8,display:'flex',alignItems:'center',gap:5}}><SGTIcon name="calendar" size={12} color="var(--ink3)"/>Este es el <strong style={{color:'var(--ink)'}}>ancla de la rotativa</strong>: fija la fase del ciclo. Debe ser <strong style={{color:'var(--ink)'}}>lunes</strong> (resaltados).</div>
         </div>
+
+        {start&&(
+          <div style={{background:'#fff',padding:'14px',borderBottom:'1px solid var(--line2)'}}>
+            <div style={stepLbl}>{stepNum(2)} Vigencia efectiva</div>
+            <div style={{fontSize:11,color:'var(--ink3)',fontWeight:600,marginBottom:10}}>El rango de fechas en que realmente se crearán turnos. Puede empezar en una fecha distinta al ancla (p. ej. ancla lunes 28 de julio, vigencia efectiva desde el sábado 1 de agosto) y abarcar varios ciclos o varios meses — no está limitado a un mes.</div>
+
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:10,fontWeight:800,color:'var(--ink3)',textTransform:'uppercase',marginBottom:4}}>Inicio efectivo</div>
+                <input type="date" value={inicioEfectiva} min={fecha} onChange={e=>{setInicioEfectiva(e.target.value);setInicioEditadoManualmente(true);}} style={{width:'100%',padding:'8px 10px',borderRadius:9,border:'1px solid var(--line)',fontSize:13,fontWeight:700,color:'var(--ink)',fontFamily:'inherit',boxSizing:'border-box'}}/>
+              </div>
+              <SGTIcon name="arrow-right" size={14} color="var(--ink3)"/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:10,fontWeight:800,color:'var(--ink3)',textTransform:'uppercase',marginBottom:4}}>Término efectivo</div>
+                <input type="date" value={finEfectiva} min={inicioEfectiva||fecha} onChange={e=>{setFinEfectiva(e.target.value);setFinEditadoManualmente(true);}} style={{width:'100%',padding:'8px 10px',borderRadius:9,border:'1px solid var(--line)',fontSize:13,fontWeight:700,color:'var(--ink)',fontFamily:'inherit',boxSizing:'border-box'}}/>
+              </div>
+            </div>
+            {!anclaValida&&<div style={{fontSize:11,color:'var(--warn)',fontWeight:700,marginTop:6}}>El inicio efectivo no puede ser anterior al ancla de la rotativa ({fmt(start)}).</div>}
+            {anclaValida&&!rangoValido&&finEfectiva&&<div style={{fontSize:11,color:'var(--warn)',fontWeight:700,marginTop:6}}>La fecha de término no puede ser anterior al inicio efectivo.</div>}
+            {rangoValido&&<div style={{fontSize:11,color:'var(--ink3)',fontWeight:600,marginTop:6}}>{diasTotalesRango} día{diasTotalesRango===1?'':'s'} · ≈{cantidadCiclos} ciclo{cantidadCiclos===1?'':'s'} de la rotativa</div>}
+          </div>
+        )}
 
         {!start?(
           <div style={{padding:'30px 20px',textAlign:'center',color:'var(--ink3)',fontSize:12.5,fontWeight:600}}>Selecciona un lunes para ver dónde se generarán los turnos.</div>
         ):(
           <div style={{padding:'14px'}}>
-            <div style={stepLbl}>{stepNum(2)} Previsualización</div>
+            <div style={stepLbl}>{stepNum(3)} Previsualización</div>
             <div style={{display:'flex',gap:8,marginBottom:10}}>
-              {[['calendar','var(--primary)','var(--primary-soft)',instancias.length,'Rotativas'],['clock','var(--accent)','var(--accent-soft)',totalTurnos,'Turnos']].map(([icon,ink,bg,n,label])=>(
+              {[['calendar','var(--primary)','var(--primary-soft)',instancias.length,'Rotativas'],['clock','var(--accent)','var(--accent-soft)',totalTurnosEstimado,'Turnos (aprox.)']].map(([icon,ink,bg,n,label])=>(
                 <div key={label} style={{flex:1,background:'#fff',border:'1px solid var(--line)',borderRadius:10,padding:'10px',textAlign:'center'}}>
                   <div style={{width:26,height:26,borderRadius:8,background:bg,display:'grid',placeItems:'center',margin:'0 auto 6px'}}><SGTIcon name={icon} size={14} color={ink}/></div>
                   <div style={{fontSize:17,fontWeight:900,color:'var(--ink)',lineHeight:1}}>{n}</div>
@@ -863,8 +1052,8 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
       </div>
       <div style={{padding:'10px 14px',background:'#fff',borderTop:'1px solid var(--line)',flexShrink:0,display:'flex',gap:8}}>
         <button onClick={onCancel} style={{padding:'14px 16px',borderRadius:12,background:'#fff',color:'var(--ink2)',border:'1.5px solid var(--line)',fontSize:13.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>Cancelar</button>
-        <button onClick={()=>start&&setConfirmando(true)} disabled={!start||generando} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:12,background:(start&&!generando)?'var(--primary)':'var(--line)',color:(start&&!generando)?'#fff':'var(--ink3)',border:'none',fontSize:14.5,fontWeight:800,cursor:(start&&!generando)?'pointer':'not-allowed',fontFamily:'inherit'}}>
-          <SGTIcon name="check" size={17} color={(start&&!generando)?'#fff':'var(--ink3)'}/> Confirmar y generar
+        <button onClick={()=>rangoValido&&setConfirmando(true)} disabled={!rangoValido||generando} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:14,borderRadius:12,background:(rangoValido&&!generando)?'var(--primary)':'var(--line)',color:(rangoValido&&!generando)?'#fff':'var(--ink3)',border:'none',fontSize:14.5,fontWeight:800,cursor:(rangoValido&&!generando)?'pointer':'not-allowed',fontFamily:'inherit'}}>
+          <SGTIcon name="check" size={17} color={(rangoValido&&!generando)?'#fff':'var(--ink3)'}/> Confirmar y generar
         </button>
       </div>
 
@@ -874,12 +1063,13 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
             <div style={{display:'flex',justifyContent:'center',paddingBottom:14}}><div style={{width:40,height:4,background:'var(--line)',borderRadius:99}}/></div>
             <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><div style={{width:56,height:56,borderRadius:16,background:'var(--primary-soft)',display:'grid',placeItems:'center'}}><SGTIcon name="calendar" size={26} color="var(--primary)"/></div></div>
             <div style={{fontWeight:800,fontSize:18,color:'var(--ink)',textAlign:'center',marginBottom:10}}>¿Generar la planificación?</div>
-            <p style={{fontSize:14,color:'var(--ink2)',margin:'0 0 6px',lineHeight:1.5,textAlign:'center'}}>Se crearán <strong style={{color:'var(--ink)'}}>{totalTurnos} turnos</strong> desde el <strong style={{color:'var(--ink)'}}>{fmt(minD)}</strong>.</p>
+            <p style={{fontSize:14,color:'var(--ink2)',margin:'0 0 6px',lineHeight:1.5,textAlign:'center'}}>Se crearán <strong style={{color:'var(--ink)'}}>≈{totalTurnosEstimado} turnos</strong> entre el <strong style={{color:'var(--ink)'}}>{fmt(inicioEfectivaDt)}</strong> y el <strong style={{color:'var(--ink)'}}>{fmt(finEfectivaDt)}</strong> ({diasTotalesRango} días).</p>
+            {inicioEfectiva!==fecha&&<p style={{fontSize:12,color:'var(--ink3)',margin:'0 0 6px',lineHeight:1.5,textAlign:'center'}}>Ancla de rotativa: <strong style={{color:'var(--ink)'}}>{fmt(start)}</strong> (fase del ciclo).</p>}
             <p style={{fontSize:12.5,color:'var(--ink3)',margin:'0 0 8px',lineHeight:1.5,textAlign:'center'}}>{conflictos.length>0?<><strong style={{color:'var(--warn)'}}>{conflictos.length}</strong> quedará{conflictos.length===1?'':'n'} vacante{conflictos.length===1?'':'s'} por conflicto de horario.</>:'Los turnos con choque de horario se crearán sin asignar (vacantes).'}</p>
             <p style={{fontSize:12,color:'var(--ink3)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}><SGTIcon name="clock" size={12} color={reglasSel.length?'var(--primary)':'var(--ink3)'}/>{reglasSel.length>0?<>Se aplicarán <strong style={{color:'var(--primary)'}}>{reglasSel.length}</strong> regla{reglasSel.length===1?'':'s'} de horario.</>:'Sin reglas de horario (horarios base).'}</p>
             <div style={{display:'flex',gap:10}}>
               <button onClick={()=>setConfirmando(false)} disabled={generando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'1.5px solid var(--line)',background:'none',color:'var(--ink2)',fontSize:15,fontWeight:700,cursor:generando?'not-allowed':'pointer',fontFamily:'inherit'}}>Cancelar</button>
-              <button onClick={()=>onConfirm(fecha,[...seleccion])} disabled={generando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:15,fontWeight:700,cursor:generando?'not-allowed':'pointer',opacity:generando?0.7:1,fontFamily:'inherit'}}>{generando?'Generando…':'Sí, generar'}</button>
+              <button onClick={()=>onConfirm(fecha,inicioEfectiva,finEfectiva,[...seleccion])} disabled={generando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--primary)',color:'#fff',fontSize:15,fontWeight:700,cursor:generando?'not-allowed':'pointer',opacity:generando?0.7:1,fontFamily:'inherit'}}>{generando?'Generando…':'Sí, generar'}</button>
             </div>
           </div>
         </div>
@@ -914,6 +1104,10 @@ function PlanGuardarBase({onBack}){
   const[generando,setGenerando]=useState(false);
   const[eliminarOpen,setEliminarOpen]=useState(false);
   const[eliminandoTurnos,setEliminandoTurnos]=useState(false);
+  const[vigenciasOpen,setVigenciasOpen]=useState(false);
+  const[ejecuciones,setEjecuciones]=useState([]);
+  const[cargandoEjecuciones,setCargandoEjecuciones]=useState(false);
+  const[procesandoVigencia,setProcesandoVigencia]=useState(false);
   const[assignInstance,setAssignInstance]=useState(null);
   const[detailDia,setDetailDia]=useState(null);
   const[toast,setToast]=useState('');
@@ -988,11 +1182,11 @@ function PlanGuardarBase({onBack}){
     }catch(e){ setError(e?.response?.data?.error||e.message||'Error al eliminar el molde.'); }
   };
 
-  const onGenerar=async(fecha,idsReglas=[])=>{
+  const onGenerar=async(fechaInicioRotativa,fechaInicioEfectiva,fechaFinEfectiva,idsReglas=[])=>{
     if(!planActualId){ setGenerarOpen(false); flash('Guarda el molde antes de generar.'); return; }
     setGenerando(true);
     try{
-      const res=await planificacionService.generar(planActualId,fecha,idsReglas);
+      const res=await planificacionService.generar(planActualId,fechaInicioRotativa,fechaInicioEfectiva,fechaFinEfectiva,idsReglas);
       setGenerarOpen(false);
       const vac=res?.vacantesPorConflicto||0;
       flash(`${res?.generados||0} turnos generados${vac?` · ${vac} vacantes por conflicto`:''}`);
@@ -1011,6 +1205,46 @@ function PlanGuardarBase({onBack}){
   };
 
   const abrirEliminarTurnos=()=>{ if(!planActualId){ flash('Guarda el molde antes de eliminar turnos generados.'); return; } setEliminarOpen(true); };
+
+  const cargarEjecuciones=async()=>{
+    if(!servicioId)return;
+    setCargandoEjecuciones(true);
+    try{ const list=await planificacionService.getEjecucionesServicio(servicioId); setEjecuciones(Array.isArray(list)?list:[]); }
+    catch(e){ setError(e?.response?.data?.error||e.message||'Error al cargar las vigencias.'); }
+    finally{ setCargandoEjecuciones(false); }
+  };
+
+  const abrirVigencias=()=>{ setVigenciasOpen(true); cargarEjecuciones(); };
+
+  const onAcortarEjecucion=async(idEjecucion,fechaDesde)=>{
+    setProcesandoVigencia(true);
+    try{
+      const res=await planificacionService.acortarEjecucion(idEjecucion,fechaDesde);
+      flash(`${res?.turnosDesactivados||0} turnos eliminados desde ${fechaDesde}`);
+      await cargarEjecuciones();
+    }catch(e){ setError(e?.response?.data?.error||e.message||'Error al eliminar desde esa fecha.'); }
+    finally{ setProcesandoVigencia(false); }
+  };
+
+  const onAnularEjecucion=async(idEjecucion)=>{
+    setProcesandoVigencia(true);
+    try{
+      const res=await planificacionService.anularEjecucion(idEjecucion);
+      flash(`${res?.eliminados||0} turnos eliminados`);
+      await cargarEjecuciones();
+    }catch(e){ setError(e?.response?.data?.error||e.message||'Error al anular la vigencia.'); }
+    finally{ setProcesandoVigencia(false); }
+  };
+
+  const onEditarDesdeFecha=async(fechaDesde,fechaFinEfectiva)=>{
+    setProcesandoVigencia(true);
+    try{
+      const res=await planificacionService.editarDesde(planActualId,{ fechaDesde, fechaFinEfectiva, asignaciones:toAsignaciones() });
+      flash(`${res?.generados||0} turnos generados en la nueva vigencia`);
+      await cargarEjecuciones();
+    }catch(e){ setError(e?.response?.data?.error||e.message||'Error al editar desde esa fecha.'); }
+    finally{ setProcesandoVigencia(false); }
+  };
 
   const openMoldes=()=>{ cargarMoldes(); setMoldesOpen(true); };
   const nuevoMolde=()=>{ reset(); setPlanActualId(null); setPlanNombre(null); flash('Molde nuevo'); };
@@ -1040,7 +1274,8 @@ function PlanGuardarBase({onBack}){
         rightSlot={
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <button onClick={nuevoMolde} title="Molde nuevo" style={ghostBtnGB}><SGTIcon name="plus" size={16} color="var(--ink2)"/></button>
-            <button onClick={abrirEliminarTurnos} title="Eliminar turnos generados por este molde" style={ghostBtnGB}><SGTIcon name="trash" size={15} color="var(--warn)"/></button>
+            <button onClick={abrirVigencias} title="Ver vigencias del servicio (eliminar desde fecha, anular, editar)" style={ghostBtnGB}><SGTIcon name="clock" size={15} color="var(--primary)"/></button>
+            <button onClick={abrirEliminarTurnos} title="Eliminar turnos generados por este molde (legado)" style={ghostBtnGB}><SGTIcon name="trash" size={15} color="var(--warn)"/></button>
             <button onClick={()=>setInjectOpen(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'8px 12px',borderRadius:10,background:'var(--primary)',color:'#fff',border:'none',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}><SGTIcon name="plus" size={14} color="#fff"/> Agregar</button>
           </div>
         }
@@ -1079,6 +1314,18 @@ function PlanGuardarBase({onBack}){
       <InyectarSheet open={injectOpen} onClose={()=>setInjectOpen(false)} onInject={onInject} plantillas={plantillas} puestos={puestos}/>
       <MoldesSheet open={moldesOpen} onClose={()=>setMoldesOpen(false)} onSave={onSave} onLoad={onLoad} onDelete={onDeleteMolde} instancias={instancias} moldes={moldes} loading={cargandoMoldes} nombreInicial={planNombre} planActualId={planActualId}/>
       <EliminarTurnosSheet open={eliminarOpen} onClose={()=>setEliminarOpen(false)} onConfirm={onEliminarTurnos} eliminando={eliminandoTurnos} nombreMolde={planNombre}/>
+      <VigenciasSheet
+        open={vigenciasOpen}
+        onClose={()=>setVigenciasOpen(false)}
+        ejecuciones={ejecuciones}
+        cargando={cargandoEjecuciones}
+        onAcortar={onAcortarEjecucion}
+        onAnular={onAnularEjecucion}
+        onEditarDesde={onEditarDesdeFecha}
+        procesando={procesandoVigencia}
+        moldeActualId={planActualId}
+        nombreMoldeActual={planNombre}
+      />
       <AsignarFuncionarioSheet open={!!assignInstance} onClose={()=>setAssignInstance(null)} instancia={assignInstance?instancias.find(i=>i.id===assignInstance.id):null} instancias={instancias} funcionarios={funcionarios} onAssign={onAssign} onUnassign={(id)=>{ unassign(id); flash('Asignación retirada'); }} onRemove={(id)=>{ removeInstancia(id); flash('Rotativa quitada'); }}/>
       <DetalleDiaSheet open={detailDia!=null} onClose={()=>setDetailDia(null)} diaIndex={detailDia} entradasDelDia={dayEntradas} tipoColor={tipoColor} onAssignInstance={(inst)=>{ setDetailDia(null); setTimeout(()=>setAssignInstance(inst),220); }}/>
     </div>

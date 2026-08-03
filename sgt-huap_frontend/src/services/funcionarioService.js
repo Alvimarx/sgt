@@ -4,6 +4,7 @@ import axiosInstance from '../utils/axiosConfig';
 import { getUserId as getUserIdFromToken ,
     getServicioId as getUserServiceIdFromToken
 } from '../utils/tokenManager';
+import { hoyISOEnZonaHospital } from '../utils/dateUtils';
 
 
 const API_BASE = '/funcionarios';
@@ -99,7 +100,8 @@ const buildTeamMember = (turno, funcionarioId) => {
  */
 const mapTurnoForAgenda = (turno, funcionarioId) => {
     const fechaInicio = normalizeDateString(turno?.diaInicioTurno);
-    const tipo = normalizeDateString(turno?.diaInicioTurno) === normalizeDateString(turno?.diaFinalTurno)
+    const fechaFin = normalizeDateString(turno?.diaFinalTurno);
+    const tipo = fechaInicio === fechaFin
         ? 'dia'
         : 'noche';
     const teamKey = `${fechaInicio || 'sin-fecha'}-tipo-${turno?.idTipoTurno ?? 'sin-tipo'}`;
@@ -107,6 +109,9 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
     return {
         id: turno?.id ?? null,
         fecha: fechaInicio,
+        // Última fecha en la que el turno sigue vigente (relevante para turnos nocturnos que
+        // cruzan medianoche: "fecha" es el día de inicio, pero el turno sigue activo en "fechaFin").
+        fechaFin: fechaFin || fechaInicio,
         tipo,
         horaInicio: formatTime(turno?.horaInicio) ?? null,
         horaFin: formatTime(turno?.horaFin) ?? null,
@@ -270,9 +275,18 @@ const buildAgendaData = (turnos, funcionarioId) => {
         return acc;
     }, {});
 
-    const todayKey = new Date().toISOString().slice(0, 10);
+    // Zona horaria del hospital, no UTC: new Date().toISOString() convierte primero a UTC y puede
+    // desfasar "hoy" en un día cerca de la medianoche en Chile.
+    const todayKey = hoyISOEnZonaHospital();
 
     const weekDays = Object.keys(grouped)
+        .filter((key) => {
+            if (key >= todayKey) return true; // hoy o futuro: siempre se muestra
+            // Día completamente pasado: se muestra solo si contiene un turno que sigue vigente hoy
+            // (p. ej. un nocturno que empezó ayer y termina hoy en la mañana) — no debe desaparecer
+            // solo porque su día de INICIO ya pasó.
+            return (grouped[key] ?? []).some((t) => (t.fechaFin ?? t.fecha) >= todayKey);
+        })
         .sort()
         .map((key) => {
             const date = new Date(`${key}T00:00:00`);

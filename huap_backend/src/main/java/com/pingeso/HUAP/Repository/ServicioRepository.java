@@ -1,9 +1,13 @@
 package com.pingeso.HUAP.Repository;
 
 import com.pingeso.HUAP.Entity.ServicioEntity;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -45,5 +49,17 @@ public interface ServicioRepository extends JpaRepository<ServicioEntity, Long> 
 
     /** Búsqueda paginada de servicios vigentes por nombre parcial. */
     Page<ServicioEntity> findByNombreContainingIgnoreCaseAndEliminadoFalse(String nombre, Pageable pageable);
+
+    /**
+     * Lock pesimista (SELECT ... FOR UPDATE) sobre la fila del servicio. Se usa para serializar,
+     * entre peticiones concurrentes, la validación de no-superposición de vigencias efectivas de
+     * planificación más la creación de la nueva {@code PlanificacionEjecucionEntity}: mientras una
+     * transacción mantiene el lock, otra que intente generar/extender/editar una planificación del
+     * mismo servicio espera hasta el commit y recién ahí ve la ejecución ya creada, evitando que dos
+     * generaciones concurrentes creen vigencias superpuestas. Debe invocarse dentro de una transacción.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM ServicioEntity s WHERE s.idServicio = :id")
+    Optional<ServicioEntity> lockServicio(@Param("id") Long id);
 
 }

@@ -21,6 +21,15 @@ import java.util.stream.Stream;
  * oferta particular a un médico y oferta general al servicio), la respuesta de los
  * receptores (aceptar/rechazar), el cambio de estado y la modificación del motivo.
  * Al resolverse una solicitud, coordina la reasignación de los turnos implicados.
+ *
+ * <p>Antes de crear una solicitud que agregaría un turno a un funcionario (Cobertura,
+ * Intercambio, Oferta particular), y de nuevo — de forma obligatoria — al aprobarla, se valida
+ * mediante {@link ValidadorAsignacionTurnoService} que el calendario resultante del funcionario
+ * no quede con turnos superpuestos ni con una secuencia incompatible de dos turnos de 12 horas
+ * consecutivos sin descanso (corrección funcional "turnos de 12 horas", ver
+ * {@code Archivo de funcionalidades.md}). La revalidación en la aprobación es indispensable porque
+ * el calendario del funcionario puede haber cambiado entre la creación de la solicitud y su
+ * aprobación.
  */
 @Service
 @RequiredArgsConstructor
@@ -31,6 +40,7 @@ public class SolicitudService {
     private final TipoSolicitudRepository tipoSolicitudRepository;
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
+    private final ValidadorAsignacionTurnoService validadorAsignacion;
 
     @Transactional
     public List<SolicitudEntity> findAllSolicitudes() {
@@ -100,12 +110,85 @@ public class SolicitudService {
                 .aceptadoReceptor(null)
                 .build();
 
+        validarConflictoSegunTipo(solicitud);
+
         SolicitudEntity guardada = solicitudRepository.save(solicitud);
 
         agendarBitacora("SOLICITUD_CREADA", guardada.getIdSolicitud(),
                 funcionario.getIdFuncionario());
 
         return guardada;
+    }
+
+    // ============================ Validación de 12 horas consecutivas ============================
+
+    /**
+     * Valida, según el tipo de solicitud, que el/los funcionario(s) que terminarían con un turno
+     * nuevo no queden con superposición ni con una secuencia incompatible de 12 horas. Se usa tanto
+     * al crear la solicitud (aviso temprano) como al aprobarla (revalidación obligatoria y definitiva
+     * con el calendario más reciente). Los tipos 1 (Permiso) y 2 (Botar turno) solo liberan un turno,
+     * nunca agregan uno, por lo que no requieren esta validación.
+     */
+    private void validarConflictoSegunTipo(SolicitudEntity solicitud) {
+        Integer tipo = solicitud.getTipoSolicitud() != null ? solicitud.getTipoSolicitud().getTipo() : null;
+        if (tipo == null) return;
+
+        if (tipo.equals(3)) {
+            // Cobertura: el emisor tomaría el turno.
+            TurnoEntity turno = solicitud.getTurno();
+            FuncionarioEntity emisor = solicitud.getFuncionario();
+            if (turno != null && emisor != null) {
+                validarNuevoTurnoParaFuncionario(emisor, turno, List.of());
+            }
+        } else if (tipo.equals(4)) {
+            // Intercambio: el emisor recibe turnoDeseado (solicitud.turno), el receptor recibe
+            // turnoPropio (solicitud.turnoReceptor). Se simula excluyendo de cada calendario el
+            // turno que esa persona está entregando, antes de validar el que recibe.
+            TurnoEntity turnoDeseado = solicitud.getTurno();
+            TurnoEntity turnoPropio = solicitud.getTurnoReceptor();
+            FuncionarioEntity emisor = solicitud.getFuncionario();
+            FuncionarioEntity receptor = solicitud.getFuncionarioReceptor();
+            if (turnoDeseado != null && turnoPropio != null && emisor != null && receptor != null) {
+                validarNuevoTurnoParaFuncionario(emisor, turnoDeseado, List.of(turnoPropio.getIdTurno()));
+                validarNuevoTurnoParaFuncionario(receptor, turnoPropio, List.of(turnoDeseado.getIdTurno()));
+            }
+        } else if (tipo.equals(5)) {
+            // Oferta particular: el receptor tomaría el turno.
+            TurnoEntity turno = solicitud.getTurno();
+            FuncionarioEntity receptor = solicitud.getFuncionarioReceptor();
+            if (turno != null && receptor != null) {
+                validarNuevoTurnoParaFuncionario(receptor, turno, List.of());
+            }
+        }
+        // Tipos 1 y 2 (Permiso, Botar turno): solo liberan, no requieren validar.
+    }
+
+    /**
+     * Valida que {@code turnoCandidato} pueda asignarse a {@code funcionario} contra su calendario
+     * vigente actual (en cualquier servicio), excluyendo de ese calendario los turnos que el propio
+     * movimiento le hace entregar simultáneamente (relevante en un intercambio).
+     */
+    private void validarNuevoTurnoParaFuncionario(FuncionarioEntity funcionario, TurnoEntity turnoCandidato,
+            List<Long> idsExcluirDelCalendario) {
+        if (turnoCandidato.getDiaInicioTurno() == null || turnoCandidato.getHoraInicio() == null
+                || turnoCandidato.getDiaFinalTurno() == null || turnoCandidato.getHoraFin() == null) {
+            return; // datos incompletos (p. ej. en pruebas unitarias): no hay base temporal para validar.
+        }
+
+        List<TurnoEntity> vigentes = turnoRepository.findByFuncionario_IdFuncionario(funcionario.getIdFuncionario());
+        Long[] idsExcluir = idsExcluirDelCalendario.toArray(new Long[0]);
+        List<TurnoEntity> calendarioResultante = validadorAsignacion.excluyendo(vigentes, idsExcluir);
+
+        LocalDateTime nuevoInicio = turnoCandidato.getDiaInicioTurno().atTime(turnoCandidato.getHoraInicio());
+        LocalDateTime nuevoFin = turnoCandidato.getDiaFinalTurno().atTime(turnoCandidato.getHoraFin());
+
+        validadorAsignacion.validarAsignacion(
+                nombreCompleto(funcionario), nuevoInicio, nuevoFin, turnoCandidato.getIdTurno(), calendarioResultante);
+    }
+
+    private String nombreCompleto(FuncionarioEntity f) {
+        if (f == null) return "el funcionario";
+        return (f.getNombre() + (f.getApelPat() != null ? " " + f.getApelPat() : "")).trim();
     }
 
     /**
@@ -125,6 +208,7 @@ public class SolicitudService {
         FuncionarioEntity receptor = funcionarioRepository.findById(idReceptor).orElseThrow();
 
         if (acepta) {
+            validarConflictoSegunTipo(solicitud); // aviso temprano; la aprobación revalida de todos modos
             solicitud.setAceptadoReceptor(true);
         } else {
             solicitud.setAceptadoReceptor(false);
@@ -152,6 +236,7 @@ public class SolicitudService {
         FuncionarioEntity receptor = funcionarioRepository.findById(idReceptor).orElseThrow();
 
         if (acepta) {
+            validarConflictoSegunTipo(solicitud); // aviso temprano; la aprobación revalida de todos modos
             solicitud.setAceptadoReceptor(true);
         } else {
             solicitud.setAceptadoReceptor(false);
@@ -205,6 +290,10 @@ public class SolicitudService {
                 throw new RuntimeException(
                         "Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)");
             }
+
+            // Revalidación OBLIGATORIA y definitiva con el calendario más reciente: el funcionario
+            // pudo haber tomado otro turno entre la creación de la solicitud y esta aprobación.
+            validarConflictoSegunTipo(solicitud);
 
             if (solicitud.getTurno() != null) {
                 rechazarSolicitudesCompetitivas(solicitud.getTurno().getIdTurno(), idSolicitud, asignador);
