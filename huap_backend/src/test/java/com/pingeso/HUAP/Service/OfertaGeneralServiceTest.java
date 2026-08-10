@@ -9,6 +9,7 @@ import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.PostulacionRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -25,6 +26,13 @@ import static org.mockito.Mockito.*;
  * Pruebas unitarias de {@link OfertaGeneralService} — el flujo de "oferta general" (un
  * funcionario ofrece un turno a todo el servicio y otros postulan), distinto del tipo 5
  * "oferta particular" dentro de {@link SolicitudEntity}. Estilo Mockito puro, sin contexto Spring.
+ *
+ * <p>El actor (ofertor/jefatura/postulante) ya no se recibe como parámetro de los métodos del
+ * service — se deriva de {@link SeguridadServicio#idUsuarioActual()} (identidad del JWT, ver
+ * corrección C-02/H-02). {@link #actorAutenticado(long)} configura ese mock por test. Por
+ * defecto {@code esAdministrador()} devuelve {@code true} para no activar el nuevo chequeo de
+ * alcance por servicio (los turnos de prueba no tienen servicio asociado) — este archivo prueba
+ * la lógica de negocio, no la autorización.
  */
 class OfertaGeneralServiceTest {
 
@@ -34,10 +42,21 @@ class OfertaGeneralServiceTest {
     private final TurnoRepository turnoRepository = mock(TurnoRepository.class);
     private final BitacoraService bitacoraService = mock(BitacoraService.class);
     private final ValidadorAsignacionTurnoService validadorAsignacion = new ValidadorAsignacionTurnoService();
+    private final SeguridadServicio seguridadServicio = mock(SeguridadServicio.class);
 
     private final OfertaGeneralService service = new OfertaGeneralService(
             ofertaGeneralRepository, postulacionRepository, funcionarioRepository, turnoRepository, bitacoraService,
-            validadorAsignacion);
+            validadorAsignacion, seguridadServicio);
+
+    {
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(1L);
+    }
+
+    /** Configura el actor autenticado (antes, el parámetro final de cada método del service). */
+    private void actorAutenticado(long id) {
+        when(seguridadServicio.idUsuarioActual()).thenReturn(id);
+    }
 
     private static FuncionarioEntity funcionario(long id) {
         return FuncionarioEntity.builder().idFuncionario(id).nombre("Func" + id).build();
@@ -120,7 +139,7 @@ class OfertaGeneralServiceTest {
     @Test
     void aprobarOferta_ofertaInexistente_lanza() {
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L, 9L));
+        assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L));
     }
 
     @Test
@@ -128,7 +147,7 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), ABIERTA);
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
 
-        assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L, 9L));
+        assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L));
         verify(ofertaGeneralRepository, never()).save(any());
     }
 
@@ -138,7 +157,8 @@ class OfertaGeneralServiceTest {
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
         ofertaSaveDevuelveArgumento();
 
-        OfertaGeneralEntity resultado = service.aprobarOferta(1L, 9L);
+        actorAutenticado(9L);
+        OfertaGeneralEntity resultado = service.aprobarOferta(1L);
 
         assertEquals(ABIERTA, resultado.getEstado());
         verify(bitacoraService).registrarEventoOferta("OFERTA_GENERAL_APROBADA", 1L, 9L);
@@ -149,7 +169,7 @@ class OfertaGeneralServiceTest {
     @Test
     void rechazarOferta_ofertaInexistente_lanza() {
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L, 9L));
+        assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L));
     }
 
     @Test
@@ -157,7 +177,7 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), CERRADA);
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
 
-        assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L, 9L));
+        assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L));
         verify(ofertaGeneralRepository, never()).save(any());
     }
 
@@ -167,7 +187,8 @@ class OfertaGeneralServiceTest {
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
         ofertaSaveDevuelveArgumento();
 
-        OfertaGeneralEntity resultado = service.rechazarOferta(1L, 9L);
+        actorAutenticado(9L);
+        OfertaGeneralEntity resultado = service.rechazarOferta(1L);
 
         assertEquals(RECHAZADA, resultado.getEstado());
         verify(bitacoraService).registrarEventoOferta("OFERTA_GENERAL_RECHAZADA", 1L, 9L);
@@ -178,7 +199,8 @@ class OfertaGeneralServiceTest {
     @Test
     void postular_ofertaInexistente_lanza() {
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(RuntimeException.class, () -> service.postular(1L, 2L));
+        actorAutenticado(2L);
+        assertThrows(RuntimeException.class, () -> service.postular(1L));
     }
 
     @Test
@@ -186,7 +208,8 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), PENDIENTE_APROBACION);
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
 
-        assertThrows(RuntimeException.class, () -> service.postular(1L, 2L));
+        actorAutenticado(2L);
+        assertThrows(RuntimeException.class, () -> service.postular(1L));
         verify(postulacionRepository, never()).save(any());
     }
 
@@ -196,7 +219,8 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, ofertor, turno(1L), ABIERTA);
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
 
-        assertThrows(RuntimeException.class, () -> service.postular(1L, 1L));
+        actorAutenticado(1L);
+        assertThrows(RuntimeException.class, () -> service.postular(1L));
         verify(postulacionRepository, never()).save(any());
     }
 
@@ -207,7 +231,8 @@ class OfertaGeneralServiceTest {
         when(postulacionRepository.existsByOfertaGeneral_IdOfertaGeneralAndPostulante_IdFuncionario(1L, 2L))
                 .thenReturn(true);
 
-        assertThrows(RuntimeException.class, () -> service.postular(1L, 2L));
+        actorAutenticado(2L);
+        assertThrows(RuntimeException.class, () -> service.postular(1L));
         verify(postulacionRepository, never()).save(any());
     }
 
@@ -219,7 +244,8 @@ class OfertaGeneralServiceTest {
                 .thenReturn(false);
         when(funcionarioRepository.findById(2L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> service.postular(1L, 2L));
+        actorAutenticado(2L);
+        assertThrows(RuntimeException.class, () -> service.postular(1L));
         verify(postulacionRepository, never()).save(any());
     }
 
@@ -233,7 +259,8 @@ class OfertaGeneralServiceTest {
         when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(postulante));
         when(postulacionRepository.save(any(PostulacionEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        PostulacionEntity creada = service.postular(1L, 2L);
+        actorAutenticado(2L);
+        PostulacionEntity creada = service.postular(1L);
 
         assertSame(o, creada.getOfertaGeneral());
         assertSame(postulante, creada.getPostulante());
@@ -247,7 +274,8 @@ class OfertaGeneralServiceTest {
     @Test
     void retirarPostulacion_postulacionInexistente_lanza() {
         when(postulacionRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(RuntimeException.class, () -> service.retirarPostulacion(1L, 2L));
+        actorAutenticado(2L);
+        assertThrows(RuntimeException.class, () -> service.retirarPostulacion(1L));
     }
 
     @Test
@@ -258,7 +286,8 @@ class OfertaGeneralServiceTest {
                 .ofertaGeneral(oferta(1L, funcionario(1L), turno(1L), ABIERTA)).build();
         when(postulacionRepository.findById(1L)).thenReturn(Optional.of(postulacion));
 
-        assertThrows(RuntimeException.class, () -> service.retirarPostulacion(1L, 999L));
+        actorAutenticado(999L);
+        assertThrows(RuntimeException.class, () -> service.retirarPostulacion(1L));
         verify(ofertaGeneralRepository, never()).save(any());
     }
 
@@ -270,7 +299,8 @@ class OfertaGeneralServiceTest {
                 .idPostulacion(1L).postulante(postulante).ofertaGeneral(o).build();
         when(postulacionRepository.findById(1L)).thenReturn(Optional.of(postulacion));
 
-        assertThrows(RuntimeException.class, () -> service.retirarPostulacion(1L, 2L));
+        actorAutenticado(2L);
+        assertThrows(RuntimeException.class, () -> service.retirarPostulacion(1L));
         verify(ofertaGeneralRepository, never()).save(any());
     }
 
@@ -284,7 +314,8 @@ class OfertaGeneralServiceTest {
         when(postulacionRepository.findById(1L)).thenReturn(Optional.of(postulacion));
         ofertaSaveDevuelveArgumento();
 
-        service.retirarPostulacion(1L, 2L);
+        actorAutenticado(2L);
+        service.retirarPostulacion(1L);
 
         assertFalse(o.getPostulaciones().contains(postulacion));
         verify(ofertaGeneralRepository).save(o);
@@ -296,7 +327,7 @@ class OfertaGeneralServiceTest {
     @Test
     void seleccionarPostulante_ofertaInexistente_lanza() {
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
-        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L, 9L));
+        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L));
     }
 
     @Test
@@ -304,7 +335,7 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), PENDIENTE_APROBACION);
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
 
-        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L, 9L));
+        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L));
     }
 
     @Test
@@ -313,7 +344,7 @@ class OfertaGeneralServiceTest {
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
         when(postulacionRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L, 9L));
+        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L));
     }
 
     @Test
@@ -327,7 +358,8 @@ class OfertaGeneralServiceTest {
         when(postulacionRepository.findById(5L)).thenReturn(Optional.of(postulacion));
         ofertaSaveDevuelveArgumento();
 
-        OfertaGeneralEntity resultado = service.seleccionarPostulante(1L, 5L, 9L);
+        actorAutenticado(9L);
+        OfertaGeneralEntity resultado = service.seleccionarPostulante(1L, 5L);
 
         assertSame(postulante, turno.getFuncionario());
         verify(turnoRepository).save(turno);
@@ -348,7 +380,7 @@ class OfertaGeneralServiceTest {
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(estaOferta));
         when(postulacionRepository.findById(99L)).thenReturn(Optional.of(postulacionDeOtraOferta));
 
-        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 99L, 9L));
+        assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 99L));
         assertNull(turnoDeEstaOferta.getFuncionario());
         verify(turnoRepository, never()).save(any());
         verify(ofertaGeneralRepository, never()).save(any());
@@ -368,7 +400,7 @@ class OfertaGeneralServiceTest {
         when(turnoRepository.findByFuncionario_IdFuncionario(2L)).thenReturn(List.of(chocaConPostulante));
 
         assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
-                () -> service.seleccionarPostulante(1L, 5L, 9L));
+                () -> service.seleccionarPostulante(1L, 5L));
         assertNull(turnoOfrecido.getFuncionario(), "no debe asignarse el turno si hay conflicto");
         assertFalse(postulacion.getSeleccionado());
         verify(turnoRepository, never()).save(any());

@@ -42,7 +42,7 @@ Confirmado en `BaseDatosMySQL/desarrollo/innhosp/02_datos.sql`: todos los funcio
 
 | RUT | Nombre | Rol de sistema | Rol de servicio | Servicio |
 |---|---|---|---|---|
-| 17599096-8 | Álvaro López | ADMINISTRADOR | JEFATURA (en los 5 servicios) | Medicina Interna (y ve todos) |
+| 11111111-1 | Admin Bootstrap | ADMINISTRADOR | JEFATURA (en los 5 servicios) | Medicina Interna (y ve todos) |
 | 22222223-3 | Fernando Roman | USUARIO | MEDICO | Medicina Interna |
 
 Estas credenciales se usaron exclusivamente contra la base de datos de **desarrollo** (`huap-dev-db`), con datos ficticios generados para pruebas — no se tocaron datos reales de producción ni del hospital en ningún momento.

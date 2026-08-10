@@ -2,6 +2,7 @@ package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.DTO.CrearSolicitudDTO;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
+import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.SolicitudEntity;
 import com.pingeso.HUAP.Entity.TipoSolicitudEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
@@ -9,6 +10,7 @@ import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TipoSolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -28,6 +30,15 @@ import static org.mockito.Mockito.*;
  * 5 ramas por tipo y el rechazo automático de competidoras), respuesta del receptor a ofertas,
  * modificación de motivo y las lecturas de delegación directa al repositorio.
  * Estilo Mockito puro, sin contexto Spring.
+ *
+ * <p>El actor (emisor/receptor/asignador) ya no se recibe como parámetro de los métodos del
+ * service — se deriva de {@link SeguridadServicio#idUsuarioActual()} (identidad del JWT, ver
+ * corrección C-02). {@link #actorAutenticado(long)} configura ese mock por test, reemplazando
+ * el antiguo argumento numérico final de cada llamada. Por defecto {@code esAdministrador()}
+ * devuelve {@code true} para no activar el nuevo chequeo de alcance por servicio
+ * (H-01/H-07), que no es el foco de este archivo — el service en sí valida ese alcance
+ * (ver {@link SolicitudService#cambiarEstado}), y aquí se prueba solo la lógica de negocio
+ * por tipo de solicitud, no la autorización.
  */
 class SolicitudServiceTest {
 
@@ -41,10 +52,21 @@ class SolicitudServiceTest {
     private final TurnoRepository turnoRepository = mock(TurnoRepository.class);
     private final BitacoraService bitacoraService = mock(BitacoraService.class);
     private final ValidadorAsignacionTurnoService validadorAsignacion = new ValidadorAsignacionTurnoService();
+    private final SeguridadServicio seguridadServicio = mock(SeguridadServicio.class);
 
     private final SolicitudService service = new SolicitudService(
             solicitudRepository, funcionarioRepository, tipoSolicitudRepository, turnoRepository, bitacoraService,
-            validadorAsignacion);
+            validadorAsignacion, seguridadServicio);
+
+    {
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(ID_FUNCIONARIO);
+    }
+
+    /** Configura el actor autenticado (antes, el parámetro final de cada método del service). */
+    private void actorAutenticado(long id) {
+        when(seguridadServicio.idUsuarioActual()).thenReturn(id);
+    }
 
     private static FuncionarioEntity funcionario(long id) {
         return FuncionarioEntity.builder().idFuncionario(id).nombre("Func" + id).build();
@@ -52,6 +74,21 @@ class SolicitudServiceTest {
 
     private static TurnoEntity turno(long id) {
         return TurnoEntity.builder().idTurno(id).build();
+    }
+
+    private static com.pingeso.HUAP.Entity.ServicioEntity servicio(long id) {
+        return com.pingeso.HUAP.Entity.ServicioEntity.builder().idServicio(id).nombre("Servicio" + id).build();
+    }
+
+    private static TurnoEntity turnoDeServicio(long id, com.pingeso.HUAP.Entity.ServicioEntity servicio) {
+        return TurnoEntity.builder().idTurno(id).servicio(servicio).build();
+    }
+
+    /** Autentica como un actor NO administrador, con servicio de sesión explícito (para probar el scoping real). */
+    private void actorNoAdministrador(long id, long servicioSesionId) {
+        when(seguridadServicio.idUsuarioActual()).thenReturn(id);
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.idServicioActual()).thenReturn(servicioSesionId);
     }
 
     private static final LocalDate LUNES = LocalDate.of(2026, 6, 8);
@@ -279,7 +316,8 @@ class SolicitudServiceTest {
     void cambiarEstado_solicitudInexistente_lanzaYNoGuarda() {
         when(solicitudRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA, 9L));
+        actorAutenticado(9L);
+        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -296,7 +334,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
         solicitudSaveDevuelveArgumento();
 
-        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA, 9L);
+        actorAutenticado(9L);
+        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA);
 
         assertNull(turno.getFuncionario());
         verify(turnoRepository).save(turno);
@@ -317,7 +356,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
         solicitudSaveDevuelveArgumento();
 
-        service.cambiarEstado(1L, APROBADA, 9L);
+        actorAutenticado(9L);
+        service.cambiarEstado(1L, APROBADA);
 
         assertNull(turno.getFuncionario());
         verify(turnoRepository).save(turno);
@@ -333,7 +373,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
         solicitudSaveDevuelveArgumento();
 
-        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA, 9L);
+        actorAutenticado(9L);
+        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA);
 
         assertEquals(APROBADA, resultado.getEstado());
         verify(turnoRepository, never()).save(any());
@@ -354,7 +395,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
         solicitudSaveDevuelveArgumento();
 
-        service.cambiarEstado(1L, APROBADA, 9L);
+        actorAutenticado(9L);
+        service.cambiarEstado(1L, APROBADA);
 
         assertSame(emisor, turno.getFuncionario());
         verify(turnoRepository).save(turno);
@@ -369,7 +411,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
         when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
 
-        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA, 9L));
+        actorAutenticado(9L);
+        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -389,7 +432,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
         solicitudSaveDevuelveArgumento();
 
-        service.cambiarEstado(1L, APROBADA, 9L);
+        actorAutenticado(9L);
+        service.cambiarEstado(1L, APROBADA);
 
         assertSame(emisor, turnoDeseado.getFuncionario());
         assertSame(receptor, turnoPropio.getFuncionario());
@@ -407,7 +451,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
         when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
 
-        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA, 9L));
+        actorAutenticado(9L);
+        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -422,7 +467,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
         when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
 
-        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA, 9L));
+        actorAutenticado(9L);
+        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -440,7 +486,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
         solicitudSaveDevuelveArgumento();
 
-        service.cambiarEstado(1L, APROBADA, 9L);
+        actorAutenticado(9L);
+        service.cambiarEstado(1L, APROBADA);
 
         assertSame(receptor, turno.getFuncionario());
         verify(turnoRepository).save(turno);
@@ -456,7 +503,8 @@ class SolicitudServiceTest {
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
         when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
 
-        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA, 9L));
+        actorAutenticado(9L);
+        assertThrows(RuntimeException.class, () -> service.cambiarEstado(1L, APROBADA));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -471,7 +519,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
         solicitudSaveDevuelveArgumento();
 
-        SolicitudEntity resultado = service.cambiarEstado(1L, RECHAZADA, 9L);
+        actorAutenticado(9L);
+        SolicitudEntity resultado = service.cambiarEstado(1L, RECHAZADA);
 
         assertEquals(RECHAZADA, resultado.getEstado());
         assertNotNull(turno.getFuncionario()); // no se toca el turno al rechazar
@@ -490,7 +539,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(999L)).thenReturn(Optional.empty());
         solicitudSaveDevuelveArgumento();
 
-        service.cambiarEstado(1L, APROBADA, 999L);
+        actorAutenticado(999L);
+        service.cambiarEstado(1L, APROBADA);
 
         verify(bitacoraService).registrarEvento("CAMBIO_ESTADO_APROBADA", 1L, null);
     }
@@ -515,7 +565,8 @@ class SolicitudServiceTest {
                 .thenReturn(List.of(aprobada, competidoraPendiente, competidoraYaRechazada, competidoraYaAprobada));
         solicitudSaveDevuelveArgumento();
 
-        service.cambiarEstado(1L, APROBADA, 9L);
+        actorAutenticado(9L);
+        service.cambiarEstado(1L, APROBADA);
 
         assertEquals(RECHAZADA, competidoraPendiente.getEstado());
         assertEquals("Rechazo automático: Otra solicitud para este turno fue aprobada.", competidoraPendiente.getMotivo());
@@ -533,7 +584,8 @@ class SolicitudServiceTest {
     @Test
     void responderOfertaParticular_solicitudInexistente_lanza() {
         when(solicitudRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(RuntimeException.class, () -> service.responderOfertaParticular(1L, 6L, true));
+        actorAutenticado(6L);
+        assertThrows(RuntimeException.class, () -> service.responderOfertaParticular(1L, true));
     }
 
     @Test
@@ -542,7 +594,8 @@ class SolicitudServiceTest {
                 .idSolicitud(1L).funcionarioReceptor(funcionario(6L)).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
 
-        assertThrows(RuntimeException.class, () -> service.responderOfertaParticular(1L, 7L, true));
+        actorAutenticado(7L);
+        assertThrows(RuntimeException.class, () -> service.responderOfertaParticular(1L, true));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -552,7 +605,8 @@ class SolicitudServiceTest {
                 .idSolicitud(1L).funcionarioReceptor(null).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
 
-        assertThrows(RuntimeException.class, () -> service.responderOfertaParticular(1L, 6L, true));
+        actorAutenticado(6L);
+        assertThrows(RuntimeException.class, () -> service.responderOfertaParticular(1L, true));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -562,7 +616,8 @@ class SolicitudServiceTest {
                 .idSolicitud(1L).funcionarioReceptor(null).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
 
-        assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, 6L, true));
+        actorAutenticado(6L);
+        assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, true));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -575,7 +630,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(6L)).thenReturn(Optional.of(receptor));
         solicitudSaveDevuelveArgumento();
 
-        SolicitudEntity resultado = service.responderOfertaParticular(1L, 6L, true);
+        actorAutenticado(6L);
+        SolicitudEntity resultado = service.responderOfertaParticular(1L, true);
 
         assertTrue(resultado.getAceptadoReceptor());
         assertEquals(PENDIENTE, resultado.getEstado()); // aceptar NO aprueba, solo registra la intención
@@ -591,7 +647,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(6L)).thenReturn(Optional.of(receptor));
         solicitudSaveDevuelveArgumento();
 
-        SolicitudEntity resultado = service.responderOfertaParticular(1L, 6L, false);
+        actorAutenticado(6L);
+        SolicitudEntity resultado = service.responderOfertaParticular(1L, false);
 
         assertFalse(resultado.getAceptadoReceptor());
         assertEquals(RECHAZADA, resultado.getEstado());
@@ -603,7 +660,8 @@ class SolicitudServiceTest {
     @Test
     void responderOfertaIntercambio_solicitudInexistente_lanza() {
         when(solicitudRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, 6L, true));
+        actorAutenticado(6L);
+        assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, true));
     }
 
     @Test
@@ -612,7 +670,8 @@ class SolicitudServiceTest {
                 .idSolicitud(1L).funcionarioReceptor(funcionario(6L)).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
 
-        assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, 7L, true));
+        actorAutenticado(7L);
+        assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, true));
         verify(solicitudRepository, never()).save(any());
     }
 
@@ -625,7 +684,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(6L)).thenReturn(Optional.of(receptor));
         solicitudSaveDevuelveArgumento();
 
-        SolicitudEntity resultado = service.responderOfertaIntercambio(1L, 6L, true);
+        actorAutenticado(6L);
+        SolicitudEntity resultado = service.responderOfertaIntercambio(1L, true);
 
         assertTrue(resultado.getAceptadoReceptor());
         assertEquals(PENDIENTE, resultado.getEstado());
@@ -641,7 +701,8 @@ class SolicitudServiceTest {
         when(funcionarioRepository.findById(6L)).thenReturn(Optional.of(receptor));
         solicitudSaveDevuelveArgumento();
 
-        SolicitudEntity resultado = service.responderOfertaIntercambio(1L, 6L, false);
+        actorAutenticado(6L);
+        SolicitudEntity resultado = service.responderOfertaIntercambio(1L, false);
 
         assertFalse(resultado.getAceptadoReceptor());
         assertEquals(RECHAZADA, resultado.getEstado());
@@ -659,7 +720,8 @@ class SolicitudServiceTest {
     @Test
     void modificarMotivo_pendiente_actualizaYGuarda() {
         SolicitudEntity solicitud = SolicitudEntity.builder()
-                .idSolicitud(1L).estado(PENDIENTE).motivo("motivo original").build();
+                .idSolicitud(1L).estado(PENDIENTE).motivo("motivo original")
+                .funcionario(funcionario(ID_FUNCIONARIO)).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         solicitudSaveDevuelveArgumento();
 
@@ -778,8 +840,9 @@ class SolicitudServiceTest {
         TurnoEntity nocturnoNuevo = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 12);
         when(turnoRepository.findByFuncionario_IdFuncionario(5L)).thenReturn(List.of(nocturnoNuevo));
 
+        actorAutenticado(9L);
         assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
-                () -> service.cambiarEstado(1L, APROBADA, 9L));
+                () -> service.cambiarEstado(1L, APROBADA));
         verify(turnoRepository, never()).save(any());
         // No debe haber rechazado solicitudes competidoras: la validación aborta ANTES de tocar nada.
         verify(solicitudRepository, never()).findByTurno_IdTurno(any());
@@ -804,8 +867,9 @@ class SolicitudServiceTest {
         TurnoEntity chocaConReceptor = turnoConHorario(70L, LUNES.plusDays(6), LocalTime.of(8, 0), 12);
         when(turnoRepository.findByFuncionario_IdFuncionario(6L)).thenReturn(List.of(turnoDeseado, chocaConReceptor));
 
+        actorAutenticado(9L);
         assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
-                () -> service.cambiarEstado(1L, APROBADA, 9L));
+                () -> service.cambiarEstado(1L, APROBADA));
         verify(turnoRepository, never()).save(any());
     }
 
@@ -821,9 +885,242 @@ class SolicitudServiceTest {
         TurnoEntity chocaConReceptor = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 12);
         when(turnoRepository.findByFuncionario_IdFuncionario(6L)).thenReturn(List.of(chocaConReceptor));
 
+        actorAutenticado(6L);
         assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
-                () -> service.responderOfertaParticular(1L, 6L, true));
+                () -> service.responderOfertaParticular(1L, true));
         assertNull(solicitud.getAceptadoReceptor(), "no debe marcarse aceptado si hay conflicto");
         verify(solicitudRepository, never()).save(any());
+    }
+
+    // ============================ cambiarEstado: alcance por servicio en intercambio (item 3) ============================
+
+    @Test
+    void cambiarEstado_intercambio_turnoDeseadoDeA_turnoReceptorDeB_lanzaAccessDenied() {
+        ServicioEntity servicioA = servicio(100L);
+        ServicioEntity servicioB = servicio(200L);
+        TurnoEntity turnoDeseado = turnoDeServicio(1L, servicioA);
+        TurnoEntity turnoPropio = turnoDeServicio(2L, servicioB);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        // JEFATURA del servicio A (donde está el turno deseado) — el turno entregado es de B.
+        actorNoAdministrador(9L, 100L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
+        verify(solicitudRepository, never()).findByIdForUpdate(any());
+        verify(turnoRepository, never()).save(any());
+    }
+
+    @Test
+    void cambiarEstado_intercambio_turnoDeseadoEsDeOtroServicio_lanzaAccessDenied() {
+        ServicioEntity servicioA = servicio(100L);
+        ServicioEntity servicioB = servicio(200L);
+        TurnoEntity turnoDeseado = turnoDeServicio(1L, servicioB);
+        TurnoEntity turnoPropio = turnoDeServicio(2L, servicioB);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        // JEFATURA del servicio A; ambos turnos del intercambio son del servicio B.
+        actorNoAdministrador(9L, 100L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
+    }
+
+    @Test
+    void cambiarEstado_intercambio_ambosTurnosDelServicioDelActor_permitido() {
+        ServicioEntity servicioA = servicio(100L);
+        TurnoEntity turnoDeseado = turnoDeServicio(1L, servicioA);
+        TurnoEntity turnoPropio = turnoDeServicio(2L, servicioA);
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(emisor).funcionarioReceptor(receptor)
+                .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
+        when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
+        solicitudSaveDevuelveArgumento();
+
+        // JEFATURA del servicio A, no participante, y AMBOS turnos son del servicio A.
+        actorNoAdministrador(9L, 100L);
+        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA);
+
+        assertEquals(APROBADA, resultado.getEstado());
+        assertSame(emisor, turnoDeseado.getFuncionario());
+        assertSame(receptor, turnoPropio.getFuncionario());
+    }
+
+    @Test
+    void cambiarEstado_intercambio_administradorNoParticipante_permitido() {
+        ServicioEntity servicioA = servicio(100L);
+        ServicioEntity servicioB = servicio(200L);
+        TurnoEntity turnoDeseado = turnoDeServicio(1L, servicioA);
+        TurnoEntity turnoPropio = turnoDeServicio(2L, servicioB);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
+        when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
+        solicitudSaveDevuelveArgumento();
+
+        // ADMINISTRADOR global, no participante: el chequeo de servicio no aplica, aunque
+        // los dos turnos del intercambio sean de servicios distintos entre sí.
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        actorAutenticado(9L);
+
+        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA);
+        assertEquals(APROBADA, resultado.getEstado());
+    }
+
+    // ============================ cambiarEstado: segregación de funciones completa (item 4) ============================
+
+    private SolicitudEntity solicitudOfertaParticular(FuncionarioEntity emisor, FuncionarioEntity receptor, TurnoEntity turno) {
+        return SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 5))
+                .funcionario(emisor).funcionarioReceptor(receptor)
+                .turno(turno).estado(PENDIENTE).build();
+    }
+
+    @Test
+    void cambiarEstado_emisorIntentaAprobarSuPropiaSolicitud_lanza403_aunqueSeaJefatura() {
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        ServicioEntity servicioA = servicio(100L);
+        SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turnoDeServicio(1L, servicioA));
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        // El emisor es JEFATURA del servicio A (mismo servicio del turno) — el rol no exime.
+        actorNoAdministrador(5L, 100L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
+        verify(solicitudRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void cambiarEstado_receptorJefaturaIntentaAprobarLaOfertaQueLoBeneficia_lanza403() {
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        ServicioEntity servicioA = servicio(100L);
+        SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turnoDeServicio(1L, servicioA));
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        // El receptor (a quien se le asignaría el turno) es JEFATURA del mismo servicio.
+        actorNoAdministrador(6L, 100L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
+    }
+
+    @Test
+    void cambiarEstado_receptorSubroganteIntentaAprobar_lanza403() {
+        // Nota: SolicitudService no distingue JEFATURA de SUBROGANTE (esa distinción de rol
+        // ya se filtra en SecurityConfig/@PreAuthorize); a nivel de service, ambos son
+        // simplemente "no ADMINISTRADOR", y el chequeo de participante aplica igual.
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        ServicioEntity servicioA = servicio(100L);
+        SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turnoDeServicio(1L, servicioA));
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        actorNoAdministrador(6L, 100L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
+    }
+
+    @Test
+    void cambiarEstado_receptorAdministradorIntentaAprobarSuPropiaOferta_lanza403() {
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turno(1L));
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        // El receptor tiene además rol de sistema ADMINISTRADOR: la exención de ADMIN es
+        // SOLO para el chequeo de servicio, nunca para el de participación directa.
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        actorAutenticado(6L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
+        verify(solicitudRepository, never()).findByIdForUpdate(any());
+    }
+
+    @Test
+    void cambiarEstado_jefaturaAutorizadaNoParticipante_apruebaYQuedaRegistradaComoAprobadorReal() {
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        ServicioEntity servicioA = servicio(100L);
+        TurnoEntity turno = turnoDeServicio(1L, servicioA);
+        SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turno);
+        FuncionarioEntity jefatura = funcionario(9L);
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(jefatura));
+        when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
+        solicitudSaveDevuelveArgumento();
+
+        actorNoAdministrador(9L, 100L);
+        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA);
+
+        assertEquals(APROBADA, resultado.getEstado());
+        assertSame(receptor, turno.getFuncionario());
+        // La bitácora debe registrar al aprobador REAL (9L, quien está autenticado), no a
+        // emisor ni receptor.
+        verify(bitacoraService).registrarEvento("CAMBIO_ESTADO_APROBADA", 1L, 9L);
+    }
+
+    @Test
+    void cambiarEstado_administradorNoParticipante_apruebaYQuedaRegistradaComoAprobadorReal() {
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        TurnoEntity turno = turno(1L);
+        SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turno);
+        FuncionarioEntity admin = funcionario(99L);
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(99L)).thenReturn(Optional.of(admin));
+        when(solicitudRepository.findByTurno_IdTurno(1L)).thenReturn(List.of(solicitud));
+        solicitudSaveDevuelveArgumento();
+
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        actorAutenticado(99L);
+        SolicitudEntity resultado = service.cambiarEstado(1L, APROBADA);
+
+        assertEquals(APROBADA, resultado.getEstado());
+        verify(bitacoraService).registrarEvento("CAMBIO_ESTADO_APROBADA", 1L, 99L);
+    }
+
+    @Test
+    void cambiarEstado_dueñoActualDelTurnoDeseadoIntentaAprobar_lanza403() {
+        // Caso defensivo: el emisor/receptor no coinciden con el dueño actual del turno, pero
+        // ese dueño también tiene un interés directo (perdería o vería alterado su turno) y
+        // no debe poder resolver la solicitud.
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        FuncionarioEntity dueñoActual = funcionario(7L);
+        TurnoEntity turno = turno(1L);
+        turno.setFuncionario(dueñoActual);
+        SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turno);
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        actorAutenticado(7L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
     }
 }

@@ -3,8 +3,10 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.DTO.CrearOfertaGeneralDTO;
 import com.pingeso.HUAP.Entity.*;
 import com.pingeso.HUAP.Repository.*;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -36,11 +38,13 @@ public class OfertaGeneralService {
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
     private final ValidadorAsignacionTurnoService validadorAsignacion;
+    private final SeguridadServicio seguridadServicio;
 
     /** Crea la oferta en estado {@code PENDIENTE_APROBACION}; no queda visible para postular hasta aprobarse. */
     @Transactional
     public OfertaGeneralEntity crearOferta(CrearOfertaGeneralDTO dto) {
-        FuncionarioEntity ofertor = funcionarioRepository.findById(dto.getIdFuncionario())
+        // SEC (C-02): el ofertor siempre es quien está autenticado, nunca el idFuncionario del DTO.
+        FuncionarioEntity ofertor = funcionarioRepository.findById(seguridadServicio.idUsuarioActual())
                 .orElseThrow(() -> new RuntimeException("Funcionario no existe"));
 
         TurnoEntity turno = turnoRepository.findById(dto.getIdTurno())
@@ -59,11 +63,29 @@ public class OfertaGeneralService {
         return guardada;
     }
 
+    /** Verifica que la oferta pertenezca al servicio de la sesión activa (salvo ADMINISTRADOR). */
+    private void exigirMismoServicioQueOferta(OfertaGeneralEntity oferta) {
+        Long servicioOferta = (oferta.getTurno() != null && oferta.getTurno().getServicio() != null)
+                ? oferta.getTurno().getServicio().getIdServicio() : null;
+        if (servicioOferta == null) {
+            if (!seguridadServicio.esAdministrador()) {
+                throw new AccessDeniedException("No se pudo determinar el servicio de la oferta");
+            }
+            return;
+        }
+        seguridadServicio.exigirMismoServicio(servicioOferta);
+    }
+
     /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code ABIERTA}, habilitando postulaciones. */
     @Transactional
-    public OfertaGeneralEntity aprobarOferta(Long idOferta, Long idJefatura) {
+    public OfertaGeneralEntity aprobarOferta(Long idOferta) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
+
+        // SEC (H-02, High): antes cualquier autenticado podía aprobar ofertas de cualquier
+        // servicio y la bitácora atribuía la acción a un idJefatura arbitrario del parámetro.
+        exigirMismoServicioQueOferta(oferta);
+        Long idJefatura = seguridadServicio.idUsuarioActual();
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION) {
             throw new RuntimeException("La oferta no está en estado PENDIENTE_APROBACION");
@@ -77,9 +99,12 @@ public class OfertaGeneralService {
 
     /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code RECHAZADA}. */
     @Transactional
-    public OfertaGeneralEntity rechazarOferta(Long idOferta, Long idJefatura) {
+    public OfertaGeneralEntity rechazarOferta(Long idOferta) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
+
+        exigirMismoServicioQueOferta(oferta);
+        Long idJefatura = seguridadServicio.idUsuarioActual();
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION) {
             throw new RuntimeException("La oferta no está en estado PENDIENTE_APROBACION");
@@ -96,7 +121,9 @@ public class OfertaGeneralService {
      * postularse a su propia oferta o si ya existe una postulación suya para esta oferta.
      */
     @Transactional
-    public PostulacionEntity postular(Long idOferta, Long idFuncionario) {
+    public PostulacionEntity postular(Long idOferta) {
+        // SEC (C-02): el postulante siempre es quien está autenticado.
+        Long idFuncionario = seguridadServicio.idUsuarioActual();
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
 
@@ -129,7 +156,9 @@ public class OfertaGeneralService {
 
     /** Solo el propio postulante puede retirarse, y solo mientras la oferta siga {@code ABIERTA}. */
     @Transactional
-    public void retirarPostulacion(Long idPostulacion, Long idFuncionario) {
+    public void retirarPostulacion(Long idPostulacion) {
+        // SEC (C-02): solo el propio postulante autenticado puede retirar su postulación.
+        Long idFuncionario = seguridadServicio.idUsuarioActual();
         PostulacionEntity postulacion = postulacionRepository.findById(idPostulacion)
                 .orElseThrow(() -> new RuntimeException("Postulación no existe"));
 
@@ -156,12 +185,17 @@ public class OfertaGeneralService {
      * de leer el estado ABIERTA en paralelo) y luego relee con datos frescos gracias al lock.
      */
     @Transactional
-    public OfertaGeneralEntity seleccionarPostulante(Long idOferta, Long idPostulacion, Long idJefatura) {
+    public OfertaGeneralEntity seleccionarPostulante(Long idOferta, Long idPostulacion) {
         // Lock pesimista: si dos jefaturas seleccionan postulantes distintos para la misma oferta
         // al mismo tiempo, la segunda espera a que la primera termine (en vez de leer el estado
         // ABIERTA en paralelo) y luego relee con datos frescos gracias al propio lock.
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
+
+        // SEC (H-02, High): antes cualquier autenticado podía cerrar/seleccionar postulantes
+        // de ofertas de cualquier servicio, auto-asignándose turnos ajenos.
+        exigirMismoServicioQueOferta(oferta);
+        Long idJefatura = seguridadServicio.idUsuarioActual();
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.ABIERTA) {
             throw new RuntimeException("La oferta no está abierta");

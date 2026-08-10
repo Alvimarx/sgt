@@ -109,7 +109,7 @@ INSERT INTO feriados (fecha, descripcion) VALUES
 INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA) VALUES
 -- === Medicina Interna ===
 -- Jefatura → ADMINISTRADOR (1)
-(1,  'Álvaro',     'López',       '',           '17599096', '8', 1, 0, 'Médico Urgenciólogo',  1),
+(1,  'Admin',      'Bootstrap',   '',           '11111111', '1', 1, 0, 'Administrador de Sistema',  1),
 -- Médicos → USUARIO (2)
 (2,  'Fernando',   'Roman',       '',           '22222223', '3', 1, 0, 'Médico Internista',    2),
 (3,  'Sergio',     'González',    '',           '22222224', '4', 1, 0, 'Médico Internista',    2),
@@ -246,7 +246,7 @@ INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Es
 -- ==============================================================
 INSERT INTO Servicios_Funcionario (ID_FUNCIONARIO, id_servicio, id_rol_servicio) VALUES
 -- Medicina Interna (id_servicio = 1)
-(1,  1, 1),  -- Álvaro López        → JEFATURA (ADMINISTRADOR: accede al resto de servicios por código, sin membresía)
+(1,  1, 1),  -- Admin Bootstrap        → JEFATURA (ADMINISTRADOR: accede al resto de servicios por código, sin membresía)
 (2,  1, 3),
 (3,  1, 3),
 (4,  1, 3),
@@ -700,10 +700,10 @@ INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD,
  '2026-04-28 10:30:00', '2026-05-09 20:00:00', '2026-04-28 10:30:00', TRUE);
 
 -- ==============================================================
--- DEMO: Turnos de Álvaro López (ID_FUNCIONARIO=1) + relleno mayo
+-- DEMO: Turnos de Admin Bootstrap (ID_FUNCIONARIO=1) + relleno mayo
 -- ==============================================================
 INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_rotativa, id_tipo_turno) VALUES
--- Álvaro López – 10 turnos distribuidos en mayo 2026
+-- Admin Bootstrap – 10 turnos distribuidos en mayo 2026
 (36, '2026-05-05', '2026-05-05', '08:00:00', '20:00:00',  1, 1, 3, 1, 1),
 (37, '2026-05-06', '2026-05-07', '20:00:00', '08:00:00',  1, 1, 1, 1, 2),
 (38, '2026-05-09', '2026-05-09', '08:00:00', '20:00:00',  1, 1, 2, 1, 1),
@@ -732,7 +732,7 @@ INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, ho
 -- Tipo: 1=Permiso  2=Botar turno  3=Cobertura  4=Intercambio
 -- ==============================================================
 INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TURNO, ID_TURNO_RECEPTOR, ID_FUNCIONARIO_RECEPTOR, Aceptado_Receptor, Estado, Fecha_creacion, Fecha_inicio_permiso, Fecha_termino_permiso, Motivo) VALUES
--- (5) Álvaro pide permiso para su propio turno 36 (05-May diurno) — PENDIENTE
+-- (5) Admin pide permiso para su propio turno 36 (05-May diurno) — PENDIENTE
 (5, 1, 1, 36, NULL, NULL, NULL, 'PENDIENTE',
  '2026-05-02 08:30:00', '2026-05-05 08:00:00', '2026-05-05 20:00:00',
  'Congreso médico SOCHINMI — asistencia obligatoria como jefe de servicio'),
@@ -744,7 +744,7 @@ INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TUR
 (7, 9, 2, 8, NULL, NULL, NULL, 'PENDIENTE',
  '2026-05-10 16:00:00', NULL, NULL,
  'Acumulación de horas extra — solicito liberar el turno del 14-May'),
--- (8) Andrés Tigre (func 4) propone intercambio: ofrece turno 3 (07-May) por turno 40 (Álvaro, 15-May); Álvaro aceptó — PENDIENTE jefatura
+-- (8) Andrés Tigre (func 4) propone intercambio: ofrece turno 3 (07-May) por turno 40 (Admin, 15-May); Admin aceptó — PENDIENTE jefatura
 (8, 4, 4, 3, 40, 1, TRUE, 'PENDIENTE',
  '2026-05-05 09:00:00', NULL, NULL,
  'Necesito moverme al 15-May por asistencia a parto familiar'),
@@ -760,7 +760,7 @@ INSERT INTO Solicitudes (ID_SOLICITUD, ID_FUNCIONARIO, ID_TIPO_SOLICITUD, ID_TUR
 (11, 10, 3, 47, NULL, NULL, NULL, 'RECHAZADA',
  '2026-05-22 09:00:00', NULL, NULL,
  'Me ofrezco voluntariamente para cubrir el nocturno del 27-May'),
--- (12) María José Espinoza (func 8) propone intercambio: ofrece turno 7 (13-May) por turno 43 (Álvaro, 23-May); Álvaro aún no responde — PENDIENTE
+-- (12) María José Espinoza (func 8) propone intercambio: ofrece turno 7 (13-May) por turno 43 (Admin, 23-May); Admin aún no responde — PENDIENTE
 (12, 8, 4, 7, 43, 1, NULL, 'PENDIENTE',
  '2026-05-12 17:30:00', NULL, NULL,
  'Me conviene más el turno del 23-May, ofrezco mi turno del 13-May');
@@ -776,7 +776,7 @@ INSERT INTO Notificacion (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLI
 (7, 'NO_LEIDA', '2026-05-10 16:00:01',
  'Su solicitud para liberar el turno del 14-May ha sido recibida y está en revisión.', 7),
 (8, 'NO_LEIDA', '2026-05-05 09:00:01',
- 'El funcionario receptor (Álvaro López) ha aceptado el intercambio de turnos. Pendiente de aprobación por jefatura.', 8),
+ 'El funcionario receptor (Admin Bootstrap) ha aceptado el intercambio de turnos. Pendiente de aprobación por jefatura.', 8),
 (9, 'NO_LEIDA', '2026-05-20 10:30:01',
  'Su solicitud de cobertura del turno diurno 24-May ha sido recibida y está pendiente de asignación.', 9),
 (10, 'LEIDA',   '2026-05-14 14:00:01',
@@ -792,7 +792,7 @@ INSERT INTO Notificacion (ID_NOTIFICACION, Estado, Fecha_envio, Mensaje, ID_SOLI
 INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD, Tipo_evento, Motivo, Observaciones, Fecha_inicio_afectada, Fecha_fin_afectada, Fecha_modificacion, Activo) VALUES
 (5, 1,  NULL, 5,  'SOLICITUD_CREADA',
  'Permiso por congreso médico',
- 'Álvaro López — turno diurno 05-May (id=36), Pabellón MI. Solicita permiso como jefe de servicio.',
+ 'Admin Bootstrap — turno diurno 05-May (id=36), Pabellón MI. Solicita permiso como jefe de servicio.',
  '2026-05-02 08:30:00', NULL, '2026-05-02 08:30:00', TRUE),
 (6, 3,  NULL, 6,  'SOLICITUD_CREADA',
  'Permiso por reunión académica',
@@ -804,7 +804,7 @@ INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD,
  '2026-05-10 16:00:00', NULL, '2026-05-10 16:00:00', TRUE),
 (8, 4,  NULL, 8,  'OFERTA_ACEPTADA_POR_RECEPTOR',
  'Receptor acepta intercambio de turno',
- 'Func 4 (Andrés Tigre) ↔ Func 1 (Álvaro López): turno 07-May ↔ turno 15-May. Pendiente aprobación jefatura.',
+ 'Func 4 (Andrés Tigre) ↔ Func 1 (Admin Bootstrap): turno 07-May ↔ turno 15-May. Pendiente aprobación jefatura.',
  '2026-05-05 09:30:00', NULL, '2026-05-05 09:30:00', TRUE),
 (9, 7,  NULL, 9,  'SOLICITUD_CREADA',
  'Solicitud cobertura voluntaria',
@@ -812,15 +812,15 @@ INSERT INTO Bitacora_eventos (ID_EVENTO, ID_FUNCIONARIO, ID_TURNO, ID_SOLICITUD,
  '2026-05-20 10:30:00', NULL, '2026-05-20 10:30:00', TRUE),
 (10, 1, NULL, 10, 'CAMBIO_ESTADO_APROBADA',
  'Permiso aprobado por jefatura',
- 'Tomás Ide — turno diurno 21-May (id=48). Aprobado por Álvaro López.',
+ 'Tomás Ide — turno diurno 21-May (id=48). Aprobado por Admin Bootstrap.',
  '2026-05-14 15:00:00', '2026-05-21 20:00:00', '2026-05-14 15:00:00', TRUE),
 (11, 1, NULL, 11, 'CAMBIO_ESTADO_RECHAZADA',
  'Cobertura rechazada por jefatura',
  'Karla Rojas — turno libre nocturno 27-May (id=47). Rechazado: cobertura ya asignada internamente.',
  '2026-05-22 10:00:00', NULL, '2026-05-22 10:00:00', TRUE),
 (12, 8, NULL, 12, 'SOLICITUD_CREADA',
- 'Propuesta de intercambio enviada a Álvaro López',
- 'María José Espinoza ofrece turno 13-May (id=7) por turno 23-May de Álvaro (id=43). Pendiente respuesta receptor.',
+ 'Propuesta de intercambio enviada a Admin Bootstrap',
+ 'María José Espinoza ofrece turno 13-May (id=7) por turno 23-May de Admin (id=43). Pendiente respuesta receptor.',
  '2026-05-12 17:30:00', NULL, '2026-05-12 17:30:00', TRUE);
 
 -- ==============================================================
@@ -861,7 +861,7 @@ INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, ho
 -- ==============================================================
 INSERT INTO Turnos (id_turno, dia_inicio_turno, dia_final_turno, hora_inicio, hora_fin, ID_FUNCIONARIO, id_servicio, id_puesto, id_rotativa, id_tipo_turno) VALUES
 -- Medicina Interna (servicio 1)
-(60, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00',   1, 1, 3, 1, 1),  -- Álvaro López
+(60, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00',   1, 1, 3, 1, 1),  -- Admin Bootstrap
 (61, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00',   6, 1, 1, 1, 1),  -- Tania Bustos
 (62, '2026-06-05', '2026-06-06', '20:00:00', '08:00:00',   7, 1, 2, 1, 2),  -- Fabián Díaz
 (63, '2026-06-05', '2026-06-05', '08:00:00', '20:00:00', NULL, 1, 2, 1, 1),  -- libre

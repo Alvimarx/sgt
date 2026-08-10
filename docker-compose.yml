@@ -6,6 +6,22 @@ services:
     image: httpd:2.4-alpine
     container_name: huap-apache-lb
     restart: always
+    # SEC (M-17): mínimo privilegio a nivel de runtime del contenedor. Apache arranca como
+    # root para poder bindear los puertos privilegiados 80/443, y LUEGO baja privilegios a
+    # "daemon" para los workers vía "User/Group daemon" en httpd.conf. Esa bajada de
+    # privilegios la hace el propio proceso maestro llamando a setuid()/setgid() — por eso,
+    # además de NET_BIND_SERVICE (para bindear el puerto), hacen falta SETUID/SETGID.
+    # Sin ellas (regresión detectada y corregida): setgid falla con "Operation not permitted"
+    # y los workers quedan corriendo como root en vez de "daemon" — verificado con
+    # `docker top`/`ps aux` antes y después (ver REVISION_POST_CORRECCIONES_SGT.md).
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "5173:80" # Puerto 5173 externo -> 80 interno (puerto 80 bloqueado por router)
       - "443:443" # HTTPS (opcional, para producción)
@@ -44,6 +60,10 @@ services:
     image: huap-backend-1:latest
     container_name: huap-backend-1
     restart: always
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     expose:
       - "8080"
     environment:
@@ -80,6 +100,10 @@ services:
     image: huap-backend-2:latest
     container_name: huap-backend-2
     restart: always
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     expose:
       - "8080"
     environment:
@@ -116,6 +140,10 @@ services:
     image: huap-backend-3:latest
     container_name: huap-backend-3
     restart: always
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     expose:
       - "8080"
     environment:
@@ -159,6 +187,17 @@ services:
     image: huap-frontend-1:latest
     container_name: huap-frontend-1
     restart: always
+    # SEC (M-17): ver nota en apache-lb — httpd necesita NET_BIND_SERVICE (puerto 80) y
+    # SETUID/SETGID (para bajar los workers a "daemon"); sin estas dos últimas los workers
+    # quedan corriendo como root, que es la regresión que corrige este cap_add.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     expose:
       - "80"
     networks:
@@ -184,6 +223,17 @@ services:
     image: huap-frontend-2:latest
     container_name: huap-frontend-2
     restart: always
+    # SEC (M-17): ver nota en apache-lb — httpd necesita NET_BIND_SERVICE (puerto 80) y
+    # SETUID/SETGID (para bajar los workers a "daemon"); sin estas dos últimas los workers
+    # quedan corriendo como root, que es la regresión que corrige este cap_add.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     expose:
       - "80"
     networks:
@@ -209,6 +259,17 @@ services:
     image: huap-frontend-3:latest
     container_name: huap-frontend-3
     restart: always
+    # SEC (M-17): ver nota en apache-lb — httpd necesita NET_BIND_SERVICE (puerto 80) y
+    # SETUID/SETGID (para bajar los workers a "daemon"); sin estas dos últimas los workers
+    # quedan corriendo como root, que es la regresión que corrige este cap_add.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
     expose:
       - "80"
     networks:

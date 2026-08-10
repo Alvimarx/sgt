@@ -47,8 +47,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 Long userId = tokenProvider.getUserIdFromToken(jwt);
+                String rut = tokenProvider.getRutFromToken(jwt);
                 String rol = tokenProvider.getRolFromToken(jwt);
                 String rolSistema = tokenProvider.getRolSistemaFromToken(jwt);
+                Long servicioId = tokenProvider.getServicioIdFromToken(jwt);
 
                 // Autoridades: rol de servicio (JEFATURA/SUBROGANTE/MEDICO) +
                 // rol de sistema (ADMINISTRADOR/USUARIO), ambos como ROLE_<valor>.
@@ -56,7 +58,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (rol != null) authorities.add(new SimpleGrantedAuthority("ROLE_" + rol));
                 if (rolSistema != null) authorities.add(new SimpleGrantedAuthority("ROLE_" + rolSistema));
 
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userId,
+                // Principal enriquecido: antes solo se propagaba el userId, así que ningún
+                // controller/service podía validar el servicioId del recurso solicitado
+                // contra el servicioId real de la sesión (ver SeguridadServicio).
+                AuthenticatedUser principal = new AuthenticatedUser(userId, rut, rol, rolSistema, servicioId);
+
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal,
                         null, authorities);
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

@@ -1,11 +1,13 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
+import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -35,11 +37,16 @@ class TurnoServiceTest {
     @Mock private PuestoRepository puestoRepository;
     @Mock private FuncionarioRepository funcionarioRepository;
     @Mock private SolicitudRepository solicitudRepository;
+    @Mock private SeguridadServicio seguridadServicio;
 
     @InjectMocks private TurnoService turnoService;
 
     private static FuncionarioEntity func(long id) {
         return FuncionarioEntity.builder().idFuncionario(id).nombre("Juan").apelPat("Pérez").build();
+    }
+
+    private static ServicioEntity servicio(long id) {
+        return ServicioEntity.builder().idServicio(id).nombre("Servicio" + id).build();
     }
 
     private static TurnoEntity turno(FuncionarioEntity func, LocalDate di, LocalTime hi, LocalDate df, LocalTime hf) {
@@ -84,6 +91,35 @@ class TurnoServiceTest {
         when(turnoRepository.save(turnoExistente)).thenReturn(turnoExistente);
 
         assertSame(turnoExistente, turnoService.saveTurno(turnoExistente));
+    }
+
+    @Test
+    void save_turnoDeOtroServicio_noAdministrador_lanzaAccessDenied() throws Exception {
+        // item 9, punto 2: JEFATURA del servicio 100 no puede crear/editar un turno del servicio 200.
+        TurnoEntity turnoDeB = TurnoEntity.builder()
+                .servicio(servicio(200L))
+                .diaInicioTurno(LUNES).horaInicio(LocalTime.of(8, 0))
+                .diaFinalTurno(LUNES).horaFin(LocalTime.of(20, 0))
+                .build();
+        doThrow(new org.springframework.security.access.AccessDeniedException("No tienes acceso a datos de otro servicio"))
+                .when(seguridadServicio).exigirMismoServicio(200L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.saveTurno(turnoDeB));
+        verify(turnoRepository, never()).save(any());
+    }
+
+    @Test
+    void save_turnoDelPropioServicio_permitido() throws Exception {
+        TurnoEntity turnoDeA = TurnoEntity.builder()
+                .servicio(servicio(100L))
+                .diaInicioTurno(LUNES).horaInicio(LocalTime.of(8, 0))
+                .diaFinalTurno(LUNES).horaFin(LocalTime.of(20, 0))
+                .build();
+        when(turnoRepository.save(turnoDeA)).thenReturn(turnoDeA);
+
+        assertSame(turnoDeA, turnoService.saveTurno(turnoDeA));
+        verify(seguridadServicio).exigirMismoServicio(100L);
     }
 
     // ============================ computeUnionHours (vía getCoberturaRealByServicio) ============================

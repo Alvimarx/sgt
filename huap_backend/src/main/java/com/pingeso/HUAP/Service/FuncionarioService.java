@@ -435,6 +435,22 @@ public class FuncionarioService {
     }
 
     /**
+     * ¿El funcionario tiene una asignación vigente (no eliminada) al servicio indicado?
+     * Usado por {@code FuncionarioController.update} para impedir que una JEFATURA/SUBROGANTE
+     * edite a un funcionario de un servicio ajeno — la pertenencia se verifica siempre en BD,
+     * nunca a partir de un {@code servicioId} entregado por el cliente.
+     */
+    public boolean perteneceAServicio(Long idFuncionario, Long idServicio) {
+        if (idFuncionario == null || idServicio == null) return false;
+        FuncionarioEntity f = funcionarioRepository.findById(idFuncionario).orElse(null);
+        if (f == null || f.getServiciosFuncionario() == null) return false;
+        return f.getServiciosFuncionario().stream()
+                .anyMatch(sf -> sf.getServicio() != null
+                        && !sf.getServicio().isEliminado()
+                        && idServicio.equals(sf.getServicio().getIdServicio()));
+    }
+
+    /**
      * Servicios que el funcionario puede elegir al iniciar sesión.
      *
      * <p>Un {@code ADMINISTRADOR} ve <b>todos</b> los servicios vigentes aunque no sea miembro

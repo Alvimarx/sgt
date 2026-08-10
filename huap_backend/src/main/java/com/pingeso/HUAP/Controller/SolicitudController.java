@@ -11,7 +11,11 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -32,6 +36,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v2/solicitudes")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "Solicitudes",
         description = "Permisos, botar turno, cobertura, intercambio y oferta particular de turnos.")
 public class SolicitudController {
@@ -59,18 +64,18 @@ public class SolicitudController {
             @ApiResponse(responseCode = "200", description = "Respuesta registrada"),
     })
     @PutMapping("/{id}/oferta-particular")
-    public ResponseEntity<SolicitudEntity> responderOfertaParticular(@PathVariable Long id, @RequestParam Long idReceptor,
+    public ResponseEntity<SolicitudEntity> responderOfertaParticular(@PathVariable @Positive Long id,
             @RequestParam boolean respuesta) {
-        return ResponseEntity.ok(solicitudService.responderOfertaParticular(id, idReceptor, respuesta));
+        return ResponseEntity.ok(solicitudService.responderOfertaParticular(id, respuesta));
     }
 
     @Operation(summary = "Responder una solicitud de intercambio",
             description = "El funcionario receptor del intercambio acepta o rechaza. Igual que la oferta "
                     + "particular, aceptar no mueve los turnos: eso ocurre al aprobar con /estado.")
     @PutMapping("/{id}/intercambio")
-    public ResponseEntity<SolicitudEntity> responderIntercambio(@PathVariable Long id, @RequestParam Long idReceptor,
+    public ResponseEntity<SolicitudEntity> responderIntercambio(@PathVariable @Positive Long id,
             @RequestParam boolean respuesta) {
-        return ResponseEntity.ok(solicitudService.responderOfertaIntercambio(id, idReceptor, respuesta));
+        return ResponseEntity.ok(solicitudService.responderOfertaIntercambio(id, respuesta));
     }
 
     @Operation(summary = "Cambiar el estado de una solicitud",
@@ -85,9 +90,9 @@ public class SolicitudController {
             @ApiResponse(responseCode = "403", description = "Sin rol habilitado para cambiar el estado"),
     })
     @PutMapping("/{id}/estado")
-    public ResponseEntity<SolicitudEntity> cambiarEstado(@PathVariable Long id, @RequestParam SolicitudEntity.EstadoSolicitud nuevoEstado,
-            @RequestParam Long idUsuarioAsignador) {
-        return ResponseEntity.ok(solicitudService.cambiarEstado(id, nuevoEstado, idUsuarioAsignador));
+    public ResponseEntity<SolicitudEntity> cambiarEstado(@PathVariable @Positive Long id,
+            @RequestParam @NotNull SolicitudEntity.EstadoSolicitud nuevoEstado) {
+        return ResponseEntity.ok(solicitudService.cambiarEstado(id, nuevoEstado));
     }
 
     @Operation(summary = "Modificar el motivo de una solicitud",

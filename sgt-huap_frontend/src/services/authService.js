@@ -72,8 +72,6 @@ export const selectService = async (preAuthToken, servicioId) => {
             servicioNombre: servicioEncontrado ? servicioEncontrado.nombreServicio : 'Servicio Asignado'
         };
 
-        console.log("🚨 DATA DESDE AUTH SERVICE:", userData);
-
         saveUserData(userData);
 
         return { success: true, userData };

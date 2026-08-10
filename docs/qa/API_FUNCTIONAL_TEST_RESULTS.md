@@ -3,7 +3,7 @@
 Todas las pruebas se ejecutaron con `curl` contra `http://localhost:8080` (ambiente `docker-compose.dev.yml`), usando JWT reales obtenidos por login real contra datos de desarrollo (ver `QA_BASELINE.md`). Ninguna prueba modificó datos de producción. Cada fila es 100% reproducible con el comando indicado.
 
 Cuentas usadas:
-- **A (ADMINISTRADOR + JEFATURA todos los servicios):** Álvaro López, RUT `17599096-8`.
+- **A (ADMINISTRADOR + JEFATURA todos los servicios):** Admin Bootstrap, RUT `11111111-1`.
 - **M (MEDICO, solo servicios 1 y 3):** Fernando Roman, RUT `22222223-3`.
 - **J (JEFATURA puro, rolSistema=USUARIO, solo servicio 3):** Ricardo Morales Vega, RUT `11111111-1`.
 

@@ -6,6 +6,7 @@ import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class GestionTurnoService {
     private final BitacoraService bitacoraService;
     private final NotificacionService notificacionService;
     private final ServiciosFuncionarioRepository serviciosFuncionarioRepository;
+    private final SeguridadServicio seguridadServicio;
 
     /**
      * Kill-switch del lock pesimista (por defecto activado). Existe para poder medir A/B el costo del
@@ -61,8 +63,15 @@ public class GestionTurnoService {
                 throw new RuntimeException("El turno no tiene servicio asociado.");
         }
 
-        FuncionarioEntity admin = funcionarioRepository.findById(request.getIdAdministrador())
-                .orElseThrow(() -> new RuntimeException("Administrador no encontrado: " + request.getIdAdministrador()));
+        // SEC (H-06, High): antes se podía alterar (asignar/desasignar/reasignar/cambiar
+        // horas) un turno de un servicio ajeno con solo indicar su id.
+        seguridadServicio.exigirMismoServicio(turno.getServicio().getIdServicio());
+
+        // SEC (C-02, Critical): el administrador que ejecuta la acción SIEMPRE es quien está
+        // autenticado, nunca el idAdministrador del body — de lo contrario cualquiera podía
+        // alterar turnos atribuyendo la acción a un tercero en la bitácora.
+        FuncionarioEntity admin = funcionarioRepository.findById(seguridadServicio.idUsuarioActual())
+                .orElseThrow(() -> new RuntimeException("Administrador no encontrado"));
 
         FuncionarioEntity funcionarioAnterior = turno.getFuncionario();
 

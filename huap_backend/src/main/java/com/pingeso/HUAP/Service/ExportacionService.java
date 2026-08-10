@@ -90,12 +90,23 @@ public class ExportacionService {
         return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
+    /** Prefijos que Excel/LibreOffice/Google Sheets interpretan como inicio de fórmula (CWE-1236). */
+    private static final String CARACTERES_FORMULA = "=+-@\t\r";
+
     private String valor(Object valor) {
         if (valor == null) {
             return "";
         }
 
         String texto = String.valueOf(valor);
+        // SEC (C-03, Critical): sin esto, un campo de texto libre (ej. el motivo de una
+        // solicitud) que empiece con =, +, -, @, tab o retorno de carro se interpreta como
+        // fórmula al abrir el CSV en una hoja de cálculo — permite exfiltración de datos e
+        // incluso ejecución de comandos (DDE) en el equipo de quien exporta. Se antepone un
+        // apóstrofe para forzar que la celda se trate siempre como texto.
+        if (!texto.isEmpty() && CARACTERES_FORMULA.indexOf(texto.charAt(0)) >= 0) {
+            texto = "'" + texto;
+        }
         texto = texto.replace("\"", "\"\"");
 
         return "\"" + texto + "\"";

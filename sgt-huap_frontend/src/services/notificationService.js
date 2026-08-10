@@ -7,8 +7,9 @@
 import axiosInstance from '../utils/axiosConfig';
 import { getUserId as getUserIdFromToken } from '../utils/tokenManager';
 
-/** Obtiene el ID del funcionario autenticado (del token o del storage). @returns {number|string|null} */
-const getUserId = () => getUserIdFromToken() || localStorage.getItem('userId');
+/** Obtiene el ID del funcionario autenticado. @returns {number|string|null} */
+// SEC (H-11): sin respaldo a localStorage crudo (manipulable) — ver adminService.js.
+const getUserId = () => getUserIdFromToken();
 
 /**
  * Normaliza una notificación cruda de la API a la forma que consume la UI.

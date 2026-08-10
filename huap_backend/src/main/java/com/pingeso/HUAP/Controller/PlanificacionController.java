@@ -188,7 +188,8 @@ public class PlanificacionController {
 
     private Long actorIdActual() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return (auth != null && auth.getPrincipal() instanceof Long) ? (Long) auth.getPrincipal() : null;
+        return (auth != null && auth.getPrincipal() instanceof com.pingeso.HUAP.Security.AuthenticatedUser au)
+                ? au.id() : null;
     }
 
     // =========================================================================

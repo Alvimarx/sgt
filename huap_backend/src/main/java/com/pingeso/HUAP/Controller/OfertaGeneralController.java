@@ -6,6 +6,7 @@ import com.pingeso.HUAP.Entity.PostulacionEntity;
 import com.pingeso.HUAP.Service.OfertaGeneralService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,43 +41,45 @@ public class OfertaGeneralController {
     }
 
     @Operation(summary = "Aprobar una oferta",
-            description = "Pasa de PENDIENTE_APROBACION a ABIERTA, habilitando postulaciones.")
+            description = "Pasa de PENDIENTE_APROBACION a ABIERTA, habilitando postulaciones. "
+                    + "Requiere rol de gestión sobre el servicio del turno ofertado.")
     @PutMapping("/{id}/aprobar")
-    public ResponseEntity<OfertaGeneralEntity> aprobar(@PathVariable Long id, @RequestParam Long idJefatura) {
-        return ResponseEntity.ok(ofertaGeneralService.aprobarOferta(id, idJefatura));
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE')")
+    public ResponseEntity<OfertaGeneralEntity> aprobar(@PathVariable Long id) {
+        return ResponseEntity.ok(ofertaGeneralService.aprobarOferta(id));
     }
 
     @Operation(summary = "Rechazar una oferta",
             description = "Pasa de PENDIENTE_APROBACION a RECHAZADA.")
     @PutMapping("/{id}/rechazar")
-    public ResponseEntity<OfertaGeneralEntity> rechazar(@PathVariable Long id, @RequestParam Long idJefatura) {
-        return ResponseEntity.ok(ofertaGeneralService.rechazarOferta(id, idJefatura));
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE')")
+    public ResponseEntity<OfertaGeneralEntity> rechazar(@PathVariable Long id) {
+        return ResponseEntity.ok(ofertaGeneralService.rechazarOferta(id));
     }
 
     @Operation(summary = "Postular a una oferta abierta",
             description = "Solo si la oferta está ABIERTA. El ofertor no puede postular a su propia "
                     + "oferta, ni un funcionario postular dos veces a la misma.")
     @PostMapping("/{id}/postular")
-    public ResponseEntity<PostulacionEntity> postular(@PathVariable Long id, @RequestParam Long idFuncionario) {
-        return ResponseEntity.ok(ofertaGeneralService.postular(id, idFuncionario));
+    public ResponseEntity<PostulacionEntity> postular(@PathVariable Long id) {
+        return ResponseEntity.ok(ofertaGeneralService.postular(id));
     }
 
     @Operation(summary = "Retirar una postulación",
             description = "Solo el propio postulante, y solo mientras la oferta siga ABIERTA.")
     @DeleteMapping("/{id}/postular/{idPostulacion}")
-    public ResponseEntity<Void> retirarPostulacion(@PathVariable Long id, @PathVariable Long idPostulacion,
-            @RequestParam Long idFuncionario) {
-        ofertaGeneralService.retirarPostulacion(idPostulacion, idFuncionario);
+    public ResponseEntity<Void> retirarPostulacion(@PathVariable Long id, @PathVariable Long idPostulacion) {
+        ofertaGeneralService.retirarPostulacion(idPostulacion);
         return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Seleccionar un postulante",
             description = "Asigna el turno al postulante elegido y cierra la oferta (CERRADA). Requiere "
-                    + "que la oferta esté ABIERTA.")
+                    + "que la oferta esté ABIERTA y rol de gestión sobre el servicio del turno.")
     @PutMapping("/{id}/seleccionar/{idPostulacion}")
-    public ResponseEntity<OfertaGeneralEntity> seleccionar(@PathVariable Long id, @PathVariable Long idPostulacion,
-            @RequestParam Long idJefatura) {
-        return ResponseEntity.ok(ofertaGeneralService.seleccionarPostulante(id, idPostulacion, idJefatura));
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE')")
+    public ResponseEntity<OfertaGeneralEntity> seleccionar(@PathVariable Long id, @PathVariable Long idPostulacion) {
+        return ResponseEntity.ok(ofertaGeneralService.seleccionarPostulante(id, idPostulacion));
     }
 
     @Operation(summary = "Listar ofertas de un servicio")

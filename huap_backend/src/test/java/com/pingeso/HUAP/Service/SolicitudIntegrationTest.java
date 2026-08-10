@@ -103,6 +103,8 @@ class SolicitudIntegrationTest extends AbstractContainerTest {
         TurnoEntity turno = turnoVacante();
         TipoSolicitudEntity tipoCobertura = tipoSolicitud(3);
 
+        // El emisor se deriva del SecurityContext (C-02), ya no del DTO.
+        autenticarComo(emisor.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
         SolicitudEntity creada = solicitudService.crearSolicitud(dtoCobertura(emisor, turno, tipoCobertura));
 
         SolicitudEntity recargada = solicitudRepository.findById(creada.getIdSolicitud()).orElseThrow();
@@ -124,8 +126,13 @@ class SolicitudIntegrationTest extends AbstractContainerTest {
         TurnoEntity turno = turnoVacante();
         TipoSolicitudEntity tipoCobertura = tipoSolicitud(3);
 
+        autenticarComo(emisor.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
         SolicitudEntity creada = solicitudService.crearSolicitud(dtoCobertura(emisor, turno, tipoCobertura));
-        solicitudService.cambiarEstado(creada.getIdSolicitud(), APROBADA, jefe.getIdFuncionario());
+
+        // Aprueba un ADMINISTRADOR no participante (bypassa el scoping por servicio a propósito;
+        // el escenario "jefatura del mismo servicio, no participante" se cubre en SolicitudServiceTest).
+        autenticarComoAdministrador(jefe.getIdFuncionario());
+        solicitudService.cambiarEstado(creada.getIdSolicitud(), APROBADA);
 
         TurnoEntity turnoRecargado = turnoRepository.findById(turno.getIdTurno()).orElseThrow();
         assertThat(turnoRecargado.getFuncionario()).isNotNull();
@@ -145,11 +152,19 @@ class SolicitudIntegrationTest extends AbstractContainerTest {
         TipoSolicitudEntity tipoCobertura = tipoSolicitud(3);
         FuncionarioEntity jefe = funcionario();
 
-        SolicitudEntity ganadora = solicitudService.crearSolicitud(dtoCobertura(funcionario(), turno, tipoCobertura));
-        SolicitudEntity competidoraB = solicitudService.crearSolicitud(dtoCobertura(funcionario(), turno, tipoCobertura));
-        SolicitudEntity competidoraC = solicitudService.crearSolicitud(dtoCobertura(funcionario(), turno, tipoCobertura));
+        FuncionarioEntity emisorGanadora = funcionario();
+        FuncionarioEntity emisorB = funcionario();
+        FuncionarioEntity emisorC = funcionario();
 
-        solicitudService.cambiarEstado(ganadora.getIdSolicitud(), APROBADA, jefe.getIdFuncionario());
+        autenticarComo(emisorGanadora.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        SolicitudEntity ganadora = solicitudService.crearSolicitud(dtoCobertura(emisorGanadora, turno, tipoCobertura));
+        autenticarComo(emisorB.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        SolicitudEntity competidoraB = solicitudService.crearSolicitud(dtoCobertura(emisorB, turno, tipoCobertura));
+        autenticarComo(emisorC.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        SolicitudEntity competidoraC = solicitudService.crearSolicitud(dtoCobertura(emisorC, turno, tipoCobertura));
+
+        autenticarComoAdministrador(jefe.getIdFuncionario());
+        solicitudService.cambiarEstado(ganadora.getIdSolicitud(), APROBADA);
 
         SolicitudEntity ganadoraRecargada = solicitudRepository.findById(ganadora.getIdSolicitud()).orElseThrow();
         SolicitudEntity bRecargada = solicitudRepository.findById(competidoraB.getIdSolicitud()).orElseThrow();

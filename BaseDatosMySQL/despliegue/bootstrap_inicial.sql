@@ -10,8 +10,13 @@
 --   - Roles de sistema y de servicio (catálogos).
 --   - Tipos de solicitud y feriados (datos base del sistema).
 --   - Un servicio inicial "Administración" (landing de arranque).
---   - El administrador Álvaro López (RUT 17599096-8).
---   - Sus credenciales en el hospital (innhosp) → clave: huap2025.
+--   - Un administrador de arranque (RUT de ejemplo, ver INSERT abajo).
+--   - Sus credenciales se validan contra innhosp (vista viewPersonal), no aquí.
+--
+-- SEC: este RUT/nombre deben ser SIEMPRE datos de ejemplo, nunca los de un
+-- funcionario real — este script y su contraparte en innhosp quedan en el
+-- historial de git. Si necesitas bootstrapear con una persona real, hazlo a
+-- mano en el entorno real y NO lo commitees.
 --
 -- Es idempotente: se puede ejecutar varias veces sin duplicar.
 -- Requiere el ESQUEMA ya creado (schema_gestionturnos.sql + innhosp).
@@ -73,5 +78,5 @@ WHERE NOT EXISTS (SELECT 1 FROM servicios WHERE nombre = 'Administración');
 -- Administrador del sistema (ID_ROL_SISTEMA = 1 = ADMINISTRADOR).
 -- No requiere fila en Servicios_Funcionario: por ser ADMINISTRADOR ve todos los servicios.
 INSERT INTO Funcionario (Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA)
-SELECT 'Álvaro', 'López', '', '17599096', '8', 1, 0, 'Médico Urgenciólogo', 1
-WHERE NOT EXISTS (SELECT 1 FROM Funcionario WHERE Rut = '17599096' AND DV = '8');
+SELECT 'Admin', 'Bootstrap', '', '11111111', '1', 1, 0, 'Administrador de Sistema', 1
+WHERE NOT EXISTS (SELECT 1 FROM Funcionario WHERE Rut = '11111111' AND DV = '1');

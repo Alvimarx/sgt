@@ -5,6 +5,7 @@ import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +43,9 @@ public class TurnoService {
     @Autowired
     private SolicitudRepository solicitudRepository;
 
+    @Autowired
+    private SeguridadServicio seguridadServicio;
+
     /**
      * Kill-switch del lock pesimista sobre el funcionario (por defecto activado). Existe para poder
      * medir A/B el costo del lock contra la versión sin él (ver {@code LockBenchmark}). En producción
@@ -57,6 +61,16 @@ public class TurnoService {
             throw new Exception("No se encontró el turno con ID: " + id);
         }
         TurnoEntity turnoExistente = optTurno.get();
+
+        // SEC (H-06, High): antes, un SUBROGANTE/JEFATURA podía editar el turno de un
+        // servicio ajeno con solo cambiar el id en la URL. Se exige que el turno (y, si se
+        // reasigna, el servicio destino) pertenezcan al servicio de la sesión activa.
+        if (turnoExistente.getServicio() != null) {
+            seguridadServicio.exigirMismoServicio(turnoExistente.getServicio().getIdServicio());
+        }
+        if (turnoActualizado.getServicio() != null) {
+            seguridadServicio.exigirMismoServicio(turnoActualizado.getServicio().getIdServicio());
+        }
 
         turnoExistente.setDiaInicioTurno(turnoActualizado.getDiaInicioTurno());
         turnoExistente.setDiaFinalTurno(turnoActualizado.getDiaFinalTurno());
@@ -97,6 +111,13 @@ public class TurnoService {
     @Transactional
     public TurnoEntity saveTurno(TurnoEntity turno) throws Exception {
 
+        // SEC (H-06, High): el turno debe crearse en el servicio de la sesión activa
+        // (salvo ADMINISTRADOR) — antes se podía crear un turno directamente en un
+        // servicio ajeno con solo cambiar "idServicio" en el payload.
+        if (turno.getServicio() != null) {
+            seguridadServicio.exigirMismoServicio(turno.getServicio().getIdServicio());
+        }
+
         // 1. Validar conflictos de Funcionario (evitar que un médico esté en dos lugares a la vez)
         if (turno.getFuncionario() != null) {
             // Lock pesimista del funcionario ANTES del chequeo: serializa chequeo+inserción para un
@@ -131,6 +152,11 @@ public class TurnoService {
     public void eliminarTurno(Long id) throws Exception {
         TurnoEntity turno = turnoRepository.findById(id)
                 .orElseThrow(() -> new Exception("No se encontró el turno a eliminar con ID: " + id));
+        // SEC (H-06, High): antes cualquier SUBROGANTE/JEFATURA podía borrar turnos de un
+        // servicio ajeno con solo cambiar el id en la URL.
+        if (turno.getServicio() != null) {
+            seguridadServicio.exigirMismoServicio(turno.getServicio().getIdServicio());
+        }
         turno.setEliminado(true);
         turnoRepository.save(turno);
     }

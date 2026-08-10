@@ -8,7 +8,8 @@ import { hoyISOEnZonaHospital } from '../utils/dateUtils';
 
 
 const API_BASE = '/funcionarios';
-const getUserId = () => getUserIdFromToken() || localStorage.getItem('userId');
+// SEC (H-11): sin respaldo a localStorage crudo (manipulable) — ver adminService.js.
+const getUserId = () => getUserIdFromToken();
 
 const Rol_Medico = 3;
 

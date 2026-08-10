@@ -133,7 +133,8 @@ const CalendarView = ({
         esJefatura ||
         esSubrogante;
 
-    const servicioIdActivo = user?.servicioId || localStorage.getItem('servicioId');
+    // SEC (H-11): sin respaldo a localStorage crudo (manipulable) — ver adminService.js.
+    const servicioIdActivo = user?.servicioId;
 
     const puedeExportarServicioCompleto = puedeEditarAsignacionTurnos;
 

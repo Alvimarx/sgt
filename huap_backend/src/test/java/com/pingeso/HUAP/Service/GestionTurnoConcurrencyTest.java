@@ -17,6 +17,7 @@ import com.pingeso.HUAP.Repository.TurnoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -67,6 +68,7 @@ class GestionTurnoConcurrencyTest extends AbstractContainerTest {
 
     private Long turnoId;
     private Long adminId;
+    private Long servicioId;
     private final List<Long> candidatoIds = new ArrayList<>();
 
     @BeforeEach
@@ -74,6 +76,7 @@ class GestionTurnoConcurrencyTest extends AbstractContainerTest {
         RolSistemaEntity rolSistema = rolSistemaRepository.save(new RolSistemaEntity("MEDICO"));
         RolServicioEntity rolServicio = rolServicioRepository.save(new RolServicioEntity("MEDICO"));
         ServicioEntity servicio = servicioRepository.save(ServicioEntity.builder().nombre("Urgencias").build());
+        servicioId = servicio.getIdServicio();
 
         adminId = funcionarioRepository.save(nuevoFuncionario("ADMIN", rolSistema)).getIdFuncionario();
 
@@ -120,6 +123,9 @@ class GestionTurnoConcurrencyTest extends AbstractContainerTest {
                     req.setIdAdministrador(adminId);
                     req.setMotivo("test concurrencia");
 
+                    // SeguridadServicio.exigirMismoServicio (en alterarTurno) exige un
+                    // SecurityContext autenticado; ThreadLocal, se configura dentro del hilo.
+                    autenticarComo(adminId, "JEFATURA", "USUARIO", servicioId);
                     barrera.await(); // todos entran a alterarTurno casi al mismo tiempo
                     gestionTurnoService.alterarTurno(req);
                     exitos.incrementAndGet();
@@ -132,6 +138,7 @@ class GestionTurnoConcurrencyTest extends AbstractContainerTest {
                         rechazos.incrementAndGet();
                     }
                 } finally {
+                    SecurityContextHolder.clearContext();
                     fin.countDown();
                 }
             });

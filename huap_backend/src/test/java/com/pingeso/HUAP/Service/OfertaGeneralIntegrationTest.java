@@ -87,6 +87,8 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
         dto.setIdTurno(turno.getIdTurno());
         dto.setMotivo("No puedo cubrir");
 
+        // El ofertor se deriva del SecurityContext (C-02), ya no del DTO.
+        autenticarComo(ofertor.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
         OfertaGeneralEntity creada = ofertaGeneralService.crearOferta(dto);
 
         OfertaGeneralEntity recargada = ofertaGeneralRepository.findById(creada.getIdOfertaGeneral()).orElseThrow();
@@ -100,12 +102,16 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
     void aprobarOferta_pasaAAbiertaYPermitePostular() {
         FuncionarioEntity ofertor = funcionario();
         FuncionarioEntity postulante = funcionario();
+        FuncionarioEntity jefe = funcionario();
         TurnoEntity turno = turnoVacante();
         OfertaGeneralEntity oferta = ofertaGeneralRepository.save(OfertaGeneralEntity.builder()
                 .ofertor(ofertor).turno(turno).estado(PENDIENTE_APROBACION).build());
 
-        ofertaGeneralService.aprobarOferta(oferta.getIdOfertaGeneral(), funcionario().getIdFuncionario());
-        PostulacionEntity postulacion = ofertaGeneralService.postular(oferta.getIdOfertaGeneral(), postulante.getIdFuncionario());
+        autenticarComoAdministrador(jefe.getIdFuncionario());
+        ofertaGeneralService.aprobarOferta(oferta.getIdOfertaGeneral());
+
+        autenticarComo(postulante.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        PostulacionEntity postulacion = ofertaGeneralService.postular(oferta.getIdOfertaGeneral());
 
         assertThat(ofertaGeneralRepository.findById(oferta.getIdOfertaGeneral()).orElseThrow().getEstado()).isEqualTo(ABIERTA);
         assertThat(postulacion.getSeleccionado()).isFalse();
@@ -119,8 +125,9 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
         TurnoEntity turno = turnoVacante();
         OfertaGeneralEntity oferta = ofertaAbierta(ofertor, turno);
 
+        autenticarComo(ofertor.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
         assertThrows(RuntimeException.class,
-                () -> ofertaGeneralService.postular(oferta.getIdOfertaGeneral(), ofertor.getIdFuncionario()));
+                () -> ofertaGeneralService.postular(oferta.getIdOfertaGeneral()));
     }
 
     @Test
@@ -130,10 +137,11 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
         TurnoEntity turno = turnoVacante();
         OfertaGeneralEntity oferta = ofertaAbierta(ofertor, turno);
 
-        ofertaGeneralService.postular(oferta.getIdOfertaGeneral(), postulante.getIdFuncionario());
+        autenticarComo(postulante.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        ofertaGeneralService.postular(oferta.getIdOfertaGeneral());
 
         assertThrows(RuntimeException.class,
-                () -> ofertaGeneralService.postular(oferta.getIdOfertaGeneral(), postulante.getIdFuncionario()));
+                () -> ofertaGeneralService.postular(oferta.getIdOfertaGeneral()));
     }
 
     // ======================= seleccionarPostulante =======================
@@ -145,9 +153,11 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
         FuncionarioEntity jefe = funcionario();
         TurnoEntity turno = turnoVacante();
         OfertaGeneralEntity oferta = ofertaAbierta(ofertor, turno);
-        PostulacionEntity postulacion = ofertaGeneralService.postular(oferta.getIdOfertaGeneral(), postulante.getIdFuncionario());
+        autenticarComo(postulante.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        PostulacionEntity postulacion = ofertaGeneralService.postular(oferta.getIdOfertaGeneral());
 
-        ofertaGeneralService.seleccionarPostulante(oferta.getIdOfertaGeneral(), postulacion.getIdPostulacion(), jefe.getIdFuncionario());
+        autenticarComoAdministrador(jefe.getIdFuncionario());
+        ofertaGeneralService.seleccionarPostulante(oferta.getIdOfertaGeneral(), postulacion.getIdPostulacion());
 
         TurnoEntity turnoRecargado = turnoRepository.findById(turno.getIdTurno()).orElseThrow();
         assertThat(turnoRecargado.getFuncionario().getIdFuncionario()).isEqualTo(postulante.getIdFuncionario());
@@ -160,14 +170,17 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
         FuncionarioEntity ofertor1 = funcionario();
         FuncionarioEntity ofertor2 = funcionario();
         FuncionarioEntity postulante = funcionario();
+        FuncionarioEntity jefe = funcionario();
         TurnoEntity turno1 = turnoVacante();
         TurnoEntity turno2 = turnoVacante();
         OfertaGeneralEntity oferta1 = ofertaAbierta(ofertor1, turno1);
         OfertaGeneralEntity oferta2 = ofertaAbierta(ofertor2, turno2);
-        PostulacionEntity postulacionDeOferta2 = ofertaGeneralService.postular(oferta2.getIdOfertaGeneral(), postulante.getIdFuncionario());
+        autenticarComo(postulante.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        PostulacionEntity postulacionDeOferta2 = ofertaGeneralService.postular(oferta2.getIdOfertaGeneral());
 
+        autenticarComoAdministrador(jefe.getIdFuncionario());
         assertThrows(RuntimeException.class, () -> ofertaGeneralService.seleccionarPostulante(
-                oferta1.getIdOfertaGeneral(), postulacionDeOferta2.getIdPostulacion(), funcionario().getIdFuncionario()));
+                oferta1.getIdOfertaGeneral(), postulacionDeOferta2.getIdPostulacion()));
 
         assertThat(turnoRepository.findById(turno1.getIdTurno()).orElseThrow().getFuncionario()).isNull();
         assertThat(ofertaGeneralRepository.findById(oferta1.getIdOfertaGeneral()).orElseThrow().getEstado()).isEqualTo(ABIERTA);

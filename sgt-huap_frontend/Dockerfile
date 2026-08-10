@@ -31,10 +31,15 @@ FROM httpd:alpine
 COPY --from=build /app/dist /usr/local/apache2/htdocs/
 
 # Habilitar módulos necesarios y configurar SPA routing
+# SEC (M-14): "Options -Indexes" evita listado de directorios si el fallback no aplica;
+# "AllowOverride None" evita que un .htaccess (si alguien lograra escribir uno) reconfigure
+# Apache; ServerTokens/ServerSignature ocultan la versión del servidor en este vhost.
 RUN sed -i 's/#LoadModule rewrite_module/LoadModule rewrite_module/' /usr/local/apache2/conf/httpd.conf && \
+    echo 'ServerTokens Prod' >> /usr/local/apache2/conf/httpd.conf && \
+    echo 'ServerSignature Off' >> /usr/local/apache2/conf/httpd.conf && \
     echo '<Directory "/usr/local/apache2/htdocs">' >> /usr/local/apache2/conf/httpd.conf && \
-    echo '    Options Indexes FollowSymLinks' >> /usr/local/apache2/conf/httpd.conf && \
-    echo '    AllowOverride All' >> /usr/local/apache2/conf/httpd.conf && \
+    echo '    Options -Indexes +FollowSymLinks' >> /usr/local/apache2/conf/httpd.conf && \
+    echo '    AllowOverride None' >> /usr/local/apache2/conf/httpd.conf && \
     echo '    Require all granted' >> /usr/local/apache2/conf/httpd.conf && \
     echo '    FallbackResource /index.html' >> /usr/local/apache2/conf/httpd.conf && \
     echo '</Directory>' >> /usr/local/apache2/conf/httpd.conf

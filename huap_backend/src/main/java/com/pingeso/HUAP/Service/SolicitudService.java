@@ -3,6 +3,7 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.DTO.CrearSolicitudDTO;
 import com.pingeso.HUAP.Entity.*;
 import com.pingeso.HUAP.Repository.*;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class SolicitudService {
     private final TurnoRepository turnoRepository;
     private final BitacoraService bitacoraService;
     private final ValidadorAsignacionTurnoService validadorAsignacion;
+    private final SeguridadServicio seguridadServicio;
 
     @Transactional
     public List<SolicitudEntity> findAllSolicitudes() {
@@ -81,7 +83,11 @@ public class SolicitudService {
      */
     @Transactional
     public SolicitudEntity crearSolicitud(CrearSolicitudDTO dto) {
-        FuncionarioEntity funcionario = funcionarioRepository.findById(dto.getIdFuncionario())
+        // SEC (C-02, Critical): el emisor SIEMPRE es quien está autenticado, nunca el
+        // idFuncionario que venga en el DTO — de lo contrario cualquiera podía crear
+        // solicitudes atribuidas a un tercero.
+        Long idFuncionarioEmisor = seguridadServicio.idUsuarioActual();
+        FuncionarioEntity funcionario = funcionarioRepository.findById(idFuncionarioEmisor)
                 .orElseThrow(() -> new RuntimeException("Funcionario emisor no existe"));
 
         TipoSolicitudEntity tipoSolicitud = tipoSolicitudRepository.findById(dto.getIdTipoSolicitud())
@@ -197,7 +203,11 @@ public class SolicitudService {
      * en {@link #cambiarEstado}). Rechazar sí resuelve la solicitud directamente (RECHAZADA).
      */
     @Transactional
-    public SolicitudEntity responderOfertaParticular(Long idSolicitud, Long idReceptor, boolean acepta) {
+    public SolicitudEntity responderOfertaParticular(Long idSolicitud, boolean acepta) {
+        // SEC (C-02, Critical): el receptor SIEMPRE es quien está autenticado, nunca un
+        // idReceptor de query param — de lo contrario cualquiera podía aceptar/rechazar
+        // ofertas dirigidas a otro funcionario.
+        Long idReceptor = seguridadServicio.idUsuarioActual();
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
@@ -225,7 +235,10 @@ public class SolicitudService {
 
     /** Igual que {@link #responderOfertaParticular} pero para solicitudes de intercambio. */
     @Transactional
-    public SolicitudEntity responderOfertaIntercambio(Long idSolicitud, Long idReceptor, boolean acepta) {
+    public SolicitudEntity responderOfertaIntercambio(Long idSolicitud, boolean acepta) {
+        // SEC (C-02, Critical): igual que en responderOfertaParticular, el receptor se
+        // deriva del token, nunca del parámetro.
+        Long idReceptor = seguridadServicio.idUsuarioActual();
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
@@ -266,12 +279,61 @@ public class SolicitudService {
      * cualquier otra solicitud PENDIENTE que apunte al mismo turno.
      */
     @Transactional
-    public SolicitudEntity cambiarEstado(Long idSolicitud, SolicitudEntity.EstadoSolicitud nuevoEstado, Long idUsuarioAsignador) {
+    public SolicitudEntity cambiarEstado(Long idSolicitud, SolicitudEntity.EstadoSolicitud nuevoEstado) {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
 
+        // SEC (C-02, Critical): quien resuelve la solicitud SIEMPRE es quien está
+        // autenticado, nunca un idUsuarioAsignador de query param — de lo contrario
+        // cualquiera podía aprobar/rechazar solicitudes atribuyendo la acción a un tercero
+        // (falsificación de la bitácora de auditoría).
+        Long idUsuarioAsignador = seguridadServicio.idUsuarioActual();
         FuncionarioEntity asignador = funcionarioRepository.findById(idUsuarioAsignador).orElse(null);
+
         Integer tipoSolicitud = solicitud.getTipoSolicitud().getTipo();
+
+        // SEC (H-07, High): segregación de funciones completa — nadie con un interés directo
+        // en la operación (emisor, receptor/beneficiario, o dueño actual de cualquiera de los
+        // turnos involucrados) puede resolverla, sin excepción de rol: ni JEFATURA, ni
+        // SUBROGANTE, ni ADMINISTRADOR. El ADMINISTRADOR solo queda exento del chequeo de
+        // *servicio* (más abajo), nunca de este.
+        if (participantesDirectos(solicitud).contains(idUsuarioAsignador)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "No puedes aprobar ni rechazar una solicitud en la que participas directamente");
+        }
+
+        // SEC (H-07/H-01, High): la solicitud debe pertenecer al servicio de la sesión de
+        // quien la resuelve (salvo ADMINISTRADOR) — antes cualquier JEFATURA/SUBROGANTE
+        // podía resolver solicitudes de otro servicio. Los IDs de servicio se leen SIEMPRE
+        // desde las entidades cargadas de BD (turno/turnoReceptor/funcionario), nunca de
+        // parámetros del cliente.
+        if (!seguridadServicio.esAdministrador()) {
+            Long servicioSesion = seguridadServicio.idServicioActual();
+            if (Integer.valueOf(4).equals(tipoSolicitud)) {
+                // Intercambio: involucra DOS turnos que pueden pertenecer a servicios
+                // distintos. Ambos deben coincidir con el servicio del resolutor — de lo
+                // contrario, una jefatura del servicio del turno deseado podía aprobar un
+                // intercambio que también reasigna el turno entregado en un servicio ajeno
+                // que no controla.
+                Long servicioTurnoDeseado = servicioDe(solicitud.getTurno());
+                Long servicioTurnoEntregado = servicioDe(solicitud.getTurnoReceptor());
+                boolean ambosDelServicio = servicioTurnoDeseado != null && servicioTurnoDeseado.equals(servicioSesion)
+                        && servicioTurnoEntregado != null && servicioTurnoEntregado.equals(servicioSesion);
+                if (!ambosDelServicio) {
+                    throw new org.springframework.security.access.AccessDeniedException(
+                            "El intercambio involucra un turno de otro servicio");
+                }
+            } else {
+                boolean turnoDelServicio = solicitud.getTurno() != null
+                        && solicitud.getTurno().getServicio() != null
+                        && solicitud.getTurno().getServicio().getIdServicio().equals(servicioSesion);
+                boolean emisorDelServicio = funcionarioPerteneceAServicio(solicitud.getFuncionario(), servicioSesion);
+                if (!turnoDelServicio && !emisorDelServicio) {
+                    throw new org.springframework.security.access.AccessDeniedException(
+                            "No tienes acceso a solicitudes de otro servicio");
+                }
+            }
+        }
 
         if (nuevoEstado == SolicitudEntity.EstadoSolicitud.APROBADA) {
             // Serializa aprobaciones concurrentes que compiten por el/los mismo(s) turno(s):
@@ -341,6 +403,42 @@ public class SolicitudService {
         return guardada;
     }
 
+    /** ¿El funcionario tiene una asignación vigente al servicio indicado? */
+    private boolean funcionarioPerteneceAServicio(FuncionarioEntity funcionario, Long servicioId) {
+        if (funcionario == null || funcionario.getServiciosFuncionario() == null || servicioId == null) return false;
+        return funcionario.getServiciosFuncionario().stream()
+                .anyMatch(sf -> sf.getServicio() != null && servicioId.equals(sf.getServicio().getIdServicio()));
+    }
+
+    /** Id de servicio del turno, o {@code null} si el turno o su servicio no están cargados. */
+    private Long servicioDe(TurnoEntity turno) {
+        return (turno != null && turno.getServicio() != null) ? turno.getServicio().getIdServicio() : null;
+    }
+
+    /**
+     * Todos los funcionarios con un interés directo en la solicitud — emisor, receptor
+     * (intercambio/oferta particular), y dueño actual de cada turno involucrado — ninguno de
+     * ellos puede resolverla (aprobar/rechazar), sea cual sea su rol (SEC H-07).
+     */
+    private java.util.Set<Long> participantesDirectos(SolicitudEntity solicitud) {
+        java.util.Set<Long> ids = new java.util.HashSet<>();
+        agregarIdSiPresente(ids, solicitud.getFuncionario());
+        agregarIdSiPresente(ids, solicitud.getFuncionarioReceptor());
+        if (solicitud.getTurno() != null) {
+            agregarIdSiPresente(ids, solicitud.getTurno().getFuncionario());
+        }
+        if (solicitud.getTurnoReceptor() != null) {
+            agregarIdSiPresente(ids, solicitud.getTurnoReceptor().getFuncionario());
+        }
+        return ids;
+    }
+
+    private void agregarIdSiPresente(java.util.Set<Long> ids, FuncionarioEntity funcionario) {
+        if (funcionario != null && funcionario.getIdFuncionario() != null) {
+            ids.add(funcionario.getIdFuncionario());
+        }
+    }
+
     private void lockTurnosInvolucrados(SolicitudEntity solicitud, Integer tipoSolicitud) {
         if (Integer.valueOf(4).equals(tipoSolicitud)) {
             Long idTurnoDeseado = solicitud.getTurno() != null ? solicitud.getTurno().getIdTurno() : null;
@@ -368,13 +466,22 @@ public class SolicitudService {
                 });
     }
 
-    /** Solo permitido mientras la solicitud está {@code PENDIENTE}. */
+    /** Solo permitido mientras la solicitud está {@code PENDIENTE}, y solo por quien la emitió. */
     @Transactional
     public SolicitudEntity modificarMotivo(Long idSolicitud, String nuevoMotivo) {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
         if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
             throw new RuntimeException("Solo se puede modificar el motivo si la solicitud está en estado PENDIENTE");
+        }
+        // SEC (IDOR): sin esto, cualquier usuario autenticado podía reescribir el motivo de
+        // la solicitud de otro funcionario.
+        Long idActual = seguridadServicio.idUsuarioActual();
+        boolean esEmisor = solicitud.getFuncionario() != null
+                && idActual.equals(solicitud.getFuncionario().getIdFuncionario());
+        if (!esEmisor && !seguridadServicio.esAdministrador()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Solo quien emitió la solicitud puede modificar su motivo");
         }
         solicitud.setMotivo(nuevoMotivo);
         return solicitudRepository.save(solicitud);

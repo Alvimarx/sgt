@@ -5,7 +5,10 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 # Etapa 2: Ejecución (Java 21 Alpine)
-FROM eclipse-temurin:21-jdk-alpine
+# SEC (L-08): JRE en vez de JDK — el runtime no necesita compilador ni herramientas de
+# desarrollo (javac, jdb, jstack), que solo amplían la superficie útil a un atacante
+# post-explotación.
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 

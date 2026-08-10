@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.*;
 
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.ServiciosFuncionarioEntity;
+import com.pingeso.HUAP.Security.AuthenticatedUser;
 import com.pingeso.HUAP.Security.JwtTokenProvider;
 import com.pingeso.HUAP.Security.LoginAttemptService;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import com.pingeso.HUAP.Service.FuncionarioService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,6 +51,9 @@ public class FuncionarioController {
 
     @Autowired
     private LoginAttemptService loginAttemptService;
+
+    @Autowired
+    private SeguridadServicio seguridadServicio;
 
     // ====================================================================
     // AUTENTICACIÓN Y SESIÓN
@@ -187,11 +192,19 @@ public class FuncionarioController {
      * Obtiene el resumen de funcionarios, opcionalmente filtrado por servicio.
      */
     @Operation(summary = "Resumen de funcionarios",
-            description = "Lista los funcionarios (opcionalmente filtrados por servicio) en formato resumido.")
-        @GetMapping("/summary")
+            description = "Lista los funcionarios del servicio de la sesión activa en formato resumido. "
+                    + "Solo ADMINISTRADOR puede omitir el filtro (o pedir otro servicio) para ver el listado global.")
+    @GetMapping("/summary")
     public ResponseEntity<List<FuncionarioSummaryDTO>> getAllSummary(
             @RequestParam(required = false) Long servicioId) {
-        return ResponseEntity.ok(funcionarioService.getAllUserSummaryByServicio(servicioId));
+        // SEC: sin esto, cualquier autenticado podía leer la nómina de CUALQUIER servicio
+        // (o de todo el hospital, omitiendo el parámetro) cambiando/quitando servicioId.
+        Long alcance = servicioId;
+        if (!seguridadServicio.esAdministrador()) {
+            alcance = (servicioId != null) ? servicioId : seguridadServicio.idServicioActual();
+            seguridadServicio.exigirMismoServicio(alcance);
+        }
+        return ResponseEntity.ok(funcionarioService.getAllUserSummaryByServicio(alcance));
     }
 
 
@@ -213,44 +226,112 @@ public class FuncionarioController {
     @Operation(summary = "Disponibilidad de funcionarios de un servicio")
     @GetMapping("/disponibilidad/{servicioId}")
     public ResponseEntity<Map<String, Object>> getDisponibilidad(@PathVariable Long servicioId) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         return ResponseEntity.ok(funcionarioService.getAvailabilityByServicio(servicioId));
     }
 
     /**
      * Actualiza los datos de un funcionario, respetando reglas de permisos para modificar
      * su propio perfil o delegar cambios de rol/estado a usuarios con privilegios.
+     *
+     * <p>SEC (alcance entre servicios): JEFATURA/SUBROGANTE solo pueden editar funcionarios
+     * que pertenezcan a SU servicio autenticado — la pertenencia se verifica contra las
+     * relaciones {@code Servicios_Funcionario} reales en BD (nunca contra el {@code servicioId}
+     * que venga en la URL/body). Antes, cualquier JEFATURA podía editar (nombre, estado, etc.)
+     * a un funcionario de OTRO servicio con solo cambiar el id en la URL.
+     *
+     * <p>Nota de diseño (campos globales — documentado, no resuelto por esquema): {@code nombre},
+     * {@code apellidoPaterno}, {@code apellidoMaterno} y {@code estado} son atributos del
+     * funcionario como persona, no de una relación específica con un servicio. Si el
+     * funcionario pertenece a más de un servicio, una JEFATURA de CUALQUIERA de esos
+     * servicios (verificada como perteneciente) puede modificar estos campos, y el cambio se
+     * refleja en todos los servicios donde participa. Cerrar esto por completo requeriría un
+     * cambio de modelo de datos (campos por-servicio) fuera del alcance autorizado en esta
+     * etapa; se documenta como limitación conocida en REVISION_POST_CORRECCIONES_SGT.md. El
+     * campo {@code servicioId}+{@code rol} (la relación de servicio en sí) SÍ queda
+     * estrictamente limitado a la relación del servicio autenticado (ver más abajo).
      */
     @Operation(summary = "Actualizar un funcionario",
-            description = "Un usuario solo puede modificar su propio registro; solo JEFATURA/ADMINISTRADOR "
-                    + "pueden cambiar el rol o el estado de otro funcionario.")
+            description = "Un usuario solo puede modificar su propio registro. JEFATURA/SUBROGANTE pueden "
+                    + "además modificar (incl. rol/estado) funcionarios de SU MISMO servicio; ADMINISTRADOR, "
+                    + "de cualquier servicio.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funcionario actualizado"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
-            @ApiResponse(responseCode = "403", description = "Sin permiso para modificar a otro funcionario o su rol/estado"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso para modificar a este funcionario, su rol/estado, o de otro servicio"),
             @ApiResponse(responseCode = "404", description = "Funcionario no encontrado")
     })
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> payload) {
+            @RequestBody(required = false) Map<String, Object> payload) {
+
+        // SEC (item 7, Bean Validation mínima): id inválido o body ausente/vacío antes de
+        // tocar seguridad/negocio — evita NPE/estado inconsistente más abajo.
+        if (id == null || id <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "id de funcionario inválido"));
+        }
+        if (payload == null || payload.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No se recibieron campos para actualizar"));
+        }
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getPrincipal() == null) {
+        if (auth == null || !(auth.getPrincipal() instanceof AuthenticatedUser current)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        Long currentUserId = (Long) auth.getPrincipal();
-        boolean isJefatura = auth.getAuthorities().stream()
-                .anyMatch(a -> ("ROLE_JEFATURA".equals(a.getAuthority()) || "ROLE_ADMINISTRADOR".equals(a.getAuthority())));
+        Long currentUserId = current.id();
+        boolean isAdmin = current.esAdministrador();
+        // SEC (item 5): SUBROGANTE se equipara a JEFATURA para esta operación — igual que ya
+        // ocurre en SecurityConfig.SERVICE_ADMIN_PATHS para puestos/turnos/reglas-servicio.
+        // Antes SUBROGANTE quedaba excluido aquí (solo podía editar su propio registro), una
+        // inconsistencia respecto al resto de la administración por servicio.
+        boolean isGestionServicio = isAdmin || "JEFATURA".equals(current.rol()) || "SUBROGANTE".equals(current.rol());
 
-        // Ownership: quien no es JEFATURA solo puede modificar su propio registro.
-        if (!isJefatura && !currentUserId.equals(id)) {
+        // Ownership: quien no gestiona un servicio solo puede modificar su propio registro.
+        if (!isGestionServicio && !currentUserId.equals(id)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "No tienes permiso para modificar a otro funcionario"));
         }
-        // Escalada de privilegios: solo JEFATURA puede cambiar el rol.
-        if (!isJefatura && (payload.containsKey("rol") || payload.containsKey("estado"))) {
+        // SEC: JEFATURA/SUBROGANTE editando a OTRO funcionario (no a sí mismos) deben
+        // verificar que ese funcionario pertenezca a su propio servicio — en BD, no por lo
+        // que diga el cliente. ADMINISTRADOR queda exento (alcance global legítimo).
+        if (isGestionServicio && !isAdmin && !currentUserId.equals(id)) {
+            Long servicioSesion = seguridadServicio.idServicioActual();
+            if (!funcionarioService.perteneceAServicio(id, servicioSesion)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "No tienes permiso para modificar a un funcionario de otro servicio"));
+            }
+        }
+        // Escalada de privilegios: solo JEFATURA/SUBROGANTE puede cambiar el rol o el estado.
+        if (!isGestionServicio && (payload.containsKey("rol") || payload.containsKey("estado"))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "No tienes permiso para cambiar el rol o el estado"));
+        }
+        // SEC (C-01, Critical): el rut es el identificador que vincula al funcionario con
+        // su identidad real en el hospital (viewPersonal) — nadie puede reasignarlo salvo
+        // ADMINISTRADOR, para no habilitar suplantación de identidad entre funcionarios.
+        if (!isAdmin && payload.containsKey("rut")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "No tienes permiso para cambiar el RUT"));
+        }
+        // SEC (C-01, Critical): antes, una JEFATURA de CUALQUIER servicio podía asignar a
+        // cualquier funcionario (incluida su propia cuenta) como JEFATURA de un servicio
+        // ajeno, cambiando solo "servicioId" en el body — escalada de privilegios entre
+        // servicios. Ahora el servicio destino debe coincidir con el de la sesión activa
+        // de quien hace el cambio, salvo que sea ADMINISTRADOR. Como el service solo toca la
+        // relación cuyo servicioId coincide con este valor, esto también impide crear o
+        // modificar relaciones de OTROS servicios (Servicios_Funcionario de un tercero).
+        if (!isAdmin && payload.containsKey("servicioId")) {
+            Long servicioDestino;
+            try {
+                servicioDestino = Long.valueOf(payload.get("servicioId").toString());
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "servicioId inválido"));
+            }
+            if (servicioDestino <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "servicioId inválido"));
+            }
+            seguridadServicio.exigirMismoServicio(servicioDestino);
         }
 
         FuncionarioSummaryDTO updated = funcionarioService.updateUser(id, payload);
@@ -330,8 +411,7 @@ public class FuncionarioController {
             description = "Genera un nuevo JWT para otro servicio al que el funcionario autenticado tenga acceso.")
     @PostMapping("/switch-service")
     public ResponseEntity<?> switchService(@RequestBody SelectServiceRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        Long idFuncionario = (Long) auth.getPrincipal();
+        Long idFuncionario = seguridadServicio.idUsuarioActual();
 
         FuncionarioEntity usuario = funcionarioService.findById(idFuncionario);
         if (usuario == null) {
@@ -387,7 +467,9 @@ public class FuncionarioController {
             @ApiResponse(responseCode = "500", description = "Error interno")
     })
     @PostMapping("/register/{rut}")
-    @PreAuthorize("hasAnyRole('ROLE_JEFATURA','ROLE_ADMINISTRADOR')") // Spring se encarga del 403/401 automáticamente si no tiene el rol
+    // SEC (L-01): hasAnyRole ya antepone "ROLE_" — con el prefijo duplicado esta regla
+    // nunca se cumplía (nadie podía registrar personal, fail-closed mudo).
+    @PreAuthorize("hasAnyRole('JEFATURA','ADMINISTRADOR')")
     public ResponseEntity<Long> registerPersonal(@PathVariable String rut) {
         try {
             Long newId = funcionarioService.registerPersonal(rut);

@@ -68,6 +68,13 @@ public class BitacoraService {
     }
 
     public BitacoraEntity save(BitacoraEntity evento) {
+        // SEC (H-03, High): la bitácora es append-only. Sin este chequeo, enviar el
+        // idEvento de un registro existente hace que JPA lo sobrescriba (merge) en vez de
+        // insertar uno nuevo, permitiendo borrar o falsificar evidencia de auditoría.
+        if (evento.getIdEvento() != null) {
+            throw new IllegalArgumentException(
+                    "La bitácora es de solo escritura (append-only); no se puede modificar un evento existente");
+        }
         if (evento.getFechaModificacion() == null) {
             evento.setFechaModificacion(LocalDateTime.now());
         }

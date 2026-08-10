@@ -7,15 +7,22 @@
  *
  * Cada método envuelve una llamada HTTP (Axios) a un endpoint `/api/v2/...`. El comentario
  * sobre cada método indica el endpoint exacto que invoca. El `servicioId`/`userId` se
- * resuelven desde el token JWT (con respaldo en localStorage) cuando no se pasan como argumento.
+ * resuelven exclusivamente desde los datos de sesión guardados al autenticarse (derivados
+ * del JWT devuelto por el backend) cuando no se pasan como argumento.
+ *
+ * SEC (H-11): antes había un respaldo directo a `localStorage.getItem('servicioId'/'userId')`
+ * — una clave cruda que cualquier usuario puede escribir desde la consola del navegador. Se
+ * quitó: el backend igualmente ignora estos valores y deriva todo del JWT firmado (ver
+ * SeguridadServicio en el backend), pero mantenerlo en el cliente invitaba a manipulación
+ * sin ningún beneficio funcional real.
  */
 import axiosInstance from '../utils/axiosConfig';
 import { getServicioId as getServicioIdFromToken, getUserId as getUserIdFromToken } from '../utils/tokenManager';
 
-/** @returns {number|string|null} Servicio activo del token o del storage. */
-const getServicioId = () => getServicioIdFromToken() || localStorage.getItem('servicioId');
-/** @returns {number|string|null} ID del usuario del token o del storage. */
-const getUserId    = () => getUserIdFromToken()    || localStorage.getItem('userId');
+/** @returns {number|string|null} Servicio activo de la sesión actual. */
+const getServicioId = () => getServicioIdFromToken();
+/** @returns {number|string|null} ID del usuario de la sesión actual. */
+const getUserId    = () => getUserIdFromToken();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FUNCIONARIOS  →  /api/v2/funcionarios

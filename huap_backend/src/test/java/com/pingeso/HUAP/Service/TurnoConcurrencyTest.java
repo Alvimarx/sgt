@@ -12,6 +12,7 @@ import com.pingeso.HUAP.Repository.TurnoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -77,6 +78,10 @@ class TurnoConcurrencyTest extends AbstractContainerTest {
         for (int i = 0; i < hilos; i++) {
             pool.submit(() -> {
                 try {
+                    // SeguridadServicio.exigirMismoServicio (en TurnoService.saveTurno) exige un
+                    // SecurityContext autenticado; es ThreadLocal, así que se configura DENTRO de
+                    // cada hilo del pool, no en el hilo principal antes del submit.
+                    autenticarComo(funcionario.getIdFuncionario(), "JEFATURA", "USUARIO", servicio.getIdServicio());
                     barrera.await(); // todos cruzan el chequeo casi al mismo tiempo
                     TurnoEntity t = TurnoEntity.builder()
                             .servicio(servicio).funcionario(funcionario)
@@ -88,6 +93,7 @@ class TurnoConcurrencyTest extends AbstractContainerTest {
                 } catch (Exception e) {
                     rechazos.incrementAndGet(); // conflicto detectado (lo deseable para todos menos uno)
                 } finally {
+                    SecurityContextHolder.clearContext();
                     fin.countDown();
                 }
             });

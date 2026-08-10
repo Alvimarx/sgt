@@ -7,6 +7,7 @@ import com.pingeso.HUAP.Repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -91,6 +92,8 @@ class SolicitudConcurrencyTest extends AbstractContainerTest {
         dto.setIdFuncionario(emisor.getIdFuncionario());
         dto.setIdTipoSolicitud(tipo.getIdTipoSolicitud());
         dto.setIdTurno(turno.getIdTurno());
+        // El emisor se deriva del SecurityContext (C-02): autenticar como él antes de crear.
+        autenticarComo(emisor.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
         return solicitudService.crearSolicitud(dto);
     }
 
@@ -112,22 +115,28 @@ class SolicitudConcurrencyTest extends AbstractContainerTest {
         CyclicBarrier barrera = new CyclicBarrier(2); // arranque simultáneo de ambos hilos
         CountDownLatch fin = new CountDownLatch(2);
 
+        // SecurityContextHolder es ThreadLocal por defecto: autenticar dentro de cada hilo, no
+        // en el hilo principal antes del submit (ahí no se propagaría a los workers del pool).
         pool.submit(() -> {
             try {
+                autenticarComo(jefeA.getIdFuncionario(), "JEFATURA", "USUARIO", servicio.getIdServicio());
                 barrera.await();
-                solicitudService.cambiarEstado(solicitudA.getIdSolicitud(), APROBADA, jefeA.getIdFuncionario());
+                solicitudService.cambiarEstado(solicitudA.getIdSolicitud(), APROBADA);
             } catch (Exception ignored) {
                 // Una excepción de negocio es un resultado aceptable para el hilo perdedor.
             } finally {
+                SecurityContextHolder.clearContext();
                 fin.countDown();
             }
         });
         pool.submit(() -> {
             try {
+                autenticarComo(jefeB.getIdFuncionario(), "JEFATURA", "USUARIO", servicio.getIdServicio());
                 barrera.await();
-                solicitudService.cambiarEstado(solicitudB.getIdSolicitud(), APROBADA, jefeB.getIdFuncionario());
+                solicitudService.cambiarEstado(solicitudB.getIdSolicitud(), APROBADA);
             } catch (Exception ignored) {
             } finally {
+                SecurityContextHolder.clearContext();
                 fin.countDown();
             }
         });
@@ -171,19 +180,23 @@ class SolicitudConcurrencyTest extends AbstractContainerTest {
 
         Runnable aprobar = () -> {
             try {
+                autenticarComo(jefe1.getIdFuncionario(), "JEFATURA", "USUARIO", servicio.getIdServicio());
                 barrera.await();
-                solicitudService.cambiarEstado(solicitud.getIdSolicitud(), APROBADA, jefe1.getIdFuncionario());
+                solicitudService.cambiarEstado(solicitud.getIdSolicitud(), APROBADA);
             } catch (Exception ignored) {
             } finally {
+                SecurityContextHolder.clearContext();
                 fin.countDown();
             }
         };
         Runnable aprobarOtroJefe = () -> {
             try {
+                autenticarComo(jefe2.getIdFuncionario(), "JEFATURA", "USUARIO", servicio.getIdServicio());
                 barrera.await();
-                solicitudService.cambiarEstado(solicitud.getIdSolicitud(), APROBADA, jefe2.getIdFuncionario());
+                solicitudService.cambiarEstado(solicitud.getIdSolicitud(), APROBADA);
             } catch (Exception ignored) {
             } finally {
+                SecurityContextHolder.clearContext();
                 fin.countDown();
             }
         };

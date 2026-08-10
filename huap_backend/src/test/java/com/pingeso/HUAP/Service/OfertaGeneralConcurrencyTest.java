@@ -6,6 +6,7 @@ import com.pingeso.HUAP.Repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -91,29 +92,36 @@ class OfertaGeneralConcurrencyTest extends AbstractContainerTest {
         oferta.setEstado(ABIERTA);
         oferta = ofertaGeneralRepository.save(oferta);
 
-        PostulacionEntity postA = ofertaGeneralService.postular(oferta.getIdOfertaGeneral(), postulanteA.getIdFuncionario());
-        PostulacionEntity postB = ofertaGeneralService.postular(oferta.getIdOfertaGeneral(), postulanteB.getIdFuncionario());
+        autenticarComo(postulanteA.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        PostulacionEntity postA = ofertaGeneralService.postular(oferta.getIdOfertaGeneral());
+        autenticarComo(postulanteB.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
+        PostulacionEntity postB = ofertaGeneralService.postular(oferta.getIdOfertaGeneral());
 
         Long idOferta = oferta.getIdOfertaGeneral();
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CyclicBarrier barrera = new CyclicBarrier(2); // arranque simultáneo de ambos hilos
         CountDownLatch fin = new CountDownLatch(2);
 
+        // SecurityContextHolder es ThreadLocal: autenticar dentro de cada hilo del pool.
         pool.submit(() -> {
             try {
+                autenticarComo(jefeA.getIdFuncionario(), "JEFATURA", "USUARIO", servicio.getIdServicio());
                 barrera.await();
-                ofertaGeneralService.seleccionarPostulante(idOferta, postA.getIdPostulacion(), jefeA.getIdFuncionario());
+                ofertaGeneralService.seleccionarPostulante(idOferta, postA.getIdPostulacion());
             } catch (Exception ignored) {
             } finally {
+                SecurityContextHolder.clearContext();
                 fin.countDown();
             }
         });
         pool.submit(() -> {
             try {
+                autenticarComo(jefeB.getIdFuncionario(), "JEFATURA", "USUARIO", servicio.getIdServicio());
                 barrera.await();
-                ofertaGeneralService.seleccionarPostulante(idOferta, postB.getIdPostulacion(), jefeB.getIdFuncionario());
+                ofertaGeneralService.seleccionarPostulante(idOferta, postB.getIdPostulacion());
             } catch (Exception ignored) {
             } finally {
+                SecurityContextHolder.clearContext();
                 fin.countDown();
             }
         });

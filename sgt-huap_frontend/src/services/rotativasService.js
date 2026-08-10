@@ -4,7 +4,8 @@
 import axiosInstance from '../utils/axiosConfig';
 import { getServicioId as getServicioIdFromToken } from '../utils/tokenManager';
 
-const getServicioId = () => getServicioIdFromToken() || localStorage.getItem('servicioId');
+// SEC (H-11): sin respaldo a localStorage crudo (manipulable) — ver adminService.js.
+const getServicioId = () => getServicioIdFromToken();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UTILIDADES DE FORMATO

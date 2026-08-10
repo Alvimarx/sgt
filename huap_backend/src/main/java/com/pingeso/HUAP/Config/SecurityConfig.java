@@ -107,11 +107,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, SERVICE_ADMIN_PATHS).hasAnyRole("ADMINISTRADOR", "JEFATURA", "SUBROGANTE")
                         .requestMatchers(HttpMethod.DELETE, SERVICE_ADMIN_PATHS).hasAnyRole("ADMINISTRADOR", "JEFATURA", "SUBROGANTE")
 
-                        // --- Solicitudes: cualquier rol autenticado ---
+                        // --- Solicitudes ---
+                        // SEC (H-07): aprobar/rechazar es una función de gestión — antes incluía
+                        // MEDICO, lo que permitía auto-aprobación (cerrado además en el service
+                        // con la verificación de que el aprobador no sea el propio emisor).
                         .requestMatchers(HttpMethod.PUT, "/api/v2/solicitudes/*/estado")
-                        .hasAnyRole("JEFATURA", "SUBROGANTE", "MEDICO")
+                        .hasAnyRole("ADMINISTRADOR", "JEFATURA", "SUBROGANTE")
+                        // Responder una oferta/intercambio dirigido a uno mismo sí es de cualquier rol.
                         .requestMatchers(HttpMethod.PUT, "/api/v2/solicitudes/*/intercambio")
-                        .hasAnyRole("JEFATURA", "SUBROGANTE", "MEDICO")
+                        .hasAnyRole("ADMINISTRADOR", "JEFATURA", "SUBROGANTE", "MEDICO")
 
                         // --- Todo lo demás requiere autenticación ---
                         .anyRequest().authenticated());
