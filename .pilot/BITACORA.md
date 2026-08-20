@@ -23,3 +23,22 @@
    (¿nginx/traefik/caddy en 80/443?).
 3. ¿Datos demo o datos reales de personal? (impacta dónde pueden vivir y el seed).
 4. ¿Dominio/subdominio disponible para HTTPS?
+
+## 2026-08-20 · F1 completada (opción A: todo en la VM Hetzner)
+- Usuario eligió Hetzner (`167.233.77.149`) y preguntó por las implicancias de reducir
+  la topología 3+3+LB. Verificado en código que reducir es seguro: sin `@Scheduled`,
+  sin `@Cacheable`, sin websockets, JWT stateless, `stickysession` del LB es config muerta.
+  Además el lock de fuerza bruta (`LoginAttemptService`) es un ConcurrentHashMap por
+  instancia → con 3 backends era evadible; con 1 queda consistente.
+- Creados: `docker-compose.hetzner.yml` (mysql interno + 1 backend + 1 frontend,
+  mem_limits, sin puertos de BD), `.env.hetzner.example`, `scripts/init_db.sh`
+  (idempotente, guardas para V2 y para no pisar innhosp), `scripts/backup_mysql.sh`
+  (verifica el .gz antes de rotar), `.pilot/DEPLOY.md` (runbook completo).
+- Validado en esta sesión: backend compila (`HUAP-0.0.1-SNAPSHOT.jar`, exit 0) y
+  `docker compose config` renderiza bien. NO validado acá: arranque real del stack
+  (este contenedor no tiene demonio Docker) → se prueba en la VM.
+- Falso positivo descartado: `setup_innhosp.sql` siembra claves con SHA2(...,512) y el
+  backend usa BCrypt; el `DelegatingPasswordEncoder` tiene SHA-512 como fallback para
+  hashes sin prefijo `{id}`, así que el login demo funciona.
+- Datos pendientes del usuario (no bloquean el Paso 0 del runbook): specs de la VM,
+  qué proxy corre el otro sistema, demo vs datos reales, dominio para TLS.
