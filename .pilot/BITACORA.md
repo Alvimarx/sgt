@@ -42,3 +42,17 @@
   hashes sin prefijo `{id}`, así que el login demo funciona.
 - Datos pendientes del usuario (no bloquean el Paso 0 del runbook): specs de la VM,
   qué proxy corre el otro sistema, demo vs datos reales, dominio para TLS.
+
+## 2026-08-21 · F3 en curso — primer despliegue en la VM
+- VM verificada: 3.7 GB RAM / 2 vCPU / 27 GB libres, sin contenedores corriendo y con
+  80/443 libres (el "otro sistema" —hostname `Efeso`— no estaba levantado). Swap de 2 GB
+  creada. Stack expuesto en 8090.
+- **Bug propio detectado y corregido en `scripts/init_db.sh`**: `V2__planificacion_vigencia.sql`
+  es el único script SQL sin `USE gestionturnos;`, y el script lo ejecutaba sin base por
+  defecto → MySQL falló con "No database selected" y no creó `planificacion_ejecucion`.
+  El fallo quedó OCULTO porque el helper `my()` terminaba en `|| true`. Síntoma final:
+  el backend en bucle de reinicio con `Schema-validation: missing table
+  [planificacion_ejecucion]`.
+  Corrección: (1) `my()` ahora propaga el código de salida; (2) la migración se invoca con
+  `my gestionturnos < ...`; (3) el guard verifica tabla Y columna, y se valida que la tabla
+  haya quedado creada.
