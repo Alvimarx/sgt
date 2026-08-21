@@ -56,3 +56,34 @@
   Corrección: (1) `my()` ahora propaga el código de salida; (2) la migración se invoca con
   `my gestionturnos < ...`; (3) el guard verifica tabla Y columna, y se valida que la tabla
   haya quedado creada.
+
+## 2026-08-21 (tarde) · Encoding + coherencia con el Excel de agosto
+- **Mojibake en la UI ("Ãlvaro LÃ³pez")**: causado por comandos mysql ad-hoc SIN
+  `--default-character-set=utf8mb4` (el cliente en el contenedor negocia latin1 con locale
+  POSIX). Afectó: las 80 personas cargadas en personalAux + las filas del usuario real.
+  Fix: `scripts/mysql.sh` (wrapper que fija utf8mb4), `personal_urgencias_innhosp.sql`
+  regenerado para reparar nombres al re-ejecutarse, advertencia en DEPLOY.md.
+- **CSV nuevo "no está en UTF-8"**: auditoría (workflow 3 agentes) concluyó que es el
+  export viejo RE-GUARDADO por Excel/Sheets (coma, sin comillas, h:mm, enteros, BOM
+  perdido, mojibake fijado). El export del backend es UTF-8 impecable (BOM + charset
+  explícito, ExportacionService/Controller). Datos: idénticos 945/945 al CSV viejo.
+- **Colisiones bootstrap↔poblado descubiertas** (hacían abortar TODO el poblado en la
+  primera sentencia, silenciado por el viejo `|| true`):
+  1. servicios: bootstrap crea 'Administración' id auto=1; poblado inserta ids fijos 1-4.
+     Fix: preámbulo que reubica 'Administración' a id 99.
+  2. Catálogos Rol_Sistema/Rol_Servicio/Tipo_Solicitud/feriados duplicados → INSERT IGNORE.
+  3. Funcionario: RUT 11111111 duplicado (admin bootstrap + Ricardo Morales id 200, que
+     además chocaba consigo mismo dentro del poblado) → INSERT IGNORE + RUT 20000200-6
+     (consistente con el fix de innhosp).
+  Consecuencia en la BD desplegada: el poblado NUNCA cargó (el 'Urgencias' visible lo
+  creó el usuario a mano). Decisión: recargar gestionturnos desde cero con seeds
+  corregidos (determinista) en vez de reparación quirúrgica.
+- **Coherencia con el Excel**: los turnos de agosto 2026 (ids 6966-8221) NO están en el
+  seed (que llega hasta mayo, ids 1-111): son la ejecución de 'Rotativa 2026' del
+  ambiente antiguo. Nuevo `turnos_agosto2026_urgencias.sql`: crea la
+  planificacion_ejecucion (vigencia 31/07-31/08), importa los 945 turnos con IDs
+  originales (INSERT IGNORE, resolución por subconsulta de funcionario/puesto/rotativa,
+  41 vacantes) y escribe la bitácora GENERACION_TURNO ('Planificación: Rotativa 2026')
+  + ASIGNACION_MANUAL para 7332 y 7500, para que el export rotule igual que el Excel.
+- Pendiente del usuario en la VM: git pull → backup → recrear gestionturnos → re-seed →
+  reparar innhosp (nombres) → re-alta de su usuario → importar agosto → restart backend.

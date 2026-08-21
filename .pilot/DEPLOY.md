@@ -199,10 +199,14 @@ protege contra la pérdida de la VM.
 | Logs backend | `... logs -f backend` |
 | Reiniciar backend | `... restart backend` |
 | Actualizar código | `git pull && ... up -d --build backend frontend` |
-| Consola MySQL | `... exec mysql mysql -uroot -p gestionturnos` |
+| Consola MySQL | `bash scripts/mysql.sh` (fija utf8mb4; NUNCA llamar a mysql a mano) |
 | Apagar todo | `... down` (los datos sobreviven en el volumen `mysql_data`) |
 
 ## Decisiones y trampas conocidas
+
+- **Charset en comandos manuales**: dentro del contenedor, el cliente `mysql` sin flags
+  negocia latin1 (locale POSIX) — cualquier acento cargado así queda doble-codificado
+  ("Ãlvaro LÃ³pez"). Usar SIEMPRE `bash scripts/mysql.sh` para consolas y cargas de SQL.
 
 - **MySQL no publica puertos**: solo es alcanzable dentro de la red Docker. Para entrar,
   `docker compose exec`. No abrir 3306 a internet.
