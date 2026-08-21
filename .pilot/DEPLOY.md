@@ -9,6 +9,17 @@ Archivos: `docker-compose.hetzner.yml`, `.env.hetzner.example`, `scripts/init_db
 
 ---
 
+## Estado verificado de la VM (2026-08-21)
+
+| Dato | Valor | Consecuencia |
+|---|---|---|
+| RAM | 3.7 GB (3.0 GB disponibles) | Alcanza; el stack tope ~1.8 GB. **Falta swap: crearla.** |
+| Swap | 0 B | Crear 2 GB antes de construir el frontend (Paso 1b) |
+| Disco | 38 GB, 27 GB libres | De sobra (~4 GB entre imágenes y datos) |
+| CPU | 2 vCPU | Suficiente; el build inicial tardará unos minutos |
+| Contenedores corriendo | **ninguno** | El "otro sistema" NO está levantado — verificar con `docker ps -a` |
+| Puertos 80/443 | libres | Se puede exponer directo; igual usamos 8090 para no chocar cuando vuelva el otro sistema |
+
 ## Paso 0 — Reconocimiento (antes de tocar nada)
 
 ```bash
@@ -34,9 +45,9 @@ Qué mirar:
 # Docker (solo si el Paso 0 mostró que falta)
 curl -fsSL https://get.docker.com | sh
 
-# 1b. Swap — SOLO si RAM total < 4 GB. El build del frontend (Vite) pide hasta
-#     2.5 GB y sin swap puede matar por OOM al OTRO sistema de la VM.
-free -h | awk '/Swap/ {print "swap actual:", $2}'
+# 1b. Swap — OBLIGATORIO en esta VM (3.7 GB RAM, 0 B de swap). El build del
+#     frontend (Vite) pide hasta 2.5 GB y sin swap puede matar por OOM al
+#     otro sistema de la VM.
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
@@ -65,6 +76,30 @@ done
 echo "JWT_SECRET=$(openssl rand -base64 48)"
 
 nano .env.hetzner    # pegar los valores; revisar CORS_ALLOWED_ORIGINS y PUBLIC_BIND/PORT
+chmod 600 .env.hetzner
+```
+
+Alternativa sin editor — genera el archivo completo de una vez (valores ya ajustados a
+esta VM). Las contraseñas salen alfanuméricas a propósito, para no romper el parseo del
+archivo `.env`:
+
+```bash
+cd /opt/sgt
+gen() { openssl rand -base64 24 | tr -d '/+='; }
+cat > .env.hetzner <<EOF
+MYSQL_ROOT_PASSWORD=$(gen)
+DB_USERNAME=sgt_app
+DB_PASSWORD=$(gen)
+HOSPITAL_DB_USERNAME=sgt_hospital_ro
+HOSPITAL_DB_PASSWORD=$(gen)
+JWT_SECRET=$(openssl rand -base64 48)
+CORS_ALLOWED_ORIGINS=http://167.233.77.149:8090
+PUBLIC_BIND=0.0.0.0
+PUBLIC_PORT=8090
+LOGIN_LOCK_DURATION_MS=900000
+BACKUP_DIR=./backups
+RETENTION_DAYS=7
+EOF
 chmod 600 .env.hetzner
 ```
 
