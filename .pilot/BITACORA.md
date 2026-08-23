@@ -132,3 +132,12 @@
   quedó aprobado tal como estaba.
 - Docs: 5 requerimientos pasan a "aprobado ✅"; R2 reescrito como v2 (renombrado
   a ..._R2_resumen-turno-propio-con-rotativa.md), pendiente de visto bueno.
+
+## 2026-08-23 (3) · Lote R1-R6 cerrado
+- Usuario probó R2 v2 en la VM y dio el visto bueno ("quedó perfecto").
+- Los seis requerimientos quedan "aprobado ✅" en requerimientos/ y el README
+  cierra con el estado del lote: listo para replicar en el repo con datos reales.
+- DEPLOY.md: se agregó a "Operación diaria" la fila de actualización solo-frontend
+  (es la operación recurrente ahora que el trabajo es de UI).
+- Pendiente operativo (no bloqueante, requiere la VM): dejar el cron de respaldos
+  activo y verificar la restauración — Paso 8 de DEPLOY.md.

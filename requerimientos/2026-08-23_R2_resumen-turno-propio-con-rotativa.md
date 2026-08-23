@@ -1,6 +1,6 @@
 # R2 · Resumen del turno propio: "Tienes turno {tipo}: {rotativa}"
 
-**Estado: pendiente de visto bueno (v2)** · Fecha: 2026-08-23 · Alcance: solo frontend
+**Estado: aprobado ✅** (visto bueno del usuario, 2026-08-23; v2 tras corregir puesto -> rotativa) · Fecha: 2026-08-23 · Alcance: solo frontend
 
 > Historial: la v1 mostraba el **puesto** ("Tienes turno Dia: Médico General 7").
 > El usuario corrigió la interpretación: lo que debe aparecer es la **rotativa**

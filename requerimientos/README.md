@@ -29,8 +29,14 @@ por qué se hizo y cómo se hizo.
 | Req | Fecha | Título | Estado |
 |-----|-------|--------|--------|
 | R1 | 2026-08-23 | Quitar el filtro "Aprobados" del home | aprobado ✅ |
-| R2 | 2026-08-23 | Resumen del turno propio con tipo y rotativa | pendiente de visto bueno (v2: rotativa) |
+| R2 | 2026-08-23 | Resumen del turno propio con tipo y rotativa | aprobado ✅ |
 | R3 | 2026-08-23 | Título del detalle de turno con el puesto propio | aprobado ✅ |
 | R4 | 2026-08-23 | Solicitar un cupo libre tocándolo directamente | aprobado ✅ |
 | R5 | 2026-08-23 | Refrescar la página no expulsa al login | aprobado ✅ |
 | R6 | 2026-08-23 | Quitar el punto amarillo del calendario | aprobado ✅ |
+
+## Estado del lote
+
+Los seis requerimientos de este lote (R1-R6) están **probados y aprobados** por
+el usuario sobre el despliegue de prueba, y quedan listos para replicarse en el
+repositorio que corre con los datos reales de HUAP.

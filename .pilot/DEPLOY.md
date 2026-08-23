@@ -199,6 +199,7 @@ protege contra la pérdida de la VM.
 | Logs backend | `... logs -f backend` |
 | Reiniciar backend | `... restart backend` |
 | Actualizar código | `git pull && ... up -d --build backend frontend` |
+| Solo frontend (cambios de UI) | `git pull && ... up -d --build frontend` (+ Ctrl+Shift+R en el navegador) |
 | Consola MySQL | `bash scripts/mysql.sh` (fija utf8mb4; NUNCA llamar a mysql a mano) |
 | Apagar todo | `... down` (los datos sobreviven en el volumen `mysql_data`) |
 
