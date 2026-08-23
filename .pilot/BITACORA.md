@@ -147,3 +147,24 @@
   ni siquiera existe en gestionturnos (solo en innhosp: entraría sin servicio).
   Reemplazados por los tres verificados en la VM: Admin Bootstrap, Flavio Ayala
   (JEFATURA Urgencias) y Pablo Garrido (MEDICO Urgencias).
+
+## 2026-08-23 (4) · Lote 2: R7 y R8
+- R7 (captura del usuario): el encabezado de grupo del home decía solo "Dia".
+  Debe decir "Día: Turno X" = la ROTATIVA del equipo, y SIEMPRE (en la captura
+  no tenía turno ese día). Corrige el criterio de R3, que anexaba el puesto y
+  solo para el turno propio; R3 queda marcado como supersedido en parte.
+  Verificación previa sobre los 945 turnos: 63 grupos de 15; 53 con una sola
+  rotativa y 10 con reparto 14+1, todos explicados por un único dato del seed
+  (Pedro Marín duplicado en "Médico General 9" con dos rotativas). Por eso el
+  criterio implementado es "rotativa mayoritaria del grupo, ignorando turnos sin
+  rotativa" en vez de asumir unanimidad.
+  Tocado: buildAgendaData y buildTurnoTeams exponen group.nombreRotativa;
+  AgendaView (card expandida), ShiftDetail (header) y calendarView (sheet del día).
+- Ajuste de datos: el tipo de turno se llamaba 'Dia' sin tilde en el seed →
+  'Día'. El import de agosto acepta ambas grafías para no romperse contra una BD
+  ya cargada. UPDATE documentado en el doc de R7 para la base desplegada.
+- R8: con un solo servicio se canjea el preAuthToken automáticamente y se entra
+  al home; la pantalla de selección solo aparece con 2+ servicios. Si el canje
+  falla se cae al flujo normal con el error visible (no se traga).
+- Validación: vite build OK; eslint 15 problemas antes y 15 después (misma deuda
+  preexistente, sin regresiones).

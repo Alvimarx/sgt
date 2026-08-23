@@ -501,7 +501,7 @@ INSERT INTO tipo_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
 
 -- Urgencias (id_servicio=4) — mismos rangos horarios que Diurno/Nocturno MI
 INSERT INTO tipo_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
-(4, '08:00:00', '20:00:00', 'Dia'),     -- id auto = 7
+(4, '08:00:00', '20:00:00', 'Día'),     -- id auto = 7
 (4, '20:00:00', '08:00:00', 'Noche');   -- id auto = 8
 
 -- ==============================================================

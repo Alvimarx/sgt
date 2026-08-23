@@ -163,6 +163,24 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
     };
 };
 
+// Rotativa del grupo de turnos (el "Turno I/II/III" del servicio). Un grupo
+// día/noche lo cubre normalmente UNA rotativa, pero un cupo puede quedar cubierto
+// por alguien de otro equipo; se toma la mayoritaria y se ignoran los turnos sin
+// rotativa (vacantes y asignaciones manuales).
+const rotativaDominante = (turnos = []) => {
+    const cuenta = new Map();
+    turnos.forEach((t) => {
+        const nombre = t?.nombreRotativa;
+        if (!nombre) return;
+        cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
+    });
+    let mejor = null;
+    cuenta.forEach((veces, nombre) => {
+        if (!mejor || veces > mejor.veces) mejor = { nombre, veces };
+    });
+    return mejor?.nombre ?? null;
+};
+
 const buildTurnoTeams = (turnos, funcionarioId) => {
     const teamsByKey = turnos.reduce((acc, turno) => {
         if (!turno.teamKey) return acc;
@@ -196,6 +214,7 @@ const buildTurnoTeams = (turnos, funcionarioId) => {
     Object.values(teamsByKey).forEach((group) => {
         const grupoTurnos = group.turnos ?? [];
         group.totalTurnos = grupoTurnos.length;
+        group.nombreRotativa = rotativaDominante(grupoTurnos);
         group.asignados = grupoTurnos.filter((t) => t.idFuncionario != null).length;
         group.completo = group.totalTurnos > 0 && group.asignados === group.totalTurnos;
 

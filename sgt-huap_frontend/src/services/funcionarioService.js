@@ -195,6 +195,24 @@ const buildDaySummary = (turnosDelDia = []) => {
 // CONSTRUCCIÓN DEL OBJETO AGENDA COMPLETO
 // ---------------------------------------------------------------------------
 
+// Rotativa del grupo de turnos (el "Turno I/II/III" del servicio). Un grupo
+// día/noche lo cubre normalmente UNA rotativa, pero un cupo puede quedar cubierto
+// por alguien de otro equipo; se toma la mayoritaria y se ignoran los turnos sin
+// rotativa (vacantes y asignaciones manuales).
+const rotativaDominante = (turnos = []) => {
+    const cuenta = new Map();
+    turnos.forEach((t) => {
+        const nombre = t?.nombreRotativa;
+        if (!nombre) return;
+        cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
+    });
+    let mejor = null;
+    cuenta.forEach((veces, nombre) => {
+        if (!mejor || veces > mejor.veces) mejor = { nombre, veces };
+    });
+    return mejor?.nombre ?? null;
+};
+
 const buildAgendaData = (turnos, funcionarioId) => {
     const mappedTurnos = Array.isArray(turnos)
         ? turnos
@@ -234,6 +252,7 @@ const buildAgendaData = (turnos, funcionarioId) => {
     Object.values(teamsByKey).forEach((group) => {
         const turnos = group.turnos ?? [];
         group.totalTurnos = turnos.length;
+        group.nombreRotativa = rotativaDominante(turnos);
         group.asignados = turnos.filter((t) => t.idFuncionario != null).length;
         group.completo = group.totalTurnos > 0 && group.asignados === group.totalTurnos;
 

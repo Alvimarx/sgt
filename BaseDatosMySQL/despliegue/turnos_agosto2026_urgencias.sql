@@ -42,7 +42,7 @@ WHERE @plan IS NOT NULL
 SET @ej    = (SELECT id_ejecucion FROM planificacion_ejecucion
                WHERE id_planificacion = @plan AND fecha_inicio_efectiva = '2026-07-31'
                  AND fecha_fin_efectiva = '2026-08-31' AND estado = 'ACTIVA' LIMIT 1);
-SET @dia   = (SELECT id_tipo_turno FROM tipo_turno WHERE id_servicio = 4 AND nombre = 'Dia'   LIMIT 1);
+SET @dia   = (SELECT id_tipo_turno FROM tipo_turno WHERE id_servicio = 4 AND nombre IN ('Día', 'Dia') LIMIT 1);
 SET @noche = (SELECT id_tipo_turno FROM tipo_turno WHERE id_servicio = 4 AND nombre = 'Noche' LIMIT 1);
 
 -- 2. Los 945 turnos (IDs explícitos; INSERT IGNORE los hace re-ejecutables)

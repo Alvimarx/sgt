@@ -667,9 +667,12 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
               const vacantes = total - asignados;
               const hayMiTurno = teamShifts.some((x) => x.miTurno);
 
+              // El sufijo es la ROTATIVA del equipo ("Turno I/II/III"), no el puesto, y se
+              // muestra siempre: identifica al equipo que cubre ese día, tengas turno o no.
+              const rotativaGrupo = group?.nombreRotativa || rep.nombreRotativa || null;
               const tituloCard =
                 (rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")) +
-                (hayMiTurno && rep.nombrePuesto ? `: ${rep.nombrePuesto}` : "");
+                (rotativaGrupo ? `: ${rotativaGrupo}` : "");
 
               return (
                 <div

@@ -2,6 +2,12 @@
 
 **Estado: aprobado ✅** (visto bueno del usuario, 2026-08-23) · Fecha: 2026-08-23 · Alcance: solo frontend
 
+> ⚠️ **SUPERSEDIDO EN PARTE POR R7.** Lo que aquí se implementó (anexar el
+> **puesto**, y solo cuando el turno es tuyo) fue reemplazado: el sufijo pasó a
+> ser la **rotativa** del equipo y se muestra siempre. Al replicar, aplicar
+> directamente R7 en vez de este documento; se conserva como historia de la
+> decisión.
+
 ## Qué se pidió
 
 > "Cuando abro un turno desde el home (cuando se divide en Día y Noche), dice

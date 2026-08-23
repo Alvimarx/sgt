@@ -220,7 +220,9 @@ const ShiftDetail = ({
                             shift.nombreTipo ||
                             shift.nombre ||
                             (shift.tipo === "dia" ? "Turno día" : "Turno noche")) +
-                            (shift.miTurno && shift.nombrePuesto ? `: ${shift.nombrePuesto}` : "")}
+                            (shift.nombreRotativa || groupData?.nombreRotativa
+                                ? `: ${shift.nombreRotativa || groupData.nombreRotativa}`
+                                : "")}
                     </span>
                 </div>
 

@@ -6,6 +6,7 @@ import "../Style/style.css";
 import { PhoneShell, TabBar } from "../Style/UIPrimitives";
 
 import { useAuth } from "../../context/AuthContext";
+import { selectService } from "../../services/authService";
 
 //Importaciones de Comun
 import AgendaView from "../Comun/AgendaView";
@@ -142,6 +143,7 @@ const Prop4 = ({ tweaks = {} }) => {
   const [activeTab, setActiveTab] = useState(navInicial.tab);
 
   const [preAuthToken, setPreAuthToken] = useState(null);
+  const [entrandoDirecto, setEntrandoDirecto] = useState(false);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
   const [pendingRegistrationMessage, setPendingRegistrationMessage] = useState('');
   const [solicitudesReturn, setSolicitudesReturn] = useState(navInicial.returns.solicitudes);
@@ -199,7 +201,7 @@ const Prop4 = ({ tweaks = {} }) => {
     setCurrentView("solicitudes");
   };
 
-  const handleLoginSuccess = ({ preAuthToken, servicios = [], registeredInSystem, message }) => {
+  const handleLoginSuccess = async ({ preAuthToken, servicios = [], registeredInSystem, message }) => {
     if (!registeredInSystem) {
       setPreAuthToken(null);
       setServiciosDisponibles([]);
@@ -209,6 +211,26 @@ const Prop4 = ({ tweaks = {} }) => {
     }
 
     setPendingRegistrationMessage('');
+
+    // Con UN solo servicio no hay nada que elegir: se canjea el preAuthToken al vuelo
+    // y se entra directo al home. Si el canje falla, se cae al flujo normal para que
+    // el usuario vea el error y pueda reintentar.
+    if (preAuthToken && servicios.length === 1) {
+      const unico = servicios[0];
+      setEntrandoDirecto(true);
+      const result = await selectService(preAuthToken, unico.servicioId);
+      setEntrandoDirecto(false);
+
+      if (result.success) {
+        setServiciosDisponibles(servicios);
+        if (unico.nombre) {
+          localStorage.setItem("sgt_servicio_activo_nombre", unico.nombre);
+        }
+        handleServiceSelected(result.userData);
+        return;
+      }
+    }
+
     setPreAuthToken(preAuthToken);
     setServiciosDisponibles(servicios);
     setCurrentView("select_service");
@@ -276,8 +298,17 @@ const Prop4 = ({ tweaks = {} }) => {
         @keyframes sgtSlideLeft { from { transform:translateX(100%); } to { transform:translateX(0); } }
       `}</style>
 
-      {currentView === "login" && (
+      {currentView === "login" && !entrandoDirecto && (
         <LoginView onLoginSuccess={handleLoginSuccess} />
+      )}
+      {currentView === "login" && entrandoDirecto && (
+        <div
+          className="login-gradient-bg"
+          role="status"
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#17416C" }}
+        >
+          Entrando…
+        </div>
       )}
       {currentView === "select_service" && (
         <SelectServiceView

@@ -42,6 +42,21 @@ const getShiftName = (shift) =>
     shift?.nombreTipoTurno || shift?.nombreTipo || shift?.nombre ||
     (shift?.tipo === 'noche' ? 'Turno noche' : 'Turno día');
 
+// Misma regla que en los servicios: la rotativa mayoritaria del grupo.
+const rotativaDominanteCal = (turnos = []) => {
+    const cuenta = new Map();
+    turnos.forEach((t) => {
+        const nombre = t?.nombreRotativa;
+        if (!nombre) return;
+        cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
+    });
+    let mejor = null;
+    cuenta.forEach((veces, nombre) => {
+        if (!mejor || veces > mejor.veces) mejor = { nombre, veces };
+    });
+    return mejor?.nombre ?? null;
+};
+
 const buildDayGroups = (shifts = []) => {
     const map = new Map();
     shifts.forEach((shift) => {
@@ -63,6 +78,7 @@ const buildDayGroups = (shifts = []) => {
             key: group.key, sample,
             turnos: group.turnos,
             nombre: getShiftName(sample),
+            nombreRotativa: rotativaDominanteCal(group.turnos),
             tipo: sample.tipo,
             inicio: sample.inicio,
             fin: sample.fin,
@@ -653,7 +669,7 @@ const DayDetailOverview = ({ stats, onOpen }) => {
                             <SGTIcon name={group.tipo === 'noche' ? 'moon' : 'sun'} size={15} color={color.ink} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 900, color: color.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {group.nombre}
+                                    {group.nombre}{group.nombreRotativa ? `: ${group.nombreRotativa}` : ''}
                                 </div>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: color.ink, opacity: 0.8 }}>
                                     {group.inicio && group.fin ? `${group.inicio}–${group.fin}` : 'Horario no definido'}
