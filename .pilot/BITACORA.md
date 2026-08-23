@@ -168,3 +168,20 @@
   falla se cae al flujo normal con el error visible (no se traga).
 - Validación: vite build OK; eslint 15 problemas antes y 15 después (misma deuda
   preexistente, sin regresiones).
+
+## 2026-08-23 (5) · R9: filtros "Solicitudes" y "Disponibles"
+- Renombres de chips + cambio de fondo en "Disponibles": esDisponibleParaMi
+  excluye (a) cupos de un equipo del que el usuario ya es parte (teamKey) y
+  (b) turnos de DÍA cuya fecha es la fechaFin de una noche propia (viene
+  saliendo). El contador del chip usa el mismo predicado que el filtro.
+- Verificación adversarial (2 agentes): reglas correctas contra el mapper
+  (teamKey/tipo/fechaFin), rename sin referencias huérfanas. Incorporado de sus
+  hallazgos: guard fechaFin!==fecha, texto del día "N cupos libres" (sin
+  "disponible"), TODO restaurado sobre solicitudPendiente.
+- Hallazgo importante confirmado con grep al backend: convertirTurnoAMap NUNCA
+  emite solicitudPendiente/cambioAprobado → el chip Solicitudes (y el viejo
+  Pendientes) cuenta 0 con datos reales. Preexistente; requiere backend para
+  funcionar de verdad. Documentado en código y en el doc R9.
+- Decisión de alcance registrada en el doc: el filtro aplica a todos los roles
+  (spec del usuario, que es jefatura y también hace turnos); el caso simétrico
+  día→noche NO se implementó por no ser pedido.

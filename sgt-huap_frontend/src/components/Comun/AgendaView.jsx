@@ -275,40 +275,69 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   // ---------------------------------------------------------------------------
-  // CONTADORES DE FILTROS — "pendientes" excluye los cambios ya aprobados
+  // CONTADORES DE FILTROS — "solicitudes" excluye los cambios ya aprobados
   // ---------------------------------------------------------------------------
   const countMisTurnos = useMemo(
     () => agendaDays.filter((day) => getShifts(day.key).some((s) => s.miTurno)).length,
     [agendaDays, shiftsByDay]
   );
-  const countPendientes = useMemo(
-    // TO DO: Lógica correcta para ver turnos pendientes
+  // OJO (limitación preexistente): el endpoint de turnos del backend NO emite
+  // solicitudPendiente/cambioAprobado (convertirTurnoAMap), así que este chip
+  // cuenta 0 con datos reales hasta que el backend exponga ese estado.
+  const countSolicitudes = useMemo(
     () => agendaDays.reduce(
       (acc, day) => acc + getShifts(day.key).filter((s) => s.solicitudPendiente && !s.cambioAprobado).length, 0
     ),
     [agendaDays, shiftsByDay]
   );
-  const countLibres = useMemo(
-    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter((s) => s.turnoLibre).length, 0),
-    [agendaDays, shiftsByDay]
+
+  // "Disponibles": cupos libres que el usuario REALMENTE podría tomar.
+  // Se excluyen (a) los cupos de un equipo día/noche del que ya es parte
+  // (mismo teamKey: ya está trabajando en ese bloque, no puede doblar ahí), y
+  // (b) los turnos de DÍA cuando viene saliendo de su turno de noche: la noche
+  // que empieza el día anterior termina la mañana de ese día (fechaFin).
+  const misTeamKeys = useMemo(
+    () => new Set(
+      (agendaData.turnos || []).filter((t) => t.miTurno && t.teamKey).map((t) => t.teamKey)
+    ),
+    [agendaData.turnos]
+  );
+  const misMananasPostNoche = useMemo(
+    () => new Set(
+      (agendaData.turnos || [])
+        .filter((t) => t.miTurno && t.tipo === "noche" && t.fechaFin && t.fechaFin !== t.fecha)
+        .map((t) => t.fechaFin)
+    ),
+    [agendaData.turnos]
+  );
+  const esDisponibleParaMi = (s) =>
+    s.turnoLibre &&
+    !(s.teamKey && misTeamKeys.has(s.teamKey)) &&
+    !(s.tipo === "dia" && misMananasPostNoche.has(s.fecha));
+
+  const countDisponibles = useMemo(
+    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter(esDisponibleParaMi).length, 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [agendaDays, shiftsByDay, misTeamKeys, misMananasPostNoche]
   );
   const FILTERS = [
-    { id: "todos",      label: "Todos"      },
-    { id: "miTurno",   label: "Mis turnos", count: countMisTurnos  },
-    { id: "pendientes", label: "Pendientes", count: countPendientes },
-    { id: "libres",    label: "Libres",     count: countLibres     },
+    { id: "todos",        label: "Todos"      },
+    { id: "miTurno",     label: "Mis turnos",  count: countMisTurnos   },
+    { id: "solicitudes",  label: "Solicitudes", count: countSolicitudes },
+    { id: "disponibles", label: "Disponibles", count: countDisponibles },
   ];
 
   const visibleDays = useMemo(() => {
     return agendaDays.filter((day) => {
       const shifts = getShifts(day.key);
-      if (filter === "todos")      return true;
-      if (filter === "miTurno")    return shifts.some((s) => s.miTurno);
-      if (filter === "pendientes") return shifts.some((s) => s.solicitudPendiente && !s.cambioAprobado);
-      if (filter === "libres")     return shifts.some((s) => s.turnoLibre);
+      if (filter === "todos")       return true;
+      if (filter === "miTurno")     return shifts.some((s) => s.miTurno);
+      if (filter === "solicitudes") return shifts.some((s) => s.solicitudPendiente && !s.cambioAprobado);
+      if (filter === "disponibles") return shifts.some(esDisponibleParaMi);
       return true;
     });
-  }, [agendaDays, filter, shiftsByDay]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agendaDays, filter, shiftsByDay, misTeamKeys, misMananasPostNoche]);
 
   // ---------------------------------------------------------------------------
   // RENDER
@@ -631,7 +660,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
               <span style={{ fontSize: 13, color: PA.ink2, fontWeight: 700 }}>Sin turno asignado</span>
               {libres.length > 0 && (
                 <span style={{ fontSize: 11.5, color: "#B85A60", fontWeight: 700 }}>
-                  {libres.length} cupo{libres.length > 1 ? "s" : ""} libre disponible
+                  {libres.length} cupo{libres.length > 1 ? "s" : ""} libre{libres.length > 1 ? "s" : ""}
                 </span>
               )}
             </div>
