@@ -141,3 +141,9 @@
   (es la operación recurrente ahora que el trabajo es de UI).
 - Pendiente operativo (no bloqueante, requiere la VM): dejar el cron de respaldos
   activo y verificar la restauración — Paso 8 de DEPLOY.md.
+- Corrección en DEPLOY.md (Paso 7): la tabla de usuarios de prueba estaba obsoleta
+  tras limpiar el seed. Decía "12345678-9 Álvaro López — JEFATURA" (hoy ese RUT es
+  Ana María González, SUBROGANTE de Enfermería) y "12345677-0 Fernando Rojas", que
+  ni siquiera existe en gestionturnos (solo en innhosp: entraría sin servicio).
+  Reemplazados por los tres verificados en la VM: Admin Bootstrap, Flavio Ayala
+  (JEFATURA Urgencias) y Pablo Garrido (MEDICO Urgencias).

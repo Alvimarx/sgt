@@ -165,14 +165,22 @@ curl -sI http://127.0.0.1:8090/ | head -1      # frontend sirve la SPA
 
 En el navegador, con `SEED_DEMO=1`, usuarios de prueba (clave **`huap2025`**):
 
-| RUT | Perfil |
-|---|---|
-| `11111111-1` | Admin Bootstrap (ADMINISTRADOR) |
-| `12345678-9` | Álvaro López — JEFATURA |
-| `12345677-0` | Fernando Rojas — MÉDICO |
+| RUT | Perfil | Sirve para |
+|---|---|---|
+| `11111111-1` | Admin Bootstrap — ADMINISTRADOR (Medicina Interna) | Panel de administración, crear servicios |
+| `30000006-6` | Flavio Ayala — JEFATURA de Urgencias | Panel de jefatura, aprobar solicitudes, asignar cupos |
+| `30000070-0` | Pablo Garrido — MÉDICO de Urgencias | Vista de médico, solicitar un cupo libre |
 
-Probar: login → ver el servicio "Administración" → crear un servicio → registrar un
-funcionario (debe aparecer el listado que viene de `viewPersonal`) → generar turnos.
+Los dos de Urgencias tienen turnos en agosto 2026 y son el par recomendado para
+probar el flujo completo de una solicitud (Pablo la crea, Flavio la aprueba).
+
+> Los dígitos verificadores del personal ficticio (`3000xxxx`) no cumplen módulo 11.
+> Da igual para el sistema —ni el frontend ni el backend los validan, el backend
+> descarta el último carácter y busca por el número— pero un validador externo los
+> rechazaría.
+
+Probar: login → ver el servicio → crear un servicio → registrar un funcionario
+(debe aparecer el listado que viene de `viewPersonal`) → generar turnos.
 
 ## Paso 8 — Respaldos
 
