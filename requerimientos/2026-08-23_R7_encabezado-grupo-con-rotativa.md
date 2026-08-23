@@ -1,6 +1,6 @@
 # R7 · Encabezado de grupo: "Día: Turno X" (rotativa del equipo)
 
-**Estado: pendiente de visto bueno** · Fecha: 2026-08-23 · Alcance: solo frontend (+ un ajuste de datos)
+**Estado: aprobado ✅** (visto bueno del usuario, 2026-08-23) · Fecha: 2026-08-23 · Alcance: solo frontend (+ un ajuste de datos)
 
 ## Qué se pidió
 

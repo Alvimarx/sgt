@@ -185,3 +185,17 @@
 - Decisión de alcance registrada en el doc: el filtro aplica a todos los roles
   (spec del usuario, que es jefatura y también hace turnos); el caso simétrico
   día→noche NO se implementó por no ser pedido.
+
+## 2026-08-23 (6) · Visto bueno R7-R9 y paquete de traspaso
+- Usuario aprobó el lote 2 ("Perfecto"). Los 9 requerimientos quedan aprobados.
+- Nuevo paquete de traspaso al repo con datos reales:
+  · requerimientos/TRASPASO.md — guía maestra: qué llevar (7 archivos frontend,
+    cero backend), qué NO (compose/seeds/scripts de este ambiente), Método A
+    (parche git) con fallback Método B (docs por palabra, en orden, saltando R3
+    que fue reemplazado por R7), paso opcional de datos de R7, verificación
+    final y prompt sugerido para un asistente en la otra máquina.
+  · requerimientos/traspaso/frontend_R1-R9.patch — diff consolidado 691dca3..HEAD
+    de sgt-huap_frontend/src (7 archivos, +323/-63). Verificado con
+    `git apply --check` sobre un worktree del commit base: aplica limpio.
+  · requerimientos/traspaso/r7_tipo_turno_dia.sql — inspección + UPDATE
+    condicional del nombre del tipo de turno.

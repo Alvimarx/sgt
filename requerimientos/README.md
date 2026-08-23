@@ -34,14 +34,19 @@ por qué se hizo y cómo se hizo.
 | R4 | 2026-08-23 | Solicitar un cupo libre tocándolo directamente | aprobado ✅ |
 | R5 | 2026-08-23 | Refrescar la página no expulsa al login | aprobado ✅ |
 | R6 | 2026-08-23 | Quitar el punto amarillo del calendario | aprobado ✅ |
-| R7 | 2026-08-23 | Encabezado de grupo "Día: Turno X" (rotativa) | pendiente de visto bueno |
-| R8 | 2026-08-23 | Con un solo servicio, entrar directo al home | pendiente de visto bueno |
-| R9 | 2026-08-23 | Filtros "Solicitudes" y "Disponibles" con elegibilidad | pendiente de visto bueno |
+| R7 | 2026-08-23 | Encabezado de grupo "Día: Turno X" (rotativa) | aprobado ✅ |
+| R8 | 2026-08-23 | Con un solo servicio, entrar directo al home | aprobado ✅ |
+| R9 | 2026-08-23 | Filtros "Solicitudes" y "Disponibles" con elegibilidad | aprobado ✅ |
 
 ## Estado por lote
 
-- **Lote 1 (R1-R6)**: probado y **aprobado** por el usuario sobre el despliegue
-  de prueba; listo para replicarse en el repositorio con los datos reales.
-- **Lote 2 (R7-R9)**: implementado y compilado, **pendiente de prueba**.
-  Ojo con R7: ajusta el criterio de R3 (el sufijo del título pasa a ser la
-  rotativa y se muestra siempre) — quien replique R3 debe leer R7 a continuación.
+Los nueve requerimientos (R1-R9) están **probados y aprobados** por el usuario
+sobre el despliegue de prueba. Ojo con R7: reemplaza el criterio de R3 (el
+sufijo del título pasa a ser la rotativa y se muestra siempre).
+
+## Traspaso a la máquina con datos reales
+
+Todo lo necesario está en **`TRASPASO.md`** (guía maestra con dos métodos y la
+verificación final) y en **`traspaso/`**: el parche git consolidado y
+verificado de los 7 archivos de frontend (`frontend_R1-R9.patch`) y el paso
+opcional de datos de R7 (`r7_tipo_turno_dia.sql`).
