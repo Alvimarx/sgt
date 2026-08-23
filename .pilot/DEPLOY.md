@@ -208,6 +208,16 @@ protege contra la pérdida de la VM.
   negocia latin1 (locale POSIX) — cualquier acento cargado así queda doble-codificado
   ("Ãlvaro LÃ³pez"). Usar SIEMPRE `bash scripts/mysql.sh` para consolas y cargas de SQL.
 
+- **El cliente `mysql` corta el archivo al primer error**: no hay `--force`. Un solo
+  INSERT que viole una clave única deja SIN CARGAR todo lo que venga después, y si el
+  comando está dentro de un `|| true` no se nota. Pasó de verdad: el poblado repetía el
+  RUT '11111111','1' (funcionarios 1 y 200) contra `uk_funcionario_rut_dv` y por eso
+  nunca se cargaron puestos, rotativas ni turnos. Tras cargar un seed, verificar
+  contando filas, no confiando en que "no dijo nada".
+- **El poblado es destructivo por diseño**: empieza con `FOREIGN_KEY_CHECKS=0` + TRUNCATE
+  de 20 tablas. Correrlo borra lo que hayas creado a mano en gestionturnos. Es la razón
+  de que `init_db.sh` lo deje tras la bandera `SEED_DEMO=1`.
+
 - **MySQL no publica puertos**: solo es alcanzable dentro de la red Docker. Para entrar,
   `docker compose exec`. No abrir 3306 a internet.
 - **`setup_innhosp.sql` hace TRUNCATE de `personalAux`**: `init_db.sh` solo lo ejecuta si

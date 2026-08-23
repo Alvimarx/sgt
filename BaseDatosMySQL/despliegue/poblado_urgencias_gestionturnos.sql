@@ -30,7 +30,7 @@ TRUNCATE TABLE feriados;
 -- 1. ROL_SISTEMA  →  tabla: Rol_Sistema
 -- Rol global del funcionario (no va al JWT).
 -- ==============================================================
-INSERT IGNORE INTO Rol_Sistema (id_rol_sistema, nombre_rol) VALUES
+INSERT INTO Rol_Sistema (id_rol_sistema, nombre_rol) VALUES
 (1, 'ADMINISTRADOR'),
 (2, 'USUARIO');
 
@@ -41,7 +41,7 @@ INSERT IGNORE INTO Rol_Sistema (id_rol_sistema, nombre_rol) VALUES
 -- lo evalúa como ROLE_<nombre_rol>.
 -- Valores válidos según SecurityConfig: JEFATURA, SUBROGANTE, MEDICO
 -- ==============================================================
-INSERT IGNORE INTO Rol_Servicio (id_rol_servicio, nombre_rol) VALUES
+INSERT INTO Rol_Servicio (id_rol_servicio, nombre_rol) VALUES
 (1, 'JEFATURA'),
 (2, 'SUBROGANTE'),
 (3, 'MEDICO');
@@ -51,11 +51,6 @@ INSERT IGNORE INTO Rol_Servicio (id_rol_servicio, nombre_rol) VALUES
 -- Unidades activas del hospital en el sistema.
 -- El id_servicio se incluye en el JWT tras seleccionar servicio.
 -- ==============================================================
--- Compatibilidad con bootstrap_inicial.sql: si el bootstrap ya creó el servicio
--- 'Administración' (id auto = 1), moverlo a un id libre para que los ids fijos
--- 1-4 de este demo no choquen (el choque abortaba TODO el archivo: el cliente
--- mysql corta al primer error).
-UPDATE servicios SET id_servicio = 99 WHERE nombre = 'Administración' AND id_servicio = 1;
 
 INSERT INTO servicios (id_servicio, nombre, eliminado) VALUES
 (1, 'Medicina Interna', 0),
@@ -71,7 +66,7 @@ INSERT INTO servicios (id_servicio, nombre, eliminado) VALUES
 -- Días feriados de Chile (2025–2026). El motor de ajuste de horarios
 -- los consulta por fecha; el front los usa para colorear el preview.
 -- ==============================================================
-INSERT IGNORE INTO feriados (fecha, descripcion) VALUES
+INSERT INTO feriados (fecha, descripcion) VALUES
 ('2025-01-01', 'Año Nuevo'),
 ('2025-04-18', 'Viernes Santo'),
 ('2025-04-19', 'Sábado Santo'),
@@ -112,11 +107,13 @@ INSERT IGNORE INTO feriados (fecha, descripcion) VALUES
 -- ID_ROL_SISTEMA: 1=ADMINISTRADOR (jefes/subrogantes)  2=USUARIO (médicos/enfermeros)
 -- ==============================================================
 -- Contraseña "huap2025" hasheada en SHA-512 (inlinea para compatibilidad con DBeaver)
--- INSERT IGNORE: en el flujo de despliegue, bootstrap_inicial.sql ya creó al
--- Admin Bootstrap (11111111-1); sin IGNORE el choque de PK/RUT único abortaba
--- este INSERT COMPLETO y los 35 funcionarios base quedaban sin cargar (y en
--- cascada fallaban sus Servicios_Funcionario y los Turnos 1-69 por FK).
-INSERT IGNORE INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA) VALUES
+-- OJO: RUT único. El funcionario 200 tenía '11111111','1', el MISMO que el
+-- funcionario 1 (Admin Bootstrap): la clave única uk_funcionario_rut_dv abortaba
+-- este INSERT completo y, como el cliente mysql corta al primer error, el resto
+-- del archivo (puestos, rotativas, planificación, turnos) nunca se cargaba.
+-- Se le asignó 20000200-6. El INSERT queda estricto a propósito: si vuelve a
+-- haber un RUT repetido, tiene que fallar a la vista y no tragarse la fila.
+INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA) VALUES
 -- === Medicina Interna ===
 -- Jefatura → ADMINISTRADOR (1)
 (1,  'Admin',      'Bootstrap',   '',           '11111111', '1', 1, 0, 'Administrador de Sistema',  1),
@@ -430,7 +427,7 @@ INSERT INTO puestos (nombre, id_servicio) VALUES
 -- Columnas: ID_TIPO_SOLICITUD, Tipo
 -- 1=Permiso  2=Botar turno  3=Cobertura  4=Intercambio  5=Oferta Particular
 -- ==============================================================
-INSERT IGNORE INTO Tipo_Solicitud (ID_TIPO_SOLICITUD, Tipo) VALUES
+INSERT INTO Tipo_Solicitud (ID_TIPO_SOLICITUD, Tipo) VALUES
 (1, 1),
 (2, 2),
 (3, 3),

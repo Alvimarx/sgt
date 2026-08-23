@@ -67,17 +67,31 @@
   export viejo RE-GUARDADO por Excel/Sheets (coma, sin comillas, h:mm, enteros, BOM
   perdido, mojibake fijado). El export del backend es UTF-8 impecable (BOM + charset
   explícito, ExportacionService/Controller). Datos: idénticos 945/945 al CSV viejo.
-- **Colisiones bootstrap↔poblado descubiertas** (hacían abortar TODO el poblado en la
-  primera sentencia, silenciado por el viejo `|| true`):
-  1. servicios: bootstrap crea 'Administración' id auto=1; poblado inserta ids fijos 1-4.
-     Fix: preámbulo que reubica 'Administración' a id 99.
-  2. Catálogos Rol_Sistema/Rol_Servicio/Tipo_Solicitud/feriados duplicados → INSERT IGNORE.
-  3. Funcionario: RUT 11111111 duplicado (admin bootstrap + Ricardo Morales id 200, que
-     además chocaba consigo mismo dentro del poblado) → INSERT IGNORE + RUT 20000200-6
-     (consistente con el fix de innhosp).
-  Consecuencia en la BD desplegada: el poblado NUNCA cargó (el 'Urgencias' visible lo
-  creó el usuario a mano). Decisión: recargar gestionturnos desde cero con seeds
-  corregidos (determinista) en vez de reparación quirúrgica.
+- **Por qué el poblado nunca cargó** — CAUSA REAL: RUT duplicado DENTRO del propio
+  poblado. `Funcionario` tiene `UNIQUE KEY uk_funcionario_rut_dv (Rut, DV)`, y el
+  archivo insertaba dos veces '11111111','1' (id 1 Admin Bootstrap e id 200 Ricardo
+  Morales) en la MISMA sentencia. La sentencia abortaba, el cliente mysql corta el
+  archivo al primer error y todo lo posterior (servicios, puestos, rotativas,
+  tipo_turno, planificación, turnos) quedaba sin cargar. Fix: id 200 → 20000200-6
+  (consistente con el fix de innhosp). El 'Urgencias' que el usuario ve lo creó a mano.
+  Nota: en la VM además nunca se invocó `SEED_DEMO=1`, así que el paso 5 se saltó.
+- **CORRECCIÓN de un diagnóstico previo mío**: registré aquí que había "colisiones
+  bootstrap↔poblado" que abortaban el archivo en su primera sentencia. Es FALSO: el
+  poblado empieza con `SET FOREIGN_KEY_CHECKS=0` y TRUNCATE de las 20 tablas, así que
+  cuando llega a los INSERT no queda nada del bootstrap con qué chocar. Verificado
+  leyendo el archivo (las TRUNCATE son originales, no mías). Los parches que había
+  puesto por esa teoría —`UPDATE servicios ... id_servicio=99` y los `INSERT IGNORE`—
+  eran no-ops, y el IGNORE sobre `Funcionario` era además NOCIVO: habría enmascarado
+  el siguiente RUT duplicado en vez de hacerlo fallar. Revertidos ambos archivos
+  (despliegue/ y desarrollo/); del parche solo sobrevive el cambio de RUT, que es el
+  que de verdad arregla el problema.
+- **Verificación estática del import de agosto** (sin daemon Docker en esta sesión, así
+  que se cruzaron los archivos con Python): los 81 RUT que referencia resuelven contra
+  el poblado salvo 17599096 (el usuario, que se da de alta en el paso previo); 15/15
+  puestos existen; tipo_turno 'Dia'/'Noche' de servicio 4 existen; 'Rotativa 2026'
+  existe con id_servicio=4. De los 87 pares (puesto,RUT), 2 no tienen fila en
+  `planificacion_asignacion` y por eso quedan con id_rotativa NULL: son exactamente los
+  turnos 7332 y 7500, las dos asignaciones manuales — o sea, correcto.
 - **Coherencia con el Excel**: los turnos de agosto 2026 (ids 6966-8221) NO están en el
   seed (que llega hasta mayo, ids 1-111): son la ejecución de 'Rotativa 2026' del
   ambiente antiguo. Nuevo `turnos_agosto2026_urgencias.sql`: crea la
