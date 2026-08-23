@@ -28,9 +28,9 @@ por qué se hizo y cómo se hizo.
 
 | Req | Fecha | Título | Estado |
 |-----|-------|--------|--------|
-| R1 | 2026-08-23 | Quitar el filtro "Aprobados" del home | pendiente de visto bueno |
-| R2 | 2026-08-23 | Resumen del turno propio con tipo y puesto | pendiente de visto bueno |
-| R3 | 2026-08-23 | Título del detalle de turno con el puesto propio | pendiente de visto bueno |
-| R4 | 2026-08-23 | Solicitar un cupo libre tocándolo directamente | pendiente de visto bueno |
-| R5 | 2026-08-23 | Refrescar la página no expulsa al login | pendiente de visto bueno |
-| R6 | 2026-08-23 | Quitar el punto amarillo del calendario | pendiente de visto bueno |
+| R1 | 2026-08-23 | Quitar el filtro "Aprobados" del home | aprobado ✅ |
+| R2 | 2026-08-23 | Resumen del turno propio con tipo y rotativa | pendiente de visto bueno (v2: rotativa) |
+| R3 | 2026-08-23 | Título del detalle de turno con el puesto propio | aprobado ✅ |
+| R4 | 2026-08-23 | Solicitar un cupo libre tocándolo directamente | aprobado ✅ |
+| R5 | 2026-08-23 | Refrescar la página no expulsa al login | aprobado ✅ |
+| R6 | 2026-08-23 | Quitar el punto amarillo del calendario | aprobado ✅ |

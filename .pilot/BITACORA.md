@@ -122,3 +122,13 @@
   AuthContext/funcionarioService son deuda preexistente, idéntica en HEAD).
 - Sin daemon Docker en esta sesión: la prueba visual queda en manos del usuario
   (rebuild del frontend en la VM).
+
+## 2026-08-23 (2) · Visto bueno R1/R3/R4/R5/R6; R2 corregido a rotativa
+- Usuario probó en la VM: aprobó 5 de 6. R2 estaba mal interpretado: el sufijo
+  no es el puesto sino la ROTATIVA del turno ("Turno III" en el repo real).
+- El backend ya enviaba nombreRotativa (centinela "Sin Rotativa"): solo se mapeó
+  en el frontend (helper genérico limpiarCentinela en ambos services) y se cambió
+  la línea de AgendaView a nombreRotativa. R3 (puesto en el título del detalle)
+  quedó aprobado tal como estaba.
+- Docs: 5 requerimientos pasan a "aprobado ✅"; R2 reescrito como v2 (renombrado
+  a ..._R2_resumen-turno-propio-con-rotativa.md), pendiente de visto bueno.

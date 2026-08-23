@@ -123,10 +123,14 @@ const buildTeamMember = (turno, funcionarioId) => {
  * Mapea un turno crudo del endpoint de calendario al formato de vista.
  * turnoLibre = idFuncionario es null (Sin Asignar en el JSON).
  */
-const limpiarNombrePuesto = (nombre) => {
+// Los endpoints del backend usan centinelas string ("Sin Puesto", "Sin Rotativa")
+// en vez de null; se normalizan para que las vistas puedan omitir el dato.
+const limpiarCentinela = (nombre, regexCentinela) => {
     if (!nombre) return null;
-    return /^sin puesto$/i.test(String(nombre).trim()) ? null : nombre;
+    return regexCentinela.test(String(nombre).trim()) ? null : nombre;
 };
+const limpiarNombrePuesto = (nombre) => limpiarCentinela(nombre, /^sin puesto$/i);
+const limpiarNombreRotativa = (nombre) => limpiarCentinela(nombre, /^sin rotativa$/i);
 
 const mapTurnoCalendario = (turno, funcionarioId) => {
     const fecha = parseDateKey(turno?.diaInicioTurno || turno?.fecha);
@@ -144,11 +148,11 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         nombreTipo: turno?.nombre ?? null,
         inicio,
         fin,
-        // Mismo centinela "Sin Puesto" que en funcionarioService: se normaliza a null.
         nombrePuesto: limpiarNombrePuesto(turno?.nombrePuesto),
         idPuesto: turno?.idPuesto ?? null,
         idTipoTurno: turno?.idTipoTurno ?? null,
         idRotativa: turno?.idRotativa ?? 1,
+        nombreRotativa: limpiarNombreRotativa(turno?.nombreRotativa),
         nombreTipoTurno: turno?.nombreTipoTurno ?? null,
         nombreFuncionario: turnoLibre ? null : (turno?.nombreFuncionario ?? null),
         idFuncionario: turno?.idFuncionario ?? null,

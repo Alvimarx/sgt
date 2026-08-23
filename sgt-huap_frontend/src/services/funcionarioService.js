@@ -99,10 +99,14 @@ const buildTeamMember = (turno, funcionarioId) => {
  * - Si no, intenta construirlo desde los campos crudos con buildTeamFromRaw.
  * - Si no hay datos de equipo, team queda null (la vista lo maneja con &&).
  */
-const limpiarNombrePuesto = (nombre) => {
+// Los endpoints del backend usan centinelas string ("Sin Puesto", "Sin Rotativa")
+// en vez de null; se normalizan para que las vistas puedan omitir el dato.
+const limpiarCentinela = (nombre, regexCentinela) => {
     if (!nombre) return null;
-    return /^sin puesto$/i.test(String(nombre).trim()) ? null : nombre;
+    return regexCentinela.test(String(nombre).trim()) ? null : nombre;
 };
+const limpiarNombrePuesto = (nombre) => limpiarCentinela(nombre, /^sin puesto$/i);
+const limpiarNombreRotativa = (nombre) => limpiarCentinela(nombre, /^sin rotativa$/i);
 
 const mapTurnoForAgenda = (turno, funcionarioId) => {
     const fechaInicio = normalizeDateString(turno?.diaInicioTurno);
@@ -125,8 +129,6 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         fin: formatTime(turno?.horaFin) ?? null,
         horas: getHoursFromTurno(turno),
         equipo: null,
-        // El backend envía el string "Sin Puesto" (truthy) cuando el turno no tiene
-        // puesto; se normaliza a null para que las vistas omitan el sufijo ": puesto".
         nombrePuesto: limpiarNombrePuesto(turno?.nombrePuesto),
         idPuesto: turno?.idPuesto || null,
         idTipoTurno: turno?.idTipoTurno ?? null,
@@ -146,6 +148,7 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         cambioAprobadoCon: turno?.cambioAprobadoCon ?? null,
         cruzaMedianoche: Boolean(turno?.cruzaMedianoche),
         idRotativa: turno?.idRotativa ?? null,
+        nombreRotativa: limpiarNombreRotativa(turno?.nombreRotativa),
         teamKey,
         raw: turno,
     };

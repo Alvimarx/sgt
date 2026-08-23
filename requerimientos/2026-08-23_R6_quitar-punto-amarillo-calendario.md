@@ -1,6 +1,6 @@
 # R6 · Quitar el punto amarillo del calendario
 
-**Estado: pendiente de visto bueno** · Fecha: 2026-08-23 · Alcance: solo frontend
+**Estado: aprobado ✅** (visto bueno del usuario, 2026-08-23) · Fecha: 2026-08-23 · Alcance: solo frontend
 
 ## Qué se pidió
 

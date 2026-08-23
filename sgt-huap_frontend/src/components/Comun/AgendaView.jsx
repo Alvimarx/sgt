@@ -603,7 +603,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                 </div>
                 {miShift.nombreTipoTurno && (
                   <div style={{ fontSize: 11.5, fontWeight: 700, color: tc.ink }}>
-                    Tienes turno {miShift.nombreTipoTurno}{miShift.nombrePuesto ? `: ${miShift.nombrePuesto}` : ""}
+                    Tienes turno {miShift.nombreTipoTurno}{miShift.nombreRotativa ? `: ${miShift.nombreRotativa}` : ""}
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
