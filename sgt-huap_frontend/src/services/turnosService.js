@@ -123,6 +123,11 @@ const buildTeamMember = (turno, funcionarioId) => {
  * Mapea un turno crudo del endpoint de calendario al formato de vista.
  * turnoLibre = idFuncionario es null (Sin Asignar en el JSON).
  */
+const limpiarNombrePuesto = (nombre) => {
+    if (!nombre) return null;
+    return /^sin puesto$/i.test(String(nombre).trim()) ? null : nombre;
+};
+
 const mapTurnoCalendario = (turno, funcionarioId) => {
     const fecha = parseDateKey(turno?.diaInicioTurno || turno?.fecha);
     const inicio = formatTime(turno?.horaInicio);
@@ -139,7 +144,8 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         nombreTipo: turno?.nombre ?? null,
         inicio,
         fin,
-        nombrePuesto: turno?.nombrePuesto ?? null,
+        // Mismo centinela "Sin Puesto" que en funcionarioService: se normaliza a null.
+        nombrePuesto: limpiarNombrePuesto(turno?.nombrePuesto),
         idPuesto: turno?.idPuesto ?? null,
         idTipoTurno: turno?.idTipoTurno ?? null,
         idRotativa: turno?.idRotativa ?? 1,

@@ -99,6 +99,11 @@ const buildTeamMember = (turno, funcionarioId) => {
  * - Si no, intenta construirlo desde los campos crudos con buildTeamFromRaw.
  * - Si no hay datos de equipo, team queda null (la vista lo maneja con &&).
  */
+const limpiarNombrePuesto = (nombre) => {
+    if (!nombre) return null;
+    return /^sin puesto$/i.test(String(nombre).trim()) ? null : nombre;
+};
+
 const mapTurnoForAgenda = (turno, funcionarioId) => {
     const fechaInicio = normalizeDateString(turno?.diaInicioTurno);
     const fechaFin = normalizeDateString(turno?.diaFinalTurno);
@@ -120,7 +125,9 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         fin: formatTime(turno?.horaFin) ?? null,
         horas: getHoursFromTurno(turno),
         equipo: null,
-        nombrePuesto: turno?.nombrePuesto || null,
+        // El backend envía el string "Sin Puesto" (truthy) cuando el turno no tiene
+        // puesto; se normaliza a null para que las vistas omitan el sufijo ": puesto".
+        nombrePuesto: limpiarNombrePuesto(turno?.nombrePuesto),
         idPuesto: turno?.idPuesto || null,
         idTipoTurno: turno?.idTipoTurno ?? null,
         nombreTipoTurno: turno?.nombreTipoTurno ?? null,

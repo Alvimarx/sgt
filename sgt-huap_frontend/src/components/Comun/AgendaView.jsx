@@ -275,7 +275,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   // ---------------------------------------------------------------------------
-  // CONTADORES DE FILTROS — sin overlap entre "pendientes" y "aprobados"
+  // CONTADORES DE FILTROS — "pendientes" excluye los cambios ya aprobados
   // ---------------------------------------------------------------------------
   const countMisTurnos = useMemo(
     () => agendaDays.filter((day) => getShifts(day.key).some((s) => s.miTurno)).length,
@@ -292,17 +292,11 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter((s) => s.turnoLibre).length, 0),
     [agendaDays, shiftsByDay]
   );
-  const countAprobados = useMemo(
-    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter((s) => s.cambioAprobado).length, 0),
-    [agendaDays, shiftsByDay]
-  );
-
   const FILTERS = [
     { id: "todos",      label: "Todos"      },
     { id: "miTurno",   label: "Mis turnos", count: countMisTurnos  },
     { id: "pendientes", label: "Pendientes", count: countPendientes },
     { id: "libres",    label: "Libres",     count: countLibres     },
-    { id: "aprobados", label: "Aprobados",  count: countAprobados  },
   ];
 
   const visibleDays = useMemo(() => {
@@ -312,7 +306,6 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       if (filter === "miTurno")    return shifts.some((s) => s.miTurno);
       if (filter === "pendientes") return shifts.some((s) => s.solicitudPendiente && !s.cambioAprobado);
       if (filter === "libres")     return shifts.some((s) => s.turnoLibre);
-      if (filter === "aprobados")  return shifts.some((s) => s.cambioAprobado);
       return true;
     });
   }, [agendaDays, filter, shiftsByDay]);
@@ -610,7 +603,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                 </div>
                 {miShift.nombreTipoTurno && (
                   <div style={{ fontSize: 11.5, fontWeight: 700, color: tc.ink }}>
-                    Equipo {miShift.nombreTipoTurno}
+                    Tienes turno {miShift.nombreTipoTurno}{miShift.nombrePuesto ? `: ${miShift.nombrePuesto}` : ""}
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -674,6 +667,10 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
               const vacantes = total - asignados;
               const hayMiTurno = teamShifts.some((x) => x.miTurno);
 
+              const tituloCard =
+                (rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")) +
+                (hayMiTurno && rep.nombrePuesto ? `: ${rep.nombrePuesto}` : "");
+
               return (
                 <div
                   key={key}
@@ -681,13 +678,13 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === "Enter" && onOpen(rep)}
-                  aria-label={`Ver detalle: ${rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")}`}
+                  aria-label={`Ver detalle: ${tituloCard}`}
                   style={{ marginTop: 10, background: t.bg, border: `1.5px solid ${t.soft}`, borderRadius: 12, padding: 10, cursor: "pointer", transition: "opacity 0.15s" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: team ? 8 : 0, flexWrap: "wrap" }}>
                     <SGTIcon name={rep.tipo === "dia" ? "sun" : "moon"} size={14} color={t.ink} />
                     <span style={{ fontSize: 12.5, fontWeight: 800, color: t.ink, flex: 1, minWidth: 0 }}>
-                      {rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")}
+                      {tituloCard}
                     </span>
                     {hayMiTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
                     <SGTBadge tone={vacantes > 0 ? "accent" : "success"} size="xs">

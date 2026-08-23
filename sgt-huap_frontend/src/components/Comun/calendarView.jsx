@@ -381,7 +381,6 @@ const CalendarView = ({
                                 const shifts = shiftsByDay[key] || [];
                                 const miShift = shifts.find(s => s.miTurno);
                                 const hasLibre = shifts.some(s => s.turnoLibre || !s.idFuncionario);
-                                const hasAjeno = shifts.some(s => !s.turnoLibre && s.idFuncionario && !s.miTurno);
                                 const isToday = key === today;
                                 const isSel = selectedDay === day;
                                 const isWknd = idx % 7 >= 5;
@@ -429,7 +428,6 @@ const CalendarView = ({
                                         <div style={{ display: 'flex', justifyContent: 'center', gap: 2, minHeight: 6 }}>
                                             {miShift && <Dot color={isToday ? 'rgba(255,255,255,0.9)' : miShiftColor.ink} />}
                                             {hasLibre && <Dot color={isToday ? 'rgba(255,255,255,0.65)' : PA.accent} />}
-                                            {hasAjeno && <Dot color={isToday ? 'rgba(255,255,255,0.5)' : PA.warn} />}
                                         </div>
                                     </button>
                                 );
@@ -442,7 +440,6 @@ const CalendarView = ({
                 <div style={{ display: 'flex', gap: 14, padding: '12px 16px 8px', borderTop: `1px solid ${PA.line2}`, marginTop: 12, flexWrap: 'wrap' }}>
                     <LegendDot color={PA.primary} label="Mi turno" />
                     <LegendDot color={PA.accent} label="Cupo libre" />
-                    <LegendDot color={PA.warn} label="Turno del servicio" />
                 </div>
 
                 {/* Botón de exportación */}
@@ -461,7 +458,7 @@ const CalendarView = ({
                 {!selectedDay && !loading && (
                     <div style={{ padding: '16px 24px 24px', textAlign: 'center' }}>
                         <span style={{ fontSize: 12, color: PA.ink3, fontWeight: 600 }}>
-                            Toca un día con punto para ver sus turnos
+                            Toca un día para ver sus turnos
                         </span>
                     </div>
                 )}

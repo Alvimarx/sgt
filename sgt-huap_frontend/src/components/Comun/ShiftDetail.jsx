@@ -138,6 +138,11 @@ const ShiftDetail = ({
         onAction("editar-asignacion-turno", targetShift);
     };
 
+    const handleRequestVacancy = (vacantShift) => {
+        if (!vacantShift || !onAction) return;
+        onAction("solicitar-turno", vacantShift);
+    };
+
     const totalTurnos = groupData?.totalTurnos ?? null;
     const asignados = groupData?.asignados ?? null;
     const equipoCompleto = groupData?.completo ?? false;
@@ -211,10 +216,11 @@ const ShiftDetail = ({
                             textTransform: "uppercase",
                         }}
                     >
-                        {shift.nombreTipoTurno ||
+                        {(shift.nombreTipoTurno ||
                             shift.nombreTipo ||
                             shift.nombre ||
-                            (shift.tipo === "dia" ? "Turno día" : "Turno noche")}
+                            (shift.tipo === "dia" ? "Turno día" : "Turno noche")) +
+                            (shift.miTurno && shift.nombrePuesto ? `: ${shift.nombrePuesto}` : "")}
                     </span>
                 </div>
 
@@ -316,6 +322,7 @@ const ShiftDetail = ({
                         turnosGrupo={turnosGrupo}
                         canManageAssignments={canManageAssignments}
                         onAssignVacancy={handleAssignVacancy}
+                        onRequestVacancy={handleRequestVacancy}
                         onManageAssignedTurn={handleManageAssignedTurn}
                         onSelectMember={onSelectTargetFuncionario ? handleSelectTarget : undefined}
                         selectedMemberId={selectedTargetFuncionario?.id}
@@ -508,6 +515,7 @@ const TeamByPuesto = ({
     selectedMemberId = null,
     canManageAssignments = false,
     onAssignVacancy,
+    onRequestVacancy,
     onManageAssignedTurn,
 }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -666,6 +674,8 @@ const TeamByPuesto = ({
                                     onClick={() => {
                                         if (canManageAssignments) {
                                             onAssignVacancy?.(vacante);
+                                        } else {
+                                            onRequestVacancy?.(vacante);
                                         }
                                     }}
                                     style={{
@@ -677,13 +687,13 @@ const TeamByPuesto = ({
                                         marginTop: 4,
                                         border: canManageAssignments
                                             ? `1px dashed ${P2().primary}`
-                                            : "none",
+                                            : `1px dashed ${P2().accent}`,
                                         background: canManageAssignments
                                             ? P2().primarySoft
-                                            : "transparent",
+                                            : P2().accentSoft,
                                         width: "100%",
                                         textAlign: "left",
-                                        cursor: canManageAssignments ? "pointer" : "default",
+                                        cursor: "pointer",
                                     }}
                                 >
                                     <div
@@ -692,7 +702,7 @@ const TeamByPuesto = ({
                                             height: 28,
                                             borderRadius: 99,
                                             border: `1.5px dashed ${
-                                                canManageAssignments ? P2().primary : P2().line
+                                                canManageAssignments ? P2().primary : P2().accent
                                             }`,
                                             display: "grid",
                                             placeItems: "center",
@@ -702,7 +712,7 @@ const TeamByPuesto = ({
                                         <SGTIcon
                                             name={canManageAssignments ? "user-plus" : "hand-raised"}
                                             size={13}
-                                            color={canManageAssignments ? P2().primary : P2().ink3}
+                                            color={canManageAssignments ? P2().primary : "#B85A60"}
                                         />
                                     </div>
 
@@ -710,23 +720,20 @@ const TeamByPuesto = ({
                                         style={{
                                             fontSize: 12.5,
                                             fontWeight: 800,
-                                            color: canManageAssignments ? P2().primary : P2().ink3,
+                                            color: canManageAssignments ? P2().primary : "#B85A60",
                                             flex: 1,
-                                            fontStyle: canManageAssignments ? "normal" : "italic",
                                         }}
                                     >
                                         {canManageAssignments
                                             ? "Asignar funcionario a este cupo"
-                                            : "Cupo libre — falta cubrir"}
+                                            : "Cupo libre — tocar para solicitar"}
                                     </span>
 
-                                    {canManageAssignments && (
-                                        <SGTIcon
-                                            name="chevron-right"
-                                            size={13}
-                                            color={P2().primary}
-                                        />
-                                    )}
+                                    <SGTIcon
+                                        name="chevron-right"
+                                        size={13}
+                                        color={canManageAssignments ? P2().primary : "#B85A60"}
+                                    />
                                 </button>
                             ))
                         ) : (

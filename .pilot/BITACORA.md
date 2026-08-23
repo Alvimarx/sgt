@@ -101,3 +101,24 @@
   + ASIGNACION_MANUAL para 7332 y 7500, para que el export rotule igual que el Excel.
 - Pendiente del usuario en la VM: git pull → backup → recrear gestionturnos → re-seed →
   reparar innhosp (nombres) → re-alta de su usuario → importar agosto → restart backend.
+
+## 2026-08-23 · Requerimientos R1-R6 (primeras mejoras funcionales)
+- Usuario confirmó: recarga de la BD en la VM funcionó y los usuarios de prueba
+  (Flavio Ayala 30000006-6 JEFATURA, Pablo Garrido 30000070-0 MEDICO) entran.
+- Nueva carpeta `requerimientos/` (README + 1 doc por requerimiento) pensada para
+  replicar cada cambio "por palabra" en el repo gemelo con datos reales. Los docs
+  quedan "pendiente de visto bueno" hasta que el usuario pruebe.
+- R1 quitar filtro Aprobados (AgendaView), R2 "Tienes turno {tipo}: {puesto}" en
+  el resumen del día, R3 puesto propio en título de card expandida y de
+  ShiftDetail, R4 tocar la vacante "Cupo libre" dispara el flujo de solicitud de
+  Cobertura existente (solo médicos; jefatura conserva asignación directa), R5
+  refresh conserva sesión y vista (sgt_nav_state en sessionStorage + whitelist
+  por rol + fix de "Cambiar servicio" post-refresh exponiendo servicios en
+  AuthContext), R6 sin punto amarillo del calendario.
+- Hallazgo de la revisión adversarial (6 verificadores): el backend envía el
+  centinela "Sin Puesto" (string) en vez de null — se normaliza a null en los
+  mappers del frontend (limpiarNombrePuesto en funcionarioService/turnosService).
+- Validación: npm run build OK; eslint sin errores nuevos (los 5 de ShiftDetail/
+  AuthContext/funcionarioService son deuda preexistente, idéntica en HEAD).
+- Sin daemon Docker en esta sesión: la prueba visual queda en manos del usuario
+  (rebuild del frontend en la VM).
