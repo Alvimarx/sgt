@@ -40,13 +40,14 @@ por qué se hizo y cómo se hizo.
 | R10 | 2026-08-25 | Postulaciones agrupadas: jefatura elige entre postulantes | pendiente de visto bueno |
 | R11 | 2026-08-25 | (bug) Chip "Solicitudes" con datos reales del backend | pendiente de visto bueno |
 | R12 | 2026-08-25 | (bug) Anti doble solicitud: "Ud. ya solicitó este turno" | pendiente de visto bueno |
+| R13 | 2026-08-25 | (bug grave) Regla de descanso: 24 corridas sí, invertido no | pendiente de visto bueno |
 
 ## Estado por lote
 
 - **Lote 1-2 (R1-R9)**: probados y **aprobados**. Ojo con R7: reemplaza el
   criterio de R3 (el sufijo del título pasa a ser la rotativa y se muestra
   siempre).
-- **Lote 3 (R10-R12)**: implementado y compilado (backend 61/61 tests),
+- **Lote 3 (R10-R13)**: implementado y compilado (264/264 tests unitarios),
   **pendiente de prueba**. PRIMER LOTE QUE TOCA BACKEND: R11 y R12 modifican
   `SolicitudRepository`, `SolicitudService` y `TurnoService` — en la otra
   máquina habrá que recompilar también el backend. R11 además deja obsoleto el

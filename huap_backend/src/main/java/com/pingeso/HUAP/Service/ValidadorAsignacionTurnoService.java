@@ -3,7 +3,6 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -20,19 +19,18 @@ import java.util.Objects;
  *   <li><b>Solapamiento</b>: dos turnos del mismo funcionario no pueden ocupar el mismo instante.
  *   El intervalo es semiabierto ([inicio, fin)): tocarse exactamente en el borde no es solape,
  *   permitiendo turnos consecutivos de duraciones distintas.</li>
- *   <li><b>Secuencia incompatible de 12 horas</b>: si el turno candidato dura exactamente 12 horas
- *   y el funcionario ya tiene (o quedaría con) otro turno de exactamente 12 horas que termina justo
- *   cuando el candidato empieza, o que empieza justo cuando el candidato termina, se rechaza — no
- *   hay período de descanso entre ambos. Esta regla es simétrica: no importa si el turno existente
- *   o el candidato es "diurno" o "nocturno" según su nombre, solo que ambos duren 12 horas y sean
- *   adyacentes sin holgura.</li>
+ *   <li><b>Descanso post-nocturno</b> (corrección R13; reemplaza a la antigua regla simétrica de
+ *   "dos turnos de 12 horas exactas adyacentes", que prohibía lo permitido y permitía lo prohibido):
+ *   quien sale de un turno que cruzó la medianoche (termina la mañana del día D) no puede tener
+ *   además un turno diurno (que empieza y termina dentro del mismo día) ese mismo día D — "noche
+ *   seguida de día" queda prohibido, sin exigir duraciones exactas ni adyacencia exacta (los turnos
+ *   reales duran 11 a 13 horas). La dirección inversa es legal: un día completo seguido del
+ *   nocturno que parte esa misma tarde son 24 horas corridas permitidas, igual que dos nocturnos en
+ *   días consecutivos. Se evalúa por fechas y horas reales, nunca por el nombre del tipo.</li>
  * </ol>
  */
 @Service
 public class ValidadorAsignacionTurnoService {
-
-    /** Duración exacta que activa la regla de secuencia incompatible (parametrizable a futuro). */
-    private static final Duration DURACION_TURNO_LARGO = Duration.ofHours(12);
 
     /**
      * Excepción de negocio con el detalle exigido por la corrección 6: qué turno se intenta
@@ -64,8 +62,6 @@ public class ValidadorAsignacionTurnoService {
     ) {
         if (nuevoInicio == null || nuevoFin == null || turnosVigentes == null) return;
 
-        Duration duracionNuevo = Duration.between(nuevoInicio, nuevoFin);
-
         for (TurnoEntity existente : turnosVigentes) {
             if (idTurnoCandidato != null && idTurnoCandidato.equals(existente.getIdTurno())) continue;
             if (existente.getDiaInicioTurno() == null || existente.getHoraInicio() == null
@@ -80,36 +76,44 @@ public class ValidadorAsignacionTurnoService {
                         + "asignado que se superpone (" + existenteInicio + " a " + existenteFin + ").");
             }
 
-            if (esSecuencia12HorasIncompatible(nuevoInicio, nuevoFin, duracionNuevo, existenteInicio, existenteFin)) {
-                boolean existenteEsAnterior = existenteFin.equals(nuevoInicio);
-                String motivo = existenteEsAnterior
-                        ? "tiene un turno de 12 horas inmediatamente anterior (" + existenteInicio + " a " + existenteFin
-                          + "), sin período de descanso entre ambos turnos."
-                        : "quedaría con un turno de 12 horas inmediatamente posterior (" + existenteInicio + " a " + existenteFin
-                          + "), sin período de descanso entre ambos turnos.";
+            if (esDescansoPostNocturnoViolado(nuevoInicio, nuevoFin, existenteInicio, existenteFin)) {
+                boolean existenteEsElNocturno = existenteInicio.toLocalDate().isBefore(existenteFin.toLocalDate());
+                String motivo = existenteEsElNocturno
+                        ? "sale de su turno de noche (" + existenteInicio + " a " + existenteFin
+                          + ") la mañana de ese mismo día"
+                        : "saldría de ese turno de noche la misma mañana en que empieza su turno de día ("
+                          + existenteInicio + " a " + existenteFin + ")";
                 throw new ConflictoAsignacionException(
-                        "No es posible realizar la solicitud porque el funcionario " + nombreFuncionario + " " + motivo);
+                        "No es posible asignar el turno a " + nombreFuncionario + " porque " + motivo
+                        + ". Se permite un día seguido de su noche (24 horas corridas), pero no una noche seguida de día.");
             }
         }
     }
 
     /**
-     * ¿El turno candidato y el existente forman una secuencia de dos turnos de 12 horas exactas,
-     * adyacentes sin holgura (uno termina exactamente cuando el otro empieza)?
+     * ¿Este par (candidato, existente) viola el descanso post-nocturno? Ocurre cuando uno de los
+     * dos es un turno nocturno (cruza medianoche) que termina la mañana del día en que el otro —
+     * un turno diurno (mismo día calendario) — comienza. Da igual cuál de los dos es el candidato:
+     * tomar el día saliendo de la noche y tomar la noche que desemboca en un día ya asignado son
+     * el mismo "24 invertido". No exige adyacencia exacta: un diurno que parte a las 10:00 tras
+     * salir de la noche a las 09:00 sigue prohibido.
      */
-    private boolean esSecuencia12HorasIncompatible(
-            LocalDateTime nuevoInicio, LocalDateTime nuevoFin, Duration duracionNuevo,
+    private boolean esDescansoPostNocturnoViolado(
+            LocalDateTime nuevoInicio, LocalDateTime nuevoFin,
             LocalDateTime existenteInicio, LocalDateTime existenteFin
     ) {
-        if (!duracionNuevo.equals(DURACION_TURNO_LARGO)) return false;
+        boolean nuevoEsNocturno = nuevoInicio.toLocalDate().isBefore(nuevoFin.toLocalDate());
+        boolean existenteEsNocturno = existenteInicio.toLocalDate().isBefore(existenteFin.toLocalDate());
 
-        Duration duracionExistente = Duration.between(existenteInicio, existenteFin);
-        if (!duracionExistente.equals(DURACION_TURNO_LARGO)) return false;
-
-        boolean existenteTerminaCuandoNuevoEmpieza = existenteFin.equals(nuevoInicio);
-        boolean nuevoTerminaCuandoExistenteEmpieza = nuevoFin.equals(existenteInicio);
-
-        return existenteTerminaCuandoNuevoEmpieza || nuevoTerminaCuandoExistenteEmpieza;
+        if (existenteEsNocturno && !nuevoEsNocturno
+                && existenteFin.toLocalDate().equals(nuevoInicio.toLocalDate())) {
+            return true;
+        }
+        if (nuevoEsNocturno && !existenteEsNocturno
+                && nuevoFin.toLocalDate().equals(existenteInicio.toLocalDate())) {
+            return true;
+        }
+        return false;
     }
 
     /** Solape de dos intervalos semiabiertos [ini,fin); tocarse en el borde no cuenta como choque. */

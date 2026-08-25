@@ -225,3 +225,21 @@
   consciente): GET /solicitudes sin scoping por servicio (cualquier autenticado
   ve todas), respuestas con entidad cruda sobre-expuesta (rut del funcionario,
   etc.), GETs sin chequeo IDOR. Candidatos a requerimiento de seguridad.
+
+## 2026-08-25 (2) · R13: bug grave en la regla de 12 horas
+- Regla del negocio aclarada por el usuario: día→noche (24 corridas) LEGAL;
+  noche→día siguiente ("24 invertido") PROHIBIDO.
+- La implementación era doblemente incorrecta: (1) simétrica a propósito
+  (bloqueaba también el 24 corrido legal) y (2) exigía 12h EXACTAS adyacentes —
+  los turnos reales duran 13h/11h, así que jamás se activaba y el invertido
+  pasaba limpio.
+- Reemplazada en ValidadorAsignacionTurnoService por "descanso post-nocturno":
+  nocturno que termina la mañana del día D incompatible con diurno del día D,
+  en ambas direcciones de candidatura, sin exigir duraciones ni adyacencia
+  exacta. Permitidos explícitos: 24 corridas y noches consecutivas. Rige
+  automáticamente en solicitudes, asignación manual y ofertas (validador
+  compartido). Coherente con el filtro Disponibles de R9.
+- Tests del validador reescritos a la semántica correcta (12) incluyendo el
+  caso 13h/11h que la regla vieja dejaba pasar. Suite: 264/264 unitarios OK;
+  los 26 que fallan en esta sesión son Testcontainers sin daemon Docker
+  (fallan igual sin el cambio; correr en la VM u otra máquina si se quiere).

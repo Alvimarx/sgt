@@ -11,9 +11,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Pruebas de {@link ValidadorAsignacionTurnoService}: solapamiento general y la regla de secuencia
- * incompatible de dos turnos de 12 horas consecutivos sin descanso (corrección funcional "turnos de
- * 12 horas"). Todas las condiciones se determinan por fecha/hora/duración real, nunca por nombre.
+ * Pruebas de {@link ValidadorAsignacionTurnoService}: solapamiento general y la regla de descanso
+ * post-nocturno (R13): noche seguida de día prohibido, día seguido de noche (24 corridas) y noches
+ * en días consecutivos permitidos. Todo por fecha/hora real, nunca por nombre del tipo.
  */
 class ValidadorAsignacionTurnoServiceTest {
 
@@ -35,66 +35,97 @@ class ValidadorAsignacionTurnoServiceTest {
                 .idTurno(id).diaInicioTurno(diaInicio).horaInicio(horaInicio).diaFinalTurno(diaFin).horaFin(horaFin).build();
     }
 
-    // ============================ Caso A: turno de 12h existente ANTERIOR (típicamente "nocturno") ============================
+    // ============================ Prohibido: noche seguida de día ("24 invertido") ============================
 
     @Test
-    void turnoNocturno12h_seguidoInmediatoDeTurnoDiurno12h_rechazado() {
-        // Nocturno 20:00 -> 08:00 (12h), diurno inmediato 08:00 -> 20:00 (12h) el mismo día.
+    void nocturno_seguidoDeDiurnoEsaManana_rechazado() {
+        // Nocturno 20:00 -> 08:00; diurno 08:00 -> 20:00 del día en que la noche termina.
         TurnoEntity nocturnoExistente = turnoDe12h(1L, LUNES, LocalTime.of(20, 0));
         LocalDateTime nuevoInicio = LUNES.plusDays(1).atTime(8, 0);
         LocalDateTime nuevoFin = nuevoInicio.plusHours(12);
 
         var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
                 () -> validador.validarAsignacion("Juan Pérez", nuevoInicio, nuevoFin, 2L, List.of(nocturnoExistente)));
-        assertTrue(ex.getMessage().contains("inmediatamente anterior"));
+        assertTrue(ex.getMessage().contains("noche"));
     }
 
-    // ============================ Caso B: turno de 12h existente POSTERIOR (típicamente "diurno") ============================
-
     @Test
-    void turnoDiurno12hPosterior_alSolicitarTurnoNocturno12hInmediatoAnterior_rechazado() {
-        // Diurno existente 08:00 -> 20:00 (12h); se intenta asignar un nocturno 20:00(día anterior) -> 08:00 (12h).
+    void candidatoNocturno_queDesembocaEnDiurnoYaAsignado_rechazado() {
+        // Diurno existente el martes 08:00 -> 20:00; se intenta tomar la noche lunes 20:00 -> martes 08:00.
+        // Es el mismo "24 invertido" visto desde el otro lado: también se rechaza.
         TurnoEntity diurnoExistente = turnoDe12h(1L, LUNES.plusDays(1), LocalTime.of(8, 0));
         LocalDateTime nuevoInicio = LUNES.atTime(20, 0);
-        LocalDateTime nuevoFin = nuevoInicio.plusHours(12); // termina exactamente cuando empieza el diurno
+        LocalDateTime nuevoFin = nuevoInicio.plusHours(12);
 
         var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
                 () -> validador.validarAsignacion("Juan Pérez", nuevoInicio, nuevoFin, 2L, List.of(diurnoExistente)));
-        assertTrue(ex.getMessage().contains("inmediatamente posterior"));
+        assertTrue(ex.getMessage().contains("noche"));
     }
 
     @Test
-    void reglaEsSimetrica_noDependeDeCualEsDiurnoONocturno() {
-        // Dos turnos de 12h adyacentes, sin importar el nombre/orientación: siempre se rechaza.
-        TurnoEntity existente = turnoDe12h(1L, LUNES, LocalTime.of(6, 0)); // 06:00 -> 18:00
-        LocalDateTime nuevoInicio = LUNES.atTime(18, 0); // empieza justo cuando el existente termina
-        LocalDateTime nuevoFin = nuevoInicio.plusHours(12);
+    void horariosRealesDelServicio_noche13h_diurno11hDeEsaManana_rechazado() {
+        // El caso que la regla antigua de "12 horas exactas" dejaba pasar (el bug grave):
+        // noche real 20:00 -> 09:00 (13h) y día real 09:00 -> 20:00 (11h) de esa misma mañana.
+        TurnoEntity nocturnoExistente = turno(1L, LUNES, LocalTime.of(20, 0), LUNES.plusDays(1), LocalTime.of(9, 0));
+        LocalDateTime nuevoInicio = LUNES.plusDays(1).atTime(9, 0);
+        LocalDateTime nuevoFin = LUNES.plusDays(1).atTime(20, 0);
 
         assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
-                () -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(existente)));
+                () -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(nocturnoExistente)));
     }
 
-    // ============================ Casos permitidos ============================
-
     @Test
-    void turnosDe12hSeparadosPorDescanso_permitido() {
-        // Nocturno 20:00->08:00, luego diurno que empieza dos horas después (10:00), no exactamente adyacente.
+    void descansoCortoTrasLaNoche_diurnoDelMismoDia_rechazadoIgual() {
+        // Salir de la noche a las 08:00 y entrar a un diurno a las 10:00 del mismo día sigue
+        // siendo noche seguida de día: dos horas de descanso no lo convierten en legal.
         TurnoEntity nocturnoExistente = turnoDe12h(1L, LUNES, LocalTime.of(20, 0));
         LocalDateTime nuevoInicio = LUNES.plusDays(1).atTime(10, 0);
         LocalDateTime nuevoFin = nuevoInicio.plusHours(12);
 
-        assertDoesNotThrow(() -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(nocturnoExistente)));
+        assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(nocturnoExistente)));
+    }
+
+    // ============================ Permitido: día seguido de noche (24 corridas) y noches seguidas ============================
+
+    @Test
+    void diurno_seguidoDeSuNocturnoEsaMismaTarde_24CorridasPermitido() {
+        // Día 08:00 -> 20:00 y la noche que parte a las 20:00 de ese mismo día: legal.
+        TurnoEntity diurnoExistente = turnoDe12h(1L, LUNES, LocalTime.of(8, 0));
+        LocalDateTime nuevoInicio = LUNES.atTime(20, 0);
+        LocalDateTime nuevoFin = nuevoInicio.plusHours(12);
+
+        assertDoesNotThrow(() -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(diurnoExistente)));
     }
 
     @Test
-    void turnosQueNoDuran12Horas_noActivanLaRegla() {
-        // Turno existente de 8 horas adyacente a uno nuevo de 12 horas: la regla de 12h no aplica
-        // porque el existente no dura 12 horas (aunque sean adyacentes).
-        TurnoEntity existente8h = turno(1L, LUNES, LocalTime.of(0, 0), LUNES, LocalTime.of(8, 0));
-        LocalDateTime nuevoInicio = LUNES.atTime(8, 0);
+    void horariosRealesDelServicio_dia11h_masSuNoche13h_permitido() {
+        // Con los horarios reales (día 09:00-20:00, noche 20:00-09:00) el 24 corrido también es legal.
+        TurnoEntity diurnoExistente = turno(1L, LUNES, LocalTime.of(9, 0), LUNES, LocalTime.of(20, 0));
+        LocalDateTime nuevoInicio = LUNES.atTime(20, 0);
+        LocalDateTime nuevoFin = LUNES.plusDays(1).atTime(9, 0);
+
+        assertDoesNotThrow(() -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(diurnoExistente)));
+    }
+
+    @Test
+    void nochesEnDiasConsecutivos_permitido() {
+        // Noche lunes -> martes y noche martes -> miércoles: descansó el día de por medio.
+        TurnoEntity nocheAnterior = turnoDe12h(1L, LUNES, LocalTime.of(20, 0));
+        LocalDateTime nuevoInicio = LUNES.plusDays(1).atTime(20, 0);
         LocalDateTime nuevoFin = nuevoInicio.plusHours(12);
 
-        assertDoesNotThrow(() -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(existente8h)));
+        assertDoesNotThrow(() -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(nocheAnterior)));
+    }
+
+    @Test
+    void diurnoTrasElDiaSiguienteCompleto_permitido() {
+        // Nocturno lunes -> martes 08:00; diurno el MIÉRCOLES: día completo de descanso, legal.
+        TurnoEntity nocturnoExistente = turnoDe12h(1L, LUNES, LocalTime.of(20, 0));
+        LocalDateTime nuevoInicio = LUNES.plusDays(2).atTime(8, 0);
+        LocalDateTime nuevoFin = nuevoInicio.plusHours(12);
+
+        assertDoesNotThrow(() -> validador.validarAsignacion("Juan", nuevoInicio, nuevoFin, 2L, List.of(nocturnoExistente)));
     }
 
     @Test
