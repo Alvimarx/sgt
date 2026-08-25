@@ -116,6 +116,15 @@ public class SolicitudService {
                 .aceptadoReceptor(null)
                 .build();
 
+        // Anti-duplicado: una sola solicitud PENDIENTE por (funcionario, turno). Sin esto,
+        // el mismo médico podía postular N veces al mismo cupo y la jefatura veía N tarjetas.
+        // La garantía debe vivir aquí (dos pestañas o dos dispositivos evaden cualquier
+        // chequeo del frontend). GlobalExceptionHandler la convierte en 400 {"error": ...}.
+        if (turno != null && solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                idFuncionarioEmisor, turno.getIdTurno(), SolicitudEntity.EstadoSolicitud.PENDIENTE)) {
+            throw new RuntimeException("Ud. ya solicitó este turno");
+        }
+
         validarConflictoSegunTipo(solicitud);
 
         SolicitudEntity guardada = solicitudRepository.save(solicitud);

@@ -229,9 +229,34 @@ public class TurnoService {
      */
     public List<Map<String, Object>> getTurnosCalendario(Long servicioId, LocalDate inicio, LocalDate fin) {
         List<TurnoEntity> turnos = turnoRepository.findByServicioIdAndDateRange(servicioId, inicio, fin);
-        return turnos.stream()
+        return marcarSolicitudesPendientesDelUsuario(turnos.stream()
                      .map(this::convertirTurnoAMap)
-                     .collect(Collectors.toList());
+                     .collect(Collectors.toList()));
+    }
+
+    /**
+     * Marca con solicitudPendiente=true los turnos sobre los que EL USUARIO AUTENTICADO
+     * tiene una solicitud PENDIENTE. Una sola consulta para toda la lista (nada por turno).
+     * El frontend usa la marca para el filtro "Solicitudes" de la agenda y para bloquear
+     * la doble postulación en el detalle del turno. Si no hay usuario en contexto
+     * (p. ej. un job interno), la lista sale sin marcar en vez de fallar.
+     */
+    private List<Map<String, Object>> marcarSolicitudesPendientesDelUsuario(List<Map<String, Object>> turnos) {
+        try {
+            Long idUsuario = seguridadServicio.idUsuarioActual();
+            Set<Long> solicitados = new HashSet<>(solicitudRepository.findTurnoIdsByFuncionarioAndEstado(
+                    idUsuario, com.pingeso.HUAP.Entity.SolicitudEntity.EstadoSolicitud.PENDIENTE));
+            if (!solicitados.isEmpty()) {
+                for (Map<String, Object> turno : turnos) {
+                    if (solicitados.contains(turno.get("id"))) {
+                        turno.put("solicitudPendiente", true);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("No se pudo marcar solicitudes pendientes del usuario: {}", e.getMessage());
+        }
+        return turnos;
     }
 
     /**
@@ -366,9 +391,9 @@ public class TurnoService {
      */
     public List<Map<String, Object>> getTurnosByServicioConDetalles(Long servicioId) {
         List<TurnoEntity> turnos = turnoRepository.findByServicio_IdServicio(servicioId);
-        return turnos.stream()
+        return marcarSolicitudesPendientesDelUsuario(turnos.stream()
                      .map(this::convertirTurnoAMap)
-                     .collect(Collectors.toList());
+                     .collect(Collectors.toList()));
     }
 
     /**

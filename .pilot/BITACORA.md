@@ -199,3 +199,29 @@
     `git apply --check` sobre un worktree del commit base: aplica limpio.
   · requerimientos/traspaso/r7_tipo_turno_dia.sql — inspección + UPDATE
     condicional del nombre del tipo de turno.
+
+## 2026-08-25 · Lote 3: R10-R12 (solicitudes) — primer lote con backend
+- Mapeo previo con 2 agentes (backend y frontend del módulo solicitudes).
+  Hallazgos clave que definieron el diseño: (1) rechazarSolicitudesCompetitivas
+  YA existe — al aprobar, el backend rechaza las demás pendientes del mismo
+  turno con lock pesimista → R10 es solo presentación; (2) TurnoService tenía
+  inyectados SeguridadServicio y SolicitudRepository SIN USO — la tubería para
+  R11 estaba lista; (3) el gate anti-duplicado de ShiftDetail existía apagado
+  por falta del dato; (4) nueve `catch {` vacíos tragaban los mensajes del
+  backend; (5) el id de turno en solicitudes es turno.idTurno, no .id.
+- R10: PostulacionesGrupoCard en SolicitudesView — coberturas pendientes del
+  mismo turno (2+) agrupadas con lista de postulantes y botón Elegir.
+- R11 (bug chip Solicitudes): SolicitudRepository.findTurnoIdsByFuncionarioAndEstado
+  (proyección, 1 consulta) + TurnoService.marcarSolicitudesPendientesDelUsuario
+  aplicado a getTurnosByServicioConDetalles y getTurnosCalendario. El frontend
+  se encendió solo (chip, badge, banner, gate del detalle).
+- R12 (bug doble solicitud): exists en repositorio + validación en
+  crearSolicitud → 400 "Ud. ya solicitó este turno" (por funcionario+turno
+  PENDIENTE; rechazada/aprobada no bloquea). Catch con mensaje real en
+  SolicitudesView; tarjeta de vacante "Ya solicitaste este turno" en ShiftDetail.
+- Validación: mvn compile OK; SolicitudServiceTest 61/61 (2 tests nuevos);
+  vite build OK; eslint sin errores nuevos.
+- Hallazgos de seguridad ANOTADOS SIN CORREGIR (fuera de alcance, decisión
+  consciente): GET /solicitudes sin scoping por servicio (cualquier autenticado
+  ve todas), respuestas con entidad cruda sobre-expuesta (rut del funcionario,
+  etc.), GETs sin chequeo IDOR. Candidatos a requerimiento de seguridad.

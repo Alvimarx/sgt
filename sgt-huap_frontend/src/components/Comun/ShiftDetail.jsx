@@ -669,14 +669,20 @@ const TeamByPuesto = ({
                         })}
 
                         {vacantesDelPuesto.length > 0 ? (
-                            vacantesDelPuesto.map((vacante, i) => (
+                            vacantesDelPuesto.map((vacante, i) => {
+                                // Vacante que el usuario YA solicitó (marca del backend): la
+                                // tarjeta informa y deja de invitar — el backend igual
+                                // rechazaría el duplicado, esto solo evita el viaje.
+                                const yaSolicitada = !canManageAssignments && Boolean(vacante.solicitudPendiente);
+                                return (
                                 <button
                                     key={`vacante-${vacante.id ?? i}`}
                                     type="button"
+                                    disabled={yaSolicitada}
                                     onClick={() => {
                                         if (canManageAssignments) {
                                             onAssignVacancy?.(vacante);
-                                        } else {
+                                        } else if (!yaSolicitada) {
                                             onRequestVacancy?.(vacante);
                                         }
                                     }}
@@ -689,13 +695,17 @@ const TeamByPuesto = ({
                                         marginTop: 4,
                                         border: canManageAssignments
                                             ? `1px dashed ${P2().primary}`
-                                            : `1px dashed ${P2().accent}`,
+                                            : yaSolicitada
+                                                ? `1px dashed ${P2().line}`
+                                                : `1px dashed ${P2().accent}`,
                                         background: canManageAssignments
                                             ? P2().primarySoft
-                                            : P2().accentSoft,
+                                            : yaSolicitada
+                                                ? P2().surface2
+                                                : P2().accentSoft,
                                         width: "100%",
                                         textAlign: "left",
-                                        cursor: "pointer",
+                                        cursor: yaSolicitada ? "default" : "pointer",
                                     }}
                                 >
                                     <div
@@ -704,7 +714,7 @@ const TeamByPuesto = ({
                                             height: 28,
                                             borderRadius: 99,
                                             border: `1.5px dashed ${
-                                                canManageAssignments ? P2().primary : P2().accent
+                                                canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : P2().accent
                                             }`,
                                             display: "grid",
                                             placeItems: "center",
@@ -712,9 +722,9 @@ const TeamByPuesto = ({
                                         }}
                                     >
                                         <SGTIcon
-                                            name={canManageAssignments ? "user-plus" : "hand-raised"}
+                                            name={canManageAssignments ? "user-plus" : yaSolicitada ? "check" : "hand-raised"}
                                             size={13}
-                                            color={canManageAssignments ? P2().primary : "#B85A60"}
+                                            color={canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60"}
                                         />
                                     </div>
 
@@ -722,22 +732,27 @@ const TeamByPuesto = ({
                                         style={{
                                             fontSize: 12.5,
                                             fontWeight: 800,
-                                            color: canManageAssignments ? P2().primary : "#B85A60",
+                                            color: canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60",
                                             flex: 1,
                                         }}
                                     >
                                         {canManageAssignments
                                             ? "Asignar funcionario a este cupo"
-                                            : "Cupo libre — tocar para solicitar"}
+                                            : yaSolicitada
+                                                ? "Ya solicitaste este turno"
+                                                : "Cupo libre — tocar para solicitar"}
                                     </span>
 
-                                    <SGTIcon
-                                        name="chevron-right"
-                                        size={13}
-                                        color={canManageAssignments ? P2().primary : "#B85A60"}
-                                    />
+                                    {!yaSolicitada && (
+                                        <SGTIcon
+                                            name="chevron-right"
+                                            size={13}
+                                            color={canManageAssignments ? P2().primary : "#B85A60"}
+                                        />
+                                    )}
                                 </button>
-                            ))
+                                );
+                            })
                         ) : (
                             Array.from({ length: puesto.vacantes || 0 }).map((_, i) => (
                                 <div

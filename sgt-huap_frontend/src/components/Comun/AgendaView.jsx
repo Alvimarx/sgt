@@ -281,9 +281,9 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     () => agendaDays.filter((day) => getShifts(day.key).some((s) => s.miTurno)).length,
     [agendaDays, shiftsByDay]
   );
-  // OJO (limitación preexistente): el endpoint de turnos del backend NO emite
-  // solicitudPendiente/cambioAprobado (convertirTurnoAMap), así que este chip
-  // cuenta 0 con datos reales hasta que el backend exponga ese estado.
+  // solicitudPendiente llega del backend desde R11: los listados de turnos marcan
+  // los turnos sobre los que EL USUARIO tiene una solicitud PENDIENTE (una consulta
+  // batch en TurnoService). cambioAprobado sigue sin emitirse (solo mocks).
   const countSolicitudes = useMemo(
     () => agendaDays.reduce(
       (acc, day) => acc + getShifts(day.key).filter((s) => s.solicitudPendiente && !s.cambioAprobado).length, 0

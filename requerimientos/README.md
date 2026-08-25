@@ -37,12 +37,20 @@ por qué se hizo y cómo se hizo.
 | R7 | 2026-08-23 | Encabezado de grupo "Día: Turno X" (rotativa) | aprobado ✅ |
 | R8 | 2026-08-23 | Con un solo servicio, entrar directo al home | aprobado ✅ |
 | R9 | 2026-08-23 | Filtros "Solicitudes" y "Disponibles" con elegibilidad | aprobado ✅ |
+| R10 | 2026-08-25 | Postulaciones agrupadas: jefatura elige entre postulantes | pendiente de visto bueno |
+| R11 | 2026-08-25 | (bug) Chip "Solicitudes" con datos reales del backend | pendiente de visto bueno |
+| R12 | 2026-08-25 | (bug) Anti doble solicitud: "Ud. ya solicitó este turno" | pendiente de visto bueno |
 
 ## Estado por lote
 
-Los nueve requerimientos (R1-R9) están **probados y aprobados** por el usuario
-sobre el despliegue de prueba. Ojo con R7: reemplaza el criterio de R3 (el
-sufijo del título pasa a ser la rotativa y se muestra siempre).
+- **Lote 1-2 (R1-R9)**: probados y **aprobados**. Ojo con R7: reemplaza el
+  criterio de R3 (el sufijo del título pasa a ser la rotativa y se muestra
+  siempre).
+- **Lote 3 (R10-R12)**: implementado y compilado (backend 61/61 tests),
+  **pendiente de prueba**. PRIMER LOTE QUE TOCA BACKEND: R11 y R12 modifican
+  `SolicitudRepository`, `SolicitudService` y `TurnoService` — en la otra
+  máquina habrá que recompilar también el backend. R11 además deja obsoleto el
+  aviso de R9/TRASPASO de que el chip "Solicitudes" cuenta 0.
 
 ## Traspaso a la máquina con datos reales
 

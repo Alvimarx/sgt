@@ -274,6 +274,36 @@ class SolicitudServiceTest {
     }
 
     @Test
+    void crear_coberturaDuplicadaMismoTurno_lanzaYNoGuarda() {
+        mockFuncionarioYTipo(3);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
+        when(solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                1L, 70L, SolicitudEntity.EstadoSolicitud.PENDIENTE)).thenReturn(true);
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.crearSolicitud(dto));
+        assertEquals("Ud. ya solicitó este turno", ex.getMessage());
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_conSolicitudPendienteDeOtroFuncionario_noBloquea() {
+        // El anti-duplicado es por (funcionario, turno): otro postulante NO impide postular.
+        mockFuncionarioYTipo(3);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
+        when(solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                1L, 70L, SolicitudEntity.EstadoSolicitud.PENDIENTE)).thenReturn(false);
+        saveAsignaId();
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+
+        assertNotNull(service.crearSolicitud(dto));
+    }
+
+    @Test
     void crear_turnoInexistente_quedaNullSinLanzar() {
         mockFuncionarioYTipo(2);
         when(turnoRepository.findById(999L)).thenReturn(Optional.empty());

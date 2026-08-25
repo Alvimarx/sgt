@@ -80,6 +80,71 @@ function btnStyle(tone) {
 
 // ── SolicitudCard ─────────────────────────────────────────────────────────────
 
+// R10 — Tarjeta de POSTULACIONES AGRUPADAS: 2+ solicitudes de Cobertura PENDIENTES
+// sobre el MISMO turno se presentan como una sola disputa, y la jefatura elige a la
+// persona. Al aprobar una, el backend rechaza automáticamente a las demás
+// (rechazarSolicitudesCompetitivas), así que aquí no hay lógica extra de limpieza.
+const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
+  const turno = grupo[0]?.turno || {};
+  const nombreTipoTurno = turno.tipoTurno?.nombre || null;
+  const posicion = turno.puesto?.nombre || null;
+  const ordenadas = [...grupo].sort((a, b) => new Date(a.fechaCreacion) - new Date(b.fechaCreacion));
+
+  return (
+    <div className="sgt-list-row" style={{ background: '#fff', border: `1px solid ${PA.line}`, borderLeft: `4px solid ${TIPO_COLOR[3]}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <SGTIcon name="users" size={18} color={PA.primary} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Postulaciones al mismo turno</div>
+          <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>Cobertura · elige a una persona</div>
+        </div>
+        <SGTBadge tone="warn" size="xs">{grupo.length} postulantes</SGTBadge>
+      </div>
+
+      {/* Turno en disputa */}
+      <Row
+        label="Turno a cubrir"
+        value={`${fmtFecha(turno.diaInicioTurno)} · ${fmtHora(turno.horaInicio)}–${fmtHora(turno.horaFin)}${nombreTipoTurno ? ` · ${nombreTipoTurno}` : ''}`}
+      />
+      {posicion && <Row label="Posición" value={posicion} />}
+
+      {/* Postulantes */}
+      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {ordenadas.map((sol) => (
+          <div key={sol.idSolicitud} style={{ border: `1px solid ${PA.line2}`, borderRadius: 10, padding: '8px 10px', background: PA.surface2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {nombreFuncionario(sol.funcionario)}
+                </div>
+                <div style={{ fontSize: 10.5, color: PA.ink3, fontWeight: 600 }}>Postuló el {fmtFecha(sol.fechaCreacion)}</div>
+              </div>
+              <button onClick={() => onRechazar(sol.idSolicitud)} style={{ ...btnStyle('danger'), padding: '7px 10px', fontSize: 12 }}>
+                <SGTIcon name="close" size={12} color="#fff" />
+              </button>
+              <button onClick={() => onAprobar(sol.idSolicitud)} style={{ ...btnStyle('success'), padding: '7px 12px', fontSize: 12 }}>
+                <SGTIcon name="check" size={12} color="#fff" /> Elegir
+              </button>
+            </div>
+            {sol.motivo && (
+              <div style={{ marginTop: 5, fontSize: 11.5, color: PA.ink2, fontWeight: 600, fontStyle: 'italic' }}>
+                “{sol.motivo}”
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 10, fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
+        Al elegir a una persona, las demás postulaciones de este turno se rechazan automáticamente.
+      </div>
+    </div>
+  );
+};
+
 const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, esMiReceptor }) => {
   const tipo  = solicitud?.tipoSolicitud?.tipo;
   const estado = solicitud?.estado;
@@ -433,7 +498,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
         await solicitudesService.crear(dto);
       }
       onCreated?.(); handleClose();
-    } catch { setError('No se pudo crear la solicitud.'); }
+    } catch (e) { setError(e?.message || 'No se pudo crear la solicitud.'); }
     finally { setLoading(false); }
   };
 
@@ -808,28 +873,28 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     try {
       await solicitudesService.updateEstado(id, 'APROBADA', user.id);
       load();
-    } catch { setError('Error al aprobar la solicitud.'); }
+    } catch (e) { setError(e?.message || 'Error al aprobar la solicitud.'); }
   };
 
   const handleRechazar = async (id) => {
     try {
       await solicitudesService.updateEstado(id, 'RECHAZADA', user.id);
       load();
-    } catch { setError('Error al rechazar la solicitud.'); }
+    } catch (e) { setError(e?.message || 'Error al rechazar la solicitud.'); }
   };
 
   const handleResponder = async (id, acepta) => {
     try {
       await solicitudesService.responderIntercambio(id, user.id, acepta);
       load();
-    } catch { setError('Error al responder el intercambio.'); }
+    } catch (e) { setError(e?.message || 'Error al responder el intercambio.'); }
   };
 
   const handleResponderOfertaParticular = async (id, acepta) => {
     try {
       await solicitudesService.responderOfertaParticular(id, user.id, acepta);
       load();
-    } catch { setError('Error al responder la oferta.'); }
+    } catch (e) { setError(e?.message || 'Error al responder la oferta.'); }
   };
 
   const handleOfertaAprobar = async (id) => {
@@ -878,6 +943,27 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     if (tab === 'historial')  return solicitudes.filter(s => s.estado !== 'PENDIENTE');
     return solicitudes;
   })());
+
+  // R10 — En el tab "pendientes" de jefatura, las coberturas que compiten por el
+  // mismo turno (2+) salen agrupadas; el resto sigue como tarjetas individuales.
+  const esPostulacionCobertura = (s) =>
+    s.tipoSolicitud?.tipo === 3 && s.estado === 'PENDIENTE' && s.turno?.idTurno != null;
+
+  let gruposPostulacion = [];
+  let listaSinAgrupar = currentList;
+  if (canDecide && tab === 'pendientes') {
+    const porTurno = new Map();
+    currentList.filter(esPostulacionCobertura).forEach((sol) => {
+      const k = String(sol.turno.idTurno);
+      if (!porTurno.has(k)) porTurno.set(k, []);
+      porTurno.get(k).push(sol);
+    });
+    gruposPostulacion = Array.from(porTurno.values())
+      .filter((g) => g.length >= 2)
+      .sort((a, b) => String(a[0].turno?.diaInicioTurno || '').localeCompare(String(b[0].turno?.diaInicioTurno || '')));
+    const agrupadas = new Set(gruposPostulacion.flat().map((sol) => sol.idSolicitud));
+    listaSinAgrupar = currentList.filter((sol) => !agrupadas.has(sol.idSolicitud));
+  }
 
   const pendienteCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length;
   const recibidasCount = recibidas.filter(s => s.estado === 'PENDIENTE').length;
@@ -1008,14 +1094,22 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         )}
 
         {/* Tabs de solicitudes normales */}
-        {!loading && tab !== 'ofertas' && !error && currentList.length === 0 && (
+        {!loading && tab !== 'ofertas' && !error && currentList.length === 0 && gruposPostulacion.length === 0 && (
           <ListEmptyState
             icon="check-circle" theme="slate"
             title="Sin solicitudes"
             message="No hay solicitudes aquí por el momento."
           />
         )}
-        {!loading && tab !== 'ofertas' && currentList.map(s => (
+        {!loading && tab !== 'ofertas' && gruposPostulacion.map(g => (
+          <PostulacionesGrupoCard
+            key={`grupo-turno-${g[0].turno.idTurno}`}
+            grupo={g}
+            onAprobar={handleAprobar}
+            onRechazar={handleRechazar}
+          />
+        ))}
+        {!loading && tab !== 'ofertas' && listaSinAgrupar.map(s => (
           <SolicitudCard
             key={s.idSolicitud}
             solicitud={s}

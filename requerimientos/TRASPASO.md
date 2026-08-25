@@ -85,6 +85,7 @@ corresponde, el UPDATE. Con nombres ya correctos, no hay nada que hacer.
 3. Avisos conocidos (no son fallas del traspaso):
    - El chip "Solicitudes" cuenta 0 mientras el backend no emita
      `solicitudPendiente` (limitación histórica, documentada en R9).
+     **Obsoleto si también se aplica el lote 3 (R11 lo corrige en el backend).**
    - El banner de jefatura cuenta TODOS los cupos; el chip "Disponibles",
      solo los elegibles para el usuario — pueden diferir a propósito.
 
