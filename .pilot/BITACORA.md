@@ -243,3 +243,28 @@
   caso 13h/11h que la regla vieja dejaba pasar. Suite: 264/264 unitarios OK;
   los 26 que fallan en esta sesión son Testcontainers sin daemon Docker
   (fallan igual sin el cambio; correr en la VM u otra máquina si se quiere).
+
+## 2026-08-26 · R14 y R15 (picker de intercambio + bloqueo/cancelación)
+- R14: GET /turnos/intercambiables — el picker del canje usa el MISMO validador
+  que la creación/aprobación (futuros, sin solape ni 24 invertido simulando el
+  intercambio para ambos, mismo servicio, sin turnos comprometidos). /futuros
+  ahora excluye turnos ya iniciados y amplía horizonte 3→12 meses.
+- R15: bloqueo "un turno comprometido a la vez" (pedido U ofrecido) con mensajes
+  que nombran la cancelación; PUT /solicitudes/{id}/cancelar (solo emisor por
+  identidad JWT, solo PENDIENTE, bajo findByIdForUpdate); badge CANCELADA
+  derivado del motivo; bitácora con SOLICITUD_CANCELADA visible y filtrable.
+- Revisión adversarial (3 agentes, uno EJECUTÓ el SQL de Hibernate contra un
+  SessionFactory real): refutó mi propio "fix" del LEFT JOIN — la navegación
+  implícita al @Id NO genera join (queda como columna FK); el LEFT JOIN
+  explícito se conserva igual por robustez (si alguien navega a un campo no-id,
+  el implícito se rompe en silencio). Endurecimientos aplicados: lock en
+  cancelar (carrera con aprobación), gate por identidad y no por rol (jefatura
+  emisora quedaba sin salida), aprobación ya no pisa dueños (tipo 3 y 4),
+  barrido competitivo por ambos lados del intercambio, purga de preselecciones
+  obsoletas y loading propio del picker, filtro servicio.
+- Validación: 93 tests de los módulos tocados verdes (66 Solicitud + 12
+  Validador + 15 Turno); vite build OK; eslint sin errores nuevos.
+- Deuda anotada: estado CANCELADA real en el enum (migración), tests de
+  integración de las JPQL nuevas (Testcontainers, correr en la otra máquina),
+  y el picker de turno propio aún no oculta los comprometidos (el backend los
+  rechaza con mensaje claro).

@@ -358,6 +358,19 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.getTurnosByMedico(idFuncionario));
     }
 
+    /**
+     * Turnos del receptor que son un intercambio válido con un turno propio del usuario
+     * autenticado (futuros, sin solape ni "24 invertido" para ninguno de los dos, y sin
+     * turnos ya comprometidos en otra solicitud pendiente). Alimenta el picker de intercambio.
+     */
+    @Operation(summary = "Turnos intercambiables con un turno propio")
+    @GetMapping("/intercambiables")
+    public ResponseEntity<List<Map<String, Object>>> getTurnosIntercambiables(
+            @RequestParam Long idTurnoPropio,
+            @RequestParam Long idFuncionarioReceptor) {
+        return ResponseEntity.ok(turnoService.getTurnosIntercambiables(idTurnoPropio, idFuncionarioReceptor));
+    }
+
     /** Próximos turnos (futuros) de un funcionario. */
     @Operation(summary = "Turnos futuros de un funcionario")
     @GetMapping("/funcionario/{idFuncionario}/futuros")

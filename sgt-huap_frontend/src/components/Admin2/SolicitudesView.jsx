@@ -145,7 +145,7 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
   );
 };
 
-const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, esMiReceptor }) => {
+const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, onCancelar, esMiReceptor, esMiSolicitud }) => {
   const tipo  = solicitud?.tipoSolicitud?.tipo;
   const estado = solicitud?.estado;
 
@@ -157,10 +157,19 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
   const canDecideThis = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
   const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && estado === 'PENDIENTE';
   const canEditMotivo = !canDecide && !esMiReceptor && estado === 'PENDIENTE' && !!onEditMotivo;
+  // Cancelar la propia solicitud pendiente: es lo que libera el turno comprometido para
+  // poder pedir otra cosa sobre él (el backend bloquea mientras siga pendiente). El gate
+  // es por IDENTIDAD (soy el emisor), no por rol: una jefatura que emitió una solicitud
+  // no puede resolverla (segregación de funciones) pero SÍ debe poder cancelarla, o su
+  // turno quedaría comprometido hasta que otra jefatura la toque.
+  const canCancelar = Boolean(esMiSolicitud) && estado === 'PENDIENTE' && !!onCancelar;
+  // Cancelada por el propio solicitante: mismo estado RECHAZADA en la base, pero el badge
+  // no debe confundirse con un rechazo de jefatura.
+  const esCancelada = estado === 'RECHAZADA' && String(solicitud.motivo || '').startsWith('Cancelada por el solicitante');
 
   // Badge contextual para tipos bifásicos (4 y 5)
-  let badgeLabel = estado;
-  let badgeTone  = ESTADO_TONE[estado] || 'neutral';
+  let badgeLabel = esCancelada ? 'CANCELADA' : estado;
+  let badgeTone  = esCancelada ? 'neutral' : (ESTADO_TONE[estado] || 'neutral');
   if (esBifasico && estado === 'PENDIENTE') {
     if (esMiReceptor && esperandoReceptor) {
       badgeLabel = 'Requiere tu respuesta';
@@ -267,6 +276,12 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       {canEditMotivo && (
         <button onClick={() => onEditMotivo(solicitud)} style={{ ...btnStyle('ghost'), marginTop: 10, width: '100%' }}>
           <SGTIcon name="sliders" size={14} color={PA.ink2} /> Modificar motivo
+        </button>
+      )}
+
+      {canCancelar && (
+        <button onClick={() => onCancelar(solicitud)} style={{ ...btnStyle('danger'), marginTop: 8, width: '100%' }}>
+          <SGTIcon name="close" size={13} color="#fff" /> Cancelar solicitud
         </button>
       )}
     </div>
@@ -421,6 +436,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   const [dpMonth, setDpMonth]   = useState(null);
   const [loading, setLoading]   = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [loadingReceptor, setLoadingReceptor] = useState(false);
   const [error, setError]       = useState(null);
 
   useEffect(() => {
@@ -442,7 +458,9 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     setLoadingData(true);
     const fetches = [];
     if (tipoSel === 2 || tipoSel === 4 || tipoSel === 5 || tipoSel === 6)
-      fetches.push(turnosService.getByMedico(userId).then(d => setMisTurnos(Array.isArray(d) ? d : [])).catch(() => {}));
+      // getFuturos y no getByMedico: liberar, ofrecer o entregar un turno YA PASADO no tiene
+      // sentido y además ensuciaba el picker con todo el historial de la persona.
+      fetches.push(turnosService.getFuturos(userId).then(d => setMisTurnos(Array.isArray(d) ? d : [])).catch(() => {}));
     if (tipoSel === 3)
       fetches.push(turnosService.getSinAsignar(servicioId).then(d => setTurnosLibres(Array.isArray(d) ? d : [])).catch(() => {}));
     if (tipoSel === 4 || tipoSel === 5)
@@ -459,10 +477,35 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     Promise.all(fetches).finally(() => setLoadingData(false));
   }, [open, tipoSel, step, userId, servicioId]);
 
+  // Turnos del receptor ofrecidos en el picker de intercambio. Con el turno propio ya elegido
+  // se piden los INTERCAMBIABLES (el backend descarta pasados, choques, "24 invertido" para
+  // ambos, otros servicios y turnos ya comprometidos); sin él no hay canje que validar, así
+  // que se cae a los turnos futuros de esa persona.
   useEffect(() => {
-    if (!form.idReceptor) return;
-    turnosService.getByMedico(form.idReceptor).then(d => setTurnosReceptor(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [form.idReceptor]);
+    if (!form.idReceptor) { setTurnosReceptor([]); return; }
+    let vigente = true;
+    setTurnosReceptor([]);          // nunca servir la lista del receptor/turno anterior
+    setLoadingReceptor(true);
+    const peticion = form.idTurnoPropio
+      ? turnosService.getIntercambiables(form.idTurnoPropio, form.idReceptor)
+      : turnosService.getFuturos(form.idReceptor);
+    peticion
+      .then(d => {
+        if (!vigente) return;
+        const lista = Array.isArray(d) ? d : [];
+        setTurnosReceptor(lista);
+        // Una preselección (p. ej. del preset de la agenda) que ya no es intercambiable
+        // se purga: dejarla "seleccionada" anularía el filtrado justo donde más importa.
+        setForm(prev => (
+          prev.idTurnoDeseado != null && !lista.some(t => String(t.id) === String(prev.idTurnoDeseado))
+            ? { ...prev, idTurnoDeseado: undefined, turnoDeseadoLabel: null }
+            : prev
+        ));
+      })
+      .catch(() => { if (vigente) setTurnosReceptor([]); })
+      .finally(() => { if (vigente) setLoadingReceptor(false); });
+    return () => { vigente = false; };
+  }, [form.idReceptor, form.idTurnoPropio]);
 
   const reset = () => { setStep(1); setTipoSel(null); setForm({}); setError(null); setPickerKey(null); setDpStep('year'); setDpYear(null); setDpMonth(null); setMisTurnos([]); setTurnosLibres([]); setFuncionarios([]); setTurnosReceptor([]); };
   const handleClose = () => { reset(); onClose(); };
@@ -522,8 +565,8 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     receptorOferta: { title: 'Funcionario destinatario', items: funcionarios,               keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario })) },
     turnoBotar:     { title: 'Turno a liberar',        items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
     turnoCobertura: { title: 'Turno a cubrir',          items: turnosLibres,                keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
-    turnoPropio:    { title: 'Tu turno a entregar',     items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoPropio: t.id })) },
-    receptor:       { title: 'Funcionario receptor',    items: funcionarios,                keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario, idTurnoDeseado: undefined })) },
+    turnoPropio:    { title: 'Tu turno a entregar',     items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoPropio: t.id, turnoPropioLabel: null, idTurnoDeseado: undefined, turnoDeseadoLabel: null })) },
+    receptor:       { title: 'Funcionario receptor',    items: funcionarios,                keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario, idTurnoDeseado: undefined, turnoDeseadoLabel: null })) },
     turnoDeseado:   { title: 'Turno del receptor',      items: turnosReceptor,             keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoDeseado: t.id, turnoDeseadoLabel: null })) },
     fechaInicio:    { title: 'Fecha de inicio',  isDatePicker: true, onSel: (s) => setForm(prev => ({ ...prev, fechaInicio: s, fechaFin: prev.fechaFin && prev.fechaFin < s ? undefined : prev.fechaFin })) },
     fechaFin:       { title: 'Fecha de término', isDatePicker: true, onSel: (s) => setForm(prev => ({ ...prev, fechaFin: s })) },
@@ -615,7 +658,17 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
               <div><label style={lbl}>Tu turno a entregar *</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurnoPropio, form.turnoPropioLabel)} pkey="turnoPropio" /></div>
               <div><label style={lbl}>Con quién intercambiar *</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptor" /></div>
               {form.idReceptor && (
-                <div><label style={lbl}>Turno del receptor que quieres *</label><PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" /></div>
+                <div>
+                  <label style={lbl}>Turno del receptor que quieres *</label>
+                  <PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" />
+                  {form.idTurnoPropio && turnosReceptor.length === 0 && !loadingReceptor && (
+                    <div style={{ marginTop: 6, fontSize: 11.5, color: PA.ink3, fontWeight: 600 }}>
+                      No hay turnos intercambiables con el que elegiste: el turno que entregas ya
+                      empezó o está comprometido en otra solicitud tuya, esa persona no tiene turnos
+                      futuros de este servicio, o el canje dejaría turnos incompatibles.
+                    </div>
+                  )}
+                </div>
               )}
             </>)}
 
@@ -805,6 +858,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const [error, setError]       = useState(null);
   const [showCrear, setShowCrear]     = useState(false);
   const [editSolicitud, setEditSolicitud] = useState(null);
+  const [cancelando, setCancelando] = useState(null);
   const [crearPreset, setCrearPreset] = useState(null);
   const [sortBy, setSortBy]     = useState('reciente');
   const [showSort, setShowSort] = useState(false);
@@ -881,6 +935,20 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
       await solicitudesService.updateEstado(id, 'RECHAZADA', user.id);
       load();
     } catch (e) { setError(e?.message || 'Error al rechazar la solicitud.'); }
+  };
+
+  const handleCancelar = async (solicitud) => {
+    setCancelando(solicitud);
+  };
+
+  const confirmarCancelacion = async () => {
+    const solicitud = cancelando;
+    setCancelando(null);
+    if (!solicitud) return;
+    try {
+      await solicitudesService.cancelar(solicitud.idSolicitud);
+      load();
+    } catch (e) { setError(e?.message || 'No se pudo cancelar la solicitud.'); }
   };
 
   const handleResponder = async (id, acepta) => {
@@ -1117,6 +1185,8 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             onAprobar={handleAprobar}
             onRechazar={handleRechazar}
             onEditMotivo={isMedico ? setEditSolicitud : null}
+            onCancelar={handleCancelar}
+            esMiSolicitud={String(s.funcionario?.idFuncionario) === String(user?.id)}
             onResponderIntercambio={handleResponder}
             onResponderOfertaParticular={handleResponderOfertaParticular}
             esMiReceptor={String(s.funcionarioReceptor?.idFuncionario) === String(user?.id)}
@@ -1138,6 +1208,21 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         onClose={() => setEditSolicitud(null)}
         onSaved={load}
       />
+
+      <Sheet open={!!cancelando} onClose={() => setCancelando(null)} title="Cancelar solicitud">
+        <div style={{ padding: '8px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 14, color: PA.ink, fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
+            Se cancelará tu solicitud de <strong>{cancelando ? tipoLabel(cancelando) : ''}</strong>.
+            {cancelando?.turno ? ' El turno involucrado queda libre para que pidas otra cosa sobre él.' : ''}
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setCancelando(null)} style={{ ...btnStyle('ghost'), flex: 1 }}>Volver</button>
+            <button onClick={confirmarCancelacion} style={{ ...btnStyle('danger'), flex: 1 }}>
+              <SGTIcon name="close" size={13} color="#fff" /> Cancelar solicitud
+            </button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 };

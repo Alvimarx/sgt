@@ -15,6 +15,7 @@ const TIPO_LABEL = {
   CAMBIO_ESTADO_APROBADA:       'Aprobada',
   CAMBIO_ESTADO_RECHAZADA:      'Rechazada',
   RECHAZO_AUTOMATICO:           'Rechazo automático',
+  SOLICITUD_CANCELADA:          'Cancelada por el solicitante',
   OFERTA_ACEPTADA_POR_RECEPTOR: 'Oferta aceptada',
   OFERTA_RECHAZADA_POR_RECEPTOR:'Oferta rechazada',
   ASIGNACION:                   'Asignación',
@@ -29,6 +30,7 @@ const TIPO_TONE = {
   CAMBIO_ESTADO_APROBADA:                    'success',
   CAMBIO_ESTADO_RECHAZADA:                   'accent',
   RECHAZO_AUTOMATICO:                        'accent',
+  SOLICITUD_CANCELADA:                       'neutral',
   OFERTA_ACEPTADA_POR_RECEPTOR:              'warn',
   OFERTA_RECHAZADA_POR_RECEPTOR:             'accent',
   OFERTA_PARTICULAR_ACEPTADA_POR_RECEPTOR:   'warn',
@@ -65,6 +67,7 @@ function accionDesdeEvento(ev) {
     case 'CAMBIO_ESTADO_APROBADA':                    return 'Aprobación';
     case 'CAMBIO_ESTADO_RECHAZADA':                   return 'Rechazo';
     case 'RECHAZO_AUTOMATICO':                        return 'Rechazo automático';
+    case 'SOLICITUD_CANCELADA':                       return 'Cancelación por el solicitante';
     case 'ASIGNACION':                                return 'Asignación de turno';
     case 'DESASIGNACION':                             return 'Desasignación de turno';
     case 'REASIGNACION':                              return 'Reasignación de turno';
@@ -85,6 +88,7 @@ function estadoDesdeEvento(ev) {
     case 'CAMBIO_ESTADO_APROBADA':                    return 'APROBADA';
     case 'CAMBIO_ESTADO_RECHAZADA':
     case 'RECHAZO_AUTOMATICO':
+    case 'SOLICITUD_CANCELADA':
     case 'OFERTA_PARTICULAR_RECHAZADA_POR_RECEPTOR':
     case 'OFERTA_RECHAZADA_POR_RECEPTOR':             return 'RECHAZADA';
     case 'OFERTA_GENERAL_CREADA':

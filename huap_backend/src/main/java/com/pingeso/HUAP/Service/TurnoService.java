@@ -1,6 +1,7 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.TurnoEntity;
+import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
@@ -45,6 +46,9 @@ public class TurnoService {
 
     @Autowired
     private SeguridadServicio seguridadServicio;
+
+    @Autowired
+    private ValidadorAsignacionTurnoService validadorAsignacion;
 
     /**
      * Kill-switch del lock pesimista sobre el funcionario (por defecto activado). Existe para poder
@@ -244,8 +248,11 @@ public class TurnoService {
     private List<Map<String, Object>> marcarSolicitudesPendientesDelUsuario(List<Map<String, Object>> turnos) {
         try {
             Long idUsuario = seguridadServicio.idUsuarioActual();
-            Set<Long> solicitados = new HashSet<>(solicitudRepository.findTurnoIdsByFuncionarioAndEstado(
-                    idUsuario, com.pingeso.HUAP.Entity.SolicitudEntity.EstadoSolicitud.PENDIENTE));
+            var pendiente = com.pingeso.HUAP.Entity.SolicitudEntity.EstadoSolicitud.PENDIENTE;
+            Set<Long> solicitados = new HashSet<>(
+                    solicitudRepository.findTurnoIdsByFuncionarioAndEstado(idUsuario, pendiente));
+            // Un turno también queda comprometido si el usuario lo ESTÁ ENTREGANDO en un intercambio.
+            solicitados.addAll(solicitudRepository.findTurnoReceptorIdsByFuncionarioAndEstado(idUsuario, pendiente));
             if (!solicitados.isEmpty()) {
                 for (Map<String, Object> turno : turnos) {
                     if (solicitados.contains(turno.get("id"))) {
@@ -400,16 +407,118 @@ public class TurnoService {
      * Obtiene los turnos futuros de un funcionario específico.
      */
     public List<Map<String, Object>> getTurnosFuturosFuncionario(Long funcionarioId) {
-        // Buscamos turnos desde hoy en adelante para este funcionario
+        // 12 meses y no 3: las planificaciones no tienen tope y un tope corto hacía
+        // desaparecer en silencio turnos legítimos de los pickers (botar/ofrecer/entregar).
         List<TurnoEntity> turnos = turnoRepository.findByFuncionarioIdAndDateRange(
                 funcionarioId,
                 LocalDate.now(),
-                LocalDate.now().plusMonths(3)
+                LocalDate.now().plusMonths(12)
         );
-        
+
+        // "Futuros" de verdad: el rango por FECHA de la consulta aún incluye el turno de hoy
+        // ya empezado (y el nocturno de anoche que termina hoy); aquí se filtra por el
+        // instante real de inicio.
+        LocalDateTime ahora = LocalDateTime.now();
         return turnos.stream()
+                     .filter(t -> t.getDiaInicioTurno() != null && t.getHoraInicio() != null
+                             && t.getDiaInicioTurno().atTime(t.getHoraInicio()).isAfter(ahora))
                      .map(this::convertirTurnoAMap)
                      .collect(Collectors.toList());
+    }
+
+    /**
+     * Turnos del receptor con los que el usuario autenticado PODRÍA intercambiar su turno propio.
+     *
+     * <p>El picker de "turno del receptor" mostraba el calendario completo de esa persona —
+     * incluidos turnos pasados y turnos cuyo canje el backend rechazaría después. Aquí se aplica
+     * exactamente el mismo criterio que valida la solicitud de intercambio, para que lo ofrecido y
+     * lo aceptable no puedan divergir:
+     * <ol>
+     *   <li>el turno no puede haber empezado ya (nadie intercambia un turno en curso o pasado);</li>
+     *   <li>el emisor debe poder recibir el turno candidato con su calendario SIN el turno que
+     *       entrega (sin solape ni "24 invertido", regla de {@link ValidadorAsignacionTurnoService});</li>
+     *   <li>el receptor debe poder recibir el turno propio del emisor con su calendario SIN el
+     *       candidato — el canje tiene que ser legal para los DOS;</li>
+     *   <li>ni el candidato ni el turno propio pueden estar comprometidos en otra solicitud
+     *       pendiente del emisor.</li>
+     * </ol>
+     */
+    public List<Map<String, Object>> getTurnosIntercambiables(Long idTurnoPropio, Long idFuncionarioReceptor) {
+        Long idEmisor = seguridadServicio.idUsuarioActual();
+
+        TurnoEntity turnoPropio = turnoRepository.findById(idTurnoPropio)
+                .orElseThrow(() -> new RuntimeException("El turno a entregar no existe"));
+        if (turnoPropio.getFuncionario() == null
+                || !Objects.equals(turnoPropio.getFuncionario().getIdFuncionario(), idEmisor)) {
+            throw new RuntimeException("El turno a entregar no es tuyo");
+        }
+
+        FuncionarioEntity emisor = turnoPropio.getFuncionario();
+        FuncionarioEntity receptor = funcionarioRepository.findById(idFuncionarioReceptor)
+                .orElseThrow(() -> new RuntimeException("El funcionario receptor no existe"));
+
+        List<TurnoEntity> calendarioEmisorSinPropio = validadorAsignacion.excluyendo(
+                turnoRepository.findByFuncionario_IdFuncionario(idEmisor), idTurnoPropio);
+        List<TurnoEntity> calendarioReceptor = turnoRepository.findByFuncionario_IdFuncionario(idFuncionarioReceptor);
+
+        var pendiente = com.pingeso.HUAP.Entity.SolicitudEntity.EstadoSolicitud.PENDIENTE;
+        Set<Long> comprometidos = new HashSet<>(
+                solicitudRepository.findTurnoIdsByFuncionarioAndEstado(idEmisor, pendiente));
+        comprometidos.addAll(solicitudRepository.findTurnoReceptorIdsByFuncionarioAndEstado(idEmisor, pendiente));
+
+        LocalDateTime ahora = LocalDateTime.now();
+
+        // El turno propio también debe ser canjeable: si ya empezó, o ya está comprometido
+        // en otra solicitud pendiente del emisor, NINGÚN candidato sirve — la creación de la
+        // solicitud lo rechazaría. Se devuelve vacío y la UI explica el porqué.
+        if (turnoPropio.getDiaInicioTurno().atTime(turnoPropio.getHoraInicio()).isBefore(ahora)
+                || comprometidos.contains(idTurnoPropio)) {
+            return List.of();
+        }
+        Long idServicioPropio = turnoPropio.getServicio() != null
+                ? turnoPropio.getServicio().getIdServicio() : null;
+
+        List<Map<String, Object>> intercambiables = new ArrayList<>();
+
+        for (TurnoEntity candidato : calendarioReceptor) {
+            if (candidato.getDiaInicioTurno() == null || candidato.getHoraInicio() == null
+                    || candidato.getDiaFinalTurno() == null || candidato.getHoraFin() == null) continue;
+            if (Objects.equals(candidato.getIdTurno(), idTurnoPropio)) continue;
+            if (candidato.getDiaInicioTurno().atTime(candidato.getHoraInicio()).isBefore(ahora)) continue;
+            if (comprometidos.contains(candidato.getIdTurno())) continue;
+            // Solo turnos del MISMO servicio: la aprobación exige que ambos turnos
+            // pertenezcan al servicio del resolutor, así que un canje cruzado de
+            // servicios sería una solicitud inaprobable por diseño.
+            Long idServicioCandidato = candidato.getServicio() != null
+                    ? candidato.getServicio().getIdServicio() : null;
+            if (idServicioPropio != null && !idServicioPropio.equals(idServicioCandidato)) continue;
+
+            boolean emisorPuedeRecibirlo = puedeAsignarse(emisor, candidato, calendarioEmisorSinPropio);
+            boolean receptorPuedeRecibirElPropio = puedeAsignarse(receptor, turnoPropio,
+                    validadorAsignacion.excluyendo(calendarioReceptor, candidato.getIdTurno()));
+
+            if (emisorPuedeRecibirlo && receptorPuedeRecibirElPropio) {
+                intercambiables.add(convertirTurnoAMap(candidato));
+            }
+        }
+
+        intercambiables.sort(Comparator.comparing(m -> String.valueOf(m.get("diaInicioTurno"))));
+        return intercambiables;
+    }
+
+    /** ¿El turno cabe en ese calendario sin romper solape ni descanso post-nocturno? */
+    private boolean puedeAsignarse(FuncionarioEntity funcionario, TurnoEntity candidato, List<TurnoEntity> calendario) {
+        try {
+            validadorAsignacion.validarAsignacion(
+                    funcionario.getNombre(),
+                    candidato.getDiaInicioTurno().atTime(candidato.getHoraInicio()),
+                    candidato.getDiaFinalTurno().atTime(candidato.getHoraFin()),
+                    candidato.getIdTurno(),
+                    calendario);
+            return true;
+        } catch (ValidadorAsignacionTurnoService.ConflictoAsignacionException e) {
+            return false;
+        }
     }
 
     // ====================================================================
