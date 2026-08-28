@@ -50,7 +50,8 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
   // Filtrado local por la barra de búsqueda (Nombre, Apellido o Rut)
   const personalFiltrado = funcionarios.filter(u => {
     const nombreCompleto = `${u.nombre || ''} ${u.apellidoPaterno || ''} ${u.apellidoMaterno || ''}`.toLowerCase();
-    const rut = (u.rutCompleto || u.rut || '').toLowerCase();
+    // u.rut puede venir numérico del backend: sin String() esto crashea la vista.
+    const rut = String(u.rutCompleto || u.rut || '').toLowerCase();
     const termino = searchQuery.toLowerCase();
     return nombreCompleto.includes(termino) || rut.includes(termino);
   });

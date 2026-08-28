@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, usuariosService, ofertasGeneralesService } from '../../services/adminService';
 import { asignarTurnoLibre } from '../../services/turnosService';
+import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { useNotifications } from '../../context/NotificationContext';
 
 // ---------------------------------------------------------------------------
@@ -71,12 +72,9 @@ const DOW_LARGO = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábad
 const MES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
-// Fechas como YYYY-MM-DD en hora local (nada de toISOString: cruza a UTC y
-// desfasa el día en Chile — misma disciplina que la agenda móvil).
-const hoyISO = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+// Fechas como YYYY-MM-DD. "Hoy" se calcula en la zona horaria del hospital
+// (hoyISOEnZonaHospital), igual que la agenda móvil, para que el resalte HOY
+// no se corra un día en dispositivos con otra zona horaria.
 const parseISO = (iso) => {
   const [y, m, d] = String(iso).split('-').map(Number);
   return new Date(y, m - 1, d);
@@ -158,6 +156,7 @@ const NAV_ICONS = {
   planificacion: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>,
   estadisticas: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21V14M4 10V3M12 21V12M12 8V3M20 21V16M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>,
   bitacora: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" /><path d="M12 7v5l4 2" /></svg>,
+  notificaciones: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>,
 };
 const IconFlechas = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C88700" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -182,7 +181,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   const servicioNombre = localStorage.getItem('sgt_servicio_activo_nombre') || 'Servicio';
   const { unreadCount } = useNotifications();
 
-  const hoy = hoyISO();
+  const hoy = hoyISOEnZonaHospital();
   const [agenda, setAgenda] = useState({ turnos: [] });
   const [sols, setSols] = useState([]);
   const [ofertas, setOfertas] = useState([]);
@@ -283,47 +282,55 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   }, [solsPendientes]);
 
   // ── Acciones ──────────────────────────────────────────────────────────────
-  const aprobar = async (id) => {
+  // Guard anti doble-clic: mientras una mutación está en vuelo, los demás
+  // clics mutadores se ignoran (evita dobles POST y toasts contradictorios).
+  const enVuelo = useRef(false);
+  const mutar = async (fn) => {
+    if (enVuelo.current) return;
+    enVuelo.current = true;
+    try { await fn(); } finally { enVuelo.current = false; }
+  };
+  const aprobar = (id) => mutar(async () => {
     try { await solicitudesService.updateEstado(id, 'APROBADA', myUserId); toast('Solicitud aprobada.'); recargar(); }
     catch (e) { toast(e?.message || 'No se pudo aprobar la solicitud.'); }
-  };
-  const rechazar = async (id) => {
+  });
+  const rechazar = (id) => mutar(async () => {
     try { await solicitudesService.updateEstado(id, 'RECHAZADA', myUserId); toast('Solicitud rechazada.'); recargar(); }
     catch (e) { toast(e?.message || 'No se pudo rechazar la solicitud.'); }
-  };
-  const elegir = async (solId, nombre) => {
+  });
+  const elegir = (solId, nombre) => mutar(async () => {
     setConfirm(null);
     try {
       await solicitudesService.updateEstado(solId, 'APROBADA', myUserId);
       toast(`Cupo asignado a ${nombre}. Las demás postulaciones fueron rechazadas.`);
       recargar();
     } catch (e) { toast(e?.message || 'No se pudo asignar el cupo.'); }
-  };
-  const responder = async (id, tipo, ok) => {
+  });
+  const responder = (id, tipo, ok) => mutar(async () => {
     try {
       if (tipo === 4) await solicitudesService.responderIntercambio(id, myUserId, ok);
       else await solicitudesService.responderOfertaParticular(id, myUserId, ok);
       toast(ok ? 'Aceptaste — queda pendiente de jefatura.' : 'Rechazada.');
       recargar();
     } catch (e) { toast(e?.message || 'No se pudo responder.'); }
-  };
-  const ofAprobar = async (id) => {
+  });
+  const ofAprobar = (id) => mutar(async () => {
     try { await ofertasGeneralesService.aprobar(id, myUserId); toast('Oferta abierta al servicio.'); recargar(); }
     catch (e) { toast(e?.message || 'No se pudo abrir la oferta.'); }
-  };
-  const ofRechazar = async (id) => {
+  });
+  const ofRechazar = (id) => mutar(async () => {
     try { await ofertasGeneralesService.rechazar(id, myUserId); toast('Oferta rechazada.'); recargar(); }
     catch (e) { toast(e?.message || 'No se pudo rechazar la oferta.'); }
-  };
-  const ofSeleccionar = async (idOferta, idPostulacion, nombre) => {
+  });
+  const ofSeleccionar = (idOferta, idPostulacion, nombre) => mutar(async () => {
     setConfirm(null);
     try {
       await ofertasGeneralesService.seleccionar(idOferta, idPostulacion, myUserId);
       toast(`Turno reasignado a ${nombre}.`);
       recargar();
     } catch (e) { toast(e?.message || 'No se pudo seleccionar al postulante.'); }
-  };
-  const asignarCupo = async (turnoLibre, candidato) => {
+  });
+  const asignarCupo = (turnoLibre, candidato) => mutar(async () => {
     // asignarTurnoLibre no lanza: devuelve { success, error } — hay que chequear.
     const r = await asignarTurnoLibre({
       idTurno: turnoLibre.id,
@@ -335,7 +342,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
     setAsignFor(null);
     toast(`Cupo asignado a ${nombreCompletoDe(candidato)}.`);
     recargar();
-  };
+  });
 
   // ── VM del panel expandido de un turno (día o noche) ──────────────────────
   const shiftVM = useCallback((fechaISO, tipo) => {
@@ -366,10 +373,13 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
 
     const libres = turnos.filter((t) => t.idFuncionario == null).map((t) => {
       const assigning = asignFor === `${clave}:${t.id}`;
+      // El backend marca solicitudPendiente solo para solicitudes DEL usuario
+      // autenticado (R11): si ya lo solicitó, el cupo queda no interactivo (R12).
+      const yaSolicitada = !canAssign && Boolean(t.solicitudPendiente);
       return {
         key: t.id, puesto: t.nombrePuesto || 'Sin puesto',
         idle: !assigning, assigning,
-        yaSolicitada: Boolean(t.solicitudPendiente),
+        yaSolicitada,
         cands: assigning
           ? funcionarios
               .filter((f) => !ocupadosDia.has(String(f.idFuncionario)))
@@ -382,7 +392,9 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
           : [],
         onAsignar: canAssign
           ? () => setAsignFor(`${clave}:${t.id}`)
-          : () => onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: t.id, turnoLabel: `${fechaISO} ${fmtHora(t.inicio)}–${fmtHora(t.fin)}` }),
+          : yaSolicitada
+            ? undefined
+            : () => onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: t.id, turnoLabel: `${fechaISO} ${fmtHora(t.inicio)}–${fmtHora(t.fin)}` }),
         onCancel: () => setAsignFor(null),
       };
     });
@@ -455,7 +467,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   }, [diasSemana, gruposPorCelda]);
 
   const nSol = solsPendientes.length;
-  const nDisp = ofertas.filter((o) => o.estado !== 'CERRADA').length;
+  const nDisp = ofertas.filter((o) => o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION').length;
 
   const tituloSemana = useMemo(() => {
     const ini = parseISO(diasSemana[0]);
@@ -467,6 +479,14 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   }, [diasSemana]);
   const hoyD = parseISO(hoy);
   const subFecha = `${DOW_LARGO[(hoyD.getDay() + 6) % 7]} ${hoyD.getDate()} de ${MES_LARGO[hoyD.getMonth()]} de ${hoyD.getFullYear()}`;
+
+  // Turnos que ya tienen dueño: una cobertura PENDIENTE sobre uno de ellos es
+  // obsoleta (el backend rechazaría la aprobación) — se muestra sin acciones.
+  const turnosOcupados = useMemo(() => {
+    const s = new Set();
+    (agenda.turnos || []).forEach((t) => { if (t.idFuncionario != null && t.id != null) s.add(String(t.id)); });
+    return s;
+  }, [agenda.turnos]);
 
   // ── VM de solicitudes (agrupación R10 incluida) ───────────────────────────
   const solsVM = useMemo(() => {
@@ -484,11 +504,15 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
     const items = [];
     grupos.forEach((g) => {
       const s0 = g[0];
+      const cubierto = turnosOcupados.has(String(s0.turno.idTurno));
       items.push({
         id: `grupo-${s0.turno.idTurno}`,
         tipoL: 'Cobertura', c: TIPO_SOL[3].c,
         fecha: fmtFechaCorta(String(s0.fechaCreacion || '').slice(0, 10)),
-        badge: 'Pendiente', badgeBg: BADGE.warn[0], badgeInk: BADGE.warn[1],
+        badge: cubierto ? 'Turno ya cubierto' : 'Pendiente',
+        badgeBg: cubierto ? BADGE.neutral[0] : BADGE.warn[0],
+        badgeInk: cubierto ? BADGE.neutral[1] : BADGE.warn[1],
+        puedeElegir: canDecide && !cubierto,
         rows: [{ l: 'Turno a cubrir', v: turnoTxtDe(s0.turno) }],
         motivo: false, isGroup: true, nPost: g.length,
         postu: [...g]
@@ -536,6 +560,8 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
         if (esperandoReceptor) { badge = 'Esperando receptor'; tone = 'neutral'; }
         if (esMiReceptor && esBifasico && s.aceptadoReceptor == null) badge = 'Requiere tu respuesta';
         if (esMiReceptor && receptorAcepto) { badge = 'Pend. otra jefatura'; tone = 'neutral'; }
+        const cubierto = tipo === 3 && turnosOcupados.has(String(s.turno?.idTurno));
+        if (cubierto) { badge = 'Turno ya cubierto'; tone = 'neutral'; }
         const [badgeBg, badgeInk] = BADGE[tone];
 
         const participo = esMia || esMiReceptor;
@@ -548,7 +574,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
             ? `Esperando respuesta de ${nombreCompletoDe(s.funcionarioReceptor)} — aún no puedes decidirla.` : false,
           segNote: canDecide && participo
             ? 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.' : false,
-          canDecide: canDecide && !esperandoReceptor && !participo,
+          canDecide: canDecide && !esperandoReceptor && !participo && !cubierto,
           canRespond: esMiReceptor && esBifasico && s.aceptadoReceptor == null,
           onAprobar: () => aprobar(s.idSolicitud),
           onRechazar: () => rechazar(s.idSolicitud),
@@ -558,7 +584,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
       });
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [solsPendientes, confirm, canDecide, myUserId]);
+  }, [solsPendientes, confirm, canDecide, myUserId, turnosOcupados]);
 
   // ── VM de ofertas generales ───────────────────────────────────────────────
   const ofertasVM = useMemo(() => {
@@ -568,7 +594,10 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
       CERRADA: ['Cerrada', 'neutral'],
     };
     return ofertas
-      .filter((o) => o.estado !== 'CERRADA' || o.postulaciones?.some((p) => p.seleccionado))
+      // RECHAZADA no se lista (no es accionable ni "disponible"); CERRADA solo
+      // si tiene seleccionado, para mostrar el "Reasignado a …".
+      .filter((o) => o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION'
+        || (o.estado === 'CERRADA' && o.postulaciones?.some((p) => p.seleccionado)))
       .map((o) => {
         const [badge, tone] = map[o.estado] || ['—', 'neutral'];
         const [badgeBg, badgeInk] = BADGE[tone];
@@ -609,6 +638,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
       key={label}
       href="#"
       onClick={(e) => { e.preventDefault(); if (dest) onNavigate?.(dest); }}
+      aria-current={activo ? 'page' : undefined}
       className={activo ? '' : 'sgt-nav-item'}
       style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 9,
@@ -657,7 +687,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
                   </div>
                 ))}
                 {vm.libres.filter((l) => l.idle).map((l) => (
-                  <button key={l.key} onClick={l.onAsignar} className="sgt-libre" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FBEEEF', border: '1.5px dashed #E57F84', borderRadius: 7, padding: '4px 6px', cursor: 'pointer', minWidth: 0 }}>
+                  <button key={l.key} onClick={l.onAsignar} disabled={l.yaSolicitada} className={l.yaSolicitada ? '' : 'sgt-libre'} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FBEEEF', border: '1.5px dashed #E57F84', borderRadius: 7, padding: '4px 6px', cursor: l.yaSolicitada ? 'default' : 'pointer', minWidth: 0 }}>
                     <span style={{ width: 18, height: 18, borderRadius: 99, border: '1.5px dashed #E57F84', color: '#B85A60', display: 'inline-grid', placeItems: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>+</span>
                     <span style={{ minWidth: 0, textAlign: 'left' }}>
                       <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#8C3F44' }}>
@@ -698,6 +728,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
         @keyframes sgtUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
         @keyframes sgtToast{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
         .sgt-nav-item:hover{background:rgba(255,255,255,0.08)!important;color:#fff!important}
+        .sgt-hoy-btn:hover{background:#E8EEF4!important}
         .sgt-day-compact:hover{box-shadow:0 8px 20px rgba(15,27,45,0.1);border-color:#17416C!important}
         .sgt-libre:hover{background:#F8E2E4!important}
         .sgt-cand:hover{border-color:#17416C!important}
@@ -715,7 +746,8 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', flex: 1 }}>
           {itemNav(NAV_ICONS.inicio, 'Inicio', 'inicio')}
           {itemNav(NAV_ICONS.centro, 'Centro de turnos', null, true)}
-          {itemNav(NAV_ICONS.solicitudes, 'Solicitudes', 'solicitudes', false, nSol || unreadCount)}
+          {itemNav(NAV_ICONS.solicitudes, 'Solicitudes', 'solicitudes', false, nSol)}
+          {itemNav(NAV_ICONS.notificaciones, 'Notificaciones', 'notificaciones', false, unreadCount)}
           {canAssign && itemNav(NAV_ICONS.personal, 'Personal', 'personal')}
           {itemNav(NAV_ICONS.planificacion, 'Planificación', 'planificacion')}
           {canAssign && itemNav(NAV_ICONS.estadisticas, 'Estadísticas', 'estadisticas')}
@@ -749,7 +781,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
             <span style={{ background: '#FBEEEF', color: '#B85A60', fontSize: '11px', fontWeight: 800, borderRadius: 99, padding: '5px 10px' }}>{libresT} cupos libres</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
               <button onClick={() => setWeekOffset((v) => v - 1)} aria-label="Semana anterior" style={{ width: 29, height: 29, borderRadius: 9, border: '1px solid #E5EAF1', background: '#fff', color: '#7486A0', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Chevron dir="izq" /></button>
-              <button onClick={() => { setWeekOffset(0); setSelDay(hoy); }} style={{ height: 29, borderRadius: 9, border: '1px solid #E5EAF1', background: weekOffset === 0 ? '#E8EEF4' : '#fff', color: '#17416C', fontSize: '11px', fontWeight: 800, padding: '0 12px', cursor: 'pointer' }}>Hoy</button>
+              <button onClick={() => { setWeekOffset(0); setSelDay(hoy); }} className="sgt-hoy-btn" style={{ height: 29, borderRadius: 9, border: '1px solid #E5EAF1', background: '#fff', color: '#17416C', fontSize: '11px', fontWeight: 800, padding: '0 12px', cursor: 'pointer' }}>Hoy</button>
               <button onClick={() => setWeekOffset((v) => v + 1)} aria-label="Semana siguiente" style={{ width: 29, height: 29, borderRadius: 9, border: '1px solid #E5EAF1', background: '#fff', color: '#7486A0', display: 'grid', placeItems: 'center', cursor: 'pointer' }}><Chevron dir="der" /></button>
             </div>
           </div>
@@ -854,7 +886,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <span style={{ width: 20, height: 20, borderRadius: 99, background: p.bg, color: p.ink, display: 'inline-grid', placeItems: 'center', fontSize: '7.5px', fontWeight: 800 }}>{p.i}</span>
                               <span style={{ flex: 1, minWidth: 0, fontSize: '10.5px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.n}</span>
-                              {canDecide && (
+                              {s.puedeElegir && (
                                 <button onClick={p.onElegir} style={{ background: '#17416C', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 9px', fontSize: '9.5px', fontWeight: 800, cursor: 'pointer' }}>Elegir</button>
                               )}
                             </div>
@@ -902,7 +934,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
                     <span style={{ width: 22, height: 22, borderRadius: 99, background: o.avBg, color: o.avInk, display: 'inline-grid', placeItems: 'center', fontSize: '8px', fontWeight: 800 }}>{o.avI}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: '11px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.ofertor}</span>
-                      <span style={{ display: 'block', fontSize: '8.5px', fontWeight: 600, color: '#7486A0' }}>{o.fecha}</span>
+                      <span style={{ display: 'block', fontSize: '8.5px', fontWeight: 600, color: '#7486A0' }}>ofrece su turno · {o.fecha}</span>
                     </span>
                     <span style={{ background: o.badgeBg, color: o.badgeInk, fontSize: '8px', fontWeight: 800, textTransform: 'uppercase', borderRadius: 99, padding: '2px 6px', whiteSpace: 'nowrap' }}>{o.badge}</span>
                   </div>
@@ -914,7 +946,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
                   {o.canOpen && (
                     <div style={{ display: 'flex', gap: 5, marginTop: 7 }}>
                       <button onClick={o.onRechazar} style={{ background: '#fff', border: '1px solid #F3D2D5', color: '#B85A60', borderRadius: 8, padding: '5px 9px', fontSize: '10px', fontWeight: 800, cursor: 'pointer' }}>Rechazar</button>
-                      <button onClick={o.onAprobar} style={{ flex: 1, background: '#2E7D57', border: 'none', color: '#fff', borderRadius: 8, padding: '5px 9px', fontSize: '10px', fontWeight: 800, cursor: 'pointer' }}>Abrir al servicio</button>
+                      <button onClick={o.onAprobar} style={{ flex: 1, background: '#2E7D57', border: 'none', color: '#fff', borderRadius: 8, padding: '5px 9px', fontSize: '10px', fontWeight: 800, cursor: 'pointer' }}>Aprobar apertura</button>
                     </div>
                   )}
                   {o.showPost && (
@@ -953,7 +985,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
 
       {/* Toast */}
       {toastMsg && (
-        <div style={{ position: 'fixed', left: '50%', bottom: 26, transform: 'translateX(-50%)', background: 'rgba(23,65,108,0.96)', color: '#fff', borderRadius: 99, padding: '10px 18px', fontSize: '12.5px', fontWeight: 700, boxShadow: '0 10px 24px rgba(15,23,42,0.3)', animation: 'sgtToast .25s ease', zIndex: 60 }}>
+        <div role="status" aria-live="polite" style={{ position: 'fixed', left: '50%', bottom: 26, transform: 'translateX(-50%)', background: 'rgba(23,65,108,0.96)', color: '#fff', borderRadius: 99, padding: '10px 18px', fontSize: '12.5px', fontWeight: 700, boxShadow: '0 10px 24px rgba(15,23,42,0.3)', animation: 'sgtToast .25s ease', zIndex: 60 }}>
           {toastMsg}
         </div>
       )}

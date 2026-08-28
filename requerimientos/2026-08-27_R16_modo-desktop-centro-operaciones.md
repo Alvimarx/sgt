@@ -81,6 +81,44 @@ para la tarjeta de usuario del sidebar.
   `solicitudesService`, `ofertasGeneralesService`, `usuariosService`), sin
   endpoints nuevos.
 
+## Revisión exhaustiva (post-implementación)
+
+Se verificó con la app corriendo de verdad (Chromium + backend simulado con
+los contratos del API real): 4 revisores independientes — fidelidad visual
+contra el mockup con `getComputedStyle`, funcional jefatura (mutaciones),
+funcional médico y revisión adversarial de código. Correcciones aplicadas:
+
+- **"Hoy" en zona del hospital**: el resalte HOY, el día expandido inicial y
+  la semana usan `hoyISOEnZonaHospital()` (America/Santiago), igual que la
+  agenda móvil — antes usaba la hora local del dispositivo y podía correrse
+  un día.
+- **Coberturas obsoletas**: una cobertura PENDIENTE cuyo turno ya tiene dueño
+  se muestra como "Turno ya cubierto" sin Aprobar/Rechazar/Elegir (el backend
+  la rechazaría; antes la tarjeta invitaba a aprobarla).
+- **`asignarTurnoLibre` no lanza**: devuelve `{success,error}`; se chequea el
+  resultado (antes un fallo mostraba "Cupo asignado").
+- **Guard anti doble-clic** en todas las mutaciones (evita dobles POST y
+  toasts contradictorios).
+- **Cupo "Solicitado" desactivado** para el médico que ya postuló (R12).
+- **Ofertas RECHAZADA** ya no se listan ni se cuentan como disponibles.
+- **Notificaciones**: ítem propio en el sidebar con su contador (antes el
+  contador se fusionaba en Solicitudes y no había cómo abrirlas en desktop).
+- **Fidelidad**: "ofrece su turno · fecha" en ofertas, botón "Aprobar
+  apertura" (como el mockup), botón Hoy blanco en reposo con hover `#E8EEF4`.
+- **Accesibilidad**: toast `role="status" aria-live="polite"`, `aria-current`
+  en el ítem activo.
+- **Crash de Personal (pre-existente)**: `FuncionariosServicioJetaturaView`
+  crasheaba con pantalla blanca si `rut` venía numérico (`.toLowerCase` sobre
+  número) — corregido con `String()`.
+
+Descartados como artefactos del arnés (el backend real ya los cubre):
+sobre-escritura de dueño al aprobar cobertura (R14/R15 lo rechaza),
+solapamientos y noche+día al elegir postulante (validador R13),
+`solicitudPendiente` es por-usuario en el backend real (R11). Deuda menor
+anotada: "Historial" para médicos apunta a "Mis solicitudes"; formato ISO del
+turno preseleccionado en el sheet "Nueva solicitud"; ofertas
+PENDIENTE_APROBACION visibles para médicos (decisión de negocio pendiente).
+
 ## Cómo probar
 
 1. Entrar en una ventana ≥1200px de ancho: el home pasa a pantalla completa.
