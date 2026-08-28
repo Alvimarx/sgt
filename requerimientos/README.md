@@ -43,6 +43,7 @@ por qué se hizo y cómo se hizo.
 | R13 | 2026-08-25 | (bug grave) Regla de descanso: 24 corridas sí, invertido no | pendiente de visto bueno |
 | R14 | 2026-08-26 | Picker de intercambio: solo canjes posibles | pendiente de visto bueno |
 | R15 | 2026-08-26 | Turno comprometido único + cancelar solicitudes | pendiente de visto bueno |
+| R16 | 2026-08-27 | Modo desktop: Centro de operaciones (Propuesta C) | pendiente de visto bueno |
 
 ## Estado por lote
 
@@ -55,6 +56,9 @@ por qué se hizo y cómo se hizo.
   `SolicitudRepository`, `SolicitudService` y `TurnoService` — en la otra
   máquina habrá que recompilar también el backend. R11 además deja obsoleto el
   aviso de R9/TRASPASO de que el chip "Solicitudes" cuenta 0.
+- **Lote 4 (R16)**: solo frontend. En pantallas ≥1200px el home se reemplaza
+  por el Centro de operaciones (vista desktop, Propuesta C de Claude Design);
+  el resto de las vistas sigue en el marco móvil. Pendiente de prueba.
 
 ## Traspaso a la máquina con datos reales
 

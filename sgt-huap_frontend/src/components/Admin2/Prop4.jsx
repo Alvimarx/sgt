@@ -15,6 +15,7 @@ import NotificationView from "../Comun/NotificationView";
 import SelectServiceView from "../Comun/SelectServiceView";
 import ProfileView from "../Comun/Perfil";
 import PersonalDashboard from "../Comun/PersonalDashboard";
+import CentroOperacionesDesktop from "../Desktop/CentroOperacionesDesktop";
 
 //Importaciones de ComunAdministracion
 import PuestosView from "../ComunAdministracion/PuestosView";
@@ -289,6 +290,60 @@ const Prop4 = ({ tweaks = {} }) => {
   const handleOpenNotifications = () => {
     setCurrentView("notifications");
   };
+
+  // R16 — Modo desktop: en pantallas anchas la vista "agenda" (home) se
+  // reemplaza por el Centro de operaciones a pantalla completa (Propuesta C).
+  // El resto de las vistas sigue en el PhoneShell hasta tener su versión
+  // desktop propia.
+  const [esDesktop, setEsDesktop] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 1200px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1200px)");
+    const onChange = (e) => setEsDesktop(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const irDesdeDesktop = (dest) => {
+    if (dest === "inicio") { setActiveTab("home"); setCurrentView("agenda"); return; }
+    if (dest === "calendario") { setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); return; }
+    if (dest === "solicitudes") { setSolicitudesReturn("agenda"); setSolicitudesCreatePreset(null); setActiveTab("requests"); setCurrentView("solicitudes"); return; }
+    if (dest === "notificaciones") { setCurrentView("notifications"); return; }
+    const esAdminSistema = ["ADMIN", "ADMINISTRADOR"].includes(String(auth?.user?.rolSistema || "").toUpperCase());
+    if (dest === "personal") {
+      if (auth?.user?.rol === "JEFATURA") setCurrentView("funcionarios_servicio_jefatura");
+      else if (esAdminSistema) setCurrentView("jerarquia");
+      else if (auth?.user?.rol === "SUBROGANTE") setCurrentView("subrogante");
+      else { setActiveTab("me"); setCurrentView("perfil"); }
+      return;
+    }
+    if (dest === "planificacion") {
+      if (esAdminSistema) setCurrentView("planificacion");
+      else { setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); }
+      return;
+    }
+    if (dest === "estadisticas") { setStatsReturn("agenda"); setCurrentView("admin_stats"); return; }
+    if (dest === "bitacora") { setBitacoraReturn("agenda"); setCurrentView("bitacora"); return; }
+    if (dest === "gestion") {
+      if (auth?.user?.rol === "JEFATURA") setCurrentView("jefatura");
+      else if (auth?.user?.rol === "SUBROGANTE") setCurrentView("subrogante");
+      else if (esAdminSistema) setCurrentView("admin");
+      else { setActiveTab("me"); setCurrentView("perfil"); }
+    }
+  };
+
+  if (esDesktop && currentView === "agenda" && auth?.isLogged) {
+    return (
+      <CentroOperacionesDesktop
+        user={auth?.user}
+        onNavigate={irDesdeDesktop}
+        onLogout={handleLogout}
+        onSwitchService={handleBackToServiceSelection}
+        onOpenSolicitudes={handleOpenSolicitudes}
+      />
+    );
+  }
 
   return (
     <PhoneShell>

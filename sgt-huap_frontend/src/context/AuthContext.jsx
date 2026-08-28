@@ -29,7 +29,9 @@ export function AuthProvider({ children }) {
                             rolSistema: userData.rolSistema,
                             servicioId: userData.servicioId,
                             servicios: userData.servicios || [],
-                            userId: userData.userId
+                            userId: userData.userId,
+                            rut: userData.rut,
+                            rutCompleto: userData.rutCompleto
                         })
                     }
                 }
@@ -56,7 +58,9 @@ export function AuthProvider({ children }) {
                 rolSistema: userData.rolSistema,
                 servicioId: userData.servicioId,
                 servicios: userData.servicios || [],
-                userId: userData.userId
+                userId: userData.userId,
+                rut: userData.rut,
+                rutCompleto: userData.rutCompleto
             })
         }
     }
