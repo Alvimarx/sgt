@@ -324,17 +324,17 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
     } catch (e) { toast(e?.message || 'No se pudo seleccionar al postulante.'); }
   };
   const asignarCupo = async (turnoLibre, candidato) => {
-    try {
-      await asignarTurnoLibre({
-        idTurno: turnoLibre.id,
-        idNuevoMedico: Number(candidato.idFuncionario),
-        idAdministrador: myUserId,
-        motivo: 'Asignación desde el centro de turnos',
-      });
-      setAsignFor(null);
-      toast(`Cupo asignado a ${nombreCompletoDe(candidato)}.`);
-      recargar();
-    } catch (e) { toast(e?.message || 'No se pudo asignar el cupo.'); }
+    // asignarTurnoLibre no lanza: devuelve { success, error } — hay que chequear.
+    const r = await asignarTurnoLibre({
+      idTurno: turnoLibre.id,
+      idNuevoMedico: Number(candidato.idFuncionario),
+      idAdministrador: myUserId,
+      motivo: 'Asignación desde el centro de turnos',
+    });
+    if (!r?.success) { toast(r?.error || 'No se pudo asignar el cupo.'); return; }
+    setAsignFor(null);
+    toast(`Cupo asignado a ${nombreCompletoDe(candidato)}.`);
+    recargar();
   };
 
   // ── VM del panel expandido de un turno (día o noche) ──────────────────────
