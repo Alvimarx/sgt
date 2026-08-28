@@ -44,6 +44,7 @@ por qué se hizo y cómo se hizo.
 | R14 | 2026-08-26 | Picker de intercambio: solo canjes posibles | pendiente de visto bueno |
 | R15 | 2026-08-26 | Turno comprometido único + cancelar solicitudes | pendiente de visto bueno |
 | R16 | 2026-08-27 | Modo desktop: Centro de operaciones (Propuesta C) | pendiente de visto bueno |
+| R17 | 2026-08-28 | Desktop: ancho fluido + gestión de asignación completa + ofertas vigentes | pendiente de visto bueno |
 
 ## Estado por lote
 

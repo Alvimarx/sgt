@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getTurnosServicio } from '../../services/funcionarioService';
-import { solicitudesService, usuariosService, ofertasGeneralesService } from '../../services/adminService';
-import { asignarTurnoLibre } from '../../services/turnosService';
+import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { useNotifications } from '../../context/NotificationContext';
+// Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
+// lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
+import AsignarTurnoLibreSheet from '../Comun/AsignarTurnoLibreSheet';
 
 // ---------------------------------------------------------------------------
 // CENTRO DE OPERACIONES — vista desktop (R16, "Propuesta C" de Claude Design,
@@ -185,11 +187,11 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   const [agenda, setAgenda] = useState({ turnos: [] });
   const [sols, setSols] = useState([]);
   const [ofertas, setOfertas] = useState([]);
-  const [funcionarios, setFuncionarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selDay, setSelDay] = useState(hoy);
-  const [asignFor, setAsignFor] = useState(null);
+  // Turno (asignado o libre) abierto en el sheet de gestión de asignación.
+  const [turnoGestion, setTurnoGestion] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -233,14 +235,9 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
           .filter((s) => (vistas.has(s.idSolicitud) ? false : (vistas.add(s.idSolicitud), true))));
       }));
     }
-    if (canAssign) {
-      cargas.push(usuariosService.getAll(servicioId)
-        .then((r) => { if (vivo) setFuncionarios(Array.isArray(r) ? r : []); })
-        .catch(() => { if (vivo) setFuncionarios([]); }));
-    }
     Promise.all(cargas).finally(() => { if (vivo) setCargando(false); });
     return () => { vivo = false; };
-  }, [servicioId, myUserId, canDecide, canAssign, refreshTick]);
+  }, [servicioId, myUserId, canDecide, refreshTick]);
 
   // ── Semana visible; el día expandido parte en HOY y sigue a la navegación ──
   const diasSemana = useMemo(() => {
@@ -255,7 +252,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
 
   useEffect(() => {
     // Al cambiar de semana, expandir HOY si cae en ella; si no, el lunes.
-    setAsignFor(null);
+    setTurnoGestion(null);
     setSelDay(diasSemana.includes(hoy) ? hoy : diasSemana[0]);
   }, [diasSemana, hoy]);
 
@@ -330,19 +327,6 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
       recargar();
     } catch (e) { toast(e?.message || 'No se pudo seleccionar al postulante.'); }
   });
-  const asignarCupo = (turnoLibre, candidato) => mutar(async () => {
-    // asignarTurnoLibre no lanza: devuelve { success, error } — hay que chequear.
-    const r = await asignarTurnoLibre({
-      idTurno: turnoLibre.id,
-      idNuevoMedico: Number(candidato.idFuncionario),
-      idAdministrador: myUserId,
-      motivo: 'Asignación desde el centro de turnos',
-    });
-    if (!r?.success) { toast(r?.error || 'No se pudo asignar el cupo.'); return; }
-    setAsignFor(null);
-    toast(`Cupo asignado a ${nombreCompletoDe(candidato)}.`);
-    recargar();
-  });
 
   // ── VM del panel expandido de un turno (día o noche) ──────────────────────
   const shiftVM = useCallback((fechaISO, tipo) => {
@@ -364,38 +348,23 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
         ...personaVM(t.nombreFuncionario, { puesto: t.nombrePuesto, yo: t.miTurno }),
         key: t.id,
         puesto: etiquetaPuesto(t.nombrePuesto),
+        // Jefatura/admin: clic en la persona abre la gestión de asignación
+        // (reasignar a cualquiera del servicio, o quitar y dejar vacante).
+        onEditar: canAssign ? () => setTurnoGestion(t) : undefined,
       }));
 
-    const ocupadosDia = new Set();
-    ['dia', 'noche'].forEach((t2) => (gruposPorCelda.get(`${fechaISO}|${t2}`) || []).forEach((t) => {
-      if (t.idFuncionario != null) ocupadosDia.add(String(t.idFuncionario));
-    }));
-
     const libres = turnos.filter((t) => t.idFuncionario == null).map((t) => {
-      const assigning = asignFor === `${clave}:${t.id}`;
       // El backend marca solicitudPendiente solo para solicitudes DEL usuario
       // autenticado (R11): si ya lo solicitó, el cupo queda no interactivo (R12).
       const yaSolicitada = !canAssign && Boolean(t.solicitudPendiente);
       return {
         key: t.id, puesto: t.nombrePuesto || 'Sin puesto',
-        idle: !assigning, assigning,
         yaSolicitada,
-        cands: assigning
-          ? funcionarios
-              .filter((f) => !ocupadosDia.has(String(f.idFuncionario)))
-              .slice(0, 6)
-              .map((f) => ({
-                ...personaVM(nombreCompletoDe(f), {}),
-                key: f.idFuncionario,
-                onPick: () => asignarCupo(t, f),
-              }))
-          : [],
         onAsignar: canAssign
-          ? () => setAsignFor(`${clave}:${t.id}`)
+          ? () => setTurnoGestion(t)
           : yaSolicitada
             ? undefined
             : () => onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: t.id, turnoLabel: `${fechaISO} ${fmtHora(t.inicio)}–${fmtHora(t.fin)}` }),
-        onCancel: () => setAsignFor(null),
       };
     });
 
@@ -406,8 +375,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
       pct: `${Math.round((asignados / total) * 100)}%`, barBg: full ? '#2E7D57' : '#E57F84',
       people, libres,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gruposPorCelda, asignFor, funcionarios, canAssign, onOpenSolicitudes]);
+  }, [gruposPorCelda, canAssign, onOpenSolicitudes]);
 
   // ── VM de los 7 días (compactos + expandido) ──────────────────────────────
   const days = useMemo(() => diasSemana.map((iso) => {
@@ -450,7 +418,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
       dia: md, noche: mn,
       pendTxt: pend ? `${pend} sol.` : false,
       aria: `Expandir ${DOW_LARGO[(d.getDay() + 6) % 7]} ${d.getDate()}`,
-      onSelect: () => { setSelDay(iso); setAsignFor(null); },
+      onSelect: () => { setSelDay(iso); setTurnoGestion(null); },
       diaVM: expanded ? shiftVM(iso, 'dia') : null,
       nocheVM: expanded ? shiftVM(iso, 'noche') : null,
     };
@@ -466,8 +434,14 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
     return { asigT: a, totT: t, libresT: t - a };
   }, [diasSemana, gruposPorCelda]);
 
+  // Una oferta cuyo turno ya pasó no es "disponible": se oculta. Se usa la
+  // fecha de término si existe (nocturno que cruza medianoche sigue vigente
+  // su segundo día).
+  const ofertaVigente = (o) =>
+    String(o?.turno?.diaFinalTurno || o?.turno?.diaInicioTurno || '9999-12-31') >= hoy;
+
   const nSol = solsPendientes.length;
-  const nDisp = ofertas.filter((o) => o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION').length;
+  const nDisp = ofertas.filter((o) => ofertaVigente(o) && (o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION')).length;
 
   const tituloSemana = useMemo(() => {
     const ini = parseISO(diasSemana[0]);
@@ -595,9 +569,11 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
     };
     return ofertas
       // RECHAZADA no se lista (no es accionable ni "disponible"); CERRADA solo
-      // si tiene seleccionado, para mostrar el "Reasignado a …".
-      .filter((o) => o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION'
-        || (o.estado === 'CERRADA' && o.postulaciones?.some((p) => p.seleccionado)))
+      // si tiene seleccionado, para mostrar el "Reasignado a …". Las ofertas
+      // de turnos pasados se ocultan siempre.
+      .filter((o) => ofertaVigente(o)
+        && (o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION'
+          || (o.estado === 'CERRADA' && o.postulaciones?.some((p) => p.seleccionado))))
       .map((o) => {
         const [badge, tone] = map[o.estado] || ['—', 'neutral'];
         const [badgeBg, badgeInk] = BADGE[tone];
@@ -677,16 +653,25 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
                 <div style={{ height: '100%', background: vm.barBg, width: vm.pct, transition: 'width .3s ease' }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-                {vm.people.map((p) => (
-                  <div key={p.key} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F7F9FC', borderRadius: 7, padding: '4px 6px', minWidth: 0 }} title={p.n}>
-                    <span style={{ width: 18, height: 18, borderRadius: 99, background: p.bg, color: p.ink, display: 'inline-grid', placeItems: 'center', fontSize: '7px', fontWeight: 800, flexShrink: 0 }}>{p.i}</span>
-                    <span style={{ minWidth: 0, flex: 1 }}>
-                      <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.ap}</span>
-                      <span style={{ display: 'block', fontSize: '8px', fontWeight: 700, color: '#7486A0', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{p.puesto}</span>
-                    </span>
-                  </div>
-                ))}
-                {vm.libres.filter((l) => l.idle).map((l) => (
+                {vm.people.map((p) => {
+                  const Cell = p.onEditar ? 'button' : 'div';
+                  return (
+                    <Cell
+                      key={p.key}
+                      onClick={p.onEditar}
+                      className={p.onEditar ? 'sgt-persona' : ''}
+                      title={p.onEditar ? `${p.n} · editar asignación` : p.n}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F7F9FC', border: 'none', borderRadius: 7, padding: '4px 6px', minWidth: 0, textAlign: 'left', cursor: p.onEditar ? 'pointer' : 'default', font: 'inherit', color: 'inherit' }}
+                    >
+                      <span style={{ width: 18, height: 18, borderRadius: 99, background: p.bg, color: p.ink, display: 'inline-grid', placeItems: 'center', fontSize: '7px', fontWeight: 800, flexShrink: 0 }}>{p.i}</span>
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.ap}</span>
+                        <span style={{ display: 'block', fontSize: '8px', fontWeight: 700, color: '#7486A0', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{p.puesto}</span>
+                      </span>
+                    </Cell>
+                  );
+                })}
+                {vm.libres.map((l) => (
                   <button key={l.key} onClick={l.onAsignar} disabled={l.yaSolicitada} className={l.yaSolicitada ? '' : 'sgt-libre'} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#FBEEEF', border: '1.5px dashed #E57F84', borderRadius: 7, padding: '4px 6px', cursor: l.yaSolicitada ? 'default' : 'pointer', minWidth: 0 }}>
                     <span style={{ width: 18, height: 18, borderRadius: 99, border: '1.5px dashed #E57F84', color: '#B85A60', display: 'inline-grid', placeItems: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>+</span>
                     <span style={{ minWidth: 0, textAlign: 'left' }}>
@@ -698,22 +683,6 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
                   </button>
                 ))}
               </div>
-              {vm.libres.filter((l) => l.assigning).map((l) => (
-                <div key={l.key} style={{ border: '1.5px dashed #E57F84', background: '#FBEEEF', borderRadius: 9, padding: '8px 9px', animation: 'sgtUp .18s ease' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#8C3F44', marginBottom: 6 }}>Asignar cupo · {l.puesto}</div>
-                  {l.cands.length === 0 && (
-                    <div style={{ fontSize: '10px', fontWeight: 600, color: '#8C3F44', marginBottom: 4 }}>Sin candidatos disponibles ese día.</div>
-                  )}
-                  {l.cands.map((c) => (
-                    <button key={c.key} onClick={c.onPick} className="sgt-cand" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 7, background: '#fff', border: '1px solid #E5EAF1', borderRadius: 8, padding: '5px 8px', marginBottom: 4, cursor: 'pointer', textAlign: 'left' }}>
-                      <span style={{ width: 20, height: 20, borderRadius: 99, background: c.bg, color: c.ink, display: 'inline-grid', placeItems: 'center', fontSize: '7.5px', fontWeight: 800 }}>{c.i}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: '10.5px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.n}</span>
-                      <span style={{ fontSize: '9.5px', fontWeight: 800, color: '#17416C' }}>Asignar</span>
-                    </button>
-                  ))}
-                  <button onClick={l.onCancel} style={{ width: '100%', background: 'transparent', border: 'none', color: '#7486A0', fontSize: '10px', fontWeight: 700, cursor: 'pointer', padding: '3px 0' }}>Cancelar</button>
-                </div>
-              ))}
             </>
           )}
         </div>
@@ -722,16 +691,17 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F2F5F9', color: '#0F1B2D', fontFamily: "'Raleway', system-ui, sans-serif" }}>
+    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', background: '#F2F5F9', color: '#0F1B2D', fontFamily: "'Raleway', system-ui, sans-serif" }}>
       <style>{`
         @keyframes sgtFade{from{opacity:0}to{opacity:1}}
         @keyframes sgtUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+        @keyframes sgtSlideUp{from{transform:translateY(40px);opacity:0.6}to{transform:translateY(0);opacity:1}}
         @keyframes sgtToast{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
         .sgt-nav-item:hover{background:rgba(255,255,255,0.08)!important;color:#fff!important}
         .sgt-hoy-btn:hover{background:#E8EEF4!important}
         .sgt-day-compact:hover{box-shadow:0 8px 20px rgba(15,27,45,0.1);border-color:#17416C!important}
         .sgt-libre:hover{background:#F8E2E4!important}
-        .sgt-cand:hover{border-color:#17416C!important}
+        .sgt-persona:hover{background:#E8EEF4!important}
       `}</style>
 
       {/* Sidebar */}
@@ -982,6 +952,28 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
           </section>
         </div>
       </main>
+
+      {/* Gestión de asignación: el mismo sheet del "Detalle del turno" móvil,
+          presentado como modal centrado. El Sheet se posiciona con
+          position:absolute respecto del contenedor relativo de 420px. */}
+      {turnoGestion && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)', display: 'grid', placeItems: 'center', animation: 'sgtFade .15s ease' }}>
+          <div style={{ position: 'relative', width: 'min(430px, 94vw)', height: 'min(900px, 96vh)', borderRadius: 24, overflow: 'hidden' }}>
+            <AsignarTurnoLibreSheet
+              open
+              shift={turnoGestion}
+              servicioId={servicioId}
+              adminUserId={myUserId}
+              onClose={() => setTurnoGestion(null)}
+              onAssigned={() => {
+                setTurnoGestion(null);
+                toast('Asignación actualizada.');
+                recargar();
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toastMsg && (
