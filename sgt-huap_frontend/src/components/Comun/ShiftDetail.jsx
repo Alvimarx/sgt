@@ -138,6 +138,11 @@ const ShiftDetail = ({
         onAction("editar-asignacion-turno", targetShift);
     };
 
+    const handleRequestVacancy = (vacantShift) => {
+        if (!vacantShift || !onAction) return;
+        onAction("solicitar-turno", vacantShift);
+    };
+
     const totalTurnos = groupData?.totalTurnos ?? null;
     const asignados = groupData?.asignados ?? null;
     const equipoCompleto = groupData?.completo ?? false;
@@ -211,10 +216,13 @@ const ShiftDetail = ({
                             textTransform: "uppercase",
                         }}
                     >
-                        {shift.nombreTipoTurno ||
+                        {(shift.nombreTipoTurno ||
                             shift.nombreTipo ||
                             shift.nombre ||
-                            (shift.tipo === "dia" ? "Turno día" : "Turno noche")}
+                            (shift.tipo === "dia" ? "Turno día" : "Turno noche")) +
+                            (shift.nombreRotativa || groupData?.nombreRotativa
+                                ? `: ${shift.nombreRotativa || groupData.nombreRotativa}`
+                                : "")}
                     </span>
                 </div>
 
@@ -316,6 +324,7 @@ const ShiftDetail = ({
                         turnosGrupo={turnosGrupo}
                         canManageAssignments={canManageAssignments}
                         onAssignVacancy={handleAssignVacancy}
+                        onRequestVacancy={handleRequestVacancy}
                         onManageAssignedTurn={handleManageAssignedTurn}
                         onSelectMember={onSelectTargetFuncionario ? handleSelectTarget : undefined}
                         selectedMemberId={selectedTargetFuncionario?.id}
@@ -508,6 +517,7 @@ const TeamByPuesto = ({
     selectedMemberId = null,
     canManageAssignments = false,
     onAssignVacancy,
+    onRequestVacancy,
     onManageAssignedTurn,
 }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -659,13 +669,21 @@ const TeamByPuesto = ({
                         })}
 
                         {vacantesDelPuesto.length > 0 ? (
-                            vacantesDelPuesto.map((vacante, i) => (
+                            vacantesDelPuesto.map((vacante, i) => {
+                                // Vacante que el usuario YA solicitó (marca del backend): la
+                                // tarjeta informa y deja de invitar — el backend igual
+                                // rechazaría el duplicado, esto solo evita el viaje.
+                                const yaSolicitada = !canManageAssignments && Boolean(vacante.solicitudPendiente);
+                                return (
                                 <button
                                     key={`vacante-${vacante.id ?? i}`}
                                     type="button"
+                                    disabled={yaSolicitada}
                                     onClick={() => {
                                         if (canManageAssignments) {
                                             onAssignVacancy?.(vacante);
+                                        } else if (!yaSolicitada) {
+                                            onRequestVacancy?.(vacante);
                                         }
                                     }}
                                     style={{
@@ -677,13 +695,17 @@ const TeamByPuesto = ({
                                         marginTop: 4,
                                         border: canManageAssignments
                                             ? `1px dashed ${P2().primary}`
-                                            : "none",
+                                            : yaSolicitada
+                                                ? `1px dashed ${P2().line}`
+                                                : `1px dashed ${P2().accent}`,
                                         background: canManageAssignments
                                             ? P2().primarySoft
-                                            : "transparent",
+                                            : yaSolicitada
+                                                ? P2().surface2
+                                                : P2().accentSoft,
                                         width: "100%",
                                         textAlign: "left",
-                                        cursor: canManageAssignments ? "pointer" : "default",
+                                        cursor: yaSolicitada ? "default" : "pointer",
                                     }}
                                 >
                                     <div
@@ -692,7 +714,7 @@ const TeamByPuesto = ({
                                             height: 28,
                                             borderRadius: 99,
                                             border: `1.5px dashed ${
-                                                canManageAssignments ? P2().primary : P2().line
+                                                canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : P2().accent
                                             }`,
                                             display: "grid",
                                             placeItems: "center",
@@ -700,9 +722,9 @@ const TeamByPuesto = ({
                                         }}
                                     >
                                         <SGTIcon
-                                            name={canManageAssignments ? "user-plus" : "hand-raised"}
+                                            name={canManageAssignments ? "user-plus" : yaSolicitada ? "check" : "hand-raised"}
                                             size={13}
-                                            color={canManageAssignments ? P2().primary : P2().ink3}
+                                            color={canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60"}
                                         />
                                     </div>
 
@@ -710,25 +732,27 @@ const TeamByPuesto = ({
                                         style={{
                                             fontSize: 12.5,
                                             fontWeight: 800,
-                                            color: canManageAssignments ? P2().primary : P2().ink3,
+                                            color: canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60",
                                             flex: 1,
-                                            fontStyle: canManageAssignments ? "normal" : "italic",
                                         }}
                                     >
                                         {canManageAssignments
                                             ? "Asignar funcionario a este cupo"
-                                            : "Cupo libre — falta cubrir"}
+                                            : yaSolicitada
+                                                ? "Ya solicitaste este turno"
+                                                : "Cupo libre — tocar para solicitar"}
                                     </span>
 
-                                    {canManageAssignments && (
+                                    {!yaSolicitada && (
                                         <SGTIcon
                                             name="chevron-right"
                                             size={13}
-                                            color={P2().primary}
+                                            color={canManageAssignments ? P2().primary : "#B85A60"}
                                         />
                                     )}
                                 </button>
-                            ))
+                                );
+                            })
                         ) : (
                             Array.from({ length: puesto.vacantes || 0 }).map((_, i) => (
                                 <div

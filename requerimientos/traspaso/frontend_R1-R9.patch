@@ -1,0 +1,744 @@
+diff --git a/sgt-huap_frontend/src/components/Admin2/Prop4.jsx b/sgt-huap_frontend/src/components/Admin2/Prop4.jsx
+index b0fc1ea..7d45b7e 100644
+--- a/sgt-huap_frontend/src/components/Admin2/Prop4.jsx
++++ b/sgt-huap_frontend/src/components/Admin2/Prop4.jsx
+@@ -1,11 +1,12 @@
+ // Prop4.jsx
+-import React, { useState } from "react";
++import React, { useEffect, useMemo, useState } from "react";
+ 
+ //Importaciones Style
+ import "../Style/style.css";
+ import { PhoneShell, TabBar } from "../Style/UIPrimitives";
+ 
+ import { useAuth } from "../../context/AuthContext";
++import { selectService } from "../../services/authService";
+ 
+ //Importaciones de Comun
+ import AgendaView from "../Comun/AgendaView";
+@@ -53,24 +54,130 @@ import SolicitudesView from "./SolicitudesView";
+ import TiposTurnoView from "./TiposTurnoView";
+ import PlanificacionView from "./Planificacion";
+ 
++// ---------------------------------------------------------------------------
++// Persistencia de navegación (sgt_nav_state, sessionStorage — por pestaña).
++// El JWT y user_data ya sobreviven al refresh en localStorage (AuthContext los
++// rehidrata ANTES del primer render, bloqueando con "Cargando..."), pero la
++// vista vivía solo en useState y todo refresh caía al login. Aquí se restaura.
++// Las vistas del flujo de autenticación no se restauran: dependen de estado en
++// memoria (preAuthToken dura ~5 min y no se persiste, por diseño).
++// ---------------------------------------------------------------------------
++const NAV_STORAGE_KEY = "sgt_nav_state";
++
++// Vistas por nivel de acceso. La restauración usa WHITELIST: una vista que no
++// esté en ninguna lista (renombrada en un deploy, o sessionStorage manipulado)
++// NO se restaura — cae a "agenda" en vez de dejar la pantalla en blanco.
++const VISTAS_COMUNES = [
++  "agenda", "calendar_view", "perfil", "personal_dashboard",
++  "notifications", "solicitudes", "bitacora",
++];
++const VISTAS_SOLO_ADMIN = [
++  "admin", "funcionarios_sistema", "planificacion", "servicios",
++  "asignacion", "jerarquia", "tipos_turno", "plantillas",
++];
++const VISTAS_SOLO_JEFATURA = [
++  "jefatura", "funcionarios_servicio_jefatura", "asignacionJefatura", "jerarquiaJefatura",
++];
++const VISTAS_SOLO_SUBROGANTE = ["subrogante"];
++const VISTAS_GESTION = ["admin_stats", "puestos", "auditoria", "reglas"];
++
++// ¿Puede este usuario (ya rehidratado) ver esta vista? Mismos gates que usa
++// Perfil.jsx para mostrar los paneles. Importante en multi-pestaña: si en otra
++// pestaña se cambió a un servicio donde el rol es MEDICO, aquí no se restaura
++// un panel de jefatura con el token nuevo.
++function vistaPermitida(view, user) {
++  const esAdmin = ["ADMIN", "ADMINISTRADOR"].includes(String(user?.rolSistema || "").toUpperCase());
++  const esJefatura = user?.rol === "JEFATURA";
++  const esSubrogante = user?.rol === "SUBROGANTE";
++  if (VISTAS_COMUNES.includes(view)) return true;
++  if (VISTAS_SOLO_ADMIN.includes(view)) return esAdmin;
++  if (VISTAS_SOLO_JEFATURA.includes(view)) return esJefatura;
++  if (VISTAS_SOLO_SUBROGANTE.includes(view)) return esSubrogante;
++  if (VISTAS_GESTION.includes(view)) return esAdmin || esJefatura || esSubrogante;
++  return false;
++}
++
++const RETURNS_DEFAULT = {
++  solicitudes: "agenda",
++  calendar: "agenda",
++  stats: "admin",
++  puestos: "admin",
++  bitacora: "admin",
++  auditoria: "admin",
++  reglas: "admin",
++};
++
++function leerNavGuardada(user) {
++  const isLogged = !!user;
++  // Los returns por defecto también pasan por la whitelist: para un médico,
++  // "admin" como destino de retorno no es válido y cae a "agenda".
++  const returnsBase = {};
++  for (const [k, v] of Object.entries(RETURNS_DEFAULT)) {
++    returnsBase[k] = vistaPermitida(v, user) ? v : "agenda";
++  }
++  const base = { view: isLogged ? "agenda" : "login", tab: "home", returns: returnsBase };
++  if (!isLogged) return base;
++  try {
++    const saved = JSON.parse(sessionStorage.getItem(NAV_STORAGE_KEY) || "null");
++    if (saved?.view && vistaPermitida(saved.view, user)) {
++      const returns = { ...returnsBase };
++      for (const k of Object.keys(RETURNS_DEFAULT)) {
++        const v = saved.returns?.[k];
++        if (typeof v === "string" && vistaPermitida(v, user)) returns[k] = v;
++      }
++      return { view: saved.view, tab: saved.tab || "home", returns };
++    }
++  } catch {
++    // JSON corrupto o storage bloqueado: se cae al home logueado.
++  }
++  return base;
++}
++
+ const Prop4 = ({ tweaks = {} }) => {
+   const auth = useAuth();
+-  const [currentView, setCurrentView] = useState("login");
+-  const [activeTab, setActiveTab] = useState("home");
++  // Navegación inicial: la última vista guardada si hay sesión, o login.
++  // useMemo con [] = solo al montar; auth.user ya está rehidratado en ese punto.
++  const navInicial = useMemo(() => leerNavGuardada(auth?.user), []);
++
++  const [currentView, setCurrentView] = useState(navInicial.view);
++  const [activeTab, setActiveTab] = useState(navInicial.tab);
+ 
+   const [preAuthToken, setPreAuthToken] = useState(null);
++  const [entrandoDirecto, setEntrandoDirecto] = useState(false);
+   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
+   const [pendingRegistrationMessage, setPendingRegistrationMessage] = useState('');
+-  const [solicitudesReturn, setSolicitudesReturn] = useState("agenda");
++  const [solicitudesReturn, setSolicitudesReturn] = useState(navInicial.returns.solicitudes);
+   const [solicitudesCreatePreset, setSolicitudesCreatePreset] = useState(null);
+-  const [calendarReturn, setCalendarReturn] = useState("agenda");
++  const [calendarReturn, setCalendarReturn] = useState(navInicial.returns.calendar);
+ 
+   //Para Jefatura y subrogacia es lo mismo por lo cual es mejor compartir la vista
+-  const [statsReturn, setStatsReturn] = useState("admin");
+-  const[puestosReturn, setPuestosReturn] = useState("admin");
+-  const [bitacoraReturn, setBitacoraReturn] = useState("admin");
+-  const [auditoriaReturn, setAuditoriaReturn] = useState("admin");
+-  const [reglasReturn, setReglasReturn] = useState("admin");
++  const [statsReturn, setStatsReturn] = useState(navInicial.returns.stats);
++  const[puestosReturn, setPuestosReturn] = useState(navInicial.returns.puestos);
++  const [bitacoraReturn, setBitacoraReturn] = useState(navInicial.returns.bitacora);
++  const [auditoriaReturn, setAuditoriaReturn] = useState(navInicial.returns.auditoria);
++  const [reglasReturn, setReglasReturn] = useState(navInicial.returns.reglas);
++
++  // Cada cambio de vista queda guardado para que refrescar no expulse al login.
++  useEffect(() => {
++    try {
++      sessionStorage.setItem(NAV_STORAGE_KEY, JSON.stringify({
++        view: currentView,
++        tab: activeTab,
++        returns: {
++          solicitudes: solicitudesReturn,
++          calendar: calendarReturn,
++          stats: statsReturn,
++          puestos: puestosReturn,
++          bitacora: bitacoraReturn,
++          auditoria: auditoriaReturn,
++          reglas: reglasReturn,
++        },
++      }));
++    } catch {
++      // Storage lleno o bloqueado: la app sigue funcionando, solo sin restauración.
++    }
++  }, [currentView, activeTab, solicitudesReturn, calendarReturn, statsReturn,
++      puestosReturn, bitacoraReturn, auditoriaReturn, reglasReturn]);
+ 
+   const handleTabChange = (tabId) => {
+     setActiveTab(tabId);
+@@ -94,7 +201,7 @@ const Prop4 = ({ tweaks = {} }) => {
+     setCurrentView("solicitudes");
+   };
+ 
+-  const handleLoginSuccess = ({ preAuthToken, servicios = [], registeredInSystem, message }) => {
++  const handleLoginSuccess = async ({ preAuthToken, servicios = [], registeredInSystem, message }) => {
+     if (!registeredInSystem) {
+       setPreAuthToken(null);
+       setServiciosDisponibles([]);
+@@ -104,6 +211,26 @@ const Prop4 = ({ tweaks = {} }) => {
+     }
+ 
+     setPendingRegistrationMessage('');
++
++    // Con UN solo servicio no hay nada que elegir: se canjea el preAuthToken al vuelo
++    // y se entra directo al home. Si el canje falla, se cae al flujo normal para que
++    // el usuario vea el error y pueda reintentar.
++    if (preAuthToken && servicios.length === 1) {
++      const unico = servicios[0];
++      setEntrandoDirecto(true);
++      const result = await selectService(preAuthToken, unico.servicioId);
++      setEntrandoDirecto(false);
++
++      if (result.success) {
++        setServiciosDisponibles(servicios);
++        if (unico.nombre) {
++          localStorage.setItem("sgt_servicio_activo_nombre", unico.nombre);
++        }
++        handleServiceSelected(result.userData);
++        return;
++      }
++    }
++
+     setPreAuthToken(preAuthToken);
+     setServiciosDisponibles(servicios);
+     setCurrentView("select_service");
+@@ -128,8 +255,19 @@ const Prop4 = ({ tweaks = {} }) => {
+   };
+ 
+   const handleBackToServiceSelection = () => {
+-    const servicios = auth?.user?.servicios || serviciosDisponibles;
+-    if (servicios && servicios.length > 0) {
++    // Tras un refresh la lista en memoria está vacía, pero user_data (localStorage,
++    // rehidratado por AuthContext) conserva perfil.servicios. Se normalizan las dos
++    // formas: {servicioId, nombre} (paso 1 del login) e {idServicio, nombreServicio}
++    // (perfil persistido) — SelectServiceView espera servicioId/nombre.
++    const crudos = (serviciosDisponibles?.length > 0 ? serviciosDisponibles : auth?.user?.servicios) || [];
++    const servicios = crudos
++      .map((s) => ({
++        servicioId: s.servicioId ?? s.idServicio,
++        nombre: s.nombre ?? s.nombreServicio,
++        rol: s.rol,
++      }))
++      .filter((s) => s.servicioId != null);
++    if (servicios.length > 0) {
+       setServiciosDisponibles(servicios);
+       setPreAuthToken(null);
+       setCurrentView("select_service");
+@@ -139,6 +277,7 @@ const Prop4 = ({ tweaks = {} }) => {
+   const handleLogout = () => {
+     auth?.logout?.();
+     localStorage.removeItem("sgt_servicio_activo_nombre");
++    sessionStorage.removeItem(NAV_STORAGE_KEY);
+     setPreAuthToken(null);
+     setServiciosDisponibles([]);
+     setPendingRegistrationMessage('');
+@@ -159,9 +298,18 @@ const Prop4 = ({ tweaks = {} }) => {
+         @keyframes sgtSlideLeft { from { transform:translateX(100%); } to { transform:translateX(0); } }
+       `}</style>
+ 
+-      {currentView === "login" && (
++      {currentView === "login" && !entrandoDirecto && (
+         <LoginView onLoginSuccess={handleLoginSuccess} />
+       )}
++      {currentView === "login" && entrandoDirecto && (
++        <div
++          className="login-gradient-bg"
++          role="status"
++          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#17416C" }}
++        >
++          Entrando…
++        </div>
++      )}
+       {currentView === "select_service" && (
+         <SelectServiceView
+           preAuthToken={preAuthToken}
+diff --git a/sgt-huap_frontend/src/components/Comun/AgendaView.jsx b/sgt-huap_frontend/src/components/Comun/AgendaView.jsx
+index b27f795..6805210 100644
+--- a/sgt-huap_frontend/src/components/Comun/AgendaView.jsx
++++ b/sgt-huap_frontend/src/components/Comun/AgendaView.jsx
+@@ -275,47 +275,69 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
+   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
+ 
+   // ---------------------------------------------------------------------------
+-  // CONTADORES DE FILTROS — sin overlap entre "pendientes" y "aprobados"
++  // CONTADORES DE FILTROS — "solicitudes" excluye los cambios ya aprobados
+   // ---------------------------------------------------------------------------
+   const countMisTurnos = useMemo(
+     () => agendaDays.filter((day) => getShifts(day.key).some((s) => s.miTurno)).length,
+     [agendaDays, shiftsByDay]
+   );
+-  const countPendientes = useMemo(
+-    // TO DO: Lógica correcta para ver turnos pendientes
++  // OJO (limitación preexistente): el endpoint de turnos del backend NO emite
++  // solicitudPendiente/cambioAprobado (convertirTurnoAMap), así que este chip
++  // cuenta 0 con datos reales hasta que el backend exponga ese estado.
++  const countSolicitudes = useMemo(
+     () => agendaDays.reduce(
+       (acc, day) => acc + getShifts(day.key).filter((s) => s.solicitudPendiente && !s.cambioAprobado).length, 0
+     ),
+     [agendaDays, shiftsByDay]
+   );
+-  const countLibres = useMemo(
+-    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter((s) => s.turnoLibre).length, 0),
+-    [agendaDays, shiftsByDay]
++
++  // "Disponibles": cupos libres que el usuario REALMENTE podría tomar.
++  // Se excluyen (a) los cupos de un equipo día/noche del que ya es parte
++  // (mismo teamKey: ya está trabajando en ese bloque, no puede doblar ahí), y
++  // (b) los turnos de DÍA cuando viene saliendo de su turno de noche: la noche
++  // que empieza el día anterior termina la mañana de ese día (fechaFin).
++  const misTeamKeys = useMemo(
++    () => new Set(
++      (agendaData.turnos || []).filter((t) => t.miTurno && t.teamKey).map((t) => t.teamKey)
++    ),
++    [agendaData.turnos]
+   );
+-  const countAprobados = useMemo(
+-    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter((s) => s.cambioAprobado).length, 0),
+-    [agendaDays, shiftsByDay]
++  const misMananasPostNoche = useMemo(
++    () => new Set(
++      (agendaData.turnos || [])
++        .filter((t) => t.miTurno && t.tipo === "noche" && t.fechaFin && t.fechaFin !== t.fecha)
++        .map((t) => t.fechaFin)
++    ),
++    [agendaData.turnos]
++  );
++  const esDisponibleParaMi = (s) =>
++    s.turnoLibre &&
++    !(s.teamKey && misTeamKeys.has(s.teamKey)) &&
++    !(s.tipo === "dia" && misMananasPostNoche.has(s.fecha));
++
++  const countDisponibles = useMemo(
++    () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter(esDisponibleParaMi).length, 0),
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++    [agendaDays, shiftsByDay, misTeamKeys, misMananasPostNoche]
+   );
+-
+   const FILTERS = [
+-    { id: "todos",      label: "Todos"      },
+-    { id: "miTurno",   label: "Mis turnos", count: countMisTurnos  },
+-    { id: "pendientes", label: "Pendientes", count: countPendientes },
+-    { id: "libres",    label: "Libres",     count: countLibres     },
+-    { id: "aprobados", label: "Aprobados",  count: countAprobados  },
++    { id: "todos",        label: "Todos"      },
++    { id: "miTurno",     label: "Mis turnos",  count: countMisTurnos   },
++    { id: "solicitudes",  label: "Solicitudes", count: countSolicitudes },
++    { id: "disponibles", label: "Disponibles", count: countDisponibles },
+   ];
+ 
+   const visibleDays = useMemo(() => {
+     return agendaDays.filter((day) => {
+       const shifts = getShifts(day.key);
+-      if (filter === "todos")      return true;
+-      if (filter === "miTurno")    return shifts.some((s) => s.miTurno);
+-      if (filter === "pendientes") return shifts.some((s) => s.solicitudPendiente && !s.cambioAprobado);
+-      if (filter === "libres")     return shifts.some((s) => s.turnoLibre);
+-      if (filter === "aprobados")  return shifts.some((s) => s.cambioAprobado);
++      if (filter === "todos")       return true;
++      if (filter === "miTurno")     return shifts.some((s) => s.miTurno);
++      if (filter === "solicitudes") return shifts.some((s) => s.solicitudPendiente && !s.cambioAprobado);
++      if (filter === "disponibles") return shifts.some(esDisponibleParaMi);
+       return true;
+     });
+-  }, [agendaDays, filter, shiftsByDay]);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [agendaDays, filter, shiftsByDay, misTeamKeys, misMananasPostNoche]);
+ 
+   // ---------------------------------------------------------------------------
+   // RENDER
+@@ -610,7 +632,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) =>
+                 </div>
+                 {miShift.nombreTipoTurno && (
+                   <div style={{ fontSize: 11.5, fontWeight: 700, color: tc.ink }}>
+-                    Equipo {miShift.nombreTipoTurno}
++                    Tienes turno {miShift.nombreTipoTurno}{miShift.nombreRotativa ? `: ${miShift.nombreRotativa}` : ""}
+                   </div>
+                 )}
+                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+@@ -638,7 +660,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) =>
+               <span style={{ fontSize: 13, color: PA.ink2, fontWeight: 700 }}>Sin turno asignado</span>
+               {libres.length > 0 && (
+                 <span style={{ fontSize: 11.5, color: "#B85A60", fontWeight: 700 }}>
+-                  {libres.length} cupo{libres.length > 1 ? "s" : ""} libre disponible
++                  {libres.length} cupo{libres.length > 1 ? "s" : ""} libre{libres.length > 1 ? "s" : ""}
+                 </span>
+               )}
+             </div>
+@@ -674,6 +696,13 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) =>
+               const vacantes = total - asignados;
+               const hayMiTurno = teamShifts.some((x) => x.miTurno);
+ 
++              // El sufijo es la ROTATIVA del equipo ("Turno I/II/III"), no el puesto, y se
++              // muestra siempre: identifica al equipo que cubre ese día, tengas turno o no.
++              const rotativaGrupo = group?.nombreRotativa || rep.nombreRotativa || null;
++              const tituloCard =
++                (rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")) +
++                (rotativaGrupo ? `: ${rotativaGrupo}` : "");
++
+               return (
+                 <div
+                   key={key}
+@@ -681,13 +710,13 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) =>
+                   role="button"
+                   tabIndex={0}
+                   onKeyDown={(e) => e.key === "Enter" && onOpen(rep)}
+-                  aria-label={`Ver detalle: ${rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")}`}
++                  aria-label={`Ver detalle: ${tituloCard}`}
+                   style={{ marginTop: 10, background: t.bg, border: `1.5px solid ${t.soft}`, borderRadius: 12, padding: 10, cursor: "pointer", transition: "opacity 0.15s" }}
+                 >
+                   <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: team ? 8 : 0, flexWrap: "wrap" }}>
+                     <SGTIcon name={rep.tipo === "dia" ? "sun" : "moon"} size={14} color={t.ink} />
+                     <span style={{ fontSize: 12.5, fontWeight: 800, color: t.ink, flex: 1, minWidth: 0 }}>
+-                      {rep.nombreTipoTurno || (rep.tipo === "dia" ? "Turno día" : "Turno noche")}
++                      {tituloCard}
+                     </span>
+                     {hayMiTurno && <SGTBadge tone="primary" size="xs">Tu turno</SGTBadge>}
+                     <SGTBadge tone={vacantes > 0 ? "accent" : "success"} size="xs">
+diff --git a/sgt-huap_frontend/src/components/Comun/ShiftDetail.jsx b/sgt-huap_frontend/src/components/Comun/ShiftDetail.jsx
+index b559413..c7d9b62 100644
+--- a/sgt-huap_frontend/src/components/Comun/ShiftDetail.jsx
++++ b/sgt-huap_frontend/src/components/Comun/ShiftDetail.jsx
+@@ -138,6 +138,11 @@ const ShiftDetail = ({
+         onAction("editar-asignacion-turno", targetShift);
+     };
+ 
++    const handleRequestVacancy = (vacantShift) => {
++        if (!vacantShift || !onAction) return;
++        onAction("solicitar-turno", vacantShift);
++    };
++
+     const totalTurnos = groupData?.totalTurnos ?? null;
+     const asignados = groupData?.asignados ?? null;
+     const equipoCompleto = groupData?.completo ?? false;
+@@ -211,10 +216,13 @@ const ShiftDetail = ({
+                             textTransform: "uppercase",
+                         }}
+                     >
+-                        {shift.nombreTipoTurno ||
++                        {(shift.nombreTipoTurno ||
+                             shift.nombreTipo ||
+                             shift.nombre ||
+-                            (shift.tipo === "dia" ? "Turno día" : "Turno noche")}
++                            (shift.tipo === "dia" ? "Turno día" : "Turno noche")) +
++                            (shift.nombreRotativa || groupData?.nombreRotativa
++                                ? `: ${shift.nombreRotativa || groupData.nombreRotativa}`
++                                : "")}
+                     </span>
+                 </div>
+ 
+@@ -316,6 +324,7 @@ const ShiftDetail = ({
+                         turnosGrupo={turnosGrupo}
+                         canManageAssignments={canManageAssignments}
+                         onAssignVacancy={handleAssignVacancy}
++                        onRequestVacancy={handleRequestVacancy}
+                         onManageAssignedTurn={handleManageAssignedTurn}
+                         onSelectMember={onSelectTargetFuncionario ? handleSelectTarget : undefined}
+                         selectedMemberId={selectedTargetFuncionario?.id}
+@@ -508,6 +517,7 @@ const TeamByPuesto = ({
+     selectedMemberId = null,
+     canManageAssignments = false,
+     onAssignVacancy,
++    onRequestVacancy,
+     onManageAssignedTurn,
+ }) => (
+     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+@@ -666,6 +676,8 @@ const TeamByPuesto = ({
+                                     onClick={() => {
+                                         if (canManageAssignments) {
+                                             onAssignVacancy?.(vacante);
++                                        } else {
++                                            onRequestVacancy?.(vacante);
+                                         }
+                                     }}
+                                     style={{
+@@ -677,13 +689,13 @@ const TeamByPuesto = ({
+                                         marginTop: 4,
+                                         border: canManageAssignments
+                                             ? `1px dashed ${P2().primary}`
+-                                            : "none",
++                                            : `1px dashed ${P2().accent}`,
+                                         background: canManageAssignments
+                                             ? P2().primarySoft
+-                                            : "transparent",
++                                            : P2().accentSoft,
+                                         width: "100%",
+                                         textAlign: "left",
+-                                        cursor: canManageAssignments ? "pointer" : "default",
++                                        cursor: "pointer",
+                                     }}
+                                 >
+                                     <div
+@@ -692,7 +704,7 @@ const TeamByPuesto = ({
+                                             height: 28,
+                                             borderRadius: 99,
+                                             border: `1.5px dashed ${
+-                                                canManageAssignments ? P2().primary : P2().line
++                                                canManageAssignments ? P2().primary : P2().accent
+                                             }`,
+                                             display: "grid",
+                                             placeItems: "center",
+@@ -702,7 +714,7 @@ const TeamByPuesto = ({
+                                         <SGTIcon
+                                             name={canManageAssignments ? "user-plus" : "hand-raised"}
+                                             size={13}
+-                                            color={canManageAssignments ? P2().primary : P2().ink3}
++                                            color={canManageAssignments ? P2().primary : "#B85A60"}
+                                         />
+                                     </div>
+ 
+@@ -710,23 +722,20 @@ const TeamByPuesto = ({
+                                         style={{
+                                             fontSize: 12.5,
+                                             fontWeight: 800,
+-                                            color: canManageAssignments ? P2().primary : P2().ink3,
++                                            color: canManageAssignments ? P2().primary : "#B85A60",
+                                             flex: 1,
+-                                            fontStyle: canManageAssignments ? "normal" : "italic",
+                                         }}
+                                     >
+                                         {canManageAssignments
+                                             ? "Asignar funcionario a este cupo"
+-                                            : "Cupo libre — falta cubrir"}
++                                            : "Cupo libre — tocar para solicitar"}
+                                     </span>
+ 
+-                                    {canManageAssignments && (
+-                                        <SGTIcon
+-                                            name="chevron-right"
+-                                            size={13}
+-                                            color={P2().primary}
+-                                        />
+-                                    )}
++                                    <SGTIcon
++                                        name="chevron-right"
++                                        size={13}
++                                        color={canManageAssignments ? P2().primary : "#B85A60"}
++                                    />
+                                 </button>
+                             ))
+                         ) : (
+diff --git a/sgt-huap_frontend/src/components/Comun/calendarView.jsx b/sgt-huap_frontend/src/components/Comun/calendarView.jsx
+index ed08a86..ac361cb 100644
+--- a/sgt-huap_frontend/src/components/Comun/calendarView.jsx
++++ b/sgt-huap_frontend/src/components/Comun/calendarView.jsx
+@@ -42,6 +42,21 @@ const getShiftName = (shift) =>
+     shift?.nombreTipoTurno || shift?.nombreTipo || shift?.nombre ||
+     (shift?.tipo === 'noche' ? 'Turno noche' : 'Turno día');
+ 
++// Misma regla que en los servicios: la rotativa mayoritaria del grupo.
++const rotativaDominanteCal = (turnos = []) => {
++    const cuenta = new Map();
++    turnos.forEach((t) => {
++        const nombre = t?.nombreRotativa;
++        if (!nombre) return;
++        cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
++    });
++    let mejor = null;
++    cuenta.forEach((veces, nombre) => {
++        if (!mejor || veces > mejor.veces) mejor = { nombre, veces };
++    });
++    return mejor?.nombre ?? null;
++};
++
+ const buildDayGroups = (shifts = []) => {
+     const map = new Map();
+     shifts.forEach((shift) => {
+@@ -63,6 +78,7 @@ const buildDayGroups = (shifts = []) => {
+             key: group.key, sample,
+             turnos: group.turnos,
+             nombre: getShiftName(sample),
++            nombreRotativa: rotativaDominanteCal(group.turnos),
+             tipo: sample.tipo,
+             inicio: sample.inicio,
+             fin: sample.fin,
+@@ -381,7 +397,6 @@ const CalendarView = ({
+                                 const shifts = shiftsByDay[key] || [];
+                                 const miShift = shifts.find(s => s.miTurno);
+                                 const hasLibre = shifts.some(s => s.turnoLibre || !s.idFuncionario);
+-                                const hasAjeno = shifts.some(s => !s.turnoLibre && s.idFuncionario && !s.miTurno);
+                                 const isToday = key === today;
+                                 const isSel = selectedDay === day;
+                                 const isWknd = idx % 7 >= 5;
+@@ -429,7 +444,6 @@ const CalendarView = ({
+                                         <div style={{ display: 'flex', justifyContent: 'center', gap: 2, minHeight: 6 }}>
+                                             {miShift && <Dot color={isToday ? 'rgba(255,255,255,0.9)' : miShiftColor.ink} />}
+                                             {hasLibre && <Dot color={isToday ? 'rgba(255,255,255,0.65)' : PA.accent} />}
+-                                            {hasAjeno && <Dot color={isToday ? 'rgba(255,255,255,0.5)' : PA.warn} />}
+                                         </div>
+                                     </button>
+                                 );
+@@ -442,7 +456,6 @@ const CalendarView = ({
+                 <div style={{ display: 'flex', gap: 14, padding: '12px 16px 8px', borderTop: `1px solid ${PA.line2}`, marginTop: 12, flexWrap: 'wrap' }}>
+                     <LegendDot color={PA.primary} label="Mi turno" />
+                     <LegendDot color={PA.accent} label="Cupo libre" />
+-                    <LegendDot color={PA.warn} label="Turno del servicio" />
+                 </div>
+ 
+                 {/* Botón de exportación */}
+@@ -461,7 +474,7 @@ const CalendarView = ({
+                 {!selectedDay && !loading && (
+                     <div style={{ padding: '16px 24px 24px', textAlign: 'center' }}>
+                         <span style={{ fontSize: 12, color: PA.ink3, fontWeight: 600 }}>
+-                            Toca un día con punto para ver sus turnos
++                            Toca un día para ver sus turnos
+                         </span>
+                     </div>
+                 )}
+@@ -656,7 +669,7 @@ const DayDetailOverview = ({ stats, onOpen }) => {
+                             <SGTIcon name={group.tipo === 'noche' ? 'moon' : 'sun'} size={15} color={color.ink} />
+                             <div style={{ flex: 1, minWidth: 0 }}>
+                                 <div style={{ fontSize: 13, fontWeight: 900, color: color.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+-                                    {group.nombre}
++                                    {group.nombre}{group.nombreRotativa ? `: ${group.nombreRotativa}` : ''}
+                                 </div>
+                                 <div style={{ fontSize: 11, fontWeight: 700, color: color.ink, opacity: 0.8 }}>
+                                     {group.inicio && group.fin ? `${group.inicio}–${group.fin}` : 'Horario no definido'}
+diff --git a/sgt-huap_frontend/src/context/AuthContext.jsx b/sgt-huap_frontend/src/context/AuthContext.jsx
+index 42d5405..0b8f9ca 100644
+--- a/sgt-huap_frontend/src/context/AuthContext.jsx
++++ b/sgt-huap_frontend/src/context/AuthContext.jsx
+@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
+                             rol: userData.rol,
+                             rolSistema: userData.rolSistema,
+                             servicioId: userData.servicioId,
++                            servicios: userData.servicios || [],
+                             userId: userData.userId
+                         })
+                     }
+@@ -52,7 +53,9 @@ export function AuthProvider({ children }) {
+                 id: userData.userId,
+                 nombre: userData.nombreCompleto || userData.nombre,
+                 rol: userData.rol,
++                rolSistema: userData.rolSistema,
+                 servicioId: userData.servicioId,
++                servicios: userData.servicios || [],
+                 userId: userData.userId
+             })
+         }
+diff --git a/sgt-huap_frontend/src/services/funcionarioService.js b/sgt-huap_frontend/src/services/funcionarioService.js
+index f8b2ca6..2f068c2 100644
+--- a/sgt-huap_frontend/src/services/funcionarioService.js
++++ b/sgt-huap_frontend/src/services/funcionarioService.js
+@@ -99,6 +99,15 @@ const buildTeamMember = (turno, funcionarioId) => {
+  * - Si no, intenta construirlo desde los campos crudos con buildTeamFromRaw.
+  * - Si no hay datos de equipo, team queda null (la vista lo maneja con &&).
+  */
++// Los endpoints del backend usan centinelas string ("Sin Puesto", "Sin Rotativa")
++// en vez de null; se normalizan para que las vistas puedan omitir el dato.
++const limpiarCentinela = (nombre, regexCentinela) => {
++    if (!nombre) return null;
++    return regexCentinela.test(String(nombre).trim()) ? null : nombre;
++};
++const limpiarNombrePuesto = (nombre) => limpiarCentinela(nombre, /^sin puesto$/i);
++const limpiarNombreRotativa = (nombre) => limpiarCentinela(nombre, /^sin rotativa$/i);
++
+ const mapTurnoForAgenda = (turno, funcionarioId) => {
+     const fechaInicio = normalizeDateString(turno?.diaInicioTurno);
+     const fechaFin = normalizeDateString(turno?.diaFinalTurno);
+@@ -120,7 +129,7 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
+         fin: formatTime(turno?.horaFin) ?? null,
+         horas: getHoursFromTurno(turno),
+         equipo: null,
+-        nombrePuesto: turno?.nombrePuesto || null,
++        nombrePuesto: limpiarNombrePuesto(turno?.nombrePuesto),
+         idPuesto: turno?.idPuesto || null,
+         idTipoTurno: turno?.idTipoTurno ?? null,
+         nombreTipoTurno: turno?.nombreTipoTurno ?? null,
+@@ -139,6 +148,7 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
+         cambioAprobadoCon: turno?.cambioAprobadoCon ?? null,
+         cruzaMedianoche: Boolean(turno?.cruzaMedianoche),
+         idRotativa: turno?.idRotativa ?? null,
++        nombreRotativa: limpiarNombreRotativa(turno?.nombreRotativa),
+         teamKey,
+         raw: turno,
+     };
+@@ -185,6 +195,24 @@ const buildDaySummary = (turnosDelDia = []) => {
+ // CONSTRUCCIÓN DEL OBJETO AGENDA COMPLETO
+ // ---------------------------------------------------------------------------
+ 
++// Rotativa del grupo de turnos (el "Turno I/II/III" del servicio). Un grupo
++// día/noche lo cubre normalmente UNA rotativa, pero un cupo puede quedar cubierto
++// por alguien de otro equipo; se toma la mayoritaria y se ignoran los turnos sin
++// rotativa (vacantes y asignaciones manuales).
++const rotativaDominante = (turnos = []) => {
++    const cuenta = new Map();
++    turnos.forEach((t) => {
++        const nombre = t?.nombreRotativa;
++        if (!nombre) return;
++        cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
++    });
++    let mejor = null;
++    cuenta.forEach((veces, nombre) => {
++        if (!mejor || veces > mejor.veces) mejor = { nombre, veces };
++    });
++    return mejor?.nombre ?? null;
++};
++
+ const buildAgendaData = (turnos, funcionarioId) => {
+     const mappedTurnos = Array.isArray(turnos)
+         ? turnos
+@@ -224,6 +252,7 @@ const buildAgendaData = (turnos, funcionarioId) => {
+     Object.values(teamsByKey).forEach((group) => {
+         const turnos = group.turnos ?? [];
+         group.totalTurnos = turnos.length;
++        group.nombreRotativa = rotativaDominante(turnos);
+         group.asignados = turnos.filter((t) => t.idFuncionario != null).length;
+         group.completo = group.totalTurnos > 0 && group.asignados === group.totalTurnos;
+ 
+diff --git a/sgt-huap_frontend/src/services/turnosService.js b/sgt-huap_frontend/src/services/turnosService.js
+index d80a139..3daed52 100644
+--- a/sgt-huap_frontend/src/services/turnosService.js
++++ b/sgt-huap_frontend/src/services/turnosService.js
+@@ -123,6 +123,15 @@ const buildTeamMember = (turno, funcionarioId) => {
+  * Mapea un turno crudo del endpoint de calendario al formato de vista.
+  * turnoLibre = idFuncionario es null (Sin Asignar en el JSON).
+  */
++// Los endpoints del backend usan centinelas string ("Sin Puesto", "Sin Rotativa")
++// en vez de null; se normalizan para que las vistas puedan omitir el dato.
++const limpiarCentinela = (nombre, regexCentinela) => {
++    if (!nombre) return null;
++    return regexCentinela.test(String(nombre).trim()) ? null : nombre;
++};
++const limpiarNombrePuesto = (nombre) => limpiarCentinela(nombre, /^sin puesto$/i);
++const limpiarNombreRotativa = (nombre) => limpiarCentinela(nombre, /^sin rotativa$/i);
++
+ const mapTurnoCalendario = (turno, funcionarioId) => {
+     const fecha = parseDateKey(turno?.diaInicioTurno || turno?.fecha);
+     const inicio = formatTime(turno?.horaInicio);
+@@ -139,10 +148,11 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
+         nombreTipo: turno?.nombre ?? null,
+         inicio,
+         fin,
+-        nombrePuesto: turno?.nombrePuesto ?? null,
++        nombrePuesto: limpiarNombrePuesto(turno?.nombrePuesto),
+         idPuesto: turno?.idPuesto ?? null,
+         idTipoTurno: turno?.idTipoTurno ?? null,
+         idRotativa: turno?.idRotativa ?? 1,
++        nombreRotativa: limpiarNombreRotativa(turno?.nombreRotativa),
+         nombreTipoTurno: turno?.nombreTipoTurno ?? null,
+         nombreFuncionario: turnoLibre ? null : (turno?.nombreFuncionario ?? null),
+         idFuncionario: turno?.idFuncionario ?? null,
+@@ -153,6 +163,24 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
+     };
+ };
+ 
++// Rotativa del grupo de turnos (el "Turno I/II/III" del servicio). Un grupo
++// día/noche lo cubre normalmente UNA rotativa, pero un cupo puede quedar cubierto
++// por alguien de otro equipo; se toma la mayoritaria y se ignoran los turnos sin
++// rotativa (vacantes y asignaciones manuales).
++const rotativaDominante = (turnos = []) => {
++    const cuenta = new Map();
++    turnos.forEach((t) => {
++        const nombre = t?.nombreRotativa;
++        if (!nombre) return;
++        cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
++    });
++    let mejor = null;
++    cuenta.forEach((veces, nombre) => {
++        if (!mejor || veces > mejor.veces) mejor = { nombre, veces };
++    });
++    return mejor?.nombre ?? null;
++};
++
+ const buildTurnoTeams = (turnos, funcionarioId) => {
+     const teamsByKey = turnos.reduce((acc, turno) => {
+         if (!turno.teamKey) return acc;
+@@ -186,6 +214,7 @@ const buildTurnoTeams = (turnos, funcionarioId) => {
+     Object.values(teamsByKey).forEach((group) => {
+         const grupoTurnos = group.turnos ?? [];
+         group.totalTurnos = grupoTurnos.length;
++        group.nombreRotativa = rotativaDominante(grupoTurnos);
+         group.asignados = grupoTurnos.filter((t) => t.idFuncionario != null).length;
+         group.completo = group.totalTurnos > 0 && group.asignados === group.totalTurnos;
+ 

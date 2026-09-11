@@ -95,6 +95,13 @@ public class SolicitudController {
         return ResponseEntity.ok(solicitudService.cambiarEstado(id, nuevoEstado));
     }
 
+    @Operation(summary = "Cancelar una solicitud propia pendiente",
+            description = "Solo el emisor, y solo mientras siga PENDIENTE.")
+    @PutMapping("/{id}/cancelar")
+    public ResponseEntity<SolicitudEntity> cancelar(@PathVariable @Positive Long id) {
+        return ResponseEntity.ok(solicitudService.cancelarSolicitud(id));
+    }
+
     @Operation(summary = "Modificar el motivo de una solicitud",
             description = "Solo permitido mientras la solicitud está PENDIENTE.")
     @PatchMapping("/{id}/motivo")

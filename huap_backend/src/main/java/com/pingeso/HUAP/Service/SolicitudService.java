@@ -116,6 +116,27 @@ public class SolicitudService {
                 .aceptadoReceptor(null)
                 .build();
 
+        // Un turno solo puede estar comprometido en UNA solicitud pendiente del mismo funcionario,
+        // cuente como turno pedido o como turno entregado. Sin esto se podían apilar solicitudes
+        // contradictorias sobre el mismo turno. La garantía vive aquí porque dos pestañas o dos
+        // dispositivos evaden cualquier chequeo del frontend; GlobalExceptionHandler la convierte
+        // en 400 {"error": ...} y la UI muestra ese texto tal cual.
+        if (turno != null && solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                idFuncionarioEmisor, turno.getIdTurno(), SolicitudEntity.EstadoSolicitud.PENDIENTE)) {
+            throw new RuntimeException("Ud. ya solicitó este turno. "
+                    + "Cancele la solicitud pendiente desde Solicitudes si desea cambiarla.");
+        }
+        if (turno != null && solicitudRepository.contarPendientesQueInvolucranTurno(
+                idFuncionarioEmisor, turno.getIdTurno(), SolicitudEntity.EstadoSolicitud.PENDIENTE) > 0) {
+            throw new RuntimeException("Ese turno ya está comprometido en otra solicitud pendiente suya. "
+                    + "Cancélela desde Solicitudes para pedir otra cosa sobre él.");
+        }
+        if (turnoIntercambio != null && solicitudRepository.contarPendientesQueInvolucranTurno(
+                idFuncionarioEmisor, turnoIntercambio.getIdTurno(), SolicitudEntity.EstadoSolicitud.PENDIENTE) > 0) {
+            throw new RuntimeException("El turno que ofreces entregar ya está comprometido en otra "
+                    + "solicitud pendiente suya. Cancélela desde Solicitudes para crear esta.");
+        }
+
         validarConflictoSegunTipo(solicitud);
 
         SolicitudEntity guardada = solicitudRepository.save(solicitud);
@@ -195,6 +216,45 @@ public class SolicitudService {
     private String nombreCompleto(FuncionarioEntity f) {
         if (f == null) return "el funcionario";
         return (f.getNombre() + (f.getApelPat() != null ? " " + f.getApelPat() : "")).trim();
+    }
+
+    /**
+     * Cancela una solicitud PENDIENTE propia. Es la contraparte del bloqueo "un turno comprometido
+     * a la vez": si el funcionario se arrepiente, cancela y el turno vuelve a quedar libre para
+     * pedir otra cosa. Solo el emisor puede cancelar la suya, y solo mientras siga pendiente
+     * (aprobarla o rechazarla sigue siendo potestad de jefatura, vía {@link #cambiarEstado}).
+     *
+     * <p>Se marca RECHAZADA con un motivo explícito en lugar de introducir un estado CANCELADA:
+     * la columna Estado es un enum de base de datos y agregar un valor exigiría una migración
+     * coordinada. El evento de bitácora SÍ distingue el caso (SOLICITUD_CANCELADA).
+     */
+    @Transactional
+    public SolicitudEntity cancelarSolicitud(Long idSolicitud) {
+        Long idUsuario = seguridadServicio.idUsuarioActual();
+
+        // Lock de la fila ANTES de mirar el estado — la misma disciplina que la aprobación
+        // (cambiarEstado). Sin esto, cancelar en paralelo con una aprobación podía "ganar"
+        // después del commit ajeno: los turnos quedaban movidos y la solicitud RECHAZADA.
+        SolicitudEntity solicitud = solicitudRepository.findByIdForUpdate(idSolicitud)
+                .orElseThrow(() -> new RuntimeException("La solicitud no existe"));
+
+        if (solicitud.getFuncionario() == null
+                || !solicitud.getFuncionario().getIdFuncionario().equals(idUsuario)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Solo puedes cancelar tus propias solicitudes");
+        }
+        if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
+            throw new RuntimeException("Esta solicitud ya fue resuelta: no se puede cancelar");
+        }
+
+        solicitud.setEstado(SolicitudEntity.EstadoSolicitud.RECHAZADA);
+        solicitud.setMotivo("Cancelada por el solicitante"
+                + (solicitud.getMotivo() != null && !solicitud.getMotivo().isBlank()
+                        ? " · motivo original: " + solicitud.getMotivo() : ""));
+
+        SolicitudEntity guardada = solicitudRepository.save(solicitud);
+        agendarBitacora("SOLICITUD_CANCELADA", guardada.getIdSolicitud(), idUsuario);
+        return guardada;
     }
 
     /**
@@ -360,6 +420,12 @@ public class SolicitudService {
             if (solicitud.getTurno() != null) {
                 rechazarSolicitudesCompetitivas(solicitud.getTurno().getIdTurno(), idSolicitud, asignador);
             }
+            // En un intercambio también cambia de dueño el turno ENTREGADO: las solicitudes
+            // pendientes que lo pidan o lo ofrezcan quedan apuntando a un turno que ya no es
+            // de quien lo comprometió — se barren igual que las del turno principal.
+            if (solicitud.getTurnoReceptor() != null) {
+                rechazarSolicitudesCompetitivas(solicitud.getTurnoReceptor().getIdTurno(), idSolicitud, asignador);
+            }
 
             if (tipoSolicitud.equals(1) || tipoSolicitud.equals(2)) {
                 TurnoEntity turno = solicitud.getTurno();
@@ -372,6 +438,13 @@ public class SolicitudService {
                 if (turno == null) {
                     throw new RuntimeException("La solicitud de cobertura no tiene un turno asociado");
                 }
+                // El cupo pudo llenarse por otra vía (asignación manual, oferta) entre la
+                // creación y esta aprobación: nunca pisar al ocupante en silencio.
+                if (turno.getFuncionario() != null
+                        && !turno.getFuncionario().getIdFuncionario().equals(
+                                solicitud.getFuncionario().getIdFuncionario())) {
+                    throw new RuntimeException("Este turno ya fue asignado a otra persona");
+                }
                 turno.setFuncionario(solicitud.getFuncionario());
                 turnoRepository.save(turno);
             } else if (tipoSolicitud.equals(4)) {
@@ -379,6 +452,19 @@ public class SolicitudService {
                 TurnoEntity turnoPropio = solicitud.getTurnoReceptor();
                 if (turnoDeseado == null || turnoPropio == null) {
                     throw new RuntimeException("La solicitud de intercambio no tiene ambos turnos asociados");
+                }
+                // Los turnos deben seguir en manos de quienes pactaron el canje: si alguno
+                // cambió de dueño por otra vía (otra aprobación, asignación manual), aprobar
+                // esto le quitaría un turno a un tercero ajeno a la solicitud.
+                if (turnoDeseado.getFuncionario() != null && solicitud.getFuncionarioReceptor() != null
+                        && !turnoDeseado.getFuncionario().getIdFuncionario().equals(
+                                solicitud.getFuncionarioReceptor().getIdFuncionario())) {
+                    throw new RuntimeException("El turno solicitado ya cambió de dueño: el intercambio quedó obsoleto");
+                }
+                if (turnoPropio.getFuncionario() != null && solicitud.getFuncionario() != null
+                        && !turnoPropio.getFuncionario().getIdFuncionario().equals(
+                                solicitud.getFuncionario().getIdFuncionario())) {
+                    throw new RuntimeException("El turno ofrecido ya cambió de dueño: el intercambio quedó obsoleto");
                 }
                 turnoDeseado.setFuncionario(solicitud.getFuncionario());
                 turnoPropio.setFuncionario(solicitud.getFuncionarioReceptor());
@@ -455,7 +541,13 @@ public class SolicitudService {
     private void rechazarSolicitudesCompetitivas(Long idTurno, Long idSolicitudAprobada, FuncionarioEntity asignador) {
         Long idAsignador = asignador != null ? asignador.getIdFuncionario() : null;
 
-        solicitudRepository.findByTurno_IdTurno(idTurno).stream()
+        // Competidoras por ambos lados: las que PIDEN este turno y las que lo OFRECEN
+        // entregar (turnoReceptor de un intercambio). Ambas quedan sin sustento cuando
+        // el turno cambia de dueño.
+        java.util.stream.Stream.concat(
+                        solicitudRepository.findByTurno_IdTurno(idTurno).stream(),
+                        solicitudRepository.findByTurnoReceptor_IdTurno(idTurno).stream())
+                .distinct()
                 .filter(s -> s.getEstado() == SolicitudEntity.EstadoSolicitud.PENDIENTE
                         && !s.getIdSolicitud().equals(idSolicitudAprobada))
                 .forEach(conflicto -> {

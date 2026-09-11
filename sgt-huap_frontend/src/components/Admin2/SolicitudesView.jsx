@@ -80,7 +80,72 @@ function btnStyle(tone) {
 
 // ── SolicitudCard ─────────────────────────────────────────────────────────────
 
-const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, esMiReceptor }) => {
+// R10 — Tarjeta de POSTULACIONES AGRUPADAS: 2+ solicitudes de Cobertura PENDIENTES
+// sobre el MISMO turno se presentan como una sola disputa, y la jefatura elige a la
+// persona. Al aprobar una, el backend rechaza automáticamente a las demás
+// (rechazarSolicitudesCompetitivas), así que aquí no hay lógica extra de limpieza.
+const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
+  const turno = grupo[0]?.turno || {};
+  const nombreTipoTurno = turno.tipoTurno?.nombre || null;
+  const posicion = turno.puesto?.nombre || null;
+  const ordenadas = [...grupo].sort((a, b) => new Date(a.fechaCreacion) - new Date(b.fechaCreacion));
+
+  return (
+    <div className="sgt-list-row" style={{ background: '#fff', border: `1px solid ${PA.line}`, borderLeft: `4px solid ${TIPO_COLOR[3]}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+          <SGTIcon name="users" size={18} color={PA.primary} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Postulaciones al mismo turno</div>
+          <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>Cobertura · elige a una persona</div>
+        </div>
+        <SGTBadge tone="warn" size="xs">{grupo.length} postulantes</SGTBadge>
+      </div>
+
+      {/* Turno en disputa */}
+      <Row
+        label="Turno a cubrir"
+        value={`${fmtFecha(turno.diaInicioTurno)} · ${fmtHora(turno.horaInicio)}–${fmtHora(turno.horaFin)}${nombreTipoTurno ? ` · ${nombreTipoTurno}` : ''}`}
+      />
+      {posicion && <Row label="Posición" value={posicion} />}
+
+      {/* Postulantes */}
+      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {ordenadas.map((sol) => (
+          <div key={sol.idSolicitud} style={{ border: `1px solid ${PA.line2}`, borderRadius: 10, padding: '8px 10px', background: PA.surface2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {nombreFuncionario(sol.funcionario)}
+                </div>
+                <div style={{ fontSize: 10.5, color: PA.ink3, fontWeight: 600 }}>Postuló el {fmtFecha(sol.fechaCreacion)}</div>
+              </div>
+              <button onClick={() => onRechazar(sol.idSolicitud)} style={{ ...btnStyle('danger'), padding: '7px 10px', fontSize: 12 }}>
+                <SGTIcon name="close" size={12} color="#fff" />
+              </button>
+              <button onClick={() => onAprobar(sol.idSolicitud)} style={{ ...btnStyle('success'), padding: '7px 12px', fontSize: 12 }}>
+                <SGTIcon name="check" size={12} color="#fff" /> Elegir
+              </button>
+            </div>
+            {sol.motivo && (
+              <div style={{ marginTop: 5, fontSize: 11.5, color: PA.ink2, fontWeight: 600, fontStyle: 'italic' }}>
+                “{sol.motivo}”
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 10, fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
+        Al elegir a una persona, las demás postulaciones de este turno se rechazan automáticamente.
+      </div>
+    </div>
+  );
+};
+
+const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, onCancelar, esMiReceptor, esMiSolicitud }) => {
   const tipo  = solicitud?.tipoSolicitud?.tipo;
   const estado = solicitud?.estado;
 
@@ -92,10 +157,19 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
   const canDecideThis = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
   const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && estado === 'PENDIENTE';
   const canEditMotivo = !canDecide && !esMiReceptor && estado === 'PENDIENTE' && !!onEditMotivo;
+  // Cancelar la propia solicitud pendiente: es lo que libera el turno comprometido para
+  // poder pedir otra cosa sobre él (el backend bloquea mientras siga pendiente). El gate
+  // es por IDENTIDAD (soy el emisor), no por rol: una jefatura que emitió una solicitud
+  // no puede resolverla (segregación de funciones) pero SÍ debe poder cancelarla, o su
+  // turno quedaría comprometido hasta que otra jefatura la toque.
+  const canCancelar = Boolean(esMiSolicitud) && estado === 'PENDIENTE' && !!onCancelar;
+  // Cancelada por el propio solicitante: mismo estado RECHAZADA en la base, pero el badge
+  // no debe confundirse con un rechazo de jefatura.
+  const esCancelada = estado === 'RECHAZADA' && String(solicitud.motivo || '').startsWith('Cancelada por el solicitante');
 
   // Badge contextual para tipos bifásicos (4 y 5)
-  let badgeLabel = estado;
-  let badgeTone  = ESTADO_TONE[estado] || 'neutral';
+  let badgeLabel = esCancelada ? 'CANCELADA' : estado;
+  let badgeTone  = esCancelada ? 'neutral' : (ESTADO_TONE[estado] || 'neutral');
   if (esBifasico && estado === 'PENDIENTE') {
     if (esMiReceptor && esperandoReceptor) {
       badgeLabel = 'Requiere tu respuesta';
@@ -202,6 +276,12 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       {canEditMotivo && (
         <button onClick={() => onEditMotivo(solicitud)} style={{ ...btnStyle('ghost'), marginTop: 10, width: '100%' }}>
           <SGTIcon name="sliders" size={14} color={PA.ink2} /> Modificar motivo
+        </button>
+      )}
+
+      {canCancelar && (
+        <button onClick={() => onCancelar(solicitud)} style={{ ...btnStyle('danger'), marginTop: 8, width: '100%' }}>
+          <SGTIcon name="close" size={13} color="#fff" /> Cancelar solicitud
         </button>
       )}
     </div>
@@ -356,6 +436,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   const [dpMonth, setDpMonth]   = useState(null);
   const [loading, setLoading]   = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [loadingReceptor, setLoadingReceptor] = useState(false);
   const [error, setError]       = useState(null);
 
   useEffect(() => {
@@ -377,7 +458,9 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     setLoadingData(true);
     const fetches = [];
     if (tipoSel === 2 || tipoSel === 4 || tipoSel === 5 || tipoSel === 6)
-      fetches.push(turnosService.getByMedico(userId).then(d => setMisTurnos(Array.isArray(d) ? d : [])).catch(() => {}));
+      // getFuturos y no getByMedico: liberar, ofrecer o entregar un turno YA PASADO no tiene
+      // sentido y además ensuciaba el picker con todo el historial de la persona.
+      fetches.push(turnosService.getFuturos(userId).then(d => setMisTurnos(Array.isArray(d) ? d : [])).catch(() => {}));
     if (tipoSel === 3)
       fetches.push(turnosService.getSinAsignar(servicioId).then(d => setTurnosLibres(Array.isArray(d) ? d : [])).catch(() => {}));
     if (tipoSel === 4 || tipoSel === 5)
@@ -394,10 +477,35 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     Promise.all(fetches).finally(() => setLoadingData(false));
   }, [open, tipoSel, step, userId, servicioId]);
 
+  // Turnos del receptor ofrecidos en el picker de intercambio. Con el turno propio ya elegido
+  // se piden los INTERCAMBIABLES (el backend descarta pasados, choques, "24 invertido" para
+  // ambos, otros servicios y turnos ya comprometidos); sin él no hay canje que validar, así
+  // que se cae a los turnos futuros de esa persona.
   useEffect(() => {
-    if (!form.idReceptor) return;
-    turnosService.getByMedico(form.idReceptor).then(d => setTurnosReceptor(Array.isArray(d) ? d : [])).catch(() => {});
-  }, [form.idReceptor]);
+    if (!form.idReceptor) { setTurnosReceptor([]); return; }
+    let vigente = true;
+    setTurnosReceptor([]);          // nunca servir la lista del receptor/turno anterior
+    setLoadingReceptor(true);
+    const peticion = form.idTurnoPropio
+      ? turnosService.getIntercambiables(form.idTurnoPropio, form.idReceptor)
+      : turnosService.getFuturos(form.idReceptor);
+    peticion
+      .then(d => {
+        if (!vigente) return;
+        const lista = Array.isArray(d) ? d : [];
+        setTurnosReceptor(lista);
+        // Una preselección (p. ej. del preset de la agenda) que ya no es intercambiable
+        // se purga: dejarla "seleccionada" anularía el filtrado justo donde más importa.
+        setForm(prev => (
+          prev.idTurnoDeseado != null && !lista.some(t => String(t.id) === String(prev.idTurnoDeseado))
+            ? { ...prev, idTurnoDeseado: undefined, turnoDeseadoLabel: null }
+            : prev
+        ));
+      })
+      .catch(() => { if (vigente) setTurnosReceptor([]); })
+      .finally(() => { if (vigente) setLoadingReceptor(false); });
+    return () => { vigente = false; };
+  }, [form.idReceptor, form.idTurnoPropio]);
 
   const reset = () => { setStep(1); setTipoSel(null); setForm({}); setError(null); setPickerKey(null); setDpStep('year'); setDpYear(null); setDpMonth(null); setMisTurnos([]); setTurnosLibres([]); setFuncionarios([]); setTurnosReceptor([]); };
   const handleClose = () => { reset(); onClose(); };
@@ -433,7 +541,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
         await solicitudesService.crear(dto);
       }
       onCreated?.(); handleClose();
-    } catch { setError('No se pudo crear la solicitud.'); }
+    } catch (e) { setError(e?.message || 'No se pudo crear la solicitud.'); }
     finally { setLoading(false); }
   };
 
@@ -457,8 +565,8 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     receptorOferta: { title: 'Funcionario destinatario', items: funcionarios,               keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario })) },
     turnoBotar:     { title: 'Turno a liberar',        items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
     turnoCobertura: { title: 'Turno a cubrir',          items: turnosLibres,                keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurno: t.id, turnoLabel: null })) },
-    turnoPropio:    { title: 'Tu turno a entregar',     items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoPropio: t.id })) },
-    receptor:       { title: 'Funcionario receptor',    items: funcionarios,                keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario, idTurnoDeseado: undefined })) },
+    turnoPropio:    { title: 'Tu turno a entregar',     items: misTurnos,                  keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoPropio: t.id, turnoPropioLabel: null, idTurnoDeseado: undefined, turnoDeseadoLabel: null })) },
+    receptor:       { title: 'Funcionario receptor',    items: funcionarios,                keyFn: f => f.idFuncionario, row: funcRow,  onSel: f => setForm(prev => ({ ...prev, idReceptor: f.idFuncionario, idTurnoDeseado: undefined, turnoDeseadoLabel: null })) },
     turnoDeseado:   { title: 'Turno del receptor',      items: turnosReceptor,             keyFn: t => t.id,           row: turnoRow, onSel: t => setForm(f => ({ ...f, idTurnoDeseado: t.id, turnoDeseadoLabel: null })) },
     fechaInicio:    { title: 'Fecha de inicio',  isDatePicker: true, onSel: (s) => setForm(prev => ({ ...prev, fechaInicio: s, fechaFin: prev.fechaFin && prev.fechaFin < s ? undefined : prev.fechaFin })) },
     fechaFin:       { title: 'Fecha de término', isDatePicker: true, onSel: (s) => setForm(prev => ({ ...prev, fechaFin: s })) },
@@ -550,7 +658,17 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
               <div><label style={lbl}>Tu turno a entregar *</label><PickerBtn label="Seleccionar tu turno" value={turnoLabel(misTurnos, form.idTurnoPropio, form.turnoPropioLabel)} pkey="turnoPropio" /></div>
               <div><label style={lbl}>Con quién intercambiar *</label><PickerBtn label="Seleccionar funcionario" value={funcLabel(form.idReceptor, form.receptorLabel)} pkey="receptor" /></div>
               {form.idReceptor && (
-                <div><label style={lbl}>Turno del receptor que quieres *</label><PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" /></div>
+                <div>
+                  <label style={lbl}>Turno del receptor que quieres *</label>
+                  <PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" />
+                  {form.idTurnoPropio && turnosReceptor.length === 0 && !loadingReceptor && (
+                    <div style={{ marginTop: 6, fontSize: 11.5, color: PA.ink3, fontWeight: 600 }}>
+                      No hay turnos intercambiables con el que elegiste: el turno que entregas ya
+                      empezó o está comprometido en otra solicitud tuya, esa persona no tiene turnos
+                      futuros de este servicio, o el canje dejaría turnos incompatibles.
+                    </div>
+                  )}
+                </div>
               )}
             </>)}
 
@@ -740,6 +858,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const [error, setError]       = useState(null);
   const [showCrear, setShowCrear]     = useState(false);
   const [editSolicitud, setEditSolicitud] = useState(null);
+  const [cancelando, setCancelando] = useState(null);
   const [crearPreset, setCrearPreset] = useState(null);
   const [sortBy, setSortBy]     = useState('reciente');
   const [showSort, setShowSort] = useState(false);
@@ -808,28 +927,42 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     try {
       await solicitudesService.updateEstado(id, 'APROBADA', user.id);
       load();
-    } catch { setError('Error al aprobar la solicitud.'); }
+    } catch (e) { setError(e?.message || 'Error al aprobar la solicitud.'); }
   };
 
   const handleRechazar = async (id) => {
     try {
       await solicitudesService.updateEstado(id, 'RECHAZADA', user.id);
       load();
-    } catch { setError('Error al rechazar la solicitud.'); }
+    } catch (e) { setError(e?.message || 'Error al rechazar la solicitud.'); }
+  };
+
+  const handleCancelar = async (solicitud) => {
+    setCancelando(solicitud);
+  };
+
+  const confirmarCancelacion = async () => {
+    const solicitud = cancelando;
+    setCancelando(null);
+    if (!solicitud) return;
+    try {
+      await solicitudesService.cancelar(solicitud.idSolicitud);
+      load();
+    } catch (e) { setError(e?.message || 'No se pudo cancelar la solicitud.'); }
   };
 
   const handleResponder = async (id, acepta) => {
     try {
       await solicitudesService.responderIntercambio(id, user.id, acepta);
       load();
-    } catch { setError('Error al responder el intercambio.'); }
+    } catch (e) { setError(e?.message || 'Error al responder el intercambio.'); }
   };
 
   const handleResponderOfertaParticular = async (id, acepta) => {
     try {
       await solicitudesService.responderOfertaParticular(id, user.id, acepta);
       load();
-    } catch { setError('Error al responder la oferta.'); }
+    } catch (e) { setError(e?.message || 'Error al responder la oferta.'); }
   };
 
   const handleOfertaAprobar = async (id) => {
@@ -878,6 +1011,27 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     if (tab === 'historial')  return solicitudes.filter(s => s.estado !== 'PENDIENTE');
     return solicitudes;
   })());
+
+  // R10 — En el tab "pendientes" de jefatura, las coberturas que compiten por el
+  // mismo turno (2+) salen agrupadas; el resto sigue como tarjetas individuales.
+  const esPostulacionCobertura = (s) =>
+    s.tipoSolicitud?.tipo === 3 && s.estado === 'PENDIENTE' && s.turno?.idTurno != null;
+
+  let gruposPostulacion = [];
+  let listaSinAgrupar = currentList;
+  if (canDecide && tab === 'pendientes') {
+    const porTurno = new Map();
+    currentList.filter(esPostulacionCobertura).forEach((sol) => {
+      const k = String(sol.turno.idTurno);
+      if (!porTurno.has(k)) porTurno.set(k, []);
+      porTurno.get(k).push(sol);
+    });
+    gruposPostulacion = Array.from(porTurno.values())
+      .filter((g) => g.length >= 2)
+      .sort((a, b) => String(a[0].turno?.diaInicioTurno || '').localeCompare(String(b[0].turno?.diaInicioTurno || '')));
+    const agrupadas = new Set(gruposPostulacion.flat().map((sol) => sol.idSolicitud));
+    listaSinAgrupar = currentList.filter((sol) => !agrupadas.has(sol.idSolicitud));
+  }
 
   const pendienteCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length;
   const recibidasCount = recibidas.filter(s => s.estado === 'PENDIENTE').length;
@@ -1008,14 +1162,22 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         )}
 
         {/* Tabs de solicitudes normales */}
-        {!loading && tab !== 'ofertas' && !error && currentList.length === 0 && (
+        {!loading && tab !== 'ofertas' && !error && currentList.length === 0 && gruposPostulacion.length === 0 && (
           <ListEmptyState
             icon="check-circle" theme="slate"
             title="Sin solicitudes"
             message="No hay solicitudes aquí por el momento."
           />
         )}
-        {!loading && tab !== 'ofertas' && currentList.map(s => (
+        {!loading && tab !== 'ofertas' && gruposPostulacion.map(g => (
+          <PostulacionesGrupoCard
+            key={`grupo-turno-${g[0].turno.idTurno}`}
+            grupo={g}
+            onAprobar={handleAprobar}
+            onRechazar={handleRechazar}
+          />
+        ))}
+        {!loading && tab !== 'ofertas' && listaSinAgrupar.map(s => (
           <SolicitudCard
             key={s.idSolicitud}
             solicitud={s}
@@ -1023,6 +1185,8 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             onAprobar={handleAprobar}
             onRechazar={handleRechazar}
             onEditMotivo={isMedico ? setEditSolicitud : null}
+            onCancelar={handleCancelar}
+            esMiSolicitud={String(s.funcionario?.idFuncionario) === String(user?.id)}
             onResponderIntercambio={handleResponder}
             onResponderOfertaParticular={handleResponderOfertaParticular}
             esMiReceptor={String(s.funcionarioReceptor?.idFuncionario) === String(user?.id)}
@@ -1044,6 +1208,21 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         onClose={() => setEditSolicitud(null)}
         onSaved={load}
       />
+
+      <Sheet open={!!cancelando} onClose={() => setCancelando(null)} title="Cancelar solicitud">
+        <div style={{ padding: '8px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 14, color: PA.ink, fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
+            Se cancelará tu solicitud de <strong>{cancelando ? tipoLabel(cancelando) : ''}</strong>.
+            {cancelando?.turno ? ' El turno involucrado queda libre para que pidas otra cosa sobre él.' : ''}
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setCancelando(null)} style={{ ...btnStyle('ghost'), flex: 1 }}>Volver</button>
+            <button onClick={confirmarCancelacion} style={{ ...btnStyle('danger'), flex: 1 }}>
+              <SGTIcon name="close" size={13} color="#fff" /> Cancelar solicitud
+            </button>
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 };

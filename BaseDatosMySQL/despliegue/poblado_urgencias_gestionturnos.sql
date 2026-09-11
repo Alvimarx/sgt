@@ -51,6 +51,7 @@ INSERT INTO Rol_Servicio (id_rol_servicio, nombre_rol) VALUES
 -- Unidades activas del hospital en el sistema.
 -- El id_servicio se incluye en el JWT tras seleccionar servicio.
 -- ==============================================================
+
 INSERT INTO servicios (id_servicio, nombre, eliminado) VALUES
 (1, 'Medicina Interna', 0),
 (2, 'Enfermería', 0),
@@ -106,6 +107,12 @@ INSERT INTO feriados (fecha, descripcion) VALUES
 -- ID_ROL_SISTEMA: 1=ADMINISTRADOR (jefes/subrogantes)  2=USUARIO (médicos/enfermeros)
 -- ==============================================================
 -- Contraseña "huap2025" hasheada en SHA-512 (inlinea para compatibilidad con DBeaver)
+-- OJO: RUT único. El funcionario 200 tenía '11111111','1', el MISMO que el
+-- funcionario 1 (Admin Bootstrap): la clave única uk_funcionario_rut_dv abortaba
+-- este INSERT completo y, como el cliente mysql corta al primer error, el resto
+-- del archivo (puestos, rotativas, planificación, turnos) nunca se cargaba.
+-- Se le asignó 20000200-6. El INSERT queda estricto a propósito: si vuelve a
+-- haber un RUT repetido, tiene que fallar a la vista y no tragarse la fila.
 INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Estado, eliminado, Profesion, ID_ROL_SISTEMA) VALUES
 -- === Medicina Interna ===
 -- Jefatura → ADMINISTRADOR (1)
@@ -144,7 +151,7 @@ INSERT INTO Funcionario (ID_FUNCIONARIO, Nombre, Apel_pat, Apel_mat, Rut, DV, Es
 (107, 'Cristina',    'Flores',   'Navarrete', '10000006', '6', 1, 0, 'Enfermera(o)',            2),
 -- === Cirugía ===
 -- Jefatura → ADMINISTRADOR (1)
-(200, 'Ricardo',     'Morales',  'Vega',      '11111111', '1', 1, 0, 'Médico Cirujano',         2),
+(200, 'Ricardo',     'Morales',  'Vega',      '20000200', '6', 1, 0, 'Médico Cirujano',         2),
 -- Subrogante → ADMINISTRADOR (1)
 (201, 'Isabel',      'Parra',    'Cáceres',   '11111112', '2', 1, 0, 'Médico Cirujano',         2),
 -- Médicos → USUARIO (2)
@@ -466,7 +473,7 @@ INSERT INTO tipo_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
 
 -- Urgencias (id_servicio=4) — mismos rangos horarios que Diurno/Nocturno MI
 INSERT INTO tipo_turno (id_servicio, hora_inicio, hora_termino, nombre) VALUES
-(4, '08:00:00', '20:00:00', 'Dia'),     -- id auto = 7
+(4, '08:00:00', '20:00:00', 'Día'),     -- id auto = 7
 (4, '20:00:00', '08:00:00', 'Noche');   -- id auto = 8
 
 -- ==============================================================

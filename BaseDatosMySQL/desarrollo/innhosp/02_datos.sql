@@ -96,7 +96,7 @@ INSERT INTO personalAux (
 -- === Enfermería ===
 -- Jefaturas / Subrogantes (ID_ROL_SISTEMA 1)
 (100, 'JEFATURA', '99999999', '9', 'María Elena', 'Torres',   'Pérez',     1, '912345100', 'maria.torres@huap.cl',   'maria.torres@gmail.com',   32, NULL, 'Enfermera(o)', @dev_password_hash, 1, NOW()),
-(101, 'JEFATURA', '12345678', '9', 'Ana María',   'González', 'Rojas',     1, '912345101', 'ana.gonzalez@huap.cl',   'ana.gonzalez@gmail.com',   32, NULL, 'Enfermera(o)', @dev_password_hash, 1, NOW()),
+(101, 'JEFATURA', '20000101', '8', 'Ana María',   'González', 'Rojas',     1, '912345101', 'ana.gonzalez@huap.cl',   'ana.gonzalez@gmail.com',   32, NULL, 'Enfermera(o)', @dev_password_hash, 1, NOW()),
 -- Enfermeros/as (ID_ROL_SISTEMA 2)
 (102, 'USUARIO',  '10000001', '1', 'Carlos',      'Silva',    'Mendoza',   1, '912345102', 'carlos.silva@huap.cl',   'carlos.silva@gmail.com',   32, NULL, 'Enfermera(o)', @dev_password_hash, 1, NOW()),
 (103, 'USUARIO',  '10000002', '2', 'Patricia',    'Vargas',   'Ríos',      1, '912345103', 'patricia.vargas@huap.cl','patricia.vargas@gmail.com',32, NULL, 'Enfermera(o)', @dev_password_hash, 1, NOW()),
@@ -107,7 +107,7 @@ INSERT INTO personalAux (
 
 -- === Cirugía ===
 -- Jefaturas / Subrogantes (ID_ROL_SISTEMA 1)
-(200, 'JEFATURA', '11111111', '1', 'Ricardo',   'Morales',  'Vega',    1, '912345200', 'ricardo.morales@huap.cl', 'ricardo.morales@gmail.com', 31, NULL, 'Médico', @dev_password_hash, 1, NOW()),
+(200, 'JEFATURA', '20000200', '6', 'Ricardo',   'Morales',  'Vega',    1, '912345200', 'ricardo.morales@huap.cl', 'ricardo.morales@gmail.com', 31, NULL, 'Médico', @dev_password_hash, 1, NOW()),
 (201, 'JEFATURA', '11111112', '2', 'Isabel',    'Parra',    'Cáceres', 1, '912345201', 'isabel.parra@huap.cl',    'isabel.parra@gmail.com',    31, NULL, 'Médico', @dev_password_hash, 1, NOW()),
 -- Médicos (ID_ROL_SISTEMA 2)
 (202, 'USUARIO',  '11111113', '3', 'Felipe',    'Castillo', 'Arenas',  1, '912345202', 'felipe.castillo@huap.cl', 'felipe.castillo@gmail.com', 31, NULL, 'Médico', @dev_password_hash, 1, NOW()),

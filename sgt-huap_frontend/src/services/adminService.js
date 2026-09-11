@@ -228,6 +228,18 @@ export const turnosService = {
         return response.data;
     },
 
+    // GET /turnos/intercambiables?idTurnoPropio=&idFuncionarioReceptor=
+    // Turnos del receptor con los que SÍ se puede intercambiar el turno propio: el backend
+    // aplica el mismo criterio que valida la solicitud (futuros, sin solape ni "24 invertido"
+    // para ninguno de los dos, sin turnos comprometidos en otra solicitud pendiente).
+    getIntercambiables: async (idTurnoPropio, idFuncionarioReceptor) => {
+        if (!idTurnoPropio || !idFuncionarioReceptor) throw new Error('idTurnoPropio e idFuncionarioReceptor son requeridos');
+        const response = await axiosInstance.get(
+            `/turnos/intercambiables?idTurnoPropio=${idTurnoPropio}&idFuncionarioReceptor=${idFuncionarioReceptor}`
+        );
+        return response.data;
+    },
+
     // GET /turnos/funcionario/{id}/futuros
     getFuturos: async (funcionarioId) => {
         if (!funcionarioId) throw new Error('funcionarioId es requerido');
@@ -279,6 +291,12 @@ export const solicitudesService = {
 
     // Alias para compatibilidad con código que llama getByMedico
     getByMedico: async (funcionarioId) => solicitudesService.getByFuncionario(funcionarioId),
+
+    // PUT /solicitudes/{id}/cancelar — solo el emisor, solo mientras siga PENDIENTE
+    cancelar: async (solicitudId) => {
+        const response = await axiosInstance.put(`/solicitudes/${solicitudId}/cancelar`);
+        return response.data;
+    },
 
     // GET /solicitudes/receptor/{id}
     getByReceptor: async (receptorId) => {

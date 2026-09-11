@@ -274,6 +274,125 @@ class SolicitudServiceTest {
     }
 
     @Test
+    void crear_coberturaDuplicadaMismoTurno_lanzaYNoGuarda() {
+        mockFuncionarioYTipo(3);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
+        when(solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                1L, 70L, SolicitudEntity.EstadoSolicitud.PENDIENTE)).thenReturn(true);
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.crearSolicitud(dto));
+        assertTrue(ex.getMessage().startsWith("Ud. ya solicitó este turno"));
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_conSolicitudPendienteDeOtroFuncionario_noBloquea() {
+        // El anti-duplicado es por (funcionario, turno): otro postulante NO impide postular.
+        mockFuncionarioYTipo(3);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
+        when(solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                1L, 70L, SolicitudEntity.EstadoSolicitud.PENDIENTE)).thenReturn(false);
+        saveAsignaId();
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+
+        assertNotNull(service.crearSolicitud(dto));
+    }
+
+    @Test
+    void crear_turnoComprometidoEnOtraSolicitudPendiente_lanzaYNoGuarda() {
+        mockFuncionarioYTipo(3);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
+        when(solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                anyLong(), anyLong(), any())).thenReturn(false);
+        // Ese turno ya está comprometido, aunque no sea como "turno pedido" (p. ej. lo entrega en un cambio).
+        when(solicitudRepository.contarPendientesQueInvolucranTurno(
+                1L, 70L, SolicitudEntity.EstadoSolicitud.PENDIENTE)).thenReturn(1L);
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.crearSolicitud(dto));
+        assertTrue(ex.getMessage().contains("Cancélela desde Solicitudes"));
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_intercambioConElTurnoPropioYaComprometido_lanzaYNoGuarda() {
+        mockFuncionarioYTipo(4);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turno(71L)));
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
+        when(solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
+                anyLong(), anyLong(), any())).thenReturn(false);
+        when(solicitudRepository.contarPendientesQueInvolucranTurno(
+                1L, 70L, SolicitudEntity.EstadoSolicitud.PENDIENTE)).thenReturn(0L);
+        when(solicitudRepository.contarPendientesQueInvolucranTurno(
+                1L, 71L, SolicitudEntity.EstadoSolicitud.PENDIENTE)).thenReturn(1L);
+
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+        dto.setIdTurnoIntercambio(71L);
+        dto.setIdFuncionarioReceptor(2L);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.crearSolicitud(dto));
+        assertTrue(ex.getMessage().contains("ya está comprometido"));
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    // ============================ Cancelación por el propio emisor ============================
+
+    @Test
+    void cancelar_solicitudPropiaPendiente_quedaRechazadaConMotivoYBitacora() {
+        SolicitudEntity propia = SolicitudEntity.builder()
+                .idSolicitud(500L)
+                .funcionario(funcionario(ID_FUNCIONARIO))
+                .estado(SolicitudEntity.EstadoSolicitud.PENDIENTE)
+                .motivo("Necesito el día")
+                .build();
+        when(solicitudRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(propia));
+        when(solicitudRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SolicitudEntity resultado = service.cancelarSolicitud(500L);
+
+        assertEquals(SolicitudEntity.EstadoSolicitud.RECHAZADA, resultado.getEstado());
+        assertTrue(resultado.getMotivo().startsWith("Cancelada por el solicitante"));
+        assertTrue(resultado.getMotivo().contains("Necesito el día"));
+    }
+
+    @Test
+    void cancelar_solicitudDeOtroFuncionario_lanzaAccessDenied() {
+        SolicitudEntity ajena = SolicitudEntity.builder()
+                .idSolicitud(501L)
+                .funcionario(funcionario(99L))
+                .estado(SolicitudEntity.EstadoSolicitud.PENDIENTE)
+                .build();
+        when(solicitudRepository.findByIdForUpdate(501L)).thenReturn(Optional.of(ajena));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> service.cancelarSolicitud(501L));
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelar_solicitudYaResuelta_lanzaYNoGuarda() {
+        SolicitudEntity aprobada = SolicitudEntity.builder()
+                .idSolicitud(502L)
+                .funcionario(funcionario(ID_FUNCIONARIO))
+                .estado(SolicitudEntity.EstadoSolicitud.APROBADA)
+                .build();
+        when(solicitudRepository.findByIdForUpdate(502L)).thenReturn(Optional.of(aprobada));
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.cancelarSolicitud(502L));
+        assertTrue(ex.getMessage().contains("no se puede cancelar"));
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
     void crear_turnoInexistente_quedaNullSinLanzar() {
         mockFuncionarioYTipo(2);
         when(turnoRepository.findById(999L)).thenReturn(Optional.empty());

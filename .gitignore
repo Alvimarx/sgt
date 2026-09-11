@@ -3,3 +3,6 @@
 .env.dev
 .env.*.local
 .claude
+# Despliegue en VM propia — credenciales reales, nunca versionar.
+.env.hetzner
+backups/

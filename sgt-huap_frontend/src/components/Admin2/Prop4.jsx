@@ -1,11 +1,12 @@
 // Prop4.jsx
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 //Importaciones Style
 import "../Style/style.css";
 import { PhoneShell, TabBar } from "../Style/UIPrimitives";
 
 import { useAuth } from "../../context/AuthContext";
+import { selectService } from "../../services/authService";
 
 //Importaciones de Comun
 import AgendaView from "../Comun/AgendaView";
@@ -14,6 +15,7 @@ import NotificationView from "../Comun/NotificationView";
 import SelectServiceView from "../Comun/SelectServiceView";
 import ProfileView from "../Comun/Perfil";
 import PersonalDashboard from "../Comun/PersonalDashboard";
+import CentroOperacionesDesktop from "../Desktop/CentroOperacionesDesktop";
 
 //Importaciones de ComunAdministracion
 import PuestosView from "../ComunAdministracion/PuestosView";
@@ -53,24 +55,130 @@ import SolicitudesView from "./SolicitudesView";
 import TiposTurnoView from "./TiposTurnoView";
 import PlanificacionView from "./Planificacion";
 
+// ---------------------------------------------------------------------------
+// Persistencia de navegación (sgt_nav_state, sessionStorage — por pestaña).
+// El JWT y user_data ya sobreviven al refresh en localStorage (AuthContext los
+// rehidrata ANTES del primer render, bloqueando con "Cargando..."), pero la
+// vista vivía solo en useState y todo refresh caía al login. Aquí se restaura.
+// Las vistas del flujo de autenticación no se restauran: dependen de estado en
+// memoria (preAuthToken dura ~5 min y no se persiste, por diseño).
+// ---------------------------------------------------------------------------
+const NAV_STORAGE_KEY = "sgt_nav_state";
+
+// Vistas por nivel de acceso. La restauración usa WHITELIST: una vista que no
+// esté en ninguna lista (renombrada en un deploy, o sessionStorage manipulado)
+// NO se restaura — cae a "agenda" en vez de dejar la pantalla en blanco.
+const VISTAS_COMUNES = [
+  "agenda", "calendar_view", "perfil", "personal_dashboard",
+  "notifications", "solicitudes", "bitacora",
+];
+const VISTAS_SOLO_ADMIN = [
+  "admin", "funcionarios_sistema", "planificacion", "servicios",
+  "asignacion", "jerarquia", "tipos_turno", "plantillas",
+];
+const VISTAS_SOLO_JEFATURA = [
+  "jefatura", "funcionarios_servicio_jefatura", "asignacionJefatura", "jerarquiaJefatura",
+];
+const VISTAS_SOLO_SUBROGANTE = ["subrogante"];
+const VISTAS_GESTION = ["admin_stats", "puestos", "auditoria", "reglas"];
+
+// ¿Puede este usuario (ya rehidratado) ver esta vista? Mismos gates que usa
+// Perfil.jsx para mostrar los paneles. Importante en multi-pestaña: si en otra
+// pestaña se cambió a un servicio donde el rol es MEDICO, aquí no se restaura
+// un panel de jefatura con el token nuevo.
+function vistaPermitida(view, user) {
+  const esAdmin = ["ADMIN", "ADMINISTRADOR"].includes(String(user?.rolSistema || "").toUpperCase());
+  const esJefatura = user?.rol === "JEFATURA";
+  const esSubrogante = user?.rol === "SUBROGANTE";
+  if (VISTAS_COMUNES.includes(view)) return true;
+  if (VISTAS_SOLO_ADMIN.includes(view)) return esAdmin;
+  if (VISTAS_SOLO_JEFATURA.includes(view)) return esJefatura;
+  if (VISTAS_SOLO_SUBROGANTE.includes(view)) return esSubrogante;
+  if (VISTAS_GESTION.includes(view)) return esAdmin || esJefatura || esSubrogante;
+  return false;
+}
+
+const RETURNS_DEFAULT = {
+  solicitudes: "agenda",
+  calendar: "agenda",
+  stats: "admin",
+  puestos: "admin",
+  bitacora: "admin",
+  auditoria: "admin",
+  reglas: "admin",
+};
+
+function leerNavGuardada(user) {
+  const isLogged = !!user;
+  // Los returns por defecto también pasan por la whitelist: para un médico,
+  // "admin" como destino de retorno no es válido y cae a "agenda".
+  const returnsBase = {};
+  for (const [k, v] of Object.entries(RETURNS_DEFAULT)) {
+    returnsBase[k] = vistaPermitida(v, user) ? v : "agenda";
+  }
+  const base = { view: isLogged ? "agenda" : "login", tab: "home", returns: returnsBase };
+  if (!isLogged) return base;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(NAV_STORAGE_KEY) || "null");
+    if (saved?.view && vistaPermitida(saved.view, user)) {
+      const returns = { ...returnsBase };
+      for (const k of Object.keys(RETURNS_DEFAULT)) {
+        const v = saved.returns?.[k];
+        if (typeof v === "string" && vistaPermitida(v, user)) returns[k] = v;
+      }
+      return { view: saved.view, tab: saved.tab || "home", returns };
+    }
+  } catch {
+    // JSON corrupto o storage bloqueado: se cae al home logueado.
+  }
+  return base;
+}
+
 const Prop4 = ({ tweaks = {} }) => {
   const auth = useAuth();
-  const [currentView, setCurrentView] = useState("login");
-  const [activeTab, setActiveTab] = useState("home");
+  // Navegación inicial: la última vista guardada si hay sesión, o login.
+  // useMemo con [] = solo al montar; auth.user ya está rehidratado en ese punto.
+  const navInicial = useMemo(() => leerNavGuardada(auth?.user), []);
+
+  const [currentView, setCurrentView] = useState(navInicial.view);
+  const [activeTab, setActiveTab] = useState(navInicial.tab);
 
   const [preAuthToken, setPreAuthToken] = useState(null);
+  const [entrandoDirecto, setEntrandoDirecto] = useState(false);
   const [serviciosDisponibles, setServiciosDisponibles] = useState([]);
   const [pendingRegistrationMessage, setPendingRegistrationMessage] = useState('');
-  const [solicitudesReturn, setSolicitudesReturn] = useState("agenda");
+  const [solicitudesReturn, setSolicitudesReturn] = useState(navInicial.returns.solicitudes);
   const [solicitudesCreatePreset, setSolicitudesCreatePreset] = useState(null);
-  const [calendarReturn, setCalendarReturn] = useState("agenda");
+  const [calendarReturn, setCalendarReturn] = useState(navInicial.returns.calendar);
 
   //Para Jefatura y subrogacia es lo mismo por lo cual es mejor compartir la vista
-  const [statsReturn, setStatsReturn] = useState("admin");
-  const[puestosReturn, setPuestosReturn] = useState("admin");
-  const [bitacoraReturn, setBitacoraReturn] = useState("admin");
-  const [auditoriaReturn, setAuditoriaReturn] = useState("admin");
-  const [reglasReturn, setReglasReturn] = useState("admin");
+  const [statsReturn, setStatsReturn] = useState(navInicial.returns.stats);
+  const[puestosReturn, setPuestosReturn] = useState(navInicial.returns.puestos);
+  const [bitacoraReturn, setBitacoraReturn] = useState(navInicial.returns.bitacora);
+  const [auditoriaReturn, setAuditoriaReturn] = useState(navInicial.returns.auditoria);
+  const [reglasReturn, setReglasReturn] = useState(navInicial.returns.reglas);
+
+  // Cada cambio de vista queda guardado para que refrescar no expulse al login.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(NAV_STORAGE_KEY, JSON.stringify({
+        view: currentView,
+        tab: activeTab,
+        returns: {
+          solicitudes: solicitudesReturn,
+          calendar: calendarReturn,
+          stats: statsReturn,
+          puestos: puestosReturn,
+          bitacora: bitacoraReturn,
+          auditoria: auditoriaReturn,
+          reglas: reglasReturn,
+        },
+      }));
+    } catch {
+      // Storage lleno o bloqueado: la app sigue funcionando, solo sin restauración.
+    }
+  }, [currentView, activeTab, solicitudesReturn, calendarReturn, statsReturn,
+      puestosReturn, bitacoraReturn, auditoriaReturn, reglasReturn]);
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
@@ -94,7 +202,7 @@ const Prop4 = ({ tweaks = {} }) => {
     setCurrentView("solicitudes");
   };
 
-  const handleLoginSuccess = ({ preAuthToken, servicios = [], registeredInSystem, message }) => {
+  const handleLoginSuccess = async ({ preAuthToken, servicios = [], registeredInSystem, message }) => {
     if (!registeredInSystem) {
       setPreAuthToken(null);
       setServiciosDisponibles([]);
@@ -104,6 +212,26 @@ const Prop4 = ({ tweaks = {} }) => {
     }
 
     setPendingRegistrationMessage('');
+
+    // Con UN solo servicio no hay nada que elegir: se canjea el preAuthToken al vuelo
+    // y se entra directo al home. Si el canje falla, se cae al flujo normal para que
+    // el usuario vea el error y pueda reintentar.
+    if (preAuthToken && servicios.length === 1) {
+      const unico = servicios[0];
+      setEntrandoDirecto(true);
+      const result = await selectService(preAuthToken, unico.servicioId);
+      setEntrandoDirecto(false);
+
+      if (result.success) {
+        setServiciosDisponibles(servicios);
+        if (unico.nombre) {
+          localStorage.setItem("sgt_servicio_activo_nombre", unico.nombre);
+        }
+        handleServiceSelected(result.userData);
+        return;
+      }
+    }
+
     setPreAuthToken(preAuthToken);
     setServiciosDisponibles(servicios);
     setCurrentView("select_service");
@@ -128,8 +256,19 @@ const Prop4 = ({ tweaks = {} }) => {
   };
 
   const handleBackToServiceSelection = () => {
-    const servicios = auth?.user?.servicios || serviciosDisponibles;
-    if (servicios && servicios.length > 0) {
+    // Tras un refresh la lista en memoria está vacía, pero user_data (localStorage,
+    // rehidratado por AuthContext) conserva perfil.servicios. Se normalizan las dos
+    // formas: {servicioId, nombre} (paso 1 del login) e {idServicio, nombreServicio}
+    // (perfil persistido) — SelectServiceView espera servicioId/nombre.
+    const crudos = (serviciosDisponibles?.length > 0 ? serviciosDisponibles : auth?.user?.servicios) || [];
+    const servicios = crudos
+      .map((s) => ({
+        servicioId: s.servicioId ?? s.idServicio,
+        nombre: s.nombre ?? s.nombreServicio,
+        rol: s.rol,
+      }))
+      .filter((s) => s.servicioId != null);
+    if (servicios.length > 0) {
       setServiciosDisponibles(servicios);
       setPreAuthToken(null);
       setCurrentView("select_service");
@@ -139,6 +278,7 @@ const Prop4 = ({ tweaks = {} }) => {
   const handleLogout = () => {
     auth?.logout?.();
     localStorage.removeItem("sgt_servicio_activo_nombre");
+    sessionStorage.removeItem(NAV_STORAGE_KEY);
     setPreAuthToken(null);
     setServiciosDisponibles([]);
     setPendingRegistrationMessage('');
@@ -151,6 +291,60 @@ const Prop4 = ({ tweaks = {} }) => {
     setCurrentView("notifications");
   };
 
+  // R16 — Modo desktop: en pantallas anchas la vista "agenda" (home) se
+  // reemplaza por el Centro de operaciones a pantalla completa (Propuesta C).
+  // El resto de las vistas sigue en el PhoneShell hasta tener su versión
+  // desktop propia.
+  const [esDesktop, setEsDesktop] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 1200px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1200px)");
+    const onChange = (e) => setEsDesktop(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const irDesdeDesktop = (dest) => {
+    if (dest === "inicio") { setActiveTab("home"); setCurrentView("agenda"); return; }
+    if (dest === "calendario") { setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); return; }
+    if (dest === "solicitudes") { setSolicitudesReturn("agenda"); setSolicitudesCreatePreset(null); setActiveTab("requests"); setCurrentView("solicitudes"); return; }
+    if (dest === "notificaciones") { setCurrentView("notifications"); return; }
+    const esAdminSistema = ["ADMIN", "ADMINISTRADOR"].includes(String(auth?.user?.rolSistema || "").toUpperCase());
+    if (dest === "personal") {
+      if (auth?.user?.rol === "JEFATURA") setCurrentView("funcionarios_servicio_jefatura");
+      else if (esAdminSistema) setCurrentView("jerarquia");
+      else if (auth?.user?.rol === "SUBROGANTE") setCurrentView("subrogante");
+      else { setActiveTab("me"); setCurrentView("perfil"); }
+      return;
+    }
+    if (dest === "planificacion") {
+      if (esAdminSistema) setCurrentView("planificacion");
+      else { setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); }
+      return;
+    }
+    if (dest === "estadisticas") { setStatsReturn("agenda"); setCurrentView("admin_stats"); return; }
+    if (dest === "bitacora") { setBitacoraReturn("agenda"); setCurrentView("bitacora"); return; }
+    if (dest === "gestion") {
+      if (auth?.user?.rol === "JEFATURA") setCurrentView("jefatura");
+      else if (auth?.user?.rol === "SUBROGANTE") setCurrentView("subrogante");
+      else if (esAdminSistema) setCurrentView("admin");
+      else { setActiveTab("me"); setCurrentView("perfil"); }
+    }
+  };
+
+  if (esDesktop && currentView === "agenda" && auth?.isLogged) {
+    return (
+      <CentroOperacionesDesktop
+        user={auth?.user}
+        onNavigate={irDesdeDesktop}
+        onLogout={handleLogout}
+        onSwitchService={handleBackToServiceSelection}
+        onOpenSolicitudes={handleOpenSolicitudes}
+      />
+    );
+  }
+
   return (
     <PhoneShell>
       <style>{`
@@ -159,8 +353,17 @@ const Prop4 = ({ tweaks = {} }) => {
         @keyframes sgtSlideLeft { from { transform:translateX(100%); } to { transform:translateX(0); } }
       `}</style>
 
-      {currentView === "login" && (
+      {currentView === "login" && !entrandoDirecto && (
         <LoginView onLoginSuccess={handleLoginSuccess} />
+      )}
+      {currentView === "login" && entrandoDirecto && (
+        <div
+          className="login-gradient-bg"
+          role="status"
+          style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 800, color: "#17416C" }}
+        >
+          Entrando…
+        </div>
       )}
       {currentView === "select_service" && (
         <SelectServiceView

@@ -123,6 +123,15 @@ const buildTeamMember = (turno, funcionarioId) => {
  * Mapea un turno crudo del endpoint de calendario al formato de vista.
  * turnoLibre = idFuncionario es null (Sin Asignar en el JSON).
  */
+// Los endpoints del backend usan centinelas string ("Sin Puesto", "Sin Rotativa")
+// en vez de null; se normalizan para que las vistas puedan omitir el dato.
+const limpiarCentinela = (nombre, regexCentinela) => {
+    if (!nombre) return null;
+    return regexCentinela.test(String(nombre).trim()) ? null : nombre;
+};
+const limpiarNombrePuesto = (nombre) => limpiarCentinela(nombre, /^sin puesto$/i);
+const limpiarNombreRotativa = (nombre) => limpiarCentinela(nombre, /^sin rotativa$/i);
+
 const mapTurnoCalendario = (turno, funcionarioId) => {
     const fecha = parseDateKey(turno?.diaInicioTurno || turno?.fecha);
     const inicio = formatTime(turno?.horaInicio);
@@ -139,10 +148,11 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         nombreTipo: turno?.nombre ?? null,
         inicio,
         fin,
-        nombrePuesto: turno?.nombrePuesto ?? null,
+        nombrePuesto: limpiarNombrePuesto(turno?.nombrePuesto),
         idPuesto: turno?.idPuesto ?? null,
         idTipoTurno: turno?.idTipoTurno ?? null,
         idRotativa: turno?.idRotativa ?? 1,
+        nombreRotativa: limpiarNombreRotativa(turno?.nombreRotativa),
         nombreTipoTurno: turno?.nombreTipoTurno ?? null,
         nombreFuncionario: turnoLibre ? null : (turno?.nombreFuncionario ?? null),
         idFuncionario: turno?.idFuncionario ?? null,
@@ -151,6 +161,24 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         teamKey,
         raw: turno,
     };
+};
+
+// Rotativa del grupo de turnos (el "Turno I/II/III" del servicio). Un grupo
+// día/noche lo cubre normalmente UNA rotativa, pero un cupo puede quedar cubierto
+// por alguien de otro equipo; se toma la mayoritaria y se ignoran los turnos sin
+// rotativa (vacantes y asignaciones manuales).
+const rotativaDominante = (turnos = []) => {
+    const cuenta = new Map();
+    turnos.forEach((t) => {
+        const nombre = t?.nombreRotativa;
+        if (!nombre) return;
+        cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
+    });
+    let mejor = null;
+    cuenta.forEach((veces, nombre) => {
+        if (!mejor || veces > mejor.veces) mejor = { nombre, veces };
+    });
+    return mejor?.nombre ?? null;
 };
 
 const buildTurnoTeams = (turnos, funcionarioId) => {
@@ -186,6 +214,7 @@ const buildTurnoTeams = (turnos, funcionarioId) => {
     Object.values(teamsByKey).forEach((group) => {
         const grupoTurnos = group.turnos ?? [];
         group.totalTurnos = grupoTurnos.length;
+        group.nombreRotativa = rotativaDominante(grupoTurnos);
         group.asignados = grupoTurnos.filter((t) => t.idFuncionario != null).length;
         group.completo = group.totalTurnos > 0 && group.asignados === group.totalTurnos;
 
