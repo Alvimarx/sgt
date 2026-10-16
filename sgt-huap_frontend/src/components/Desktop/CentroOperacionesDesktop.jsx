@@ -2,17 +2,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
-import { useNotifications } from '../../context/NotificationContext';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
 // lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
+// En desktop el Sheet se presenta como panel lateral (R18).
 import AsignarTurnoLibreSheet from '../Comun/AsignarTurnoLibreSheet';
 
 // ---------------------------------------------------------------------------
 // CENTRO DE OPERACIONES — vista desktop (R16, "Propuesta C" de Claude Design,
-// la definitiva). Réplica fiel del mockup aprobado: sidebar azul con gradiente
-// y navegación vertical, fila semanal donde el día seleccionado se EXPANDE
-// inline (los demás quedan como tarjetas compactas), y debajo dos paneles:
-// Solicitudes pendientes (grid de 2 columnas) y Ofertas generales.
+// la definitiva). Réplica fiel del mockup aprobado: fila semanal donde el día
+// seleccionado se EXPANDE inline (los demás quedan como tarjetas compactas), y
+// debajo dos paneles: Solicitudes pendientes (grid de 2 columnas) y Ofertas
+// generales. Desde R18 el sidebar azul del mockup es el menú de toda la app
+// (DesktopShell) y esta vista ocupa solo el área principal.
 //
 // Dinámicos por diseño (no fijos como en el mockup estático):
 //  - el resalte de HOY (#E8EEF4 / borde #B9CCDE, pill HOY) sigue la fecha real;
@@ -150,16 +151,6 @@ const IconCheck = ({ size = 10 }) => (
     <path d="M20 6L9 17l-5-5" />
   </svg>
 );
-const NAV_ICONS = {
-  inicio: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>,
-  centro: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>,
-  solicitudes: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 16V4M3 8l4-4 4 4M17 8v12M13 16l4 4 4-4" /></svg>,
-  personal: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
-  planificacion: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>,
-  estadisticas: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 21V14M4 10V3M12 21V12M12 8V3M20 21V16M20 12V3M1 14h6M9 8h6M17 16h6" /></svg>,
-  bitacora: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" /><path d="M12 7v5l4 2" /></svg>,
-  notificaciones: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>,
-};
 const IconFlechas = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C88700" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M7 16V4M3 8l4-4 4 4M17 8v12M13 16l4 4 4-4" />
@@ -172,7 +163,7 @@ const IconMano = () => (
   </svg>
 );
 
-const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService, onOpenSolicitudes }) => {
+const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
   const servicioId = user?.servicioId;
   const myUserId = (() => {
     const raw = Number(user?.id ?? user?.userId);
@@ -181,7 +172,6 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   const canDecide = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
   const canAssign = canDecide || ['ADMIN', 'ADMINISTRADOR'].includes(String(user?.rolSistema || '').toUpperCase());
   const servicioNombre = localStorage.getItem('sgt_servicio_activo_nombre') || 'Servicio';
-  const { unreadCount } = useNotifications();
 
   const hoy = hoyISOEnZonaHospital();
   const [agenda, setAgenda] = useState({ turnos: [] });
@@ -609,28 +599,6 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   }, [ofertas, confirm, canDecide]);
 
   // ── Sub-renders ───────────────────────────────────────────────────────────
-  const itemNav = (icono, label, dest, activo = false, badge = null) => (
-    <a
-      key={label}
-      href="#"
-      onClick={(e) => { e.preventDefault(); if (dest) onNavigate?.(dest); }}
-      aria-current={activo ? 'page' : undefined}
-      className={activo ? '' : 'sgt-nav-item'}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 9,
-        color: activo ? '#fff' : 'rgba(255,255,255,0.68)',
-        fontSize: '12.5px', fontWeight: activo ? 800 : 700,
-        background: activo ? 'rgba(255,255,255,0.15)' : 'transparent',
-        boxShadow: activo ? 'inset 3px 0 0 #E57F84' : 'none',
-      }}
-    >
-      {icono}{label}
-      {badge != null && badge > 0 && (
-        <span style={{ marginLeft: 'auto', background: '#E57F84', color: '#fff', fontSize: '10px', fontWeight: 800, borderRadius: 99, padding: '1px 7px' }}>{badge}</span>
-      )}
-    </a>
-  );
-
   const panelTurno = (vm, esDia) => {
     const borde = esDia ? '#DCEBE2' : '#F3DCDE';
     const headBg = esDia ? '#F0F7F2' : '#FBF1F2';
@@ -691,56 +659,19 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
   };
 
   return (
-    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', background: '#F2F5F9', color: '#0F1B2D', fontFamily: "'Raleway', system-ui, sans-serif" }}>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', background: '#F2F5F9', color: '#0F1B2D', fontFamily: "'Raleway', system-ui, sans-serif" }}>
       <style>{`
         @keyframes sgtFade{from{opacity:0}to{opacity:1}}
         @keyframes sgtUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-        @keyframes sgtSlideUp{from{transform:translateY(40px);opacity:0.6}to{transform:translateY(0);opacity:1}}
         @keyframes sgtToast{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
-        .sgt-nav-item:hover{background:rgba(255,255,255,0.08)!important;color:#fff!important}
         .sgt-hoy-btn:hover{background:#E8EEF4!important}
         .sgt-day-compact:hover{box-shadow:0 8px 20px rgba(15,27,45,0.1);border-color:#17416C!important}
         .sgt-libre:hover{background:#F8E2E4!important}
         .sgt-persona:hover{background:#E8EEF4!important}
       `}</style>
 
-      {/* Sidebar */}
-      <aside style={{ width: 218, flexShrink: 0, background: 'linear-gradient(172deg,#17416C 0%,oklch(0.32 0.062 220) 62%,oklch(0.36 0.075 200) 100%)', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>
-        <div style={{ padding: '20px 18px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(255,255,255,0.14)', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 900, fontSize: '13px' }}>S</div>
-          <div>
-            <div style={{ color: '#fff', fontSize: '14px', fontWeight: 800, letterSpacing: '0.3px' }}>SGT · HUAP</div>
-            <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px' }}>{servicioNombre}</div>
-          </div>
-        </div>
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', flex: 1 }}>
-          {itemNav(NAV_ICONS.inicio, 'Inicio', 'inicio')}
-          {itemNav(NAV_ICONS.centro, 'Centro de turnos', null, true)}
-          {itemNav(NAV_ICONS.solicitudes, 'Solicitudes', 'solicitudes', false, nSol)}
-          {itemNav(NAV_ICONS.notificaciones, 'Notificaciones', 'notificaciones', false, unreadCount)}
-          {canAssign && itemNav(NAV_ICONS.personal, 'Personal', 'personal')}
-          {itemNav(NAV_ICONS.planificacion, 'Planificación', 'planificacion')}
-          {canAssign && itemNav(NAV_ICONS.estadisticas, 'Estadísticas', 'estadisticas')}
-          {canAssign && itemNav(NAV_ICONS.bitacora, 'Bitácora', 'bitacora')}
-        </nav>
-        <div style={{ margin: 10, padding: 12, borderRadius: 12, background: 'rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 99, background: '#fff', color: '#17416C', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '12px' }}>{iniciales(user?.nombre)}</div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ color: '#fff', fontSize: '12.5px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.nombre || 'Usuario'}</div>
-              {user?.rutCompleto && <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: '10.5px', fontWeight: 600 }}>{user.rutCompleto}</div>}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 9 }}>
-            <span style={{ background: 'rgba(255,255,255,0.18)', color: '#fff', fontSize: '9.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', borderRadius: 99, padding: '3px 8px' }}>{(user?.rol || '').toLowerCase()}</span>
-            <a href="#" onClick={(e) => { e.preventDefault(); onSwitchService?.(); }} style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.6)', fontSize: '10.5px', fontWeight: 700 }}>Cambiar servicio</a>
-          </div>
-          <button onClick={onLogout} style={{ marginTop: 8, width: '100%', background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 8, color: 'rgba(255,255,255,0.85)', fontSize: '10.5px', fontWeight: 800, padding: '6px 0', cursor: 'pointer' }}>Cerrar sesión</button>
-        </div>
-      </aside>
-
       {/* Main */}
-      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: '16px 22px 18px', gap: 12 }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: 640, display: 'flex', flexDirection: 'column', padding: '16px 22px 18px', gap: 12 }}>
         <header style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, letterSpacing: '-0.2px' }}>Centro de turnos · {tituloSemana}</h1>
@@ -765,16 +696,16 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
               onClick={d.onSelect}
               aria-label={d.aria}
               className="sgt-day-compact"
-              style={{ width: 86, flexShrink: 0, background: d.bg, border: `1.5px solid ${d.border}`, borderRadius: 14, padding: '10px 8px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, transition: 'box-shadow .15s,border-color .15s' }}
+              style={{ width: 'clamp(70px, 6vw, 86px)', flexShrink: 0, background: d.bg, border: `1.5px solid ${d.border}`, borderRadius: 14, padding: '10px 8px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, transition: 'box-shadow .15s,border-color .15s' }}
             >
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '9.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px', color: d.dateInk }}>{d.dow}</div>
                 <div style={{ fontSize: '21px', fontWeight: 900, lineHeight: 1.1, color: d.dateInk }}>{d.num}</div>
                 {d.hoy && <div style={{ marginTop: 3, fontSize: '7.5px', fontWeight: 900, color: '#fff', background: '#17416C', borderRadius: 99, padding: '1px 6px', letterSpacing: '0.5px', display: 'inline-block' }}>HOY</div>}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                {d.dia && <span style={{ background: d.dia.eqBg, color: d.dia.eqInk, fontSize: '8.5px', fontWeight: 800, borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap', maxWidth: 74, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.dia.rot}</span>}
-                {d.noche && <span style={{ background: d.noche.eqBg, color: d.noche.eqInk, fontSize: '8.5px', fontWeight: 800, borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap', maxWidth: 74, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.noche.rot}</span>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', maxWidth: '100%' }}>
+                {d.dia && <span style={{ background: d.dia.eqBg, color: d.dia.eqInk, fontSize: '8.5px', fontWeight: 800, borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.dia.rot}</span>}
+                {d.noche && <span style={{ background: d.noche.eqBg, color: d.noche.eqInk, fontSize: '8.5px', fontWeight: 800, borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.noche.rot}</span>}
               </div>
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 5, marginTop: 'auto' }}>
                 {d.dia && (
@@ -795,7 +726,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
               </div>
             </button>
           ) : (
-            <div key={d.k} style={{ flex: 1, minWidth: 540, background: '#fff', border: '1.5px solid #17416C', borderRadius: 14, padding: '12px 14px', boxShadow: '0 10px 26px rgba(23,65,108,0.13)', animation: 'sgtFade .2s ease' }}>
+            <div key={d.k} style={{ flex: 1, minWidth: 420, background: '#fff', border: '1.5px solid #17416C', borderRadius: 14, padding: '12px 14px', boxShadow: '0 10px 26px rgba(23,65,108,0.13)', animation: 'sgtFade .2s ease' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
                 <span style={{ fontSize: '15px', fontWeight: 900, color: '#17416C' }}>{d.dowFull} {d.num}</span>
                 <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#7486A0' }}>de {MES_LARGO[d.mes]}</span>
@@ -951,33 +882,26 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onLogout, onSwitchService,
             </div>
           </section>
         </div>
-      </main>
+      </div>
 
       {/* Gestión de asignación: el mismo sheet del "Detalle del turno" móvil,
-          presentado como modal centrado. El Sheet se posiciona con
-          position:absolute respecto del contenedor relativo de 420px. */}
-      {turnoGestion && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(2px)', display: 'grid', placeItems: 'center', animation: 'sgtFade .15s ease' }}>
-          <div style={{ position: 'relative', width: 'min(430px, 94vw)', height: 'min(900px, 96vh)', borderRadius: 24, overflow: 'hidden' }}>
-            <AsignarTurnoLibreSheet
-              open
-              shift={turnoGestion}
-              servicioId={servicioId}
-              adminUserId={myUserId}
-              onClose={() => setTurnoGestion(null)}
-              onAssigned={() => {
-                setTurnoGestion(null);
-                toast('Asignación actualizada.');
-                recargar();
-              }}
-            />
-          </div>
-        </div>
-      )}
+          que en desktop se abre como panel lateral (Sheet → PanelLateral). */}
+      <AsignarTurnoLibreSheet
+        open={Boolean(turnoGestion)}
+        shift={turnoGestion}
+        servicioId={servicioId}
+        adminUserId={myUserId}
+        onClose={() => setTurnoGestion(null)}
+        onAssigned={() => {
+          setTurnoGestion(null);
+          toast('Asignación actualizada.');
+          recargar();
+        }}
+      />
 
       {/* Toast */}
       {toastMsg && (
-        <div role="status" aria-live="polite" style={{ position: 'fixed', left: '50%', bottom: 26, transform: 'translateX(-50%)', background: 'rgba(23,65,108,0.96)', color: '#fff', borderRadius: 99, padding: '10px 18px', fontSize: '12.5px', fontWeight: 700, boxShadow: '0 10px 24px rgba(15,23,42,0.3)', animation: 'sgtToast .25s ease', zIndex: 60 }}>
+        <div role="status" aria-live="polite" style={{ position: 'fixed', left: 'calc(50% + 109px)', bottom: 26, transform: 'translateX(-50%)', background: 'rgba(23,65,108,0.96)', color: '#fff', borderRadius: 99, padding: '10px 18px', fontSize: '12.5px', fontWeight: 700, boxShadow: '0 10px 24px rgba(15,23,42,0.3)', animation: 'sgtToast .25s ease', zIndex: 60 }}>
           {toastMsg}
         </div>
       )}

@@ -1,0 +1,788 @@
+/* ==============================================================
+   MODO DESKTOP (R16 · R18) — marco, panel lateral y kit de componentes
+   --------------------------------------------------------------
+   Todo lo de este archivo vive bajo .sgt-desktop (marco logueado),
+   .sgt-entrada (login y elección de servicio en pantalla ancha),
+   .sgt-panel-lateral (Sheet en desktop) o clases con prefijo sgt-d-.
+   El layout móvil no usa ninguna de estas clases: nada de aquí lo toca.
+
+   Lenguaje visual: el de la "Propuesta C" aprobada (Centro de
+   operaciones). Mismos tokens de color que style.css (:root).
+   ============================================================== */
+
+:root {
+  --d-fondo: #F2F5F9;
+  --d-sidebar: 218px;
+  --d-radio: 14px;
+  --d-radio-sm: 9px;
+  --d-sombra-panel: 0 1px 2px rgba(15, 27, 45, 0.04);
+  --d-sombra-flotante: 0 10px 26px rgba(23, 65, 108, 0.13);
+  --d-coral-ink: #B85A60;
+  --d-coral-borde: #F3D2D5;
+}
+
+/* La página no scrollea: cada zona (menú, vista) maneja su scroll. */
+html.sgt-modo-desktop,
+html.sgt-modo-desktop body {
+  overflow: hidden;
+}
+
+/* ---------- Marco ---------- */
+.sgt-desktop {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  background: var(--d-fondo);
+  color: var(--ink);
+  font-family: 'Raleway', system-ui, sans-serif;
+}
+
+.sgt-desktop__sidebar {
+  width: var(--d-sidebar);
+  flex-shrink: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(172deg, #17416C 0%, oklch(0.32 0.062 220) 62%, oklch(0.36 0.075 200) 100%);
+  overflow: hidden;
+}
+
+.sgt-desktop__marca {
+  flex-shrink: 0;
+  padding: 18px 18px 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sgt-desktop__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 900;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.sgt-desktop__marca-nombre {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+.sgt-desktop__marca-servicio {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+/* El menú scrollea si no cabe; la tarjeta del usuario queda siempre visible. */
+.sgt-desktop__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 10px 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+.sgt-desktop__grupo {
+  margin: 10px 10px 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+.sgt-desktop__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sgt-desktop__item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.sgt-desktop__item:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: -2px;
+}
+.sgt-desktop__item[aria-current='page'] {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.sgt-desktop__item-texto {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sgt-desktop__badge {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 99px;
+  padding: 1px 7px;
+}
+
+.sgt-desktop__usuario {
+  flex-shrink: 0;
+  margin: 8px 10px 10px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.sgt-desktop__usuario-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sgt-desktop__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 99px;
+  background: #fff;
+  color: var(--primary);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.sgt-desktop__usuario-nombre {
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sgt-desktop__usuario-rut {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.sgt-desktop__usuario-acciones {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+}
+.sgt-desktop__rol {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 99px;
+  padding: 3px 8px;
+}
+.sgt-desktop__link {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.65);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.sgt-desktop__link:hover { color: #fff; }
+.sgt-desktop__salir {
+  margin-top: 8px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 6px 0;
+  cursor: pointer;
+}
+.sgt-desktop__salir:hover { background: rgba(255, 255, 255, 0.18); }
+
+.sgt-desktop__main {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Las vistas se diseñaron para llenar el teléfono (columna flex, scroll
+   interno): aquí llenan el área principal del mismo modo. */
+.sgt-desktop__vista {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- Piezas móviles reubicadas en desktop ---------- */
+
+/* Cabecera de las vistas: título a la izquierda, acciones a la derecha. */
+.sgt-desktop .top-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px 12px;
+  background: transparent;
+  border-bottom: none;
+}
+.sgt-desktop .top-header__left { order: 0; flex: 0 0 auto; }
+.sgt-desktop .top-header__left:empty { display: none; }
+.sgt-desktop .top-header__center { order: 1; flex: 1; text-align: left; }
+.sgt-desktop .top-header__right { order: 2; flex: 0 0 auto; }
+.sgt-desktop .top-header__title { font-size: 20px; letter-spacing: -0.2px; }
+.sgt-desktop .top-header__subtitle { font-size: 11.5px; }
+
+/* Diálogos de confirmación: centrados en la ventana, no en el teléfono. */
+.sgt-desktop .confirm-overlay,
+.sgt-entrada .confirm-overlay,
+.sgt-panel-lateral .confirm-overlay {
+  position: fixed;
+}
+
+/* Toast: sin TabBar abajo. */
+.sgt-desktop .agenda-toast {
+  left: calc(var(--d-sidebar) + 22px);
+  right: 22px;
+  bottom: 26px;
+}
+
+/* ---------- Panel lateral (Sheet en desktop) ---------- */
+@keyframes sgtPanelLateralIn {
+  from { transform: translateX(32px); opacity: 0.4; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.sgt-panel-lateral {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-end;
+}
+.sgt-panel-lateral__fondo {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(1.5px);
+  animation: sgtFade 0.18s ease;
+}
+.sgt-panel-lateral__panel {
+  position: relative;
+  height: 100vh;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -18px 0 48px rgba(15, 23, 42, 0.18);
+  /* Sin animation-fill-mode: al terminar no queda un transform que vuelva al
+     panel "contenedor" de los position:fixed de su contenido. */
+  animation: sgtPanelLateralIn 0.22s cubic-bezier(0.2, 0.9, 0.2, 1);
+  outline: none;
+}
+.sgt-panel-lateral__cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line2);
+}
+.sgt-panel-lateral__titulo {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.sgt-panel-lateral__cerrar {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: var(--line2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sgt-panel-lateral__cerrar:hover { background: var(--line); }
+.sgt-panel-lateral__cuerpo {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* Algunos contenidos de Sheet usan position:absolute contra su contenedor. */
+  position: relative;
+}
+
+/* ---------- Pantallas de entrada (login, servicio, registro) ---------- */
+.sgt-entrada {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ==============================================================
+   KIT DESKTOP (prefijo sgt-d-) — ver components/Desktop/ui.jsx
+   ============================================================== */
+
+/* Página con scroll propio dentro del marco */
+.sgt-d-pagina {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 22px 22px;
+}
+.sgt-d-contenido {
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sgt-d-contenido--amplio { max-width: 1440px; }
+.sgt-d-contenido--medio { max-width: 1120px; }
+.sgt-d-contenido--angosto { max-width: 760px; }
+
+/* Encabezado de página (para vistas que no usan TopHeader en desktop) */
+.sgt-d-encabezado {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 22px 12px;
+}
+.sgt-d-encabezado__titulo {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.sgt-d-encabezado__subtitulo {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink3);
+  margin-top: 2px;
+}
+.sgt-d-encabezado__acciones {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Panel (tarjeta blanca con cabecera opcional) */
+.sgt-d-panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--d-radio);
+  box-shadow: var(--d-sombra-panel);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+.sgt-d-panel__cabecera {
+  padding: 11px 15px 10px;
+  border-bottom: 1px solid var(--line2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+}
+.sgt-d-panel__icono {
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--primary-soft);
+  flex-shrink: 0;
+}
+.sgt-d-panel__titulo {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.sgt-d-panel__subtitulo {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+.sgt-d-panel__acciones {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sgt-d-panel__cuerpo { padding: 12px 15px 14px; }
+.sgt-d-panel__cuerpo--sin-padding { padding: 0; }
+.sgt-d-panel__cuerpo--scroll { flex: 1; min-height: 0; overflow: auto; }
+
+/* Grillas */
+.sgt-d-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--d-min-col, 280px), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.sgt-d-columnas {
+  display: grid;
+  grid-template-columns: var(--d-columnas, 1fr 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+/* Lista + detalle (maestro-detalle) */
+.sgt-d-split {
+  display: grid;
+  grid-template-columns: var(--d-ancho-lista, 380px) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+/* KPIs */
+.sgt-d-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.sgt-d-kpi {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sgt-d-kpi__valor {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.sgt-d-kpi__etiqueta {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+.sgt-d-kpi__detalle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+
+/* Chips / badges */
+.sgt-d-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 99px;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  background: var(--line2);
+  color: var(--ink2);
+}
+.sgt-d-chip--mayus { text-transform: uppercase; letter-spacing: 0.3px; font-size: 9px; padding: 2px 7px; }
+.sgt-d-chip--primario { background: var(--primary-soft); color: var(--primary); }
+.sgt-d-chip--exito { background: var(--success-soft); color: var(--success); }
+.sgt-d-chip--aviso { background: var(--warn-soft); color: var(--warn); }
+.sgt-d-chip--alerta { background: var(--accent-soft); color: var(--d-coral-ink); }
+.sgt-d-chip--solido { background: var(--primary); color: #fff; }
+
+/* Botones */
+.sgt-d-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: var(--d-radio-sm);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.sgt-d-btn:disabled { opacity: 0.55; cursor: default; }
+.sgt-d-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-d-btn--sm { height: 26px; padding: 0 9px; font-size: 10.5px; border-radius: 7px; }
+.sgt-d-btn--primario { background: var(--primary); color: #fff; }
+.sgt-d-btn--primario:hover:not(:disabled) { background: #12355a; }
+.sgt-d-btn--exito { background: var(--success); color: #fff; }
+.sgt-d-btn--exito:hover:not(:disabled) { background: #276b4a; }
+.sgt-d-btn--peligro { background: #fff; border-color: var(--d-coral-borde); color: var(--d-coral-ink); }
+.sgt-d-btn--peligro:hover:not(:disabled) { background: var(--accent-soft); }
+.sgt-d-btn--peligro-solido { background: #C2414B; color: #fff; }
+.sgt-d-btn--peligro-solido:hover:not(:disabled) { background: #A8353E; }
+.sgt-d-btn--secundario { background: #fff; border-color: var(--line); color: var(--primary); }
+.sgt-d-btn--secundario:hover:not(:disabled) { background: var(--primary-soft); }
+.sgt-d-btn--fantasma { background: transparent; color: var(--ink2); }
+.sgt-d-btn--fantasma:hover:not(:disabled) { background: var(--line2); }
+.sgt-d-btn--icono { width: 32px; padding: 0; }
+.sgt-d-btn--sm.sgt-d-btn--icono { width: 26px; }
+
+/* Campos */
+.sgt-d-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.sgt-d-campo__etiqueta {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ink2);
+}
+.sgt-d-campo__ayuda { font-size: 10.5px; font-weight: 600; color: var(--ink3); }
+.sgt-d-campo__error { font-size: 10.5px; font-weight: 700; color: var(--d-coral-ink); }
+.sgt-d-input,
+.sgt-d-select,
+.sgt-d-textarea {
+  width: 100%;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--d-radio-sm);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sgt-d-textarea { height: auto; min-height: 76px; padding: 9px 11px; resize: vertical; line-height: 1.45; }
+.sgt-d-input:focus,
+.sgt-d-select:focus,
+.sgt-d-textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(23, 65, 108, 0.14);
+}
+.sgt-d-buscador { position: relative; min-width: 220px; }
+.sgt-d-buscador .sgt-d-input { padding-left: 32px; }
+.sgt-d-buscador__icono {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink3);
+  display: grid;
+  pointer-events: none;
+}
+.sgt-d-formulario {
+  display: grid;
+  grid-template-columns: repeat(var(--d-columnas-form, 2), minmax(0, 1fr));
+  gap: 12px 14px;
+}
+.sgt-d-formulario__ancho-completo { grid-column: 1 / -1; }
+
+/* Barra de herramientas (búsqueda, filtros, acciones) */
+.sgt-d-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sgt-d-toolbar__espacio { flex: 1; }
+
+/* Pestañas / segmentos */
+.sgt-d-segmentos {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--line2);
+  border-radius: 10px;
+}
+.sgt-d-segmento {
+  border: none;
+  background: transparent;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sgt-d-segmento[aria-pressed='true'],
+.sgt-d-segmento[aria-selected='true'] {
+  background: #fff;
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(15, 27, 45, 0.12);
+}
+.sgt-d-segmento__conteo {
+  background: var(--line);
+  color: var(--ink3);
+  font-size: 9.5px;
+  border-radius: 99px;
+  padding: 1px 6px;
+}
+.sgt-d-segmento[aria-pressed='true'] .sgt-d-segmento__conteo,
+.sgt-d-segmento[aria-selected='true'] .sgt-d-segmento__conteo {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* Tabla densa */
+.sgt-d-tabla-envoltura { overflow: auto; min-width: 0; }
+.sgt-d-tabla {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  color: var(--ink);
+}
+.sgt-d-tabla th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface2);
+  text-align: left;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.sgt-d-tabla td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line2);
+  font-weight: 600;
+  vertical-align: middle;
+}
+.sgt-d-tabla tbody tr:last-child td { border-bottom: none; }
+.sgt-d-tabla tbody tr { transition: background 0.12s ease; }
+.sgt-d-tabla--interactiva tbody tr { cursor: pointer; }
+.sgt-d-tabla--interactiva tbody tr:hover td { background: var(--surface2); }
+.sgt-d-tabla tbody tr[aria-selected='true'] td {
+  background: var(--primary-soft);
+}
+.sgt-d-tabla tbody tr[aria-selected='true'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+.sgt-d-tabla__num { text-align: right; font-variant-numeric: tabular-nums; }
+.sgt-d-tabla__acciones { text-align: right; white-space: nowrap; }
+.sgt-d-tabla__secundario { display: block; font-size: 10.5px; color: var(--ink3); font-weight: 600; }
+
+/* Persona (avatar + nombre) */
+.sgt-d-persona {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sgt-d-persona__avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 99px;
+  background: #E8E2EE;
+  color: #4E3A6F;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.sgt-d-persona__nombre {
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Estado vacío y carga */
+.sgt-d-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--ink3);
+}
+.sgt-d-vacio__titulo { font-size: 13px; font-weight: 800; color: var(--ink2); }
+.sgt-d-vacio__texto { font-size: 11.5px; font-weight: 600; max-width: 420px; }
+@keyframes sgtDCarga { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.sgt-d-cargando {
+  height: 14px;
+  border-radius: 6px;
+  background: var(--line2);
+  animation: sgtDCarga 1.2s ease-in-out infinite;
+}
+
+/* Avisos dentro de paneles */
+.sgt-d-aviso {
+  border-radius: 9px;
+  padding: 8px 11px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.sgt-d-aviso--alerta { background: var(--accent-soft); color: #8C3F44; }
+.sgt-d-aviso--aviso { background: var(--warn-soft); color: #8A5D00; }
+.sgt-d-aviso--exito { background: var(--success-soft); color: var(--success); }
+
+/* Separador de sección dentro de un panel */
+.sgt-d-seccion-titulo {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink3);
+  margin: 4px 0 6px;
+}

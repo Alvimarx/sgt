@@ -7,6 +7,8 @@ import { PhoneShell, TabBar } from "../Style/UIPrimitives";
 
 import { useAuth } from "../../context/AuthContext";
 import { selectService } from "../../services/authService";
+import { useLayout } from "../../layout/layout";
+import { useSolicitudesPendientes } from "../../hooks/useSolicitudesPendientes";
 
 //Importaciones de Comun
 import AgendaView from "../Comun/AgendaView";
@@ -16,6 +18,8 @@ import SelectServiceView from "../Comun/SelectServiceView";
 import ProfileView from "../Comun/Perfil";
 import PersonalDashboard from "../Comun/PersonalDashboard";
 import CentroOperacionesDesktop from "../Desktop/CentroOperacionesDesktop";
+import DesktopShell from "../Desktop/DesktopShell";
+import { itemActivo, panelDeGestion } from "../Desktop/navegacion";
 
 //Importaciones de ComunAdministracion
 import PuestosView from "../ComunAdministracion/PuestosView";
@@ -291,68 +295,57 @@ const Prop4 = ({ tweaks = {} }) => {
     setCurrentView("notifications");
   };
 
-  // R16 — Modo desktop: en pantallas anchas la vista "agenda" (home) se
-  // reemplaza por el Centro de operaciones a pantalla completa (Propuesta C).
-  // El resto de las vistas sigue en el PhoneShell hasta tener su versión
-  // desktop propia.
-  const [esDesktop, setEsDesktop] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia("(min-width: 1200px)").matches
+  // Modo desktop (R16/R18): el breakpoint vive en layout/layout.js. En pantallas
+  // anchas las vistas logueadas se montan en el DesktopShell (menú lateral) y
+  // el home "agenda" es el Centro de operaciones; bajo el umbral todo sigue
+  // en el PhoneShell, exactamente como antes.
+  const { esDesktop } = useLayout();
+  const conteoSolicitudes = useSolicitudesPendientes(
+    esDesktop && auth?.isLogged ? auth.user : null,
+    currentView
   );
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1200px)");
-    const onChange = (e) => setEsDesktop(e.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
-  const irDesdeDesktop = (dest) => {
-    if (dest === "inicio") { setActiveTab("home"); setCurrentView("agenda"); return; }
-    if (dest === "calendario") { setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); return; }
-    if (dest === "solicitudes") { setSolicitudesReturn("agenda"); setSolicitudesCreatePreset(null); setActiveTab("requests"); setCurrentView("solicitudes"); return; }
-    if (dest === "notificaciones") { setCurrentView("notifications"); return; }
-    const esAdminSistema = ["ADMIN", "ADMINISTRADOR"].includes(String(auth?.user?.rolSistema || "").toUpperCase());
-    if (dest === "personal") {
-      if (auth?.user?.rol === "JEFATURA") setCurrentView("funcionarios_servicio_jefatura");
-      else if (esAdminSistema) setCurrentView("jerarquia");
-      else if (auth?.user?.rol === "SUBROGANTE") setCurrentView("subrogante");
-      else { setActiveTab("me"); setCurrentView("perfil"); }
-      return;
-    }
-    if (dest === "planificacion") {
-      if (esAdminSistema) setCurrentView("planificacion");
-      else { setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); }
-      return;
-    }
-    if (dest === "estadisticas") { setStatsReturn("agenda"); setCurrentView("admin_stats"); return; }
-    if (dest === "bitacora") { setBitacoraReturn("agenda"); setCurrentView("bitacora"); return; }
-    if (dest === "gestion") {
-      if (auth?.user?.rol === "JEFATURA") setCurrentView("jefatura");
-      else if (auth?.user?.rol === "SUBROGANTE") setCurrentView("subrogante");
-      else if (esAdminSistema) setCurrentView("admin");
-      else { setActiveTab("me"); setCurrentView("perfil"); }
+  // Destinos del menú lateral (navegacion.js) → vista de Prop4. Cada destino
+  // fija el "volver" de la vista igual que lo haría el panel móvil del rol.
+  const navegarDesktop = (dest) => {
+    const panel = panelDeGestion(auth?.user);
+    switch (dest) {
+      case "inicio": setActiveTab("home"); setCurrentView("agenda"); return;
+      case "calendario": setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); return;
+      case "solicitudes": setSolicitudesReturn("agenda"); setSolicitudesCreatePreset(null); setActiveTab("requests"); setCurrentView("solicitudes"); return;
+      case "notificaciones": setCurrentView("notifications"); return;
+      case "mi_dashboard": setCurrentView("personal_dashboard"); return;
+      case "perfil": setActiveTab("me"); setCurrentView("perfil"); return;
+      case "asignacion_turnos": setCalendarReturn(panel); setCurrentView("calendar_view"); return;
+      case "personal_servicio": setCurrentView("funcionarios_servicio_jefatura"); return;
+      case "asignacion_funcionarios": setCurrentView("asignacionJefatura"); return;
+      case "jerarquia_servicio": setCurrentView("jerarquiaJefatura"); return;
+      case "puestos": setPuestosReturn(panel); setCurrentView("puestos"); return;
+      case "estadisticas": setStatsReturn(panel); setCurrentView("admin_stats"); return;
+      case "bitacora": setBitacoraReturn(panel); setCurrentView("bitacora"); return;
+      case "auditoria": setAuditoriaReturn(panel); setCurrentView("auditoria"); return;
+      case "servicios": setCurrentView("servicios"); return;
+      case "personal_sistema": setCurrentView("funcionarios_sistema"); return;
+      case "asignacion_servicios": setCurrentView("asignacion"); return;
+      case "jerarquia_sistema": setCurrentView("jerarquia"); return;
+      case "tipos_turno": setCurrentView("tipos_turno"); return;
+      case "rotativas": setCurrentView("plantillas"); return;
+      case "planificacion": setCurrentView("planificacion"); return;
+      case "reglas": setReglasReturn("admin"); setCurrentView("reglas"); return;
+      default: return;
     }
   };
 
-  if (esDesktop && currentView === "agenda" && auth?.isLogged) {
-    return (
-      <CentroOperacionesDesktop
-        user={auth?.user}
-        onNavigate={irDesdeDesktop}
-        onLogout={handleLogout}
-        onSwitchService={handleBackToServiceSelection}
-        onOpenSolicitudes={handleOpenSolicitudes}
-      />
-    );
-  }
-
-  return (
-    <PhoneShell>
-      <style>{`
+  const animaciones = (
+    <style>{`
         @keyframes sgtFade { from { opacity:0 } to { opacity:1 } }
         @keyframes sgtSlideUp { from { transform:translateY(40px); opacity:0.6 } to { transform:translateY(0); opacity:1 } }
         @keyframes sgtSlideLeft { from { transform:translateX(100%); } to { transform:translateX(0); } }
       `}</style>
+  );
 
+  const vistas = (
+    <>
       {currentView === "login" && !entrandoDirecto && (
         <LoginView onLoginSuccess={handleLoginSuccess} />
       )}
@@ -502,6 +495,46 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "tipos_turno" && <TiposTurnoView onBack={() => setCurrentView("admin")} />}
       {currentView === "plantillas" && <PlantillasView onBack={() => setCurrentView("admin")} />}
       {currentView === "reglas" && <ReglasServicioView onBack={() => setCurrentView(reglasReturn)} />}
+    </>
+  );
+
+  if (esDesktop) {
+    // Login, elección de servicio y registro pendiente: pantalla completa,
+    // sin menú (aún no hay sesión con servicio).
+    const esEntrada = !auth?.isLogged || ["login", "select_service", "pending_registration"].includes(currentView);
+    if (esEntrada) {
+      return (
+        <div className="sgt-entrada">
+          {animaciones}
+          {vistas}
+        </div>
+      );
+    }
+    return (
+      <DesktopShell
+        user={auth?.user}
+        activo={itemActivo(currentView, calendarReturn)}
+        onNavigate={navegarDesktop}
+        onLogout={handleLogout}
+        onSwitchService={handleBackToServiceSelection}
+        conteoSolicitudes={conteoSolicitudes}
+      >
+        {animaciones}
+        {currentView === "agenda" ? (
+          <CentroOperacionesDesktop
+            user={auth?.user}
+            onNavigate={navegarDesktop}
+            onOpenSolicitudes={handleOpenSolicitudes}
+          />
+        ) : vistas}
+      </DesktopShell>
+    );
+  }
+
+  return (
+    <PhoneShell>
+      {animaciones}
+      {vistas}
 
       {[
         "agenda",
@@ -514,8 +547,8 @@ const Prop4 = ({ tweaks = {} }) => {
       {currentView === "calendar_view" && calendarReturn === "agenda" && (
         <TabBar active={activeTab} onChange={handleTabChange} />
       )}
-          </PhoneShell>
-        );
-      };
+    </PhoneShell>
+  );
+};
 
 export default Prop4;

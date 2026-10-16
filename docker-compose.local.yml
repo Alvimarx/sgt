@@ -1,0 +1,100 @@
+# ==============================================================
+# LOCAL — ambiente autocontenido para pruebas en la máquina de Álvaro.
+#
+# A diferencia de docker-compose.dev.yml (que apunta a las DOS BD externas
+# reales del hospital, 10.6.15.193), aquí se levanta un MySQL 8.0 local que
+# contiene AMBOS esquemas y se puebla solo con los scripts de
+# BaseDatosMySQL/desarrollo/ (datos sintéticos, sin datos reales de personal).
+#
+#   docker compose -f docker-compose.local.yml --env-file .env.local up -d --build
+#
+# Los scripts de init corren una sola vez, en orden alfabético, al crear el
+# volumen. Para repoblar desde cero: `down -v` y volver a levantar.
+# ==============================================================
+services:
+  db:
+    image: mysql:8.0
+    container_name: huap-db-local
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --performance-schema=OFF --innodb-buffer-pool-size=64M
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      # Da BD por defecto a los scripts de init. La migración V2 no trae `USE
+      # gestionturnos;` (se aplica con `mysql gestionturnos < V2.sql`), así que sin
+      # esto falla con "No database selected". Los demás scripts traen su propio USE.
+      MYSQL_DATABASE: gestionturnos
+    ports:
+      - "3306:3306"
+    volumes:
+      - huap-db-local-fechas:/var/lib/mysql
+      # innhosp (stand-in del hospital): catálogos + personalAux + vista viewPersonal
+      - ./BaseDatosMySQL/desarrollo/innhosp/01_esquema.sql:/docker-entrypoint-initdb.d/10_innhosp_esquema.sql:ro
+      - ./BaseDatosMySQL/desarrollo/innhosp/02_datos.sql:/docker-entrypoint-initdb.d/11_innhosp_datos.sql:ro
+      # gestionturnos (BD de la app): esquema base + datos de prueba
+      - ./BaseDatosMySQL/desarrollo/gestionturnos/01_esquema.sql:/docker-entrypoint-initdb.d/20_gestionturnos_esquema.sql:ro
+      - ./BaseDatosMySQL/desarrollo/gestionturnos/02_datos.sql:/docker-entrypoint-initdb.d/21_gestionturnos_datos.sql:ro
+      # migraciones incrementales (el esquema base NO las trae)
+      - ./BaseDatosMySQL/migraciones/V2__planificacion_vigencia.sql:/docker-entrypoint-initdb.d/30_V2_planificacion_vigencia.sql:ro
+      # fechas del seed desplazadas a la semana actual (turnos futuros para probar)
+      - ./BaseDatosMySQL/desarrollo/gestionturnos/03_fechas_relativas.sql:/docker-entrypoint-initdb.d/40_gestionturnos_fechas_relativas.sql:ro
+    healthcheck:
+      # Por TCP y contra la ÚLTIMA tabla que crea el init (la migración V2): durante
+      # la inicialización mysqld corre con --skip-networking y responde por socket,
+      # así que un `mysqladmin ping -h localhost` da verde con la BD a medio poblar.
+      test: ["CMD-SHELL", "mysql --protocol=TCP -h 127.0.0.1 -P 3306 -uroot -p${MYSQL_ROOT_PASSWORD} -e 'SELECT 1 FROM gestionturnos.planificacion_ejecucion LIMIT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+    networks:
+      - huap-local-network
+
+  backend:
+    build:
+      context: ./huap_backend
+      dockerfile: Dockerfile
+    container_name: huap-backend-local
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.local
+    environment:
+      # notebook de 8 GB: la JVM no necesita más para el seed de desarrollo
+      JAVA_TOOL_OPTIONS: "-Xmx512m -XX:+UseSerialGC"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - huap-local-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v2/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./sgt-huap_frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=/api/v2
+    container_name: huap-frontend-local
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    volumes:
+      # mismo proxy reverso /api/v2 -> backend:8080 que usa el compose de dev
+      - ./apache/dev/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+    depends_on:
+      - backend
+    networks:
+      - huap-local-network
+
+volumes:
+  huap-db-local-fechas:
+
+networks:
+  huap-local-network:
+    driver: bridge

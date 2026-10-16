@@ -1,6 +1,7 @@
 // src/components/AgendaMockup/UIPrimitives.jsx
 import React from 'react';
 import { SGT_DATA, DASHBOARD_ICON_THEMES, DASHBOARD_CARD_THEME_BY_TITLE, STATUS_TONE_MAP } from '../Admin2/data';
+import { useLayout } from '../../layout/layout';
 
 const P = () => SGT_DATA.PALETTE;
 
@@ -188,8 +189,63 @@ export const PhoneShell = ({ children }) => (
   </div>
 );
 
-export const Sheet = ({ open, onClose, children, title, maxHeight = '85%' }) => {
+// Anchos del panel lateral desktop (prop `anchoDesktop` del Sheet).
+const ANCHOS_PANEL_LATERAL = { md: 480, lg: 640, xl: 860 };
+
+// Panel lateral derecho: la presentación desktop de un Sheet (R18). Cubre la
+// ventana con un fondo y desliza el panel desde la derecha; Escape y el clic
+// en el fondo cierran. Se puede usar directo cuando una vista desktop quiere
+// un panel sin pasar por Sheet.
+export const PanelLateral = ({ onClose, title, ancho = 'md', children }) => {
+  const panelRef = React.useRef(null);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+
+  React.useEffect(() => {
+    // Foco al panel al abrir (lectores de pantalla, teclado). Solo al montar:
+    // re-enfocar en cada render le quitaría el foco a un input del panel.
+    panelRef.current?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') onCloseRef.current?.(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  const anchoPx = typeof ancho === 'number' ? ancho : (ANCHOS_PANEL_LATERAL[ancho] || ANCHOS_PANEL_LATERAL.md);
+  return (
+    <div className="sgt-panel-lateral">
+      <div className="sgt-panel-lateral__fondo" onClick={() => onClose?.()} />
+      <aside
+        ref={panelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : undefined}
+        className="sgt-panel-lateral__panel"
+        style={{ width: `min(${anchoPx}px, 92vw)` }}
+      >
+        {title && (
+          <div className="sgt-panel-lateral__cabecera">
+            <div className="sgt-panel-lateral__titulo">{title}</div>
+            <button type="button" className="sgt-panel-lateral__cerrar" onClick={() => onClose?.()} aria-label="Cerrar">
+              <SGTIcon name="close" size={16} color={P().ink2}/>
+            </button>
+          </div>
+        )}
+        <div className="sgt-panel-lateral__cuerpo">{children}</div>
+      </aside>
+    </div>
+  );
+};
+
+// En móvil, bottom sheet dentro del teléfono (sin cambios). En desktop, el
+// mismo contenido se presenta en un PanelLateral; `anchoDesktop` acepta
+// 'md' (480), 'lg' (640), 'xl' (860) o un número de píxeles.
+export const Sheet = ({ open, onClose, children, title, maxHeight = '85%', anchoDesktop = 'md' }) => {
+  const { esDesktop } = useLayout();
   if (!open) return null;
+  if (esDesktop) {
+    return <PanelLateral onClose={onClose} title={title} ancho={anchoDesktop}>{children}</PanelLateral>;
+  }
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.35)', backdropFilter: 'blur(2px)', animation: 'sgtFade .2s ease' }} />
