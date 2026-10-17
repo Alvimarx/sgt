@@ -5,6 +5,8 @@
 import React from "react";
 import { SGT_DATA } from "../Admin2/data";
 import { SGTAvatar, SGTBadge, SGTIcon } from "../Style/UIPrimitives";
+import { useLayout } from "../../layout/layout";
+import DetalleTurnoDesktop from "../Desktop/turnos/DetalleTurnoDesktop";
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -27,14 +29,6 @@ export const getTipoTurnoColor = (shift) => {
     const key = shift?.idTipoTurno ?? shift?.nombreTipoTurno ?? shift?.tipo ?? "sin-tipo";
     return TEAM_COLOR_LIST[colorIndexForKey(key)];
 };
-
-const buildInitials = (name = "") =>
-    String(name || "?")
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((p) => p[0]?.toUpperCase() || "")
-        .join("") || "?";
 
 export const getAgendaTeam = (shift) => {
     if (shift?.teamGroup?.integrantes?.length) {
@@ -88,6 +82,166 @@ const isSinAsignarMember = (member) => {
 };
 
 // ---------------------------------------------------------------------------
+// REGLAS DEL DETALLE (compartidas por la presentación móvil y la desktop, R18)
+// ---------------------------------------------------------------------------
+
+// Texto de la fila "Estado" del turno.
+const estadoDelTurno = (shift, turnoLibre) =>
+    shift.solicitudPendiente
+        ? `Solicitud pendiente${shift.solicitudCon ? ` con ${shift.solicitudCon}` : ""}`
+        : shift.cambioAprobado
+            ? `Cambio aprobado${shift.cambioAprobadoCon ? ` con ${shift.cambioAprobadoCon}` : ""}`
+            : turnoLibre
+                ? `Cupo libre${shift.motivoLibre ? ` · ${shift.motivoLibre}` : ""}`
+                : shift.miTurno
+                    ? "Tu turno"
+                    : "Asignado";
+
+// Equipo agrupado por puesto: cada integrante con el turno que se puede gestionar
+// y cada vacante con su estado (ya solicitada o no).
+const equipoPorPuesto = ({ porPuesto = [], turnosGrupo = [], canManageAssignments = false, selectedMemberId = null }) =>
+    porPuesto.map((puesto) => {
+        const vacantesDelPuesto = turnosGrupo.filter(
+            (turno) => isTurnoLibre(turno) && mismoPuesto(turno, puesto)
+        );
+
+        const integrantes = (puesto.integrantes || []).map((p) => {
+            const turnoAsociado = turnosGrupo.find((turno) => {
+                const mismoTurno =
+                    p.turnoId != null &&
+                    String(turno?.id) === String(p.turnoId);
+
+                const mismoFuncionarioYPuesto =
+                    p.id != null &&
+                    String(turno?.idFuncionario) === String(p.id) &&
+                    mismoPuesto(turno, puesto);
+
+                return !isTurnoLibre(turno) && (mismoTurno || mismoFuncionarioYPuesto);
+            });
+
+            return {
+                p,
+                turnoAsociado,
+                puedeGestionarEsteIntegrante: canManageAssignments && Boolean(turnoAsociado),
+                estaSeleccionado: p.esYo || String(p.id) === String(selectedMemberId),
+            };
+        });
+
+        // Vacante que el usuario YA solicitó (marca del backend): la tarjeta informa
+        // y deja de invitar — el backend igual rechazaría el duplicado, esto solo
+        // evita el viaje.
+        const vacantes = vacantesDelPuesto.map((vacante) => ({
+            vacante,
+            yaSolicitada: !canManageAssignments && Boolean(vacante.solicitudPendiente),
+        }));
+
+        return {
+            puesto,
+            cantidadVacantes: vacantesDelPuesto.length || puesto.vacantes || 0,
+            integrantes,
+            vacantes,
+            // Vacantes conocidas solo por conteo (sin turno real): no se pueden tocar.
+            vacantesSinTurno: vacantesDelPuesto.length > 0 ? 0 : (puesto.vacantes || 0),
+        };
+    });
+
+const alTocarIntegrante = (fila, { onManageAssignedTurn, onSelectMember }) => {
+    if (fila.puedeGestionarEsteIntegrante) {
+        onManageAssignedTurn?.(fila.turnoAsociado);
+        return;
+    }
+
+    onSelectMember?.(fila.p);
+};
+
+const alTocarVacante = ({ vacante, yaSolicitada }, canManageAssignments, { onAssignVacancy, onRequestVacancy }) => {
+    if (canManageAssignments) {
+        onAssignVacancy?.(vacante);
+    } else if (!yaSolicitada) {
+        onRequestVacancy?.(vacante);
+    }
+};
+
+// Acciones del pie del detalle según el turno y los permisos.
+const accionesDelTurno = ({
+    shift,
+    canRequestExchange = false,
+    canManageTurnAssignment = false,
+    canAssignFreeTurn = false,
+}) => {
+    const actions = [];
+    const turnoLibre = isTurnoLibre(shift);
+
+    const canManageAssignments = Boolean(canManageTurnAssignment || canAssignFreeTurn);
+
+    if (!shift?.solicitudPendiente) {
+        if (canManageAssignments && turnoLibre) {
+            actions.push({
+                id: "asignar-turno-libre",
+                label: "Asignar funcionario",
+                icon: "user-plus",
+                tone: "primary",
+                targetShift: shift,
+            });
+        }
+
+        if (turnoLibre) {
+            actions.push({
+                id: "solicitar-turno",
+                label: "Solicitar turno",
+                icon: "plus",
+                tone: canManageAssignments ? "ghost" : "primary",
+                targetShift: shift,
+            });
+        }
+
+        if (!turnoLibre && !canManageAssignments) {
+            actions.push({
+                id: "cambio",
+                label: canRequestExchange ? "Solicitar cambio" : "Selecciona receptor y su turno",
+                icon: "swap",
+                tone: canRequestExchange ? "primary" : "ghost",
+                disabled: !canRequestExchange,
+                targetShift: shift,
+            });
+        }
+
+        if (!turnoLibre && canManageAssignments && canRequestExchange) {
+            actions.push({
+                id: "cambio",
+                label: "Solicitar cambio",
+                icon: "swap",
+                tone: "ghost",
+                disabled: false,
+                targetShift: shift,
+            });
+        }
+    }
+
+    actions.push({
+        id: "historial",
+        label: "Ver historial",
+        icon: "history",
+        tone: "ghost",
+        targetShift: shift,
+    });
+
+    return actions;
+};
+
+const DIAS_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const MESES_LARGO = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+// "2026-10-21" → "Miércoles 21 de octubre de 2026" (solo presentación desktop).
+const fechaLarga = (fecha) => {
+    const m = String(fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return fecha ? `Fecha: ${fecha}` : "Fecha no disponible";
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const dia = DIAS_LARGO[d.getDay()];
+    return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${d.getDate()} de ${MESES_LARGO[d.getMonth()]} de ${d.getFullYear()}`;
+};
+
+// ---------------------------------------------------------------------------
 // SHIFTDETAIL
 // ---------------------------------------------------------------------------
 
@@ -110,6 +264,8 @@ const ShiftDetail = ({
     canManageTurnAssignment = false,
     canAssignFreeTurn = false,
 }) => {
+    const { esDesktop } = useLayout();
+
     if (!shift) {
         return null;
     }
@@ -182,6 +338,122 @@ const ShiftDetail = ({
 
         onSelectTargetFuncionario?.(shift, targetTurn || member);
     };
+
+    const onSelectMember = onSelectTargetFuncionario ? handleSelectTarget : undefined;
+
+    const handleShiftAction = (actionId, currentShift) => {
+        if (actionId === "cambio") {
+            handleExchangeAction();
+            return;
+        }
+
+        onAction?.(actionId, currentShift);
+    };
+
+    // Rama desktop (R18): mismas reglas (helpers de arriba), otra presentación.
+    if (esDesktop) {
+        const nombreTipo =
+            shift.nombreTipoTurno ||
+            shift.nombreTipo ||
+            shift.nombre ||
+            (shift.tipo === "dia" ? "Turno día" : "Turno noche");
+        const nombreRotativa = shift.nombreRotativa || groupData?.nombreRotativa;
+        const receptorId = selectedTargetFuncionario?.id;
+
+        const info = [{ etiqueta: "Estado", valor: estadoDelTurno(shift, turnoLibre) }];
+        if (!turnoLibre && shift.nombreFuncionario) info.push({ etiqueta: "Funcionario", valor: shift.nombreFuncionario });
+        if (shift.nombrePuesto) info.push({ etiqueta: "Puesto", valor: shift.nombrePuesto });
+        if (shift.horas != null) info.push({ etiqueta: "Duración", valor: `${shift.horas} horas` });
+
+        const integranteDesktop = (fila) => ({
+            clave: fila.p.turnoId ?? fila.p.id,
+            p: fila.p,
+            puedeGestionar: fila.puedeGestionarEsteIntegrante,
+            seleccionado: fila.estaSeleccionado,
+            esReceptor: !fila.p.esYo && receptorId != null && String(fila.p.id) === String(receptorId),
+            onClick: () => alTocarIntegrante(fila, { onManageAssignedTurn: handleManageAssignedTurn, onSelectMember }),
+        });
+
+        const equipo = groupData?.porPuesto?.length > 0
+            ? equipoPorPuesto({
+                porPuesto: groupData.porPuesto,
+                turnosGrupo,
+                canManageAssignments,
+                selectedMemberId: receptorId,
+            }).map((fila) => ({
+                clave: fila.puesto.idPuesto ?? "sin-puesto",
+                nombrePuesto: fila.puesto.nombrePuesto,
+                cantidadVacantes: fila.cantidadVacantes,
+                vacantesSinTurno: fila.vacantesSinTurno,
+                integrantes: fila.integrantes.map(integranteDesktop),
+                vacantes: fila.vacantes.map((v, i) => ({
+                    clave: `vacante-${v.vacante.id ?? i}`,
+                    yaSolicitada: v.yaSolicitada,
+                    onClick: () => alTocarVacante(v, canManageAssignments, {
+                        onAssignVacancy: handleAssignVacancy,
+                        onRequestVacancy: handleRequestVacancy,
+                    }),
+                })),
+            }))
+            : null;
+
+        let equipoLegado = null;
+        if (!groupData && legacyTeam) {
+            const integrantes = [
+                legacyTeam.jefe,
+                ...(legacyTeam.urgenciologos || []),
+                ...(legacyTeam.medicos || []),
+            ].filter(Boolean);
+            const visibles = integrantes.length > 0 && isSinAsignarMember(integrantes[0]) ? [] : integrantes;
+            equipoLegado = {
+                visibles: visibles.length,
+                integrantes: integrantes.map((p) => ({
+                    clave: p.turnoId ?? p.id,
+                    p,
+                    puedeGestionar: false,
+                    seleccionado: p.esYo || String(p.id) === String(receptorId),
+                    esReceptor: !p.esYo && receptorId != null && String(p.id) === String(receptorId),
+                    onClick: onSelectMember ? () => onSelectMember(p) : undefined,
+                })),
+            };
+        }
+
+        const acciones = accionesDelTurno({
+            shift,
+            canRequestExchange,
+            canManageTurnAssignment,
+            canAssignFreeTurn,
+        }).map((a) => ({
+            ...a,
+            clave: `${a.id}-${a.targetShift?.id ?? "actual"}`,
+            onClick: () => handleShiftAction(a.id, a.targetShift || shift),
+        }));
+
+        return (
+            <DetalleTurnoDesktop
+                tipo={shift.tipo}
+                titulo={`${nombreTipo}${nombreRotativa ? ` · ${nombreRotativa}` : ""}`}
+                horario={`${shift.inicio || "—"} – ${shift.fin || "—"}`}
+                fecha={fechaLarga(fecha)}
+                cobertura={totalTurnos != null ? {
+                    completo: equipoCompleto,
+                    asignados,
+                    total: totalTurnos,
+                    faltan: faltanPorCubrir,
+                } : null}
+                receptor={selectedTargetTurn && selectedTargetFuncionario ? {
+                    texto: `${selectedTargetFuncionario.nombre} · ${formatShiftLabel(selectedTargetTurn)}`,
+                    activo: isTargetSelection,
+                } : null}
+                info={info}
+                equipo={equipo}
+                equipoLegado={equipoLegado}
+                acciones={acciones}
+                puedeGestionar={canManageAssignments}
+                sePuedeElegirReceptor={Boolean(onSelectMember) && !canManageAssignments}
+            />
+        );
+    }
 
     return (
         <div
@@ -287,17 +559,7 @@ const ShiftDetail = ({
                 >
                     <DetailRow
                         label="Estado"
-                        value={
-                            shift.solicitudPendiente
-                                ? `Solicitud pendiente${shift.solicitudCon ? ` con ${shift.solicitudCon}` : ""}`
-                                : shift.cambioAprobado
-                                    ? `Cambio aprobado${shift.cambioAprobadoCon ? ` con ${shift.cambioAprobadoCon}` : ""}`
-                                    : turnoLibre
-                                        ? `Cupo libre${shift.motivoLibre ? ` · ${shift.motivoLibre}` : ""}`
-                                        : shift.miTurno
-                                            ? "Tu turno"
-                                            : "Asignado"
-                        }
+                        value={estadoDelTurno(shift, turnoLibre)}
                     />
 
                     {!turnoLibre && shift.nombreFuncionario && (
@@ -362,14 +624,7 @@ const ShiftDetail = ({
                     canManageTurnAssignment={canManageTurnAssignment}
                     canAssignFreeTurn={canAssignFreeTurn}
                     assignableVacancyShift={firstVacantShift}
-                    onAction={(actionId, currentShift) => {
-                        if (actionId === "cambio") {
-                            handleExchangeAction();
-                            return;
-                        }
-
-                        onAction?.(actionId, currentShift);
-                    }}
+                    onAction={handleShiftAction}
                 />
             </div>
         </div>
@@ -521,13 +776,7 @@ const TeamByPuesto = ({
     onManageAssignedTurn,
 }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {porPuesto.map((puesto) => {
-            const vacantesDelPuesto = turnosGrupo.filter(
-                (turno) => isTurnoLibre(turno) && mismoPuesto(turno, puesto)
-            );
-
-            const cantidadVacantes = vacantesDelPuesto.length || puesto.vacantes || 0;
-
+        {equipoPorPuesto({ porPuesto, turnosGrupo, canManageAssignments, selectedMemberId }).map(({ puesto, cantidadVacantes, integrantes, vacantes, vacantesSinTurno }) => {
             return (
                 <div
                     key={puesto.idPuesto ?? "sin-puesto"}
@@ -570,38 +819,14 @@ const TeamByPuesto = ({
                     </div>
 
                     <div style={{ padding: "4px 8px 8px" }}>
-                        {(puesto.integrantes || []).map((p) => {
-                            const turnoAsociado = turnosGrupo.find((turno) => {
-                                const mismoTurno =
-                                    p.turnoId != null &&
-                                    String(turno?.id) === String(p.turnoId);
-
-                                const mismoFuncionarioYPuesto =
-                                    p.id != null &&
-                                    String(turno?.idFuncionario) === String(p.id) &&
-                                    mismoPuesto(turno, puesto);
-
-                                return !isTurnoLibre(turno) && (mismoTurno || mismoFuncionarioYPuesto);
-                            });
-
-                            const puedeGestionarEsteIntegrante =
-                                canManageAssignments && Boolean(turnoAsociado);
-
-                            const estaSeleccionado =
-                                p.esYo || String(p.id) === String(selectedMemberId);
+                        {integrantes.map((fila) => {
+                            const { p, puedeGestionarEsteIntegrante, estaSeleccionado } = fila;
 
                             return (
                                 <button
                                     key={p.turnoId ?? p.id}
                                     type="button"
-                                    onClick={() => {
-                                        if (puedeGestionarEsteIntegrante) {
-                                            onManageAssignedTurn?.(turnoAsociado);
-                                            return;
-                                        }
-
-                                        onSelectMember?.(p);
-                                    }}
+                                    onClick={() => alTocarIntegrante(fila, { onManageAssignedTurn, onSelectMember })}
                                     style={{
                                         display: "flex",
                                         alignItems: "center",
@@ -668,24 +893,16 @@ const TeamByPuesto = ({
                             );
                         })}
 
-                        {vacantesDelPuesto.length > 0 ? (
-                            vacantesDelPuesto.map((vacante, i) => {
-                                // Vacante que el usuario YA solicitó (marca del backend): la
-                                // tarjeta informa y deja de invitar — el backend igual
-                                // rechazaría el duplicado, esto solo evita el viaje.
-                                const yaSolicitada = !canManageAssignments && Boolean(vacante.solicitudPendiente);
+                        {vacantes.length > 0 ? (
+                            vacantes.map((fila, i) => {
+                                // yaSolicitada: vacante que el usuario YA solicitó (ver equipoPorPuesto).
+                                const { vacante, yaSolicitada } = fila;
                                 return (
                                 <button
                                     key={`vacante-${vacante.id ?? i}`}
                                     type="button"
                                     disabled={yaSolicitada}
-                                    onClick={() => {
-                                        if (canManageAssignments) {
-                                            onAssignVacancy?.(vacante);
-                                        } else if (!yaSolicitada) {
-                                            onRequestVacancy?.(vacante);
-                                        }
-                                    }}
+                                    onClick={() => alTocarVacante(fila, canManageAssignments, { onAssignVacancy, onRequestVacancy })}
                                     style={{
                                         display: "flex",
                                         alignItems: "center",
@@ -754,7 +971,7 @@ const TeamByPuesto = ({
                                 );
                             })
                         ) : (
-                            Array.from({ length: puesto.vacantes || 0 }).map((_, i) => (
+                            Array.from({ length: vacantesSinTurno }).map((_, i) => (
                                 <div
                                     key={`vacante-${puesto.idPuesto ?? "sin-puesto"}-${i}`}
                                     style={{
@@ -810,63 +1027,12 @@ const ShiftActions = ({
     canRequestExchange = false,
     canManageTurnAssignment = false,
     canAssignFreeTurn = false,
-    assignableVacancyShift = null,
 }) => {
-    const actions = [];
-    const turnoLibre = isTurnoLibre(shift);
-
-    const canManageAssignments = Boolean(canManageTurnAssignment || canAssignFreeTurn);
-
-    if (!shift?.solicitudPendiente) {
-        if (canManageAssignments && turnoLibre) {
-            actions.push({
-                id: "asignar-turno-libre",
-                label: "Asignar funcionario",
-                icon: "user-plus",
-                tone: "primary",
-                targetShift: shift,
-            });
-        }
-
-        if (turnoLibre) {
-            actions.push({
-                id: "solicitar-turno",
-                label: "Solicitar turno",
-                icon: "plus",
-                tone: canManageAssignments ? "ghost" : "primary",
-                targetShift: shift,
-            });
-        }
-
-        if (!turnoLibre && !canManageAssignments) {
-            actions.push({
-                id: "cambio",
-                label: canRequestExchange ? "Solicitar cambio" : "Selecciona receptor y su turno",
-                icon: "swap",
-                tone: canRequestExchange ? "primary" : "ghost",
-                disabled: !canRequestExchange,
-                targetShift: shift,
-            });
-        }
-
-        if (!turnoLibre && canManageAssignments && canRequestExchange) {
-            actions.push({
-                id: "cambio",
-                label: "Solicitar cambio",
-                icon: "swap",
-                tone: "ghost",
-                disabled: false,
-                targetShift: shift,
-            });
-        }
-    }
-
-    actions.push({
-        id: "historial",
-        label: "Ver historial",
-        icon: "history",
-        tone: "ghost",
-        targetShift: shift,
+    const actions = accionesDelTurno({
+        shift,
+        canRequestExchange,
+        canManageTurnAssignment,
+        canAssignFreeTurn,
     });
 
     return (

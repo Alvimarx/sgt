@@ -8,6 +8,9 @@ import ShiftDetail, { getTipoTurnoColor, formatShiftLabel } from '../Comun/Shift
 import AsignarTurnoLibreSheet from './AsignarTurnoLibreSheet';
 import { exportarTurnosCsv } from '../../services/exportacionService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { useLayout } from '../../layout/layout';
+import CalendarioDesktop from '../Desktop/turnos/CalendarioDesktop';
+import ExportarTurnosDesktop from '../Desktop/turnos/ExportarTurnosDesktop';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS DE PRESENTACIÓN
@@ -114,6 +117,7 @@ const CalendarView = ({
 }) => {
     const { user } = useAuth();
     const PA = SGT_DATA.PALETTE;
+    const { esDesktop } = useLayout();
 
     // Validación defensiva del id — Number(undefined) = NaN (OWASP A03)
     const myUserId = (() => {
@@ -290,6 +294,40 @@ const CalendarView = ({
         setAssignmentShift(shift);
     };
 
+    // Acciones del detalle del turno (ShiftDetail): las mismas en móvil y desktop.
+    const handleShiftAction = (actionId, shift) => {
+        if (actionId === 'historial') {
+            onOpenBitacora?.();
+            return;
+        }
+
+        if (actionId === 'editar-asignacion-turno' || actionId === 'asignar-turno-libre') {
+            openAssignShift(shift);
+            return;
+        }
+
+        if (!onOpenSolicitudes) return;
+
+        if (actionId === 'cambio') {
+            handleOpenExchangeRequest(shift);
+        }
+
+        if (actionId === 'solicitar-turno') {
+            onOpenSolicitudes?.({
+                tipoSolicitudId: 3,
+                idTurno: shift.id,
+                turnoLabel: formatShiftLabel(shift),
+            });
+        }
+    };
+
+    const handleAssigned = () => {
+        setAssignmentShift(null);
+        setDetailShift(null);
+        setSelectedDay(null);
+        setRefreshTick((v) => v + 1);
+    };
+
     const cells = useMemo(() => {
         const leading = firstDayOfMonth(viewYear, viewMonth);
         const days = daysInMonth(viewYear, viewMonth);
@@ -298,6 +336,23 @@ const CalendarView = ({
         while (arr.length % 7 !== 0) arr.push(null);
         return arr;
     }, [viewYear, viewMonth]);
+
+    const abrirExportacion = () => {
+        setExportMonthValue(`${viewYear}-${String(viewMonth).padStart(2, '0')}`);
+        setExportScope('mios');
+        setExportError('');
+        setExportSheetOpen(true);
+    };
+
+    const cerrarExportacion = () => !exporting && setExportSheetOpen(false);
+
+    // delta = -1 (mes anterior) o +1 (mes siguiente) sobre el mes a exportar.
+    const moverMesExportacion = (delta) => {
+        const [y, m] = exportMonthValue.split('-').map(Number);
+        const nm = m + delta < 1 ? 12 : m + delta > 12 ? 1 : m + delta;
+        const ny = m + delta < 1 ? y - 1 : m + delta > 12 ? y + 1 : y;
+        setExportMonthValue(`${ny}-${String(nm).padStart(2, '0')}`);
+    };
 
     const triggerExportShake = () => {
         setExportShake(true);
@@ -344,6 +399,124 @@ const CalendarView = ({
     const sheetTitle = selectedDay
         ? `${DAY_LABELS[(new Date(viewYear, viewMonth - 1, selectedDay).getDay() + 6) % 7]} ${selectedDay} ${MONTH_NAMES[viewMonth - 1].slice(0, 3)}`
         : '';
+
+    // ---------------------------------------------------------------------------
+    // MODO DESKTOP (R18): misma carga, mismos permisos y mismas acciones que el
+    // móvil; solo cambia la presentación (CalendarioDesktop).
+    // ---------------------------------------------------------------------------
+    // Día abierto en el panel del calendario desktop ('YYYY-MM-DD'). Vive aparte de
+    // selectedDay (que abre el sheet móvil) para que el panel siga en el mismo día
+    // cuando el mes se recarga tras una asignación.
+    const [diaDesktop, setDiaDesktop] = useState(null);
+    const prefijoMes = `${viewYear}-${String(viewMonth).padStart(2, '0')}-`;
+    const statsPorDia = useMemo(() => {
+        const porDia = {};
+        Object.entries(shiftsByDay).forEach(([clave, turnos]) => { porDia[clave] = getCoverageStats(turnos); });
+        return porDia;
+    }, [shiftsByDay]);
+    const resumenMes = useMemo(() => {
+        const resumen = { total: 0, asignados: 0, vacantes: 0, mios: 0 };
+        Object.entries(statsPorDia).forEach(([clave, st]) => {
+            if (!clave.startsWith(prefijoMes)) return;
+            resumen.total += st.total;
+            resumen.asignados += st.asignados;
+            resumen.vacantes += st.vacantes;
+            resumen.mios += (shiftsByDay[clave] || []).filter((t) => t.miTurno).length;
+        });
+        return resumen;
+    }, [statsPorDia, shiftsByDay, prefijoMes]);
+
+    if (esDesktop) {
+        const hoyEnMes = today.startsWith(prefijoMes);
+        const primerDiaConTurnos = Object.keys(shiftsByDay).filter((k) => k.startsWith(prefijoMes)).sort()[0];
+        const diaPanel = diaDesktop && diaDesktop.startsWith(prefijoMes)
+            ? diaDesktop
+            : hoyEnMes ? today : (primerDiaConTurnos || dateKey(viewYear, viewMonth, 1));
+        const irAHoy = () => {
+            const [anioHoy, mesHoy] = today.split('-').map(Number);
+            setViewYear(anioHoy);
+            setViewMonth(mesHoy);
+            setDiaDesktop(today);
+        };
+        const servicioNombre = localStorage.getItem('sgt_servicio_activo_nombre') || '';
+        const ayuda = canManageTurnAssignments
+            ? 'Elige un día para ver su equipo, asignar cupos libres o editar asignaciones'
+            : 'Elige un día para ver tu turno, el equipo y los cupos libres';
+
+        return (
+            <>
+                <CalendarioDesktop
+                    titulo={`${modoAsignacionAdmin ? 'Asignación de turnos' : 'Calendario'} · ${MONTH_NAMES[viewMonth - 1]} ${viewYear}`}
+                    subtitulo={[servicioNombre, ayuda].filter(Boolean).join(' · ')}
+                    resumen={resumenMes.total > 0 ? {
+                        ...resumenMes,
+                        mios: canManageTurnAssignments ? null : resumenMes.mios,
+                    } : null}
+                    anio={viewYear}
+                    mes={viewMonth}
+                    celdas={cells}
+                    hoyKey={today}
+                    diaKey={diaPanel}
+                    turnosPorDia={shiftsByDay}
+                    statsPorDia={statsPorDia}
+                    cargando={loading}
+                    error={error}
+                    puedeGestionar={canManageTurnAssignments}
+                    onMesAnterior={goToPrevMonth}
+                    onMesSiguiente={goToNextMonth}
+                    onHoy={irAHoy}
+                    esMesActual={hoyEnMes}
+                    onExportar={abrirExportacion}
+                    onSeleccionarDia={setDiaDesktop}
+                    onAbrirTurno={setDetailShift}
+                    onAsignar={(shift) => handleShiftAction('asignar-turno-libre', shift)}
+                    onSolicitar={(shift) => handleShiftAction('solicitar-turno', shift)}
+                />
+
+                <Sheet open={!!detailShift} onClose={() => setDetailShift(null)} title="Detalle del turno" anchoDesktop={520}>
+                    {detailShift && (
+                        <ShiftDetail
+                            shift={detailShift}
+                            exchangeSelection={exchangeSelection}
+                            currentUserId={myUserId}
+                            onSelectTargetFuncionario={handleSelectTargetFuncionario}
+                            canManageTurnAssignment={canManageTurnAssignments}
+                            canAssignFreeTurn={canManageTurnAssignments}
+                            onAction={handleShiftAction}
+                        />
+                    )}
+                </Sheet>
+
+                <AsignarTurnoLibreSheet
+                    open={!!assignmentShift}
+                    shift={assignmentShift}
+                    servicioId={servicioIdActivo}
+                    adminUserId={myUserId}
+                    onClose={() => setAssignmentShift(null)}
+                    onAssigned={handleAssigned}
+                />
+
+                <Sheet open={exportSheetOpen} onClose={cerrarExportacion} title="Exportar turnos CSV" anchoDesktop="md">
+                    <ExportarTurnosDesktop
+                        mesEtiqueta={`${MONTH_NAMES[Number(exportMonthValue.split('-')[1]) - 1]} ${exportMonthValue.split('-')[0]}`}
+                        onMesAnterior={() => moverMesExportacion(-1)}
+                        onMesSiguiente={() => moverMesExportacion(1)}
+                        puedeExportarServicio={puedeExportarServicioCompleto}
+                        alcance={exportScope}
+                        onAlcance={setExportScope}
+                        error={exportError}
+                        exportando={exporting}
+                        exito={exportSuccess}
+                        sacudir={exportShake}
+                        onDescargar={handleExportCsv}
+                        onCancelar={cerrarExportacion}
+                    />
+                </Sheet>
+
+                {selectionToast && <div className="sgt-dt-toast" role="status" aria-live="polite">{selectionToast}</div>}
+            </>
+        );
+    }
 
     // ---------------------------------------------------------------------------
     // RENDER
@@ -463,7 +636,7 @@ const CalendarView = ({
                     <button
                         type="button"
                         className="sgt-list-row"
-                        onClick={() => { setExportMonthValue(`${viewYear}-${String(viewMonth).padStart(2, '0')}`); setExportScope('mios'); setExportError(''); setExportSheetOpen(true); }}
+                        onClick={abrirExportacion}
                         style={{ width: '100%', border: `1px solid ${PA.line2}`, background: '#fff', color: PA.ink, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                     >
                         <SGTIcon name="download" size={15} color={PA.ink} />
@@ -506,31 +679,7 @@ const CalendarView = ({
                         onSelectTargetFuncionario={handleSelectTargetFuncionario}
                         canManageTurnAssignment={canManageTurnAssignments}
                         canAssignFreeTurn={canManageTurnAssignments}
-                        onAction={(actionId, shift) => {
-                            if (actionId === 'historial') {
-                                onOpenBitacora?.();
-                                return;
-                            }
-
-                            if (actionId === 'editar-asignacion-turno' || actionId === 'asignar-turno-libre') {
-                                openAssignShift(shift);
-                                return;
-                            }
-
-                            if (!onOpenSolicitudes) return;
-
-                            if (actionId === 'cambio') {
-                                handleOpenExchangeRequest(shift);
-                            }
-
-                            if (actionId === 'solicitar-turno') {
-                                onOpenSolicitudes?.({
-                                    tipoSolicitudId: 3,
-                                    idTurno: shift.id,
-                                    turnoLabel: formatShiftLabel(shift),
-                                });
-                            }
-                        }}
+                        onAction={handleShiftAction}
                     />
                 )}
             </Sheet>
@@ -541,12 +690,7 @@ const CalendarView = ({
                 servicioId={servicioIdActivo}
                 adminUserId={myUserId}
                 onClose={() => setAssignmentShift(null)}
-                onAssigned={() => {
-                    setAssignmentShift(null);
-                    setDetailShift(null);
-                    setSelectedDay(null);
-                    setRefreshTick((v) => v + 1);
-                }}
+                onAssigned={handleAssigned}
             />
 
             {/* Toast — fixed para funcionar dentro de cualquier contenedor */}
@@ -559,20 +703,20 @@ const CalendarView = ({
             )}
 
             {/* Sheet de exportación CSV */}
-            <Sheet open={exportSheetOpen} onClose={() => !exporting && setExportSheetOpen(false)} title="Exportar turnos CSV" maxHeight="60%">
+            <Sheet open={exportSheetOpen} onClose={cerrarExportacion} title="Exportar turnos CSV" maxHeight="60%">
                 <div className={exportShake ? 'login-shake' : ''} style={{ padding: '8px 16px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
                         <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: PA.ink2, marginBottom: 8 }}>
                             Mes a exportar
                         </label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <button type="button" aria-label="Mes anterior" onClick={() => { const [y, m] = exportMonthValue.split('-').map(Number); const nm = m - 1 < 1 ? 12 : m - 1; const ny = m - 1 < 1 ? y - 1 : y; setExportMonthValue(`${ny}-${String(nm).padStart(2,'0')}`); }} disabled={exporting} style={{ width: 36, height: 36, border: `1px solid ${PA.line2}`, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exporting ? 0.5 : 1, cursor: exporting ? 'not-allowed' : 'pointer' }}>
+                            <button type="button" aria-label="Mes anterior" onClick={() => moverMesExportacion(-1)} disabled={exporting} style={{ width: 36, height: 36, border: `1px solid ${PA.line2}`, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exporting ? 0.5 : 1, cursor: exporting ? 'not-allowed' : 'pointer' }}>
                                 <SGTIcon name="chevron-left" size={16} color={PA.ink} />
                             </button>
                             <div style={{ flex: 1, border: `1px solid ${PA.line2}`, borderRadius: 12, padding: '10px 12px', textAlign: 'center', fontSize: 14, fontWeight: 700, color: PA.ink, background: '#fff' }}>
                                 {MONTH_NAMES[Number(exportMonthValue.split('-')[1]) - 1]} {exportMonthValue.split('-')[0]}
                             </div>
-                            <button type="button" aria-label="Mes siguiente" onClick={() => { const [y, m] = exportMonthValue.split('-').map(Number); const nm = m + 1 > 12 ? 1 : m + 1; const ny = m + 1 > 12 ? y + 1 : y; setExportMonthValue(`${ny}-${String(nm).padStart(2,'0')}`); }} disabled={exporting} style={{ width: 36, height: 36, border: `1px solid ${PA.line2}`, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exporting ? 0.5 : 1, cursor: exporting ? 'not-allowed' : 'pointer' }}>
+                            <button type="button" aria-label="Mes siguiente" onClick={() => moverMesExportacion(1)} disabled={exporting} style={{ width: 36, height: 36, border: `1px solid ${PA.line2}`, background: '#fff', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: exporting ? 0.5 : 1, cursor: exporting ? 'not-allowed' : 'pointer' }}>
                                 <SGTIcon name="chevron-right" size={16} color={PA.ink} />
                             </button>
                         </div>

@@ -5,6 +5,10 @@ import { SGT_DATA } from './data';
 import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import '../Style/style.css';
+import { useLayout } from '../../layout/layout';
+import SolicitudesDesktop, { EditarMotivoDesktop } from '../Desktop/turnos/SolicitudesDesktop';
+import NuevaSolicitudDesktop from '../Desktop/turnos/NuevaSolicitudDesktop';
+import ConfirmacionDesktop from '../Desktop/turnos/ConfirmacionDesktop';
 
 const PA = SGT_DATA.PALETTE;
 
@@ -32,6 +36,15 @@ function fmtFecha(str) {
 function fmtHora(str) {
   if (!str) return '';
   return str.substring(0, 5);
+}
+
+// "2026-10-07" → "mié 7 oct 2026" (desktop: el día de la semana ayuda a ubicar el turno).
+const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+function fmtFechaConDia(str) {
+  const m = String(str || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return fmtFecha(str);
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return `${DIAS_CORTOS[d.getDay()]} ${fmtFecha(`${m[1]}-${m[2]}-${m[3]}`)}`;
 }
 
 function nombreFuncionario(f) {
@@ -78,6 +91,110 @@ function btnStyle(tone) {
   };
 }
 
+// ── Reglas compartidas por la presentación móvil y la desktop (R18) ───────────
+
+// Estado de una solicitud para quien la mira: badge y qué puede hacer con ella.
+function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo, puedeCancelar }) {
+  const tipo  = solicitud?.tipoSolicitud?.tipo;
+  const estado = solicitud?.estado;
+
+  const esBifasico = tipo === 4 || tipo === 5;
+  const esperandoReceptor = esBifasico && solicitud.aceptadoReceptor == null;
+  const receptorAcepto    = esBifasico && solicitud.aceptadoReceptor === true;
+  const receptorRechazo   = esBifasico && solicitud.aceptadoReceptor === false;
+
+  const canDecideThis = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
+  const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && estado === 'PENDIENTE';
+  const canEditMotivo = !canDecide && !esMiReceptor && estado === 'PENDIENTE' && puedeEditarMotivo;
+  // Cancelar la propia solicitud pendiente: es lo que libera el turno comprometido para
+  // poder pedir otra cosa sobre él (el backend bloquea mientras siga pendiente). El gate
+  // es por IDENTIDAD (soy el emisor), no por rol: una jefatura que emitió una solicitud
+  // no puede resolverla (segregación de funciones) pero SÍ debe poder cancelarla, o su
+  // turno quedaría comprometido hasta que otra jefatura la toque.
+  const canCancelar = Boolean(esMiSolicitud) && estado === 'PENDIENTE' && puedeCancelar;
+  // Cancelada por el propio solicitante: mismo estado RECHAZADA en la base, pero el badge
+  // no debe confundirse con un rechazo de jefatura.
+  const esCancelada = estado === 'RECHAZADA' && String(solicitud.motivo || '').startsWith('Cancelada por el solicitante');
+
+  // Badge contextual para tipos bifásicos (4 y 5)
+  let badgeLabel = esCancelada ? 'CANCELADA' : estado;
+  let badgeTone  = esCancelada ? 'neutral' : (ESTADO_TONE[estado] || 'neutral');
+  if (esBifasico && estado === 'PENDIENTE') {
+    if (esMiReceptor && esperandoReceptor) {
+      badgeLabel = 'Requiere tu respuesta';
+      badgeTone  = 'warn';
+    } else if (esMiReceptor && receptorAcepto) {
+      badgeLabel = 'Aceptada · Pend. jefatura';
+      badgeTone  = 'neutral';
+    } else if (!esMiReceptor && receptorAcepto) {
+      badgeLabel = 'Pend. jefatura';
+      badgeTone  = 'neutral';
+    }
+  }
+
+  return {
+    tipo, estado, esBifasico, esperandoReceptor, receptorAcepto, receptorRechazo,
+    canDecideThis, canRespond, canEditMotivo, canCancelar, esCancelada, badgeLabel, badgeTone,
+  };
+}
+
+// Filas de datos de una solicitud (qué se muestra y con qué etiqueta).
+function filasSolicitud(solicitud) {
+  const tipo = solicitud?.tipoSolicitud?.tipo;
+  const filas = [{ clase: 'persona', label: 'Solicitante', persona: solicitud.funcionario }];
+  if (solicitud.funcionarioReceptor) filas.push({ clase: 'persona', label: 'Receptor', persona: solicitud.funcionarioReceptor });
+  if (solicitud.turno) {
+    filas.push({
+      clase: 'turno',
+      label: tipo === 2 ? 'Turno a liberar' : tipo === 3 ? 'Turno a cubrir' : tipo === 4 ? 'Turno a recibir' : tipo === 5 ? 'Turno ofrecido' : 'Turno',
+      turno: solicitud.turno,
+    });
+  }
+  if (solicitud.turnoReceptor) filas.push({ clase: 'turno', label: 'Turno a entregar', turno: solicitud.turnoReceptor });
+  if (solicitud.fechaInicioPermiso) filas.push({ clase: 'periodo', label: 'Período', desde: solicitud.fechaInicioPermiso, hasta: solicitud.fechaTerminoPermiso });
+  return filas;
+}
+
+// Texto de una fila tal como lo muestra la tarjeta móvil.
+function valorFilaMovil(f) {
+  if (f.clase === 'persona') return nombreFuncionario(f.persona);
+  if (f.clase === 'turno') return `${fmtFecha(f.turno.diaInicioTurno)}  ${fmtHora(f.turno.horaInicio)}–${fmtHora(f.turno.horaFin)}`;
+  return `${fmtFecha(f.desde)} → ${fmtFecha(f.hasta)}`;
+}
+
+// R10 — datos del turno en disputa y postulantes por orden de llegada.
+function datosGrupoPostulacion(grupo) {
+  const turno = grupo[0]?.turno || {};
+  return {
+    turno,
+    nombreTipoTurno: turno.tipoTurno?.nombre || null,
+    posicion: turno.puesto?.nombre || null,
+    ordenadas: [...grupo].sort((a, b) => new Date(a.fechaCreacion) - new Date(b.fechaCreacion)),
+  };
+}
+
+// Estado de una oferta general para quien la mira.
+function evaluarOferta(oferta, userId, canDecide) {
+  const estado = oferta?.estado;
+  const esOfertor = String(oferta?.ofertor?.idFuncionario) === String(userId);
+  const miPostulacion = oferta?.postulaciones?.find(p => String(p.postulante?.idFuncionario) === String(userId));
+  const postulaciones = oferta?.postulaciones || [];
+  return {
+    estado,
+    esOfertor,
+    miPostulacion,
+    yaPostulado: !!miPostulacion,
+    postulaciones,
+    seleccionado: postulaciones.find(p => p.seleccionado),
+    badgeTone: estado === 'ABIERTA' ? 'success' : estado === 'PENDIENTE_APROBACION' ? 'warn' : estado === 'CERRADA' ? 'neutral' : 'accent',
+    badgeLabel: estado === 'PENDIENTE_APROBACION' ? 'Pend. apertura' : estado === 'ABIERTA' ? 'Abierta' : estado === 'CERRADA' ? 'Cerrada' : 'Rechazada',
+    puedeDecidirApertura: canDecide && estado === 'PENDIENTE_APROBACION',
+    puedeSeleccionar: canDecide && estado === 'ABIERTA',
+    puedePostularORetirar: !canDecide && !esOfertor && estado === 'ABIERTA',
+    esMiOfertaAbierta: !canDecide && esOfertor && estado === 'ABIERTA',
+  };
+}
+
 // ── SolicitudCard ─────────────────────────────────────────────────────────────
 
 // R10 — Tarjeta de POSTULACIONES AGRUPADAS: 2+ solicitudes de Cobertura PENDIENTES
@@ -85,10 +202,7 @@ function btnStyle(tone) {
 // persona. Al aprobar una, el backend rechaza automáticamente a las demás
 // (rechazarSolicitudesCompetitivas), así que aquí no hay lógica extra de limpieza.
 const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
-  const turno = grupo[0]?.turno || {};
-  const nombreTipoTurno = turno.tipoTurno?.nombre || null;
-  const posicion = turno.puesto?.nombre || null;
-  const ordenadas = [...grupo].sort((a, b) => new Date(a.fechaCreacion) - new Date(b.fechaCreacion));
+  const { turno, nombreTipoTurno, posicion, ordenadas } = datosGrupoPostulacion(grupo);
 
   return (
     <div className="sgt-list-row" style={{ background: '#fff', border: `1px solid ${PA.line}`, borderLeft: `4px solid ${TIPO_COLOR[3]}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
@@ -146,42 +260,12 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
 };
 
 const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, onCancelar, esMiReceptor, esMiSolicitud }) => {
-  const tipo  = solicitud?.tipoSolicitud?.tipo;
-  const estado = solicitud?.estado;
-
-  const esBifasico = tipo === 4 || tipo === 5;
-  const esperandoReceptor = esBifasico && solicitud.aceptadoReceptor == null;
-  const receptorAcepto    = esBifasico && solicitud.aceptadoReceptor === true;
-  const receptorRechazo   = esBifasico && solicitud.aceptadoReceptor === false;
-
-  const canDecideThis = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
-  const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && estado === 'PENDIENTE';
-  const canEditMotivo = !canDecide && !esMiReceptor && estado === 'PENDIENTE' && !!onEditMotivo;
-  // Cancelar la propia solicitud pendiente: es lo que libera el turno comprometido para
-  // poder pedir otra cosa sobre él (el backend bloquea mientras siga pendiente). El gate
-  // es por IDENTIDAD (soy el emisor), no por rol: una jefatura que emitió una solicitud
-  // no puede resolverla (segregación de funciones) pero SÍ debe poder cancelarla, o su
-  // turno quedaría comprometido hasta que otra jefatura la toque.
-  const canCancelar = Boolean(esMiSolicitud) && estado === 'PENDIENTE' && !!onCancelar;
-  // Cancelada por el propio solicitante: mismo estado RECHAZADA en la base, pero el badge
-  // no debe confundirse con un rechazo de jefatura.
-  const esCancelada = estado === 'RECHAZADA' && String(solicitud.motivo || '').startsWith('Cancelada por el solicitante');
-
-  // Badge contextual para tipos bifásicos (4 y 5)
-  let badgeLabel = esCancelada ? 'CANCELADA' : estado;
-  let badgeTone  = esCancelada ? 'neutral' : (ESTADO_TONE[estado] || 'neutral');
-  if (esBifasico && estado === 'PENDIENTE') {
-    if (esMiReceptor && esperandoReceptor) {
-      badgeLabel = 'Requiere tu respuesta';
-      badgeTone  = 'warn';
-    } else if (esMiReceptor && receptorAcepto) {
-      badgeLabel = 'Aceptada · Pend. jefatura';
-      badgeTone  = 'neutral';
-    } else if (!esMiReceptor && receptorAcepto) {
-      badgeLabel = 'Pend. jefatura';
-      badgeTone  = 'neutral';
-    }
-  }
+  const {
+    tipo, estado, esperandoReceptor, receptorRechazo,
+    canDecideThis, canRespond, canEditMotivo, canCancelar, badgeLabel, badgeTone,
+  } = evaluarSolicitud(solicitud, {
+    canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo: !!onEditMotivo, puedeCancelar: !!onCancelar,
+  });
 
   return (
     <div className="sgt-list-row" style={{ background: '#fff', border: `1px solid ${PA.line}`, borderLeft: `4px solid ${TIPO_COLOR[tipo] || PA.line}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
@@ -198,25 +282,9 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       </div>
 
       {/* Datos */}
-      <Row label="Solicitante" value={nombreFuncionario(solicitud.funcionario)} />
-      {solicitud.funcionarioReceptor && (
-        <Row label="Receptor" value={nombreFuncionario(solicitud.funcionarioReceptor)} />
-      )}
-      {solicitud.turno && (
-        <Row
-          label={tipo === 2 ? 'Turno a liberar' : tipo === 3 ? 'Turno a cubrir' : tipo === 4 ? 'Turno a recibir' : tipo === 5 ? 'Turno ofrecido' : 'Turno'}
-          value={`${fmtFecha(solicitud.turno.diaInicioTurno)}  ${fmtHora(solicitud.turno.horaInicio)}–${fmtHora(solicitud.turno.horaFin)}`}
-        />
-      )}
-      {solicitud.turnoReceptor && (
-        <Row
-          label="Turno a entregar"
-          value={`${fmtFecha(solicitud.turnoReceptor.diaInicioTurno)}  ${fmtHora(solicitud.turnoReceptor.horaInicio)}–${fmtHora(solicitud.turnoReceptor.horaFin)}`}
-        />
-      )}
-      {solicitud.fechaInicioPermiso && (
-        <Row label="Período" value={`${fmtFecha(solicitud.fechaInicioPermiso)} → ${fmtFecha(solicitud.fechaTerminoPermiso)}`} />
-      )}
+      {filasSolicitud(solicitud).map((f) => (
+        <Row key={f.label} label={f.label} value={valorFilaMovil(f)} />
+      ))}
 
       {/* Motivo */}
       <div style={{ marginTop: 8, background: PA.surface2, borderRadius: 8, padding: '8px 10px' }}>
@@ -294,12 +362,10 @@ const COLOR_OFERTA = '#E0A040';
 const COLOR_OFERTA_SOFT = '#FDF3E3';
 
 const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, onPostular, onRetirar, onSeleccionar }) => {
-  const estado = oferta?.estado;
-  const esOfertor = String(oferta?.ofertor?.idFuncionario) === String(userId);
-  const miPostulacion = oferta?.postulaciones?.find(p => String(p.postulante?.idFuncionario) === String(userId));
-  const yaPostulado = !!miPostulacion;
-  const postulaciones = oferta?.postulaciones || [];
-  const seleccionado = postulaciones.find(p => p.seleccionado);
+  const {
+    estado, miPostulacion, yaPostulado, postulaciones, seleccionado, badgeTone, badgeLabel,
+    puedeDecidirApertura, puedeSeleccionar, puedePostularORetirar, esMiOfertaAbierta,
+  } = evaluarOferta(oferta, userId, canDecide);
 
   const [confirmando, setConfirmando] = useState(null); // { idPostulacion, nombrePostulante }
 
@@ -314,8 +380,8 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
           <div style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Oferta general</div>
           <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>{fmtFecha(oferta.fechaCreacion)}</div>
         </div>
-        <SGTBadge tone={estado === 'ABIERTA' ? 'success' : estado === 'PENDIENTE_APROBACION' ? 'warn' : estado === 'CERRADA' ? 'neutral' : 'accent'} size="xs">
-          {estado === 'PENDIENTE_APROBACION' ? 'Pend. apertura' : estado === 'ABIERTA' ? 'Abierta' : estado === 'CERRADA' ? 'Cerrada' : 'Rechazada'}
+        <SGTBadge tone={badgeTone} size="xs">
+          {badgeLabel}
         </SGTBadge>
       </div>
 
@@ -333,7 +399,7 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
       </div>
 
       {/* Jefatura: aprobar/rechazar si pendiente */}
-      {canDecide && estado === 'PENDIENTE_APROBACION' && (
+      {puedeDecidirApertura && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button onClick={() => onRechazar(oferta.idOfertaGeneral)} style={btnStyle('danger')}>
             <SGTIcon name="close" size={13} color="#fff" /> Rechazar
@@ -345,7 +411,7 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
       )}
 
       {/* Jefatura: lista de postulantes si abierta */}
-      {canDecide && estado === 'ABIERTA' && (
+      {puedeSeleccionar && (
         <div style={{ marginTop: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>
             Postulantes ({postulaciones.length})
@@ -368,7 +434,7 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
       )}
 
       {/* Médico: postular / retirar */}
-      {!canDecide && !esOfertor && estado === 'ABIERTA' && (
+      {puedePostularORetirar && (
         <div style={{ marginTop: 12 }}>
           {!yaPostulado ? (
             <button onClick={() => onPostular(oferta.idOfertaGeneral)} style={{ ...btnStyle('primary'), width: '100%' }}>
@@ -386,7 +452,7 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
       )}
 
       {/* Médico ofertor: indicar que está en proceso */}
-      {!canDecide && esOfertor && estado === 'ABIERTA' && (
+      {esMiOfertaAbierta && (
         <div style={{ marginTop: 8, padding: '6px 10px', background: COLOR_OFERTA_SOFT, borderRadius: 8, fontSize: 12, color: COLOR_OFERTA, fontWeight: 700 }}>
           Tu oferta está abierta · {postulaciones.length} postulante{postulaciones.length !== 1 ? 's' : ''}
         </div>
@@ -423,6 +489,7 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
 // ── CrearSolicitudSheet ───────────────────────────────────────────────────────
 
 const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, initialPreset }) => {
+  const { esDesktop } = useLayout();
   const [step, setStep]         = useState(1); // 1=tipo, 2=form, 3=picker
   const [tipoSel, setTipoSel]   = useState(null);
   const [form, setForm]         = useState({});
@@ -609,6 +676,97 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
   const lbl = { fontSize: 12, fontWeight: 800, color: PA.ink3, display: 'block', marginBottom: 4 };
   const inp = { width: '100%', padding: '12px 14px', borderRadius: 10, border: `1px solid ${PA.line}`, fontSize: 14, color: PA.ink, fontWeight: 600, background: '#fff', outline: 'none', boxSizing: 'border-box' };
   const canSubmit = !loading;
+
+  // Rama desktop (R18): mismo estado, mismos pickers y mismo envío; el panel
+  // lateral muestra el paso 2 como formulario y las fechas como campos de fecha
+  // con los mismos límites del selector móvil (desde hoy, o desde el inicio
+  // para el término, hasta fin del año siguiente).
+  if (esDesktop) {
+    const hoy = new Date();
+    const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
+    const fechaMaxima = `${hoy.getFullYear() + 1}-12-31`;
+    const fechaValida = (valor, minimo) => /^\d{4}-\d{2}-\d{2}$/.test(valor) && valor >= minimo && valor <= fechaMaxima;
+    const minimoTermino = form.fechaInicio || hoyStr;
+    const selector = (pkey, etiqueta, valor, placeholder, extra = {}) => ({
+      clave: pkey, etiqueta, tipo: 'selector', valor, placeholder, onAbrir: () => openPicker(pkey), ...extra,
+    });
+
+    const campos = [];
+    if (tipoSel === 1) {
+      // La ayuda repite la fecha elegida en palabras: el formato del campo depende
+      // del idioma del navegador.
+      campos.push({
+        clave: 'fechaInicio', etiqueta: 'Fecha inicio *', tipo: 'fecha', valor: form.fechaInicio, min: hoyStr, max: fechaMaxima,
+        ayuda: form.fechaInicio ? fmtFechaConDia(form.fechaInicio) : 'Desde hoy.',
+        onFecha: (v) => { if (fechaValida(v, hoyStr)) PICKERS.fechaInicio.onSel(v); },
+      });
+      campos.push({
+        clave: 'fechaFin', etiqueta: 'Fecha término *', tipo: 'fecha', valor: form.fechaFin, min: minimoTermino, max: fechaMaxima,
+        ayuda: form.fechaFin ? fmtFechaConDia(form.fechaFin) : form.fechaInicio ? 'Igual o posterior a la fecha de inicio.' : 'Desde hoy.',
+        onFecha: (v) => { if (fechaValida(v, minimoTermino)) PICKERS.fechaFin.onSel(v); },
+      });
+    }
+    if (tipoSel === 2) campos.push(selector('turnoBotar', 'Turno a liberar *', turnoLabel(misTurnos, form.idTurno, form.turnoLabel), 'Seleccionar turno'));
+    if (tipoSel === 3) campos.push(selector('turnoCobertura', 'Turno a cubrir *', turnoLabel(turnosLibres, form.idTurno, form.turnoLabel), 'Seleccionar turno disponible'));
+    if (tipoSel === 4) {
+      campos.push(selector('turnoPropio', 'Tu turno a entregar *', turnoLabel(misTurnos, form.idTurnoPropio, form.turnoPropioLabel), 'Seleccionar tu turno'));
+      campos.push(selector('receptor', 'Con quién intercambiar *', funcLabel(form.idReceptor, form.receptorLabel), 'Seleccionar funcionario'));
+      if (form.idReceptor) {
+        campos.push(selector('turnoDeseado', 'Turno del receptor que quieres *', turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel), 'Seleccionar turno', {
+          nota: form.idTurnoPropio && turnosReceptor.length === 0 && !loadingReceptor
+            ? 'No hay turnos intercambiables con el que elegiste: el turno que entregas ya empezó o está comprometido en otra solicitud tuya, esa persona no tiene turnos futuros de este servicio, o el canje dejaría turnos incompatibles.'
+            : null,
+        }));
+      }
+    }
+    if (tipoSel === 5) {
+      campos.push(selector('turnoOferta', 'Tu turno a ofrecer *', turnoLabel(misTurnos, form.idTurno, form.turnoLabel), 'Seleccionar tu turno'));
+      campos.push(selector('receptorOferta', 'Ofrecer a *', funcLabel(form.idReceptor, form.receptorLabel), 'Seleccionar funcionario'));
+    }
+    if (tipoSel === 6) campos.push(selector('turnoOfertaGeneral', 'Tu turno a ofrecer *', turnoLabel(misTurnos, form.idTurno, form.turnoLabel), 'Seleccionar tu turno'));
+
+    const pickerLista = step === 3 && activePicker && !activePicker.isDatePicker ? activePicker : null;
+    const esListaDePersonas = pickerLista?.row === funcRow;
+    const picker = pickerLista ? {
+      clave: pickerKey,
+      cargando: loadingData || (pickerKey === 'turnoDeseado' && loadingReceptor),
+      placeholderBusqueda: esListaDePersonas ? 'Buscar por nombre o RUT…' : 'Buscar por fecha, horario o tipo…',
+      items: pickerLista.items.map((item) => ({
+        clave: pickerLista.keyFn(item),
+        item,
+        principal: esListaDePersonas
+          ? [item.nombre, item.apellidoPaterno, item.apellidoMaterno].filter(Boolean).join(' ')
+          : fmtFechaConDia(item.diaInicioTurno),
+        secundario: esListaDePersonas
+          ? (item.rutCompleto || item.rut)
+          : `${fmtHora(item.horaInicio)}–${fmtHora(item.horaFin)}${item.nombre ? ` · ${item.nombre}` : ''}`,
+      })),
+      onElegir: (item) => { pickerLista.onSel(item); setStep(2); setPickerKey(null); },
+      onVolver: () => { setStep(2); setPickerKey(null); },
+    } : null;
+    const tipoActual = tipos.find((t) => t.id === tipoSel);
+
+    return (
+      <Sheet open={open} onClose={handleClose} title={sheetTitle} anchoDesktop="lg">
+        <NuevaSolicitudDesktop
+          paso={step === 3 && !picker ? 2 : step}
+          tipos={tipos.map((t) => ({ ...t, color: t.id === 6 ? COLOR_OFERTA : (TIPO_COLOR[t.id] || PA.primary), colorSuave: t.id === 6 ? COLOR_OFERTA_SOFT : PA.primarySoft }))}
+          onElegirTipo={(id) => { setTipoSel(id); setStep(2); }}
+          tipoEtiqueta={tipoActual?.label || TIPO_LABEL[tipoSel] || 'Tipo'}
+          onVolverATipos={() => { setStep(1); setForm({}); setError(null); }}
+          campos={campos}
+          cargandoOpciones={loadingData}
+          motivo={form.motivo || ''}
+          onMotivo={(v) => setForm(f => ({ ...f, motivo: v }))}
+          error={error}
+          enviando={loading}
+          onEnviar={handleSubmit}
+          onCancelar={handleClose}
+          picker={picker}
+        />
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet open={open} onClose={handleClose} title={sheetTitle} maxHeight="90%">
@@ -808,6 +966,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
 // ── EditMotivoSheet ───────────────────────────────────────────────────────────
 
 const EditMotivoSheet = ({ solicitud, onClose, onSaved }) => {
+  const { esDesktop } = useLayout();
   const [motivo, setMotivo]   = useState(solicitud?.motivo || '');
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState(null);
@@ -827,6 +986,22 @@ const EditMotivoSheet = ({ solicitud, onClose, onSaved }) => {
 
   const canSave = !!motivo.trim() && !saving;
 
+  if (esDesktop) {
+    return (
+      <Sheet open={!!solicitud} onClose={onClose} title="Modificar motivo" anchoDesktop="md">
+        <EditarMotivoDesktop
+          motivo={motivo}
+          onMotivo={setMotivo}
+          error={error}
+          guardando={saving}
+          puedeGuardar={canSave}
+          onGuardar={handleSave}
+          onCancelar={onClose}
+        />
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet open={!!solicitud} onClose={onClose} title="Modificar motivo">
       <div style={{ padding: '8px 16px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -844,6 +1019,7 @@ const EditMotivoSheet = ({ solicitud, onClose, onSaved }) => {
 
 const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePresetConsumed }) => {
   const { user } = useAuth();
+  const { esDesktop } = useLayout();
   const isMedico  = user?.rol === 'MEDICO';
   const canDecide = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
 
@@ -862,6 +1038,12 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const [crearPreset, setCrearPreset] = useState(null);
   const [sortBy, setSortBy]     = useState('reciente');
   const [showSort, setShowSort] = useState(false);
+  // Solo presentación desktop (R18): ítem abierto en el detalle, búsqueda y
+  // filtro por tipo de la barra, y la oferta cuya selección se está confirmando.
+  const [seleccionDesktop, setSeleccionDesktop] = useState(null);
+  const [busquedaDesktop, setBusquedaDesktop] = useState('');
+  const [tipoDesktop, setTipoDesktop] = useState('todos');
+  const [ofertaPorConfirmar, setOfertaPorConfirmar] = useState(null);
 
   useEffect(() => {
     if (!initialCreatePreset) return;
@@ -1049,6 +1231,271 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         { id: 'historial',  label: 'Historial',       badge: null },
         { id: 'ofertas',    label: 'Ofertas generales', badge: ofertasPendientes || null },
       ];
+
+  if (esDesktop) {
+    const userId = user?.id;
+    const TONO = { warn: 'aviso', success: 'exito', accent: 'alerta', neutral: 'neutral', primary: 'primario' };
+    const normalizar = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const q = normalizar(busquedaDesktop.trim());
+    const coincide = (...textos) => !q || textos.some((t) => normalizar(t).includes(q));
+    const pasaTipo = (tipo) => tipoDesktop === 'todos' || String(tipo) === tipoDesktop;
+    const turnoTexto = (t) => (t ? `${fmtFechaConDia(t.diaInicioTurno)} · ${fmtHora(t.horaInicio)}–${fmtHora(t.horaFin)}` : '');
+    const conTu = (persona) => `${nombreFuncionario(persona)}${persona && String(persona.idFuncionario) === String(userId) ? ' (tú)' : ''}`;
+    const valorFila = (f) => {
+      if (f.clase === 'persona') return conTu(f.persona);
+      if (f.clase === 'turno') return `${turnoTexto(f.turno)}${f.turno.puesto?.nombre ? ` · ${f.turno.puesto.nombre}` : ''}`;
+      return `${fmtFecha(f.desde)} → ${fmtFecha(f.hasta)}`;
+    };
+
+    const itemSolicitud = (sol) => {
+      const esMiReceptor = String(sol.funcionarioReceptor?.idFuncionario) === String(userId);
+      const esMiSolicitud = String(sol.funcionario?.idFuncionario) === String(userId);
+      const ev = evaluarSolicitud(sol, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo: isMedico, puedeCancelar: true });
+      // Segregación de funciones: el backend (SolicitudService.cambiarEstado) no deja
+      // resolver una solicitud a quien participa en ella. En vez de ofrecer Aprobar /
+      // Rechazar (que fallarían), se explica a quién le corresponde.
+      const participa = canDecide && (esMiSolicitud || esMiReceptor);
+      const acciones = [];
+      if (ev.canDecideThis && !participa) {
+        acciones.push({ clave: 'rechazar', etiqueta: 'Rechazar', variante: 'peligro', icono: 'close', onClick: () => handleRechazar(sol.idSolicitud) });
+        acciones.push({ clave: 'aprobar', etiqueta: 'Aprobar', variante: 'exito', icono: 'check', onClick: () => handleAprobar(sol.idSolicitud) });
+      }
+      if (ev.canRespond && ev.tipo === 4) {
+        acciones.push({ clave: 'rechazar-int', etiqueta: 'Rechazar', variante: 'peligro', icono: 'close', onClick: () => handleResponder(sol.idSolicitud, false) });
+        acciones.push({ clave: 'aceptar-int', etiqueta: 'Aceptar', variante: 'exito', icono: 'check', onClick: () => handleResponder(sol.idSolicitud, true) });
+      }
+      if (ev.canRespond && ev.tipo === 5) {
+        acciones.push({ clave: 'rechazar-of', etiqueta: 'Rechazar', variante: 'peligro', icono: 'close', onClick: () => handleResponderOfertaParticular(sol.idSolicitud, false) });
+        acciones.push({ clave: 'aceptar-of', etiqueta: 'Aceptar', variante: 'exito', icono: 'check', onClick: () => handleResponderOfertaParticular(sol.idSolicitud, true) });
+      }
+      if (ev.canCancelar) acciones.push({ clave: 'cancelar', etiqueta: 'Cancelar solicitud', variante: 'peligro', icono: 'close', izquierda: true, onClick: () => handleCancelar(sol) });
+      if (ev.canEditMotivo) acciones.push({ clave: 'motivo', etiqueta: 'Modificar motivo', variante: 'secundario', icono: 'sliders', onClick: () => setEditSolicitud(sol) });
+
+      const notas = [];
+      if (ev.esperandoReceptor && ev.estado === 'PENDIENTE' && !esMiReceptor) {
+        notas.push({ clave: 'espera', tono: 'aviso', texto: `⏳ Esperando respuesta del receptor${sol.funcionarioReceptor ? ` (${nombreFuncionario(sol.funcionarioReceptor)})` : ''}` });
+      }
+      if (ev.receptorRechazo) notas.push({ clave: 'rechazo', tono: 'alerta', texto: '✕ Receptor rechazó el intercambio' });
+      if (ev.canDecideThis && participa) {
+        notas.push({ clave: 'segregacion', texto: 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.' });
+      }
+
+      const turnoPrincipal = sol.turno ? turnoTexto(sol.turno) : sol.fechaInicioPermiso ? `${fmtFecha(sol.fechaInicioPermiso)} → ${fmtFecha(sol.fechaTerminoPermiso)}` : '';
+      return {
+        key: `sol-${sol.idSolicitud}`,
+        color: TIPO_COLOR[ev.tipo] || PA.line,
+        colorSuave: PA.primarySoft,
+        colorTinta: PA.primary,
+        icono: TIPO_ICON[ev.tipo] || 'alert',
+        titulo: tipoLabel(sol),
+        fecha: fmtFecha(sol.fechaCreacion),
+        subtitulo: `Creada el ${fmtFecha(sol.fechaCreacion)}`,
+        chip: { texto: ev.badgeLabel, tono: TONO[ev.badgeTone] || 'neutral' },
+        linea1: sol.funcionarioReceptor ? `${conTu(sol.funcionario)} → ${conTu(sol.funcionarioReceptor)}` : conTu(sol.funcionario),
+        linea2: turnoPrincipal,
+        filas: filasSolicitud(sol).map((f) => ({ etiqueta: f.label, valor: valorFila(f) })),
+        motivo: sol.motivo || '',
+        notas,
+        acciones,
+      };
+    };
+
+    const itemGrupo = (grupo) => {
+      const { turno, nombreTipoTurno, posicion, ordenadas } = datosGrupoPostulacion(grupo);
+      return {
+        key: `grupo-turno-${turno.idTurno}`,
+        color: TIPO_COLOR[3],
+        colorSuave: PA.primarySoft,
+        colorTinta: PA.primary,
+        icono: 'users',
+        titulo: 'Postulaciones al mismo turno',
+        subtitulo: 'Cobertura · elige a una persona',
+        chip: { texto: `${grupo.length} postulantes`, tono: 'aviso' },
+        linea1: ordenadas.map((sol) => nombreFuncionario(sol.funcionario)).join(', '),
+        linea2: `${turnoTexto(turno)}${posicion ? ` · ${posicion}` : ''}`,
+        filas: [
+          { etiqueta: 'Turno a cubrir', valor: `${turnoTexto(turno)}${nombreTipoTurno ? ` · ${nombreTipoTurno}` : ''}` },
+          ...(posicion ? [{ etiqueta: 'Posición', valor: posicion }] : []),
+        ],
+        postulantesTitulo: `Postulantes · ${grupo.length}`,
+        postulantes: ordenadas.map((sol) => {
+          const nombre = nombreFuncionario(sol.funcionario);
+          return {
+            clave: sol.idSolicitud,
+            nombre,
+            detalle: `Postuló el ${fmtFecha(sol.fechaCreacion)}`,
+            motivo: sol.motivo,
+            acciones: [
+              { clave: 'rechazar', etiqueta: 'Rechazar', variante: 'peligro', tamano: 'sm', icono: 'close', ariaLabel: `Rechazar a ${nombre}`, onClick: () => handleRechazar(sol.idSolicitud) },
+              { clave: 'elegir', etiqueta: 'Elegir', variante: 'exito', tamano: 'sm', icono: 'check', ariaLabel: `Elegir a ${nombre}`, onClick: () => handleAprobar(sol.idSolicitud) },
+            ],
+          };
+        }),
+        pie: 'Al elegir a una persona, las demás postulaciones de este turno se rechazan automáticamente.',
+      };
+    };
+
+    const itemOferta = (oferta) => {
+      const ev = evaluarOferta(oferta, userId, canDecide);
+      const acciones = [];
+      if (ev.puedeDecidirApertura) {
+        acciones.push({ clave: 'rechazar', etiqueta: 'Rechazar', variante: 'peligro', icono: 'close', onClick: () => handleOfertaRechazar(oferta.idOfertaGeneral) });
+        acciones.push({ clave: 'aprobar', etiqueta: 'Aprobar', variante: 'exito', icono: 'check', onClick: () => handleOfertaAprobar(oferta.idOfertaGeneral) });
+      }
+      if (ev.puedePostularORetirar && !ev.yaPostulado) {
+        acciones.push({ clave: 'postular', etiqueta: 'Postular', variante: 'primario', icono: 'hand-raised', onClick: () => handlePostular(oferta.idOfertaGeneral) });
+      }
+      if (ev.puedePostularORetirar && ev.yaPostulado) {
+        acciones.push({ clave: 'retirar', etiqueta: 'Retirar', variante: 'peligro', icono: 'close', onClick: () => handleRetirar(oferta.idOfertaGeneral, ev.miPostulacion.idPostulacion) });
+      }
+      const notas = [];
+      if (ev.puedePostularORetirar && ev.yaPostulado) notas.push({ clave: 'postulado', tono: 'exito', texto: 'Postulado' });
+      if (ev.esMiOfertaAbierta) {
+        notas.push({ clave: 'mia', tono: 'aviso', texto: `Tu oferta está abierta · ${ev.postulaciones.length} postulante${ev.postulaciones.length !== 1 ? 's' : ''}` });
+      }
+      const filas = [{ etiqueta: 'Ofertor', valor: conTu(oferta.ofertor) }];
+      if (oferta.turno) filas.push({ etiqueta: 'Turno ofertado', valor: `${turnoTexto(oferta.turno)}${oferta.turno.puesto?.nombre ? ` · ${oferta.turno.puesto.nombre}` : ''}` });
+      if (ev.estado === 'CERRADA' && ev.seleccionado) filas.push({ etiqueta: 'Asignado a', valor: nombreFuncionario(ev.seleccionado.postulante) });
+
+      return {
+        key: `oferta-${oferta.idOfertaGeneral}`,
+        color: COLOR_OFERTA,
+        colorSuave: COLOR_OFERTA_SOFT,
+        colorTinta: '#996520',
+        icono: 'hand-raised',
+        titulo: 'Oferta general',
+        fecha: fmtFecha(oferta.fechaCreacion),
+        subtitulo: `Publicada el ${fmtFecha(oferta.fechaCreacion)}`,
+        chip: { texto: ev.badgeLabel, tono: TONO[ev.badgeTone] || 'neutral' },
+        linea1: conTu(oferta.ofertor),
+        linea2: `${turnoTexto(oferta.turno)}${ev.estado === 'ABIERTA' ? ` · ${ev.postulaciones.length} postulante${ev.postulaciones.length !== 1 ? 's' : ''}` : ''}`,
+        filas,
+        motivo: oferta.motivo || '',
+        notas,
+        acciones,
+        ...(ev.puedeSeleccionar ? {
+          postulantesTitulo: `Postulantes (${ev.postulaciones.length})`,
+          postulantes: ev.postulaciones.map((p) => {
+            const nombre = nombreFuncionario(p.postulante);
+            return {
+              clave: p.idPostulacion,
+              nombre,
+              acciones: [{
+                clave: 'seleccionar', etiqueta: 'Seleccionar', variante: 'primario', tamano: 'sm', ariaLabel: `Seleccionar a ${nombre}`,
+                onClick: () => setOfertaPorConfirmar({ oferta, idPostulacion: p.idPostulacion, nombrePostulante: nombre }),
+              }],
+            };
+          }),
+        } : {}),
+      };
+    };
+
+    const esOfertas = tab === 'ofertas';
+    const items = esOfertas
+      ? ofertas
+        .filter((o) => coincide(nombreFuncionario(o.ofertor), o.motivo, ...(o.postulaciones || []).map((p) => nombreFuncionario(p.postulante))))
+        .map(itemOferta)
+      : [
+        ...gruposPostulacion
+          .filter((g) => pasaTipo(3) && g.some((sol) => coincide(nombreFuncionario(sol.funcionario), sol.motivo)))
+          .map(itemGrupo),
+        ...listaSinAgrupar
+          .filter((sol) => pasaTipo(sol.tipoSolicitud?.tipo) && coincide(nombreFuncionario(sol.funcionario), nombreFuncionario(sol.funcionarioReceptor), sol.motivo))
+          .map(itemSolicitud),
+      ];
+    const hayFiltros = Boolean(q) || (!esOfertas && tipoDesktop !== 'todos');
+    // Un grupo R10 cuenta todas sus postulaciones, para que cuadre con el contador de la pestaña.
+    const totalLista = esOfertas
+      ? items.length
+      : items.reduce((n, it) => n + (it.postulantes && it.key.startsWith('grupo-') ? it.postulantes.length : 1), 0);
+    const resumenLista = esOfertas
+      ? `${totalLista} ${totalLista === 1 ? 'oferta' : 'ofertas'}`
+      : `${totalLista} ${totalLista === 1 ? 'solicitud' : 'solicitudes'}`;
+    const etiquetaPestana = TABS.find((t) => t.id === tab)?.label || 'Solicitudes';
+    const subtitulo = isMedico
+      ? [servicioNombre, 'Tus solicitudes, las que te enviaron y las ofertas del servicio'].filter(Boolean).join(' · ')
+      : [servicioNombre, `${pendienteCount} ${pendienteCount === 1 ? 'pendiente' : 'pendientes'}`, ofertasPendientes ? `${ofertasPendientes} ${ofertasPendientes === 1 ? 'oferta por abrir' : 'ofertas por abrir'}` : null].filter(Boolean).join(' · ');
+    const confirmarOferta = ofertaPorConfirmar;
+
+    return (
+      <>
+        <SolicitudesDesktop
+          titulo="Solicitudes"
+          subtitulo={subtitulo}
+          onNueva={() => setShowCrear(true)}
+          pestanas={TABS.map((t) => ({ id: t.id, etiqueta: t.label, conteo: t.badge > 0 ? t.badge : undefined }))}
+          pestana={tab}
+          onPestana={setTab}
+          busqueda={busquedaDesktop}
+          onBusqueda={setBusquedaDesktop}
+          placeholderBusqueda={esOfertas ? 'Buscar ofertor o postulante…' : 'Buscar por nombre o motivo…'}
+          tipos={esOfertas ? null : [{ id: 'todos', etiqueta: 'Todos los tipos' }, ...Object.entries(TIPO_LABEL).map(([id, etiqueta]) => ({ id, etiqueta }))]}
+          tipo={tipoDesktop}
+          onTipo={setTipoDesktop}
+          ordenes={esOfertas ? null : SORT_OPTIONS}
+          orden={sortBy}
+          onOrden={setSortBy}
+          cargando={loading}
+          error={error}
+          tituloLista={etiquetaPestana}
+          subtituloLista={esOfertas && servicioNombre ? `Turnos ofertados en ${servicioNombre} · ${resumenLista}` : resumenLista}
+          items={items}
+          seleccion={seleccionDesktop}
+          onSeleccionar={setSeleccionDesktop}
+          vacio={esOfertas
+            ? { titulo: 'Sin ofertas', texto: 'No hay ofertas generales en este servicio.' }
+            : { titulo: 'Sin solicitudes', texto: 'No hay solicitudes aquí por el momento.' }}
+          hayFiltros={hayFiltros}
+          onLimpiarFiltros={() => { setBusquedaDesktop(''); setTipoDesktop('todos'); }}
+        />
+
+        <CrearSolicitudSheet
+          open={showCrear}
+          onClose={handleCloseCrear}
+          userId={user?.id}
+          servicioId={user?.servicioId}
+          onCreated={load}
+          initialPreset={crearPreset}
+        />
+
+        <EditMotivoSheet
+          solicitud={editSolicitud}
+          onClose={() => setEditSolicitud(null)}
+          onSaved={load}
+        />
+
+        {cancelando && (
+          <ConfirmacionDesktop
+            titulo="Cancelar solicitud"
+            tono="peligro"
+            etiquetaCancelar="Volver"
+            etiquetaConfirmar="Cancelar solicitud"
+            onCancelar={() => setCancelando(null)}
+            onConfirmar={confirmarCancelacion}
+          >
+            Se cancelará tu solicitud de <strong>{tipoLabel(cancelando)}</strong>.
+            {cancelando.turno ? ' El turno involucrado queda libre para que pidas otra cosa sobre él.' : ''}
+          </ConfirmacionDesktop>
+        )}
+
+        {confirmarOferta && (
+          <ConfirmacionDesktop
+            titulo="Confirmar selección"
+            onCancelar={() => setOfertaPorConfirmar(null)}
+            onConfirmar={() => { handleSeleccionar(confirmarOferta.oferta.idOfertaGeneral, confirmarOferta.idPostulacion); setOfertaPorConfirmar(null); }}
+          >
+            Se asignará el turno de <strong>{nombreFuncionario(confirmarOferta.oferta.ofertor)}</strong> a <strong>{confirmarOferta.nombrePostulante}</strong>.
+            {confirmarOferta.oferta.turno && (
+              <div className="sgt-dt-motivo" style={{ marginTop: 10 }}>
+                <div className="sgt-d-seccion-titulo" style={{ margin: '0 0 2px' }}>Turno</div>
+                <div className="sgt-dt-motivo__texto">{turnoTexto(confirmarOferta.oferta.turno)}</div>
+              </div>
+            )}
+          </ConfirmacionDesktop>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease' }}>

@@ -1,8 +1,10 @@
 // NotificationView.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNotifications } from "../../context/NotificationContext";
 import { SGTBadge, SGTIcon, TopHeader } from "../Style/UIPrimitives";
 import { SGT_DATA } from "../Admin2/data";
+import { useLayout } from "../../layout/layout";
+import NotificacionesDesktop from "../Desktop/turnos/NotificacionesDesktop";
 
 const P = () => SGT_DATA.PALETTE;
 
@@ -111,13 +113,58 @@ const NotificationCard = ({ notification, onMarkAsRead, onDelete }) => {
 
 const NotificationView = ({ onBack }) => {
   const { notifications, unreadCount, refresh, markAsRead, deleteNotification } = useNotifications();
+  const { esDesktop } = useLayout();
+  // Solo presentación desktop (R18): primera carga en curso y filtro de la bandeja.
+  const [cargando, setCargando] = useState(true);
+  const [filtroDesktop, setFiltroDesktop] = useState("todas");
 
   useEffect(() => {
-    refresh();
+    let vigente = true;
+    Promise.resolve(refresh()).finally(() => { if (vigente) setCargando(false); });
+    return () => { vigente = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const unreadItems = notifications.filter((notification) => !notification.isRead);
+
+  if (esDesktop) {
+    // Los contadores salen de la misma lista que se muestra, para que la página
+    // no contradiga las marcas "Nueva" de cada fila.
+    const noLeidas = unreadItems.length;
+    const leidas = notifications.length - noLeidas;
+    const TONO = { accent: "alerta", success: "exito", warn: "aviso", neutral: "neutral" };
+    const visibles = notifications.filter((n) =>
+      filtroDesktop === "sin-leer" ? !n.isRead : filtroDesktop === "leidas" ? n.isRead : true
+    );
+    return (
+      <NotificacionesDesktop
+        subtitulo={notifications.length === 0
+          ? "Todo al día"
+          : `${noLeidas > 0 ? `${noLeidas} sin leer` : "Todo al día"} · ${notifications.length} ${notifications.length === 1 ? "recibida" : "recibidas"}`}
+        filtros={[
+          { id: "todas", etiqueta: "Todas", conteo: notifications.length },
+          { id: "sin-leer", etiqueta: "Sin leer", conteo: noLeidas },
+          { id: "leidas", etiqueta: "Leídas", conteo: leidas },
+        ]}
+        filtro={filtroDesktop}
+        onFiltro={setFiltroDesktop}
+        cargando={cargando}
+        items={visibles.map((n) => ({
+          id: n.id,
+          titulo: n.titulo || "Notificación",
+          texto: n.texto,
+          fecha: n.fecha || "Fecha no disponible",
+          noLeida: n.isRead !== true,
+          chip: { texto: n.isRead !== true ? "Nueva" : "Leída", tono: TONO[toneForNotification(n)] || "neutral" },
+        }))}
+        vacio={notifications.length === 0
+          ? { titulo: "Sin notificaciones", texto: "No tienes notificaciones en este momento." }
+          : { titulo: filtroDesktop === "sin-leer" ? "Nada sin leer" : "Sin notificaciones leídas", texto: "Cambia el filtro para ver el resto de la bandeja." }}
+        onMarcarLeida={markAsRead}
+        onEliminar={deleteNotification}
+      />
+    );
+  }
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: P().surface2 }}>

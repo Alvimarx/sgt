@@ -4,6 +4,9 @@ import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { asignarTurnoLibre, reasignarTurno, desasignarTurno } from '../../services/turnosService';
 import { formatShiftLabel } from './ShiftDetail';
+import { useLayout } from '../../layout/layout';
+import AsignacionTurnoDesktop from '../Desktop/turnos/AsignacionTurnoDesktop';
+import ConfirmacionDesktop from '../Desktop/turnos/ConfirmacionDesktop';
 
 const MAX_SEARCH_LENGTH = 60;
 
@@ -40,14 +43,8 @@ const normalizeFuncionario = (user) => {
   };
 };
 
-const ConfirmDialog = ({
-  tipoAccion,
-  funcionario,
-  shift,
-  onConfirm,
-  onCancel,
-  guardando,
-}) => {
+// Textos de la confirmación (asignar, reasignar o quitar): los mismos en móvil y desktop.
+const textosConfirmacion = (tipoAccion, funcionario, shift) => {
   const PA = SGT_DATA.PALETTE;
 
   const textos = {
@@ -89,7 +86,19 @@ const ConfirmDialog = ({
     },
   };
 
-  const config = textos[tipoAccion] || textos.ASIGNAR;
+  return textos[tipoAccion] || textos.ASIGNAR;
+};
+
+const ConfirmDialog = ({
+  tipoAccion,
+  funcionario,
+  shift,
+  onConfirm,
+  onCancel,
+  guardando,
+}) => {
+  const PA = SGT_DATA.PALETTE;
+  const config = textosConfirmacion(tipoAccion, funcionario, shift);
 
   return (
     <div
@@ -195,6 +204,7 @@ const AsignarTurnoLibreSheet = ({
   onAssigned,
 }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
 
   const [funcionarios, setFuncionarios] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -330,6 +340,87 @@ const AsignarTurnoLibreSheet = ({
     if (!turnoAsignado) return;
     setConfirmingAction('DESASIGNAR');
   };
+
+  // Desktop: el panel puede quedar sobre el "Detalle del turno" (otro panel
+  // lateral). Escape cierra solo este panel (y, si hay una confirmación abierta,
+  // solo la confirmación): se escucha en captura y no se propaga a los paneles
+  // de abajo. Mientras guarda, no cierra nada (igual que el botón Cancelar).
+  const cerrarRef = React.useRef({ saving, onClose });
+  cerrarRef.current = { saving, onClose };
+  useEffect(() => {
+    if (!esDesktop || !open || confirmingAction) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (!cerrarRef.current.saving) cerrarRef.current.onClose?.();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [esDesktop, open, confirmingAction]);
+
+  if (esDesktop) {
+    const confirmacion = confirmingAction && (confirmingAction === 'DESASIGNAR' || seleccionado)
+      ? textosConfirmacion(confirmingAction, seleccionado, shift)
+      : null;
+
+    return (
+      <>
+        <Sheet
+          open={open}
+          onClose={() => {
+            if (!saving) onClose?.();
+          }}
+          title={tituloSheet}
+          anchoDesktop={560}
+        >
+          {!shift ? null : (
+            <AsignacionTurnoDesktop
+              turnoLibre={turnoLibre}
+              etiquetaTurno={formatShiftLabel(shift)}
+              turno={{
+                fecha: shift.fecha || shift.raw?.diaInicioTurno || null,
+                tipo: shift.tipo,
+                puesto: shift.nombrePuesto || null,
+              }}
+              funcionarioActual={turnoAsignado ? (shift.nombreFuncionario || 'Sin nombre') : null}
+              etiquetaBusqueda={turnoAsignado ? 'Buscar nuevo funcionario' : 'Buscar funcionario'}
+              query={query}
+              onQuery={handleSearchChange}
+              maxLength={MAX_SEARCH_LENGTH}
+              cargando={loading}
+              guardando={saving}
+              error={error}
+              resultados={funcionariosFiltrados}
+              seleccionadoId={selectedId}
+              onSeleccionar={(id) => setSelectedId(String(id) === String(selectedId) ? null : id)}
+              motivo={motivo}
+              onMotivo={(valor) => setMotivo(valor.slice(0, 180))}
+              puedeQuitar={turnoAsignado}
+              onQuitar={abrirConfirmacionDesasignar}
+              textoPrincipal={saving ? 'Guardando...' : textoBotonPrincipal}
+              puedeConfirmar={!saving && Boolean(seleccionado)}
+              onConfirmar={abrirConfirmacionAsignacion}
+              onCancelar={onClose}
+            />
+          )}
+        </Sheet>
+
+        {open && shift && confirmacion && (
+          <ConfirmacionDesktop
+            titulo={confirmacion.titulo}
+            tono={confirmingAction === 'DESASIGNAR' ? 'peligro' : 'primario'}
+            etiquetaConfirmar={confirmacion.boton}
+            ocupado={saving}
+            onCancelar={() => setConfirmingAction(null)}
+            onConfirmar={confirmingAction === 'DESASIGNAR' ? handleSubmitDesasignar : handleSubmitAsignacion}
+          >
+            {confirmacion.descripcion}
+          </ConfirmacionDesktop>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
