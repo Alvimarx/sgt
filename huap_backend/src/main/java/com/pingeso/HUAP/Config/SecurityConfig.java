@@ -112,8 +112,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v2/servicios").permitAll()
 
                         // --- Administración GLOBAL: solo ADMINISTRADOR (super-admin) ---
+                        // C-01: tipos de turno, rotativas y planificaciones (y C-10, reglas) solo
+                        // los escribe el administrador. PATCH no tiene rutas hoy; se cubre para que
+                        // una ruta nueva no quede abierta por omisión.
                         .requestMatchers(HttpMethod.POST, GLOBAL_ADMIN_PATHS).hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PUT, GLOBAL_ADMIN_PATHS).hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PATCH, GLOBAL_ADMIN_PATHS).hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.DELETE, GLOBAL_ADMIN_PATHS).hasRole("ADMINISTRADOR")
 
                         // --- Administración por SERVICIO: JEFATURA / SUBROGANTE / ADMINISTRADOR ---
