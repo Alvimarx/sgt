@@ -6,7 +6,9 @@ import com.pingeso.HUAP.Repository.RotativaDiaRepository;
 import com.pingeso.HUAP.Repository.TipoTurnoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -68,6 +70,23 @@ public class TipoTurnoService {
             throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
         }
 
+        // §5.1 (P-01, HU-ADM-06): la clave única (id_servicio, nombre) incluye los eliminados,
+        // porque el borrado es lógico, y crear un tipo con el nombre de uno eliminado respondía
+        // 500. Sin migración, se reactiva el eliminado con el nombre y el horario pedidos. Así los
+        // turnos que lo conservan siguen mostrando su nombre; renombrar el eliminado para liberar
+        // el nombre lo habría cambiado en sus turnos (agenda, calendario y CSV). Sus días en las
+        // rotativas no vuelven: se liberaron al eliminarlo.
+        TipoTurnoEntity eliminado = tipoTurnoRepository
+                .findByServicio_IdServicioAndNombreAndEliminadoTrue(idServicio, nombre).stream()
+                .findFirst().orElse(null);
+        if (eliminado != null) {
+            eliminado.setNombre(nombre);
+            eliminado.setHoraInicio(horaInicio);
+            eliminado.setHoraTermino(horaTermino);
+            eliminado.setEliminado(false);
+            return tipoTurnoRepository.save(eliminado);
+        }
+
         return tipoTurnoRepository.save(new TipoTurnoEntity(nombre, servicio, horaInicio, horaTermino));
     }
 
@@ -122,6 +141,16 @@ public class TipoTurnoService {
         Long idServicio = tipo.getServicio().getIdServicio();
         if (tipoTurnoRepository.existsByServicio_IdServicioAndNombreAndIdTipoTurnoNotAndEliminadoFalse(idServicio, nombre, idTipoTurno)) {
             throw new RuntimeException("Ya existe un tipo de turno con el nombre '" + nombre + "' en este servicio");
+        }
+        // §5.1: el nombre de un tipo eliminado choca con la clave única (antes, 500). Al crear se
+        // reactiva; al renombrar otro tipo no hay qué reactivar, así que se avisa.
+        boolean nombreDeUnEliminado = tipoTurnoRepository
+                .findByServicio_IdServicioAndNombreAndEliminadoTrue(idServicio, nombre).stream()
+                .anyMatch(t -> !t.getIdTipoTurno().equals(idTipoTurno));
+        if (nombreDeUnEliminado) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El nombre '" + nombre
+                    + "' es de un tipo de turno eliminado de este servicio. Para recuperarlo, crea un tipo de "
+                    + "turno con ese nombre; si no, elige otro nombre.");
         }
 
         tipo.setNombre(nombre);

@@ -36,4 +36,10 @@ public interface TipoTurnoRepository extends JpaRepository<TipoTurnoEntity, Long
     /** ¿Existe otro tipo de turno <b>vigente</b> con ese nombre en el servicio? (para evitar duplicados al actualizar). */
     boolean existsByServicio_IdServicioAndNombreAndIdTipoTurnoNotAndEliminadoFalse(Long idServicio, String nombre, Long idTipoTurno);
 
+    /**
+     * Tipos de turno <b>eliminados</b> del servicio con ese nombre. La clave única
+     * ({@code id_servicio}, {@code nombre}) los incluye, porque el borrado es lógico.
+     */
+    List<TipoTurnoEntity> findByServicio_IdServicioAndNombreAndEliminadoTrue(Long idServicio, String nombre);
+
 }

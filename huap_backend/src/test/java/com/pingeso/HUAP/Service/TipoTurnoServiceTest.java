@@ -162,4 +162,51 @@ class TipoTurnoServiceTest {
         when(tipoTurnoRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(RuntimeException.class, () -> service.obtenerRotativasAfectadas(99L));
     }
+
+    // ============================ §5.1: el nombre de un tipo eliminado ============================
+
+    private static TipoTurnoEntity eliminado(long id, String nombre) {
+        TipoTurnoEntity tipo = new TipoTurnoEntity(nombre, servicio(SERVICIO_ID), LocalTime.of(21, 0), LocalTime.of(9, 0));
+        tipo.setIdTipoTurno(id);
+        tipo.setEliminado(true);
+        return tipo;
+    }
+
+    @Test
+    void crear_conElNombreDeUnEliminado_loReactivaConElHorarioPedido_sinChocarConLaClaveUnica() {
+        TipoTurnoEntity anterior = eliminado(7L, "noche");
+        when(servicioRepository.findById(SERVICIO_ID)).thenReturn(Optional.of(servicio(SERVICIO_ID)));
+        when(tipoTurnoRepository.existsByServicio_IdServicioAndNombreAndEliminadoFalse(SERVICIO_ID, "Noche")).thenReturn(false);
+        when(tipoTurnoRepository.findByServicio_IdServicioAndNombreAndEliminadoTrue(SERVICIO_ID, "Noche"))
+                .thenReturn(java.util.List.of(anterior));
+        saveDevuelveArgumento();
+
+        TipoTurnoEntity creado = service.crearTipoDeTurno("Noche", LocalTime.of(20, 0), LocalTime.of(8, 0), SERVICIO_ID);
+
+        assertSame(anterior, creado, "se reactiva el mismo registro: no se inserta otro con su nombre");
+        assertEquals(7L, creado.getIdTipoTurno());
+        assertEquals("Noche", creado.getNombre());
+        assertEquals(LocalTime.of(20, 0), creado.getHoraInicio());
+        assertEquals(LocalTime.of(8, 0), creado.getHoraTermino());
+        assertFalse(creado.isEliminado());
+        verify(tipoTurnoRepository, times(1)).save(any(TipoTurnoEntity.class));
+    }
+
+    @Test
+    void actualizar_alNombreDeUnEliminado_409SinGuardar() {
+        TipoTurnoEntity tipo = new TipoTurnoEntity("Tarde", servicio(SERVICIO_ID), LocalTime.of(14, 0), LocalTime.of(22, 0));
+        tipo.setIdTipoTurno(5L);
+        when(tipoTurnoRepository.findById(5L)).thenReturn(Optional.of(tipo));
+        when(tipoTurnoRepository.findByServicio_IdServicioAndNombreAndEliminadoTrue(SERVICIO_ID, "Noche"))
+                .thenReturn(java.util.List.of(eliminado(7L, "Noche")));
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> service.actualizarTipoDeTurno(5L, "Noche", LocalTime.of(20, 0), LocalTime.of(8, 0)));
+
+        assertEquals(409, ex.getStatusCode().value());
+        assertTrue(ex.getReason().startsWith("El nombre 'Noche' es de un tipo de turno eliminado de este servicio."));
+        assertEquals("Tarde", tipo.getNombre());
+        verify(tipoTurnoRepository, never()).save(any());
+    }
 }
