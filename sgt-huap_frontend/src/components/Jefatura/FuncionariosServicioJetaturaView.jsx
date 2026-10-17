@@ -5,9 +5,10 @@ import { ListEmptyState, LoadingState } from '../Style/ListControls';
 
 const AVATAR_THEME = DASHBOARD_ICON_THEMES.green;
 import { getFuncionariosSummary } from '../../services/funcionarioService';
+import { exportarNominaServicioCsv } from '../../services/exportacionService';
 import { useAuth } from '../../context/AuthContext';
 import { useLayout } from '../../layout/layout';
-import { EncabezadoDesktop, PaginaDesktop, AvisoDesktop } from '../Desktop/ui';
+import { EncabezadoDesktop, PaginaDesktop, AvisoDesktop, BotonDesktop } from '../Desktop/ui';
 import { PersonalServicioDesktop } from '../Desktop/gestion/PersonalServicioDesktop';
 import { esRolJefatura, esRolSubrogante } from '../../utils/rolesServicio';
 
@@ -28,6 +29,21 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
+  const [exportando, setExportando] = useState(false);
+
+  // C-21 (17 oct 2026): exportar la nómina del servicio en CSV. El backend
+  // exige rol de gestión y que el servicio sea el de la sesión.
+  const handleExportarNomina = async () => {
+    if (exportando || !servicioActivoId) return;
+    setExportando(true);
+    setMensaje({ tipo: '', texto: '' });
+    const resultado = await exportarNominaServicioCsv(servicioActivoId);
+    setExportando(false);
+    if (!resultado.success) {
+      setMensaje({ tipo: 'error', texto: 'No se pudo exportar la nómina. Intenta de nuevo.' });
+    }
+  };
+  const exportarDeshabilitado = exportando || loading || !servicioActivoId;
 
   useEffect(() => {
     const cargarPersonal = async () => {
@@ -94,7 +110,15 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
     });
     return (
       <>
-        <EncabezadoDesktop titulo="Personal del Servicio" subtitulo={`Visualizando: ${servicioActivoNombre}`} />
+        <EncabezadoDesktop
+          titulo="Personal del Servicio"
+          subtitulo={`Visualizando: ${servicioActivoNombre}`}
+          acciones={(
+            <BotonDesktop variante="secundario" icono="download" onClick={handleExportarNomina} disabled={exportarDeshabilitado}>
+              {exportando ? 'Exportando…' : 'Exportar nómina CSV'}
+            </BotonDesktop>
+          )}
+        />
         <PaginaDesktop ancho="amplio" llena>
           {mensaje.texto && <AvisoDesktop tono="alerta">{mensaje.texto}</AvisoDesktop>}
           <PersonalServicioDesktop
@@ -136,6 +160,21 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
             Visualizando: <span style={{ color: PA.primary }}>{servicioActivoNombre}</span>
           </div>
         </div>
+
+        {/* Exportar la nómina (C-21), como «Exportar turnos CSV» del calendario */}
+        <button
+          type="button"
+          onClick={handleExportarNomina}
+          disabled={exportarDeshabilitado}
+          style={{
+            width: '100%', border: `1px solid ${PA.line2}`, background: '#fff', color: PA.ink, borderRadius: 12,
+            padding: '10px 14px', fontSize: 13, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            cursor: exportarDeshabilitado ? 'not-allowed' : 'pointer', opacity: exportarDeshabilitado ? 0.6 : 1,
+          }}
+        >
+          <SGTIcon name="download" size={15} color={PA.ink} />
+          {exportando ? 'Exportando…' : 'Exportar nómina CSV'}
+        </button>
 
         {/* Buscador */}
         <div style={{ position: 'relative' }}>
