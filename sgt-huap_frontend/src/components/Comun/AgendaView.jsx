@@ -54,6 +54,9 @@ const formatFechaCorta = (fechaISO) => {
 //   onOpenBitacora      — abre la bitácora desde el detalle de turno
 // ---------------------------------------------------------------------------
 const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifications, onOpenSolicitudes, onOpenBitacora }) => {
+  // El inicio abre en «Mis turnos» (decisión C-05, 17 oct 2026): es lo primero
+  // que busca quien entra. Los chips son Todos, Mis turnos, Solicitudes y
+  // Disponibles (R1, R9).
   const [filter, setFilter] = useState("miTurno");
   const [detailShift, setDetailShift] = useState(null);
   const [bannerCollapsed, setBannerCollapsed] = useState(false);
@@ -97,14 +100,11 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     [agendaDays, shiftsByDay]
   );
 
-  // Cambios de turno propios en curso (misTurnos con solicitud pendiente o ya aprobada),
-  // sourced de los mismos datos ya cargados para la agenda — sin llamadas ni reglas nuevas.
+  // Cambios de turno propios en curso (turnos propios con una solicitud pendiente),
+  // con los mismos datos ya cargados para la agenda. El aviso de «cambio aprobado»
+  // se retiró (C-05): el backend no lo calcula.
   const misCambiosPendientes = useMemo(
-    () => (agendaData.turnos || []).filter((t) => t.miTurno && t.solicitudPendiente && !t.cambioAprobado),
-    [agendaData.turnos]
-  );
-  const misCambiosAprobados = useMemo(
-    () => (agendaData.turnos || []).filter((t) => t.miTurno && t.cambioAprobado),
+    () => (agendaData.turnos || []).filter((t) => t.miTurno && t.solicitudPendiente),
     [agendaData.turnos]
   );
 
@@ -131,16 +131,6 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       });
     }
 
-    misCambiosAprobados.forEach((t) => {
-      items.push({
-        id: `cambio-aprobado-${t.id}`,
-        tipo: "cambio_aprobado",
-        titulo: "Cambio aprobado",
-        sub: t.cambioAprobadoCon ? `${formatFechaCorta(t.fecha)} · con ${t.cambioAprobadoCon}` : formatFechaCorta(t.fecha),
-        urgencia: "info",
-      });
-    });
-
     if (unreadCount > 0) {
       items.push({
         id: "notificaciones-sin-leer",
@@ -152,7 +142,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     }
 
     return items;
-  }, [unreadCount, canSeeFreeTurnsInBanner, freeTurnsCount, misCambiosPendientes, misCambiosAprobados]);
+  }, [unreadCount, canSeeFreeTurnsInBanner, freeTurnsCount, misCambiosPendientes]);
 
   const getShifts = (dayKey) => shiftsByDay[dayKey] || [];
 
@@ -279,7 +269,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   // ---------------------------------------------------------------------------
-  // CONTADORES DE FILTROS — "solicitudes" excluye los cambios ya aprobados
+  // CONTADORES DE FILTROS
   // ---------------------------------------------------------------------------
   const countMisTurnos = useMemo(
     () => agendaDays.filter((day) => getShifts(day.key).some((s) => s.miTurno)).length,
@@ -287,10 +277,10 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   );
   // solicitudPendiente llega del backend desde R11: los listados de turnos marcan
   // los turnos sobre los que EL USUARIO tiene una solicitud PENDIENTE (una consulta
-  // batch en TurnoService). cambioAprobado sigue sin emitirse (solo mocks).
+  // batch en TurnoService).
   const countSolicitudes = useMemo(
     () => agendaDays.reduce(
-      (acc, day) => acc + getShifts(day.key).filter((s) => s.solicitudPendiente && !s.cambioAprobado).length, 0
+      (acc, day) => acc + getShifts(day.key).filter((s) => s.solicitudPendiente).length, 0
     ),
     [agendaDays, shiftsByDay]
   );
@@ -324,7 +314,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       const shifts = getShifts(day.key);
       if (filter === "todos")       return true;
       if (filter === "miTurno")     return shifts.some((s) => s.miTurno);
-      if (filter === "solicitudes") return shifts.some((s) => s.solicitudPendiente && !s.cambioAprobado);
+      if (filter === "solicitudes") return shifts.some((s) => s.solicitudPendiente);
       if (filter === "disponibles") return shifts.some(esDisponibleParaMi);
       return true;
     });
@@ -628,8 +618,7 @@ const DayRow = ({ day, shifts, todayKey, defaultExpanded, onOpen, density }) => 
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  {miShift.cambioAprobado && <SGTBadge tone="success" size="xs">✓ Aprobado</SGTBadge>}
-                  {miShift.solicitudPendiente && !miShift.cambioAprobado && <SGTBadge tone="warn" size="xs">Pendiente</SGTBadge>}
+                  {miShift.solicitudPendiente && <SGTBadge tone="warn" size="xs">Pendiente</SGTBadge>}
                 </div>
                 {miTeam && (
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: PA.surface2, borderRadius: 8, padding: "4px 6px", marginTop: 1 }}>

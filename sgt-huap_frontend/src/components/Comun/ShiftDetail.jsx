@@ -89,13 +89,11 @@ const isSinAsignarMember = (member) => {
 const estadoDelTurno = (shift, turnoLibre) =>
     shift.solicitudPendiente
         ? `Solicitud pendiente${shift.solicitudCon ? ` con ${shift.solicitudCon}` : ""}`
-        : shift.cambioAprobado
-            ? `Cambio aprobado${shift.cambioAprobadoCon ? ` con ${shift.cambioAprobadoCon}` : ""}`
-            : turnoLibre
-                ? `Cupo libre${shift.motivoLibre ? ` · ${shift.motivoLibre}` : ""}`
-                : shift.miTurno
-                    ? "Tu turno"
-                    : "Asignado";
+        : turnoLibre
+            ? `Cupo libre${shift.motivoLibre ? ` · ${shift.motivoLibre}` : ""}`
+            : shift.miTurno
+                ? "Tu turno"
+                : "Asignado";
 
 // Equipo agrupado por puesto: cada integrante con el turno que se puede gestionar
 // y cada vacante con su estado (ya solicitada o no).

@@ -131,8 +131,6 @@ const mapTurnoForAgenda = (turno, funcionarioId) => {
         solicitudPendiente: Boolean(turno?.solicitudPendiente),
         solicitudTipo: turno?.solicitudTipo ?? null,
         solicitudCon: turno?.solicitudCon ?? null,
-        cambioAprobado: Boolean(turno?.cambioAprobado),
-        cambioAprobadoCon: turno?.cambioAprobadoCon ?? null,
         cruzaMedianoche: Boolean(turno?.cruzaMedianoche),
         idRotativa: turno?.idRotativa ?? null,
         nombreRotativa: limpiarNombreRotativa(turno?.nombreRotativa),
@@ -155,7 +153,6 @@ const buildDaySummary = (turnosDelDia = []) => {
     const misTurnos = turnosDelDia.filter((t) => t.miTurno);
     const hayLibres = turnosDelDia.some((t) => t.turnoLibre);
     const haySolicitudPendiente = turnosDelDia.some((t) => t.solicitudPendiente);
-    const hayCambioAprobado = turnosDelDia.some((t) => t.cambioAprobado);
 
     const horasTotales = misTurnos.reduce((sum, t) => {
         return t.horas != null ? sum + t.horas : sum;
@@ -169,7 +166,6 @@ const buildDaySummary = (turnosDelDia = []) => {
         misTurnos,
         hayLibres,
         haySolicitudPendiente,
-        hayCambioAprobado,
         horasTotales: horasTotales || null,
         inicioDelDia: inicios[0] ?? null,
         finDelDia: fines[fines.length - 1] ?? null,

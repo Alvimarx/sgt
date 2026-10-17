@@ -969,7 +969,7 @@ Sección ampliada, consolidando lo ya descrito en 6.6 (Rotativas), 6.9 (Planific
 ## 11. Calendarios y visualización
 
 - **Vistas disponibles**: calendario mensual (`calendarView.jsx`) y vista de agenda agrupada por día (`AgendaView.jsx`); no se encontró una vista semanal ni diaria dedicada como pantalla independiente (aunque los archivos estáticos del frontend incluyen íconos para "day_view", "weekly_view" y "monthly_view", sugiriendo que se contempló un selector de vistas más granular — ver `public/day_view.svg`, `weekly_view.svg` — **no se confirmó su uso activo en el código de componentes revisado**).
-- **Filtros**: por estado del turno (Todos/Mis turnos/Pendientes/Libres/Aprobados) en la Agenda; navegación mes a mes en el calendario.
+- **Filtros**: por estado del turno (Todos/Mis turnos/Solicitudes/Disponibles) en la Agenda, que abre con «Mis turnos» (R1, R9; decisión C-05 del 17 oct 2026); navegación mes a mes en el calendario. **Actualizado 2026-10-17:** se retiró el aviso y la marca de «cambio aprobado», que el backend nunca calculó (`cambioAprobado`); implementarlo exige que el backend lo derive de la bitácora.
 - **Navegación por fechas**: mensual, con selector de año/mes.
 - **Colores y estados**: puntos de color para turno propio, cupo libre y turno de otro funcionario; colores estables por tipo de turno (`makeTipoColor`, `pasilloColors.js` como remanente — ver sección 22).
 - **Información mostrada**: por día, turnos agrupados por equipo/puesto, con indicador de cobertura.
