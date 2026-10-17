@@ -1,4 +1,5 @@
 import axiosInstance from '../utils/axiosConfig';
+import { horasDeTurno } from '../utils/reglasTurno';
 
 const API_BASE = '/turnos';
 
@@ -158,6 +159,12 @@ const mapTurnoCalendario = (turno, funcionarioId) => {
         idFuncionario: turno?.idFuncionario ?? null,
         miTurno,
         turnoLibre,
+        // Como el mapeo de la agenda (funcionarioService.mapTurnoForAgenda): sin
+        // estos dos campos, el detalle abierto desde el calendario no mostraba la
+        // Duración, decía «Tu turno» con una solicitud pendiente y seguía
+        // ofreciendo un cupo ya pedido (y el desktop no marcaba «Solicitado»).
+        horas: horasDeTurno(turno),
+        solicitudPendiente: Boolean(turno?.solicitudPendiente),
         teamKey,
         raw: turno,
     };

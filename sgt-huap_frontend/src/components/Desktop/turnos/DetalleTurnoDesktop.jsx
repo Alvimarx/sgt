@@ -137,12 +137,6 @@ const DetalleTurnoDesktop = ({
                       <Integrante key={i.clave} fila={i} sePuedeElegir={sePuedeElegirReceptor} />
                     ))}
                     {fila.vacantes.map((v) => <Vacante key={v.clave} v={v} puedeGestionar={puedeGestionar} />)}
-                    {Array.from({ length: fila.vacantesSinTurno }).map((_, idx) => (
-                      <div key={`sin-turno-${idx}`} className="sgt-dt-equipo-fila__libre sgt-dt-equipo-fila__libre--hecho">
-                        <span className="sgt-dt-libre__mas" aria-hidden="true"><SGTIcon name="hand-raised" size={11} /></span>
-                        <span className="sgt-dt-equipo-fila__libre-texto" style={{ fontStyle: 'italic' }}>Cupo libre — falta cubrir</span>
-                      </div>
-                    ))}
                   </div>
                 </div>
               ))}

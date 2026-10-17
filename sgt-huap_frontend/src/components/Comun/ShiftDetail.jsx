@@ -135,13 +135,14 @@ const equipoPorPuesto = ({ porPuesto = [], turnosGrupo = [], canManageAssignment
             yaSolicitada: !canManageAssignments && Boolean(vacante.solicitudPendiente),
         }));
 
+        // Las vacantes de cada puesto se cuentan con los mismos turnos del grupo
+        // (buildAgendaData y buildTurnoTeams), así que toda vacante tiene su turno:
+        // no hay vacantes "solo por conteo" que dibujar aparte.
         return {
             puesto,
             cantidadVacantes: vacantesDelPuesto.length || puesto.vacantes || 0,
             integrantes,
             vacantes,
-            // Vacantes conocidas solo por conteo (sin turno real): no se pueden tocar.
-            vacantesSinTurno: vacantesDelPuesto.length > 0 ? 0 : (puesto.vacantes || 0),
         };
     });
 
@@ -384,7 +385,6 @@ const ShiftDetail = ({
                 clave: fila.puesto.idPuesto ?? "sin-puesto",
                 nombrePuesto: fila.puesto.nombrePuesto,
                 cantidadVacantes: fila.cantidadVacantes,
-                vacantesSinTurno: fila.vacantesSinTurno,
                 integrantes: fila.integrantes.map(integranteDesktop),
                 vacantes: fila.vacantes.map((v, i) => ({
                     clave: `vacante-${v.vacante.id ?? i}`,
@@ -776,7 +776,7 @@ const TeamByPuesto = ({
     onManageAssignedTurn,
 }) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {equipoPorPuesto({ porPuesto, turnosGrupo, canManageAssignments, selectedMemberId }).map(({ puesto, cantidadVacantes, integrantes, vacantes, vacantesSinTurno }) => {
+        {equipoPorPuesto({ porPuesto, turnosGrupo, canManageAssignments, selectedMemberId }).map(({ puesto, cantidadVacantes, integrantes, vacantes }) => {
             return (
                 <div
                     key={puesto.idPuesto ?? "sin-puesto"}
@@ -893,127 +893,82 @@ const TeamByPuesto = ({
                             );
                         })}
 
-                        {vacantes.length > 0 ? (
-                            vacantes.map((fila, i) => {
-                                // yaSolicitada: vacante que el usuario YA solicitó (ver equipoPorPuesto).
-                                const { vacante, yaSolicitada } = fila;
-                                return (
-                                <button
-                                    key={`vacante-${vacante.id ?? i}`}
-                                    type="button"
-                                    disabled={yaSolicitada}
-                                    onClick={() => alTocarVacante(fila, canManageAssignments, { onAssignVacancy, onRequestVacancy })}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 10,
-                                        padding: "8px 6px",
-                                        borderRadius: 8,
-                                        marginTop: 4,
-                                        border: canManageAssignments
-                                            ? `1px dashed ${P2().primary}`
-                                            : yaSolicitada
-                                                ? `1px dashed ${P2().line}`
-                                                : `1px dashed ${P2().accent}`,
-                                        background: canManageAssignments
-                                            ? P2().primarySoft
-                                            : yaSolicitada
-                                                ? P2().surface2
-                                                : P2().accentSoft,
-                                        width: "100%",
-                                        textAlign: "left",
-                                        cursor: yaSolicitada ? "default" : "pointer",
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            width: 28,
-                                            height: 28,
-                                            borderRadius: 99,
-                                            border: `1.5px dashed ${
-                                                canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : P2().accent
-                                            }`,
-                                            display: "grid",
-                                            placeItems: "center",
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        <SGTIcon
-                                            name={canManageAssignments ? "user-plus" : yaSolicitada ? "check" : "hand-raised"}
-                                            size={13}
-                                            color={canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60"}
-                                        />
-                                    </div>
-
-                                    <span
-                                        style={{
-                                            fontSize: 12.5,
-                                            fontWeight: 800,
-                                            color: canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60",
-                                            flex: 1,
-                                        }}
-                                    >
-                                        {canManageAssignments
-                                            ? "Asignar funcionario a este cupo"
-                                            : yaSolicitada
-                                                ? "Ya solicitaste este turno"
-                                                : "Cupo libre — tocar para solicitar"}
-                                    </span>
-
-                                    {!yaSolicitada && (
-                                        <SGTIcon
-                                            name="chevron-right"
-                                            size={13}
-                                            color={canManageAssignments ? P2().primary : "#B85A60"}
-                                        />
-                                    )}
-                                </button>
-                                );
-                            })
-                        ) : (
-                            Array.from({ length: vacantesSinTurno }).map((_, i) => (
+                        {vacantes.map((fila, i) => {
+                            // yaSolicitada: vacante que el usuario YA solicitó (ver equipoPorPuesto).
+                            const { vacante, yaSolicitada } = fila;
+                            return (
+                            <button
+                                key={`vacante-${vacante.id ?? i}`}
+                                type="button"
+                                disabled={yaSolicitada}
+                                onClick={() => alTocarVacante(fila, canManageAssignments, { onAssignVacancy, onRequestVacancy })}
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 10,
+                                    padding: "8px 6px",
+                                    borderRadius: 8,
+                                    marginTop: 4,
+                                    border: canManageAssignments
+                                        ? `1px dashed ${P2().primary}`
+                                        : yaSolicitada
+                                            ? `1px dashed ${P2().line}`
+                                            : `1px dashed ${P2().accent}`,
+                                    background: canManageAssignments
+                                        ? P2().primarySoft
+                                        : yaSolicitada
+                                            ? P2().surface2
+                                            : P2().accentSoft,
+                                    width: "100%",
+                                    textAlign: "left",
+                                    cursor: yaSolicitada ? "default" : "pointer",
+                                }}
+                            >
                                 <div
-                                    key={`vacante-${puesto.idPuesto ?? "sin-puesto"}-${i}`}
                                     style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 10,
-                                        padding: "7px 6px",
-                                        borderRadius: 8,
-                                        marginTop: 2,
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 99,
+                                        border: `1.5px dashed ${
+                                            canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : P2().accent
+                                        }`,
+                                        display: "grid",
+                                        placeItems: "center",
+                                        flexShrink: 0,
                                     }}
                                 >
-                                    <div
-                                        style={{
-                                            width: 28,
-                                            height: 28,
-                                            borderRadius: 99,
-                                            border: `1.5px dashed ${P2().line}`,
-                                            display: "grid",
-                                            placeItems: "center",
-                                        }}
-                                    >
-                                        <SGTIcon
-                                            name="hand-raised"
-                                            size={13}
-                                            color={P2().ink3}
-                                        />
-                                    </div>
-
-                                    <span
-                                        style={{
-                                            fontSize: 12.5,
-                                            fontWeight: 700,
-                                            color: P2().ink3,
-                                            flex: 1,
-                                            fontStyle: "italic",
-                                        }}
-                                    >
-                                        Cupo libre — falta cubrir
-                                    </span>
+                                    <SGTIcon
+                                        name={canManageAssignments ? "user-plus" : yaSolicitada ? "check" : "hand-raised"}
+                                        size={13}
+                                        color={canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60"}
+                                    />
                                 </div>
-                            ))
-                        )}
+
+                                <span
+                                    style={{
+                                        fontSize: 12.5,
+                                        fontWeight: 800,
+                                        color: canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60",
+                                        flex: 1,
+                                    }}
+                                >
+                                    {canManageAssignments
+                                        ? "Asignar funcionario a este cupo"
+                                        : yaSolicitada
+                                            ? "Ya solicitaste este turno"
+                                            : "Cupo libre — tocar para solicitar"}
+                                </span>
+
+                                {!yaSolicitada && (
+                                    <SGTIcon
+                                        name="chevron-right"
+                                        size={13}
+                                        color={canManageAssignments ? P2().primary : "#B85A60"}
+                                    />
+                                )}
+                            </button>
+                            );
+                        })}
                     </div>
                 </div>
             );

@@ -26,6 +26,24 @@ export function hoyISOEnZonaHospital() {
     return fechaISOEnZonaHospital(new Date());
 }
 
+/**
+ * Fecha y hora de un instante ('YYYY-MM-DDTHH:mm') en la zona horaria del hospital: el
+ * mismo formato que inicioDe/finDe de utils/reglasTurno.js, para saber, comparando como
+ * texto, si un turno ya empezó.
+ */
+export function ahoraISOEnZonaHospital(instante = new Date()) {
+    const partes = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+        timeZone: ZONA_HORARIA_HOSPITAL,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(instante).map((p) => [p.type, p.value]));
+    return `${partes.year}-${partes.month}-${partes.day}T${partes.hour}:${partes.minute}`;
+}
+
 export function formatDisplayDate(input, { locale = 'es-CL', withTime = false } = {}) {
     if (!input) return null
     // Si ya es un número (timestamp) o Date, convertirlo
@@ -47,7 +65,7 @@ export function formatDisplayDate(input, { locale = 'es-CL', withTime = false } 
             return d.toLocaleString(locale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
         }
         return d.toLocaleDateString(locale, { year: 'numeric', month: '2-digit', day: '2-digit' })
-    } catch (e) {
+    } catch {
         // Fallback sencillo
         const y = d.getFullYear()
         const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -56,4 +74,4 @@ export function formatDisplayDate(input, { locale = 'es-CL', withTime = false } 
     }
 }
 
-export default { formatDisplayDate, fechaISOEnZonaHospital, hoyISOEnZonaHospital, ZONA_HORARIA_HOSPITAL }
+export default { formatDisplayDate, fechaISOEnZonaHospital, hoyISOEnZonaHospital, ahoraISOEnZonaHospital, ZONA_HORARIA_HOSPITAL }

@@ -5,6 +5,7 @@ import { getUserId as getUserIdFromToken ,
     getServicioId as getUserServiceIdFromToken
 } from '../utils/tokenManager';
 import { hoyISOEnZonaHospital } from '../utils/dateUtils';
+import { horasDeTurno } from '../utils/reglasTurno';
 
 
 const API_BASE = '/funcionarios';
@@ -43,22 +44,8 @@ const normalizeDateString = (value) => {
     return date.toISOString().slice(0, 10);
 };
 
-const getHoursFromTurno = (turno) => {
-    if (turno?.horas != null) return Number(turno.horas);
-    const inicio = formatTime(turno?.horaInicio || turno?.hora_inicio);
-    const fin = formatTime(turno?.horaFin || turno?.hora_fin);
-    if (!inicio || !fin) return null;
-
-    const [inicioHoras, inicioMinutos] = inicio.split(':').map(Number);
-    const [finHoras, finMinutos] = fin.split(':').map(Number);
-    const inicioTotal = inicioHoras * 60 + inicioMinutos;
-    const finTotal = finHoras * 60 + finMinutos;
-    const diferencia = finTotal >= inicioTotal
-        ? finTotal - inicioTotal
-        : (24 * 60 - inicioTotal) + finTotal;
-
-    return diferencia / 60;
-};
+// Duración del turno: la misma cuenta que el calendario (utils/reglasTurno.js).
+const getHoursFromTurno = (turno) => horasDeTurno(turno);
 
 // ---------------------------------------------------------------------------
 // CONSTRUCCIÓN DE TEAM
