@@ -148,12 +148,24 @@ class FuncionarioControllerTest {
     }
 
     @Test
-    void subrogante_editaFuncionarioDeSuPropioServicio_permitido() {
+    void subrogante_noDesignaJerarquiaEnSuPropioServicio_403() {
+        // C-03 (HU-JER-02): antes «item 5» se lo permitía; ahora el subrogante no cambia roles.
+        autenticar(9L, "SUBROGANTE", "USUARIO", SERVICIO_A);
+
+        ResponseEntity<?> resp = controller.update(50L, Map.of("servicioId", SERVICIO_A, "rol", 2));
+
+        assertEquals(HttpStatus.FORBIDDEN, resp.getStatusCode());
+        assertEquals(Map.of("error", "El subrogante no puede designar jerarquía ni sumar funcionarios al servicio"), resp.getBody());
+        verify(funcionarioService, never()).updateUser(any(), any());
+    }
+
+    @Test
+    void subrogante_editaElEstadoDeAlguienDeSuServicio_sigueSiendoPosible() {
         autenticar(9L, "SUBROGANTE", "USUARIO", SERVICIO_A);
         when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(true);
         when(funcionarioService.updateUser(eq(50L), anyMap())).thenReturn(new FuncionarioSummaryDTO());
 
-        ResponseEntity<?> resp = controller.update(50L, Map.of("rol", 2));
+        ResponseEntity<?> resp = controller.update(50L, Map.of("estado", "activo"));
 
         assertEquals(HttpStatus.OK, resp.getStatusCode());
     }
@@ -163,9 +175,11 @@ class FuncionarioControllerTest {
         autenticar(9L, "SUBROGANTE", "USUARIO", SERVICIO_A);
         when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(false);
 
-        ResponseEntity<?> resp = controller.update(50L, Map.of("rol", 2));
+        // Sin rol ni servicioId (esos los niega antes C-03), llega al control de pertenencia.
+        ResponseEntity<?> resp = controller.update(50L, Map.of("nombre", "Otro"));
 
         assertEquals(HttpStatus.FORBIDDEN, resp.getStatusCode());
+        assertEquals(Map.of("error", "No tienes permiso para modificar a un funcionario de otro servicio"), resp.getBody());
     }
 
     // ============================ ADMINISTRADOR ============================
@@ -298,6 +312,97 @@ class FuncionarioControllerTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());
         verify(funcionarioService, never()).updateUser(any(), any());
+    }
+
+    // ============================ C-03: el subrogante no designa jerarquía ni suma personal ============================
+
+    @Test
+    void subrogante_noSumaFuncionariosNiCambiaSuPropioRol_403() {
+        autenticar(9L, "SUBROGANTE", "USUARIO", SERVICIO_A);
+
+        assertEquals(HttpStatus.FORBIDDEN, controller.update(60L, Map.of("servicioId", SERVICIO_A, "rol", 3)).getStatusCode());
+        assertEquals(HttpStatus.FORBIDDEN, controller.update(9L, Map.of("servicioId", SERVICIO_A, "rol", 1)).getStatusCode());
+        verify(funcionarioService, never()).updateUser(any(), any());
+    }
+
+    // ============================ C-07: la jefatura solo designa subrogantes ============================
+
+    @Test
+    void jefatura_designaUnSubroganteDeSuServicio_permitido() {
+        autenticar(9L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(true);
+        when(funcionarioService.nombreRolServicio(2)).thenReturn("SUBROGANTE");
+        when(funcionarioService.updateUser(eq(50L), anyMap())).thenReturn(new FuncionarioSummaryDTO());
+
+        assertEquals(HttpStatus.OK, controller.update(50L, Map.of("servicioId", SERVICIO_A, "rol", 2)).getStatusCode());
+    }
+
+    @Test
+    void jefatura_noDesignaOtraJefatura_403() {
+        autenticar(9L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(true);
+        when(funcionarioService.nombreRolServicio(1)).thenReturn("JEFATURA");
+
+        ResponseEntity<?> resp = controller.update(50L, Map.of("servicioId", SERVICIO_A, "rol", 1));
+
+        assertEquals(HttpStatus.FORBIDDEN, resp.getStatusCode());
+        assertEquals(Map.of("error", "Solo un administrador puede designar una jefatura"), resp.getBody());
+        verify(funcionarioService, never()).updateUser(any(), any());
+    }
+
+    @Test
+    void administrador_designaUnaJefatura_permitido() {
+        autenticar(1L, "JEFATURA", "ADMINISTRADOR", SERVICIO_A);
+        when(funcionarioService.updateUser(eq(50L), anyMap())).thenReturn(new FuncionarioSummaryDTO());
+
+        assertEquals(HttpStatus.OK, controller.update(50L, Map.of("servicioId", SERVICIO_B, "rol", 1)).getStatusCode());
+        verify(funcionarioService, never()).nombreRolServicio(any());
+    }
+
+    // ============================ C-23 y C-19: la jefatura suma a su servicio como Médico ============================
+
+    @Test
+    void jefatura_sumaASuServicioComoMedicoAQuienNoEstaEnEl_permitido() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.perteneceAServicio(60L, SERVICIO_A)).thenReturn(false);
+        when(funcionarioService.nombreRolServicio(3)).thenReturn("MEDICO");
+        when(funcionarioService.updateUser(eq(60L), anyMap())).thenReturn(new FuncionarioSummaryDTO());
+
+        ResponseEntity<?> resp = controller.update(60L, Map.of("servicioId", SERVICIO_A, "rol", 3));
+
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        verify(funcionarioService).updateUser(60L, Map.of("servicioId", SERVICIO_A, "rol", 3));
+    }
+
+    @Test
+    void jefatura_aQuienNoEsDeSuServicio_soloLoSumaComoMedicoASuServicio_loDemas403() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.perteneceAServicio(60L, SERVICIO_A)).thenReturn(false);
+        lenient().when(funcionarioService.nombreRolServicio(2)).thenReturn("SUBROGANTE");
+        lenient().when(funcionarioService.nombreRolServicio(3)).thenReturn("MEDICO");
+
+        // otro rol
+        assertEquals(HttpStatus.FORBIDDEN, controller.update(60L, Map.of("servicioId", SERVICIO_A, "rol", 2)).getStatusCode());
+        // otro servicio
+        assertEquals(HttpStatus.FORBIDDEN, controller.update(60L, Map.of("servicioId", SERVICIO_B, "rol", 3)).getStatusCode());
+        // campos de más
+        assertEquals(HttpStatus.FORBIDDEN,
+                controller.update(60L, Map.of("servicioId", SERVICIO_A, "rol", 3, "estado", "activo")).getStatusCode());
+        verify(funcionarioService, never()).updateUser(any(), any());
+    }
+
+    @Test
+    void sumarAQuienYaPertenece_el409DelServiceLlegaSinCambiarNada() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(true);
+        when(funcionarioService.nombreRolServicio(3)).thenReturn("MEDICO");
+        when(funcionarioService.updateUser(eq(50L), anyMap())).thenThrow(new org.springframework.web.server.ResponseStatusException(
+                HttpStatus.CONFLICT, "La persona ya pertenece a este servicio; no se cambió su rol"));
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> controller.update(50L, Map.of("servicioId", SERVICIO_A, "rol", 3)));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
     }
 
     // ============================ C-17: lecturas de funcionarios ============================

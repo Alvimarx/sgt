@@ -265,14 +265,17 @@ public class FuncionarioController {
      * estrictamente limitado a la relación del servicio autenticado (ver más abajo).
      */
     @Operation(summary = "Actualizar un funcionario",
-            description = "Un usuario solo puede modificar su propio registro. JEFATURA/SUBROGANTE pueden "
-                    + "además modificar (incl. rol/estado) funcionarios de SU MISMO servicio; ADMINISTRADOR, "
-                    + "de cualquier servicio.")
+            description = "Un usuario solo puede modificar su propio registro. JEFATURA puede además modificar "
+                    + "funcionarios de SU MISMO servicio, designar subrogantes y sumar a su servicio, como Médico "
+                    + "({servicioId, rol: 3}), a quien no está en él. SUBROGANTE no cambia roles ni relaciones con "
+                    + "servicios. Solo ADMINISTRADOR designa jefaturas y opera sobre cualquier servicio. Sumar como "
+                    + "Médico a quien ya pertenece al servicio responde 409 y no cambia su rol.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funcionario actualizado"),
             @ApiResponse(responseCode = "401", description = "No autenticado"),
             @ApiResponse(responseCode = "403", description = "Sin permiso para modificar a este funcionario, su rol/estado, o de otro servicio"),
-            @ApiResponse(responseCode = "404", description = "Funcionario no encontrado")
+            @ApiResponse(responseCode = "404", description = "Funcionario no encontrado"),
+            @ApiResponse(responseCode = "409", description = "La persona ya pertenece al servicio; no se cambió su rol")
     })
     @PutMapping("/{id}")
     public ResponseEntity<?> update(
@@ -294,11 +297,22 @@ public class FuncionarioController {
         }
         Long currentUserId = current.id();
         boolean isAdmin = current.esAdministrador();
+        boolean esJefatura = "JEFATURA".equals(current.rol());
+        boolean esSubrogante = "SUBROGANTE".equals(current.rol());
         // SEC (item 5): SUBROGANTE se equipara a JEFATURA para esta operación — igual que ya
         // ocurre en SecurityConfig.SERVICE_ADMIN_PATHS para puestos/turnos/reglas-servicio.
         // Antes SUBROGANTE quedaba excluido aquí (solo podía editar su propio registro), una
-        // inconsistencia respecto al resto de la administración por servicio.
-        boolean isGestionServicio = isAdmin || "JEFATURA".equals(current.rol()) || "SUBROGANTE".equals(current.rol());
+        // inconsistencia respecto al resto de la administración por servicio. Desde C-03 no
+        // designa jerarquía ni suma personal (ver abajo).
+        boolean isGestionServicio = isAdmin || esJefatura || esSubrogante;
+
+        // SEC (C-03, HU-JER-02): el subrogante decide solicitudes y ofertas, asigna turnos y
+        // gestiona puestos, pero no designa jerarquía ni suma funcionarios al servicio: no
+        // cambia el rol ni la relación con un servicio de nadie, tampoco la propia.
+        if (!isAdmin && esSubrogante && (payload.containsKey("rol") || payload.containsKey("servicioId"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "El subrogante no puede designar jerarquía ni sumar funcionarios al servicio"));
+        }
 
         // Ownership: quien no gestiona un servicio solo puede modificar su propio registro.
         if (!isGestionServicio && !currentUserId.equals(id)) {
@@ -308,9 +322,12 @@ public class FuncionarioController {
         // SEC: JEFATURA/SUBROGANTE editando a OTRO funcionario (no a sí mismos) deben
         // verificar que ese funcionario pertenezca a su propio servicio — en BD, no por lo
         // que diga el cliente. ADMINISTRADOR queda exento (alcance global legítimo).
+        // C-23: la única excepción es la jefatura que suma a su servicio, como Médico, a quien
+        // todavía no está en él (HU-PER-02); el service crea solo esa relación.
         if (isGestionServicio && !isAdmin && !currentUserId.equals(id)) {
             Long servicioSesion = seguridadServicio.idServicioActual();
-            if (!funcionarioService.perteneceAServicio(id, servicioSesion)) {
+            if (!funcionarioService.perteneceAServicio(id, servicioSesion)
+                    && !(esJefatura && esSumarAlServicioComoMedico(payload, servicioSesion))) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("error", "No tienes permiso para modificar a un funcionario de otro servicio"));
             }
@@ -346,10 +363,37 @@ public class FuncionarioController {
             }
             seguridadServicio.exigirMismoServicio(servicioDestino);
         }
+        // SEC (C-07, HU-JER-01 criterio 4): la jefatura solo designa subrogantes; una jefatura
+        // la designa el ADMINISTRADOR.
+        if (!isAdmin && payload.containsKey("rol")
+                && ROL_JEFATURA.equals(funcionarioService.nombreRolServicio(payload.get("rol")))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Solo un administrador puede designar una jefatura"));
+        }
 
         FuncionarioSummaryDTO updated = funcionarioService.updateUser(id, payload);
         if (updated == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(updated);
+    }
+
+    private static final String ROL_JEFATURA = "JEFATURA";
+    private static final String ROL_MEDICO = "MEDICO";
+
+    /**
+     * ¿El payload solo suma a la persona al servicio de la sesión con rol Médico? Es lo que envía
+     * la asignación de funcionarios ({@code {servicioId, rol: 3}}). Cualquier otro campo (nombre,
+     * estado, otro rol u otro servicio) sobre alguien que no es del servicio sigue negado (C-23).
+     */
+    private boolean esSumarAlServicioComoMedico(Map<String, Object> payload, Long servicioSesion) {
+        if (servicioSesion == null || payload.size() != 2
+                || !payload.containsKey("servicioId") || !payload.containsKey("rol")) {
+            return false;
+        }
+        Object servicio = payload.get("servicioId");
+        if (servicio == null || !servicioSesion.toString().equals(servicio.toString().trim())) {
+            return false;
+        }
+        return ROL_MEDICO.equals(funcionarioService.nombreRolServicio(payload.get("rol")));
     }
 
     /**

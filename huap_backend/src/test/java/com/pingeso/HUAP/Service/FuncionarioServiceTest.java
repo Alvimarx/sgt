@@ -185,4 +185,78 @@ class FuncionarioServiceTest {
         assertEquals(100L, id);
         verify(funcionarioRepository).save(any(FuncionarioEntity.class));
     }
+
+    // ============================ C-19 y C-23: sumar a una persona a un servicio ============================
+
+    private static RolServicioEntity rol(long id, String nombre) {
+        RolServicioEntity r = new RolServicioEntity(nombre);
+        r.setIdRolServicio(id);
+        return r;
+    }
+
+    private static final ServicioEntity URGENCIAS = ServicioEntity.builder().idServicio(4L).nombre("Urgencias").build();
+    private static final ServicioEntity CIRUGIA = ServicioEntity.builder().idServicio(3L).nombre("Cirugía").build();
+
+    private static FuncionarioEntity conRelacion(long id, ServicioEntity servicio, RolServicioEntity rol) {
+        FuncionarioEntity f = funcionario(id);
+        f.getServiciosFuncionario().add(new ServiciosFuncionarioEntity(f, servicio, rol));
+        return f;
+    }
+
+    @Test
+    void updateUser_sumarComoMedicoAQuienYaPertenece_409YNoCambiaSuRol() {
+        RolServicioEntity subrogante = rol(2L, "SUBROGANTE");
+        FuncionarioEntity f = conRelacion(50L, URGENCIAS, subrogante);
+        when(funcionarioRepository.findById(50L)).thenReturn(Optional.of(f));
+        when(rolServicioRepository.findById(3L)).thenReturn(Optional.of(rol(3L, "MEDICO")));
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> funcionarioService.updateUser(50L, Map.of("servicioId", 4L, "rol", 3)));
+        assertEquals(409, ex.getStatusCode().value());
+        assertEquals("La persona ya pertenece a este servicio; no se cambió su rol", ex.getReason());
+        assertSame(subrogante, f.getServiciosFuncionario().get(0).getRolServicio());
+        verify(funcionarioRepository, never()).save(any());
+    }
+
+    @Test
+    void updateUser_designarSubroganteAQuienYaPertenece_cambiaSuRol() {
+        RolServicioEntity subrogante = rol(2L, "SUBROGANTE");
+        FuncionarioEntity f = conRelacion(50L, URGENCIAS, rol(3L, "MEDICO"));
+        when(funcionarioRepository.findById(50L)).thenReturn(Optional.of(f));
+        when(rolServicioRepository.findById(2L)).thenReturn(Optional.of(subrogante));
+
+        funcionarioService.updateUser(50L, Map.of("servicioId", 4L, "rol", 2));
+
+        assertSame(subrogante, f.getServiciosFuncionario().get(0).getRolServicio());
+        verify(funcionarioRepository).save(f);
+    }
+
+    @Test
+    void updateUser_sumarComoMedicoAQuienNoEsDelServicio_creaSoloEsaRelacionSinTocarLasOtras() {
+        RolServicioEntity subroganteEnCirugia = rol(2L, "SUBROGANTE");
+        RolServicioEntity medico = rol(3L, "MEDICO");
+        FuncionarioEntity f = conRelacion(50L, CIRUGIA, subroganteEnCirugia);
+        when(funcionarioRepository.findById(50L)).thenReturn(Optional.of(f));
+        when(servicioRepository.findById(4L)).thenReturn(Optional.of(URGENCIAS));
+        when(rolServicioRepository.findById(3L)).thenReturn(Optional.of(medico));
+
+        funcionarioService.updateUser(50L, Map.of("servicioId", 4L, "rol", 3));
+
+        assertEquals(2, f.getServiciosFuncionario().size());
+        assertSame(subroganteEnCirugia, f.getServiciosFuncionario().get(0).getRolServicio(), "no toca otros roles");
+        assertSame(URGENCIAS, f.getServiciosFuncionario().get(1).getServicio());
+        assertSame(medico, f.getServiciosFuncionario().get(1).getRolServicio());
+        verify(funcionarioRepository).save(f);
+    }
+
+    @Test
+    void nombreRolServicio_resuelvePorIdOPorNombre() {
+        when(rolServicioRepository.findById(1L)).thenReturn(Optional.of(rol(1L, "JEFATURA")));
+
+        assertEquals("JEFATURA", funcionarioService.nombreRolServicio(1));
+        assertEquals("JEFATURA", funcionarioService.nombreRolServicio("1"));
+        assertEquals("SUBROGANTE", funcionarioService.nombreRolServicio("subrogante"));
+        assertNull(funcionarioService.nombreRolServicio(null));
+    }
 }

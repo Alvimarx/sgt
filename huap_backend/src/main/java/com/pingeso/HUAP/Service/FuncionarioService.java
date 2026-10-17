@@ -8,9 +8,11 @@ import jakarta.persistence.EntityExistsException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.pingeso.HUAP.DTO.FuncionarioSummaryDTO;
 import com.pingeso.HUAP.DTO.RolServicioDTO;
@@ -384,6 +386,14 @@ public class FuncionarioService {
                 .orElse(null);
 
             if (relacion != null) {
+                // C-19 (HU-PER-02 y HU-ADM-04, «quien ya pertenece»): sumar al servicio como Médico
+                // a quien ya es del servicio no le cambia el rol; se avisa. Antes una jefatura o un
+                // subrogante asignado a su propio servicio quedaba como médico sin aviso. La
+                // jerarquía designa con rol JEFATURA o SUBROGANTE, que siguen cambiando el rol.
+                if (ROL_SERVICIO_DEFECTO.equals(nombreRolServicio(rId))) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "La persona ya pertenece a este servicio; no se cambió su rol");
+                }
                 // Caso Actualizar: Solo cambiamos el objeto Rol dentro de la relación
                 rolServicioRepository.findById(rId).ifPresent(relacion::setRolServicio);
             } else {
@@ -406,6 +416,23 @@ public class FuncionarioService {
         funcionarioRepository.save(u);
     
         return getUserSummary(u.getIdFuncionario());
+    }
+
+    /**
+     * Nombre del rol de servicio que pide un payload (su id, como lo envía la interfaz, o su
+     * nombre), o {@code null} si no se reconoce. Lo usan las reglas de jerarquía de
+     * {@code FuncionarioController.update} (C-07, C-23).
+     */
+    public String nombreRolServicio(Object rol) {
+        if (rol == null) return null;
+        String valor = rol.toString().trim();
+        try {
+            return rolServicioRepository.findById(Long.valueOf(valor))
+                    .map(RolServicioEntity::getNombreRol)
+                    .orElse(null);
+        } catch (NumberFormatException e) {
+            return valor.toUpperCase();
+        }
     }
 
     /**
