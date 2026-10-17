@@ -37,6 +37,20 @@ export function participaEnSolicitud(solicitud, userId) {
 }
 
 /**
+ * ¿`userId` participa en la oferta general? La publicó, es el dueño actual de
+ * su turno o postuló a ella. Quien participa no la abre, no la rechaza ni elige
+ * al postulante: la misma segregación de funciones que las solicitudes (H-07).
+ * Hoy la aplica solo la interfaz: OfertaGeneralService.aprobarOferta y
+ * seleccionarPostulante no la exigen (§5.1).
+ */
+export function participaEnOferta(oferta, userId) {
+  if (userId == null || !oferta) return false;
+  return mismoId(oferta.ofertor?.idFuncionario, userId)
+    || mismoId(oferta.turno?.funcionario?.idFuncionario, userId)
+    || (oferta.postulaciones || []).some((p) => mismoId(p.postulante?.idFuncionario, userId));
+}
+
+/**
  * Cobertura pendiente sobre un turno que ya tiene dueño: quedó obsoleta (el
  * backend rechazaría aprobarla) y se muestra sin acciones, como «Turno ya
  * cubierto».

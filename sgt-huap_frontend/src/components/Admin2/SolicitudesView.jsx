@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
-import { esCoberturaDeTurnoCubierto, ofertaVisible, participaEnSolicitud, turnosComprometidos } from '../../utils/reglasSolicitud';
+import { esCoberturaDeTurnoCubierto, ofertaVisible, participaEnOferta, participaEnSolicitud, turnosComprometidos } from '../../utils/reglasSolicitud';
 import { puedeTomarCupo, yaEmpezo } from '../../utils/reglasTurno';
 import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { mensajeDeError } from '../../utils/errores';
@@ -104,6 +104,8 @@ function btnStyle(tone) {
 
 // Texto que reemplaza a Aprobar y Rechazar cuando quien mira participa en la solicitud.
 const NOTA_PARTICIPAS = 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.';
+// Lo mismo en una oferta general que la gestión publicó o a la que postuló.
+const NOTA_PARTICIPAS_OFERTA = 'Participas en esta oferta: por segregación de funciones, la decisión corresponde a otra jefatura.';
 
 // Estado de una solicitud para quien la mira: badge y qué puede hacer con ella.
 function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo, puedeCancelar, userId }) {
@@ -206,6 +208,9 @@ function evaluarOferta(oferta, userId, canDecide) {
   const esOfertor = String(oferta?.ofertor?.idFuncionario) === String(userId);
   const miPostulacion = oferta?.postulaciones?.find(p => String(p.postulante?.idFuncionario) === String(userId));
   const postulaciones = oferta?.postulaciones || [];
+  // H-07 también en las ofertas (§5.1): quien la publicó o postuló no la abre,
+  // no la rechaza ni elige al postulante; ve la nota en vez de los botones.
+  const participa = canDecide && participaEnOferta(oferta, userId);
   return {
     estado,
     esOfertor,
@@ -215,8 +220,9 @@ function evaluarOferta(oferta, userId, canDecide) {
     seleccionado: postulaciones.find(p => p.seleccionado),
     badgeTone: estado === 'ABIERTA' ? 'success' : estado === 'PENDIENTE_APROBACION' ? 'warn' : estado === 'CERRADA' ? 'neutral' : 'accent',
     badgeLabel: estado === 'PENDIENTE_APROBACION' ? 'Pend. apertura' : estado === 'ABIERTA' ? 'Abierta' : estado === 'CERRADA' ? 'Cerrada' : 'Rechazada',
-    puedeDecidirApertura: canDecide && estado === 'PENDIENTE_APROBACION',
-    puedeSeleccionar: canDecide && estado === 'ABIERTA',
+    puedeDecidirApertura: canDecide && !participa && estado === 'PENDIENTE_APROBACION',
+    puedeSeleccionar: canDecide && !participa && estado === 'ABIERTA',
+    bloqueadaPorParticipar: participa && (estado === 'PENDIENTE_APROBACION' || estado === 'ABIERTA'),
     puedePostularORetirar: !canDecide && !esOfertor && estado === 'ABIERTA',
     esMiOfertaAbierta: !canDecide && esOfertor && estado === 'ABIERTA',
   };
@@ -408,7 +414,7 @@ const COLOR_OFERTA_SOFT = '#FDF3E3';
 const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, onPostular, onRetirar, onSeleccionar }) => {
   const {
     estado, miPostulacion, yaPostulado, postulaciones, seleccionado, badgeTone, badgeLabel,
-    puedeDecidirApertura, puedeSeleccionar, puedePostularORetirar, esMiOfertaAbierta,
+    puedeDecidirApertura, puedeSeleccionar, puedePostularORetirar, esMiOfertaAbierta, bloqueadaPorParticipar,
   } = evaluarOferta(oferta, userId, canDecide);
 
   const [confirmando, setConfirmando] = useState(null); // { idPostulacion, nombrePostulante }
@@ -441,6 +447,12 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
         <div style={{ fontSize: 10.5, fontWeight: 800, color: PA.ink3, marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.4 }}>Motivo</div>
         <div style={{ fontSize: 13, color: PA.ink, fontWeight: 600, lineHeight: 1.45 }}>{oferta.motivo || '—'}</div>
       </div>
+
+      {bloqueadaPorParticipar && (
+        <div style={{ marginTop: 8, padding: '6px 10px', background: PA.primarySoft, borderRadius: 8, fontSize: 12, color: PA.primary, fontWeight: 700, lineHeight: 1.4 }}>
+          {NOTA_PARTICIPAS_OFERTA}
+        </div>
+      )}
 
       {/* Jefatura: aprobar/rechazar si pendiente */}
       {puedeDecidirApertura && (
@@ -1416,6 +1428,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         acciones.push({ clave: 'retirar', etiqueta: 'Retirar', variante: 'peligro', icono: 'close', onClick: () => handleRetirar(oferta.idOfertaGeneral, ev.miPostulacion.idPostulacion) });
       }
       const notas = [];
+      if (ev.bloqueadaPorParticipar) notas.push({ clave: 'segregacion', texto: NOTA_PARTICIPAS_OFERTA });
       if (ev.puedePostularORetirar && ev.yaPostulado) notas.push({ clave: 'postulado', tono: 'exito', texto: 'Postulado' });
       if (ev.esMiOfertaAbierta) {
         notas.push({ clave: 'mia', tono: 'aviso', texto: `Tu oferta está abierta · ${ev.postulaciones.length} postulante${ev.postulaciones.length !== 1 ? 's' : ''}` });

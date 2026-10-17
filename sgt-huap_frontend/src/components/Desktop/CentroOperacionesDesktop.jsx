@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
-import { ofertaVisible, participaEnSolicitud } from '../../utils/reglasSolicitud';
+import { ofertaVisible, participaEnOferta, participaEnSolicitud } from '../../utils/reglasSolicitud';
 import { formatShiftLabel } from '../Comun/turnoPresentacion';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
 // lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
@@ -574,6 +574,9 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
         const op = personaVM(nombreCompletoDe(o.ofertor), {});
         const postul = o.postulaciones || [];
         const seleccionado = postul.find((p) => p.seleccionado);
+        // H-07 en las ofertas, igual que en Solicitudes (utils/reglasSolicitud.js).
+        const participo = canDecide && participaEnOferta(o, myUserId);
+        const decide = canDecide && !participo;
         return {
           id: o.idOfertaGeneral,
           fecha: fmtFechaCorta(String(o.fechaCreacion || '').slice(0, 10)),
@@ -581,7 +584,9 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
           ofertor: op.n, ofertorAp: op.ap, avI: op.i, avBg: op.bg, avInk: op.ink,
           turno: turnoTxtDe(o.turno), motivo: o.motivo || '—',
           closedTo: o.estado === 'CERRADA' && seleccionado ? nombreCompletoDe(seleccionado.postulante) : false,
-          canOpen: canDecide && o.estado === 'PENDIENTE_APROBACION',
+          canOpen: decide && o.estado === 'PENDIENTE_APROBACION',
+          segNote: participo && (o.estado === 'PENDIENTE_APROBACION' || o.estado === 'ABIERTA')
+            ? 'Participas en esta oferta: por segregación de funciones, la decisión corresponde a otra jefatura.' : false,
           showPost: o.estado === 'ABIERTA',
           sinPost: o.estado === 'ABIERTA' && postul.length === 0,
           nPost: postul.length,
@@ -590,7 +595,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
             return {
               ...personaVM(nombreCompletoDe(p.postulante), {}),
               key: p.idPostulacion, idle: !confirming, confirming,
-              onSel: canDecide ? () => setConfirm({ t: 'oferta', id: o.idOfertaGeneral, p: p.idPostulacion }) : null,
+              onSel: decide ? () => setConfirm({ t: 'oferta', id: o.idOfertaGeneral, p: p.idPostulacion }) : null,
               onYes: () => ofSeleccionar(o.idOfertaGeneral, p.idPostulacion, nombreCompletoDe(p.postulante)),
               onNo: () => setConfirm(null),
             };
@@ -600,7 +605,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
         };
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ofertasVisibles, confirm, canDecide]);
+  }, [ofertasVisibles, confirm, canDecide, myUserId]);
 
   // ── Sub-renders ───────────────────────────────────────────────────────────
   const panelTurno = (vm, esDia) => {
@@ -850,6 +855,9 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
                   <div style={{ fontSize: '10px', fontWeight: 600, color: '#3B4A5F', marginTop: 4, lineHeight: 1.4 }}>“{o.motivo}”</div>
                   {o.closedTo && (
                     <div style={{ marginTop: 5, padding: '4px 7px', background: '#E4F1EB', borderRadius: 7, fontSize: '10px', color: '#2E7D57', fontWeight: 800 }}>✓ Reasignado a {o.closedTo}</div>
+                  )}
+                  {o.segNote && (
+                    <div style={{ marginTop: 6, padding: '4px 7px', background: '#E8EEF4', borderRadius: 7, fontSize: '9.5px', color: '#17416C', fontWeight: 700, lineHeight: 1.35 }}>{o.segNote}</div>
                   )}
                   {o.canOpen && (
                     <div style={{ display: 'flex', gap: 5, marginTop: 7 }}>
