@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
-import { turnosComprometidos } from '../../utils/reglasSolicitud';
-import { puedeTomarCupo } from '../../utils/reglasTurno';
+import { ofertaVisible, turnosComprometidos } from '../../utils/reglasSolicitud';
+import { puedeTomarCupo, yaEmpezo } from '../../utils/reglasTurno';
+import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { SGT_DATA } from './data';
 import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
@@ -557,7 +558,10 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
         turnosService.getByMedico(userId).catch(() => []),
       ]).then(([libres, mios]) => {
         const misTurnos = Array.isArray(mios) ? mios : [];
-        setTurnosLibres((Array.isArray(libres) ? libres : []).filter((cupo) => puedeTomarCupo(cupo, misTurnos)));
+        // C-16: el mismo filtro de vigencia que las ofertas: fuera los cupos que ya empezaron.
+        const ahora = ahoraISOEnZonaHospital();
+        setTurnosLibres((Array.isArray(libres) ? libres : [])
+          .filter((cupo) => !yaEmpezo(cupo, ahora) && puedeTomarCupo(cupo, misTurnos)));
       }).catch(() => {}));
     if (tipoSel === 4 || tipoSel === 5)
       fetches.push(usuariosService.getAll(servicioId).then(d => {
@@ -1251,7 +1255,14 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const pendienteCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length;
   const recibidasCount = recibidas.filter(s => s.estado === 'PENDIENTE').length;
 
-  const ofertasPendientes = ofertas.filter(o => o.estado === 'PENDIENTE_APROBACION').length;
+  // C-16 (17 oct 2026): el mismo filtro de vigencia que el Centro de
+  // operaciones (utils/reglasSolicitud.js, ofertaVisible). Nunca las ofertas de
+  // turnos que ya terminaron ni las rechazadas; la gestión ve además las que
+  // esperan apertura y las cerradas con un elegido; el médico, solo las
+  // abiertas (y las suyas).
+  const hoy = hoyISOEnZonaHospital();
+  const ofertasVisibles = ofertas.filter((o) => ofertaVisible(o, { hoy, puedeDecidir: canDecide, userId: user?.id }));
+  const ofertasPendientes = ofertasVisibles.filter(o => o.estado === 'PENDIENTE_APROBACION').length;
 
   const TABS = isMedico
     ? [
@@ -1425,7 +1436,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
 
     const esOfertas = tab === 'ofertas';
     const items = esOfertas
-      ? ofertas
+      ? ofertasVisibles
         .filter((o) => coincide(nombreFuncionario(o.ofertor), o.motivo, ...(o.postulaciones || []).map((p) => nombreFuncionario(p.postulante))))
         .map(itemOferta)
       : [
@@ -1476,7 +1487,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
           seleccion={seleccionDesktop}
           onSeleccionar={setSeleccionDesktop}
           vacio={esOfertas
-            ? { titulo: 'Sin ofertas', texto: 'No hay ofertas generales en este servicio.' }
+            ? { titulo: 'Sin ofertas', texto: 'No hay ofertas vigentes en este servicio.' }
             : { titulo: 'Sin solicitudes', texto: 'No hay solicitudes aquí por el momento.' }}
           hayFiltros={hayFiltros}
           onLimpiarFiltros={() => { setBusquedaDesktop(''); setTipoDesktop('todos'); }}
@@ -1619,14 +1630,14 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
                 Turnos ofertados por funcionarios en el servicio de <strong>{servicioNombre}</strong>
               </div>
             </div>
-            {ofertas.length === 0 && (
+            {ofertasVisibles.length === 0 && (
               <ListEmptyState
                 icon="check-circle" theme="slate"
                 title="Sin ofertas"
-                message="No hay ofertas generales en este servicio."
+                message="No hay ofertas vigentes en este servicio."
               />
             )}
-            {ofertas.map(o => (
+            {ofertasVisibles.map(o => (
               <OfertaGeneralCard
                 key={o.idOfertaGeneral}
                 oferta={o}

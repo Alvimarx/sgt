@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { ofertaVisible } from '../../utils/reglasSolicitud';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
 // lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
 // En desktop el Sheet se presenta como panel lateral (R18).
@@ -424,14 +425,18 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
     return { asigT: a, totT: t, libresT: t - a };
   }, [diasSemana, gruposPorCelda]);
 
-  // Una oferta cuyo turno ya pasó no es "disponible": se oculta. Se usa la
-  // fecha de término si existe (nocturno que cruza medianoche sigue vigente
-  // su segundo día).
-  const ofertaVigente = (o) =>
-    String(o?.turno?.diaFinalTurno || o?.turno?.diaInicioTurno || '9999-12-31') >= hoy;
+  // Ofertas que se muestran: el mismo filtro que la pestaña «Ofertas
+  // generales» de Solicitudes (utils/reglasSolicitud.js, ofertaVisible). Nunca
+  // las de turnos que ya terminaron (se usa la fecha de término: un nocturno
+  // sigue vigente su segundo día) ni las rechazadas; las cerradas, solo con un
+  // elegido; al médico, solo las abiertas y las suyas (C-16).
+  const ofertasVisibles = useMemo(
+    () => ofertas.filter((o) => ofertaVisible(o, { hoy, puedeDecidir: canDecide, userId: myUserId })),
+    [ofertas, hoy, canDecide, myUserId],
+  );
 
   const nSol = solsPendientes.length;
-  const nDisp = ofertas.filter((o) => ofertaVigente(o) && (o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION')).length;
+  const nDisp = ofertasVisibles.filter((o) => o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION').length;
 
   const tituloSemana = useMemo(() => {
     const ini = parseISO(diasSemana[0]);
@@ -557,13 +562,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
       PENDIENTE_APROBACION: ['Pend. apertura', 'warn'],
       CERRADA: ['Cerrada', 'neutral'],
     };
-    return ofertas
-      // RECHAZADA no se lista (no es accionable ni "disponible"); CERRADA solo
-      // si tiene seleccionado, para mostrar el "Reasignado a …". Las ofertas
-      // de turnos pasados se ocultan siempre.
-      .filter((o) => ofertaVigente(o)
-        && (o.estado === 'ABIERTA' || o.estado === 'PENDIENTE_APROBACION'
-          || (o.estado === 'CERRADA' && o.postulaciones?.some((p) => p.seleccionado))))
+    return ofertasVisibles
       .map((o) => {
         const [badge, tone] = map[o.estado] || ['—', 'neutral'];
         const [badgeBg, badgeInk] = BADGE[tone];
@@ -596,7 +595,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
         };
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ofertas, confirm, canDecide]);
+  }, [ofertasVisibles, confirm, canDecide]);
 
   // ── Sub-renders ───────────────────────────────────────────────────────────
   const panelTurno = (vm, esDia) => {
