@@ -196,7 +196,7 @@ const NotificationView = ({ onBack }) => {
 
       <div style={{ padding: "14px 14px 10px", display: "flex", gap: 8, flexWrap: "wrap" }}>
         <SGTBadge tone="accent" size="sm">{unreadCount} sin leer</SGTBadge>
-        <SGTBadge tone="neutral" size="sm">{notifications.length} recibidas</SGTBadge>
+        <SGTBadge tone="neutral" size="sm">{notifications.length} {notifications.length === 1 ? "recibida" : "recibidas"}</SGTBadge>
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: "0 14px 16px" }}>

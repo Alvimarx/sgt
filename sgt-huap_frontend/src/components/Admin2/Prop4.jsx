@@ -262,14 +262,16 @@ const Prop4 = ({ tweaks = {} }) => {
   const handleBackToServiceSelection = () => {
     // Tras un refresh la lista en memoria está vacía, pero user_data (localStorage,
     // rehidratado por AuthContext) conserva perfil.servicios. Se normalizan las dos
-    // formas: {servicioId, nombre} (paso 1 del login) e {idServicio, nombreServicio}
-    // (perfil persistido) — SelectServiceView espera servicioId/nombre.
+    // formas: {servicioId, nombre, rol} (paso 1 del login) e {idServicio,
+    // nombreServicio, rolServicioNombre} (perfil persistido) — SelectServiceView
+    // espera servicioId/nombre/rol. Sin rolServicioNombre, después de refrescar la
+    // lista salía sin el rol de cada servicio.
     const crudos = (serviciosDisponibles?.length > 0 ? serviciosDisponibles : auth?.user?.servicios) || [];
     const servicios = crudos
       .map((s) => ({
         servicioId: s.servicioId ?? s.idServicio,
         nombre: s.nombre ?? s.nombreServicio,
-        rol: s.rol,
+        rol: s.rol ?? s.rolServicioNombre ?? null,
       }))
       .filter((s) => s.servicioId != null);
     if (servicios.length > 0) {
