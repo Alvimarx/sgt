@@ -162,6 +162,9 @@ const PersonalDashboard = ({ onBack }) => {
     });
   }, [turnos, inicio, fin]);
 
+  // Suma todos los turnos del período, también los que aún no ocurren y los de
+  // otros servicios de la persona: por eso son horas «programadas», no
+  // trabajadas.
   const horasTrabajadas = useMemo(
     () => Math.round(turnosFiltrados.reduce((acc, t) => acc + calcHoras(t), 0)),
     [turnosFiltrados],
@@ -202,7 +205,7 @@ const PersonalDashboard = ({ onBack }) => {
           <div className="sgt-d-kpis" aria-busy={loading || undefined}>
             <KpiDesktop etiqueta="Turnos" valor={listo ? turnosFiltrados.length : '—'} detalle={esSemana ? `semana ${semanaKey}` : mesActual.format('MMMM')} />
             <KpiDesktop
-              etiqueta="Horas trabajadas"
+              etiqueta="Horas programadas"
               valor={listo ? `${horasTrabajadas}h` : '—'}
               detalle={`límite ${limiteHoras}h`}
               color={listo && sobreLimite ? 'var(--d-coral-ink)' : undefined}
@@ -345,7 +348,7 @@ const PersonalDashboard = ({ onBack }) => {
               />
               <KPICard
                 icon="clock"
-                label="Horas trabajadas"
+                label="Horas programadas"
                 value={horasTrabajadas}
                 suffix="h"
                 sub={`límite ${limiteHoras}h`}
