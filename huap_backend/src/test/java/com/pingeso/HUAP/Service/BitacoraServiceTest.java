@@ -35,7 +35,7 @@ class BitacoraServiceTest {
 
     private final BitacoraService service = new BitacoraService(
             bitacoraRepository, solicitudRepository, funcionarioRepository, ofertaGeneralRepository,
-            seguridadServicio);
+            seguridadServicio, mock(com.pingeso.HUAP.Repository.TurnoRepository.class));
 
     {
         when(seguridadServicio.esAdministrador()).thenReturn(true);

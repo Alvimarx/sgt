@@ -10,16 +10,20 @@ import com.pingeso.HUAP.Repository.BitacoraRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
+import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Security.AlcanceServicio;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -44,6 +48,7 @@ public class BitacoraService {
     private final FuncionarioRepository funcionarioRepository;
     private final OfertaGeneralRepository ofertaGeneralRepository;
     private final SeguridadServicio seguridadServicio;
+    private final TurnoRepository turnoRepository;
 
     // SEC (C-17, BUG-007): las lecturas de la bitácora exigían rol de gestión, pero entregaban
     // los eventos de todo el hospital. Ahora los listados traen solo los del servicio de la
@@ -79,13 +84,30 @@ public class BitacoraService {
         return acotarAlServicio(bitacoraRepository.findByFuncionario_IdFuncionario(idFuncionario));
     }
 
+    /**
+     * C-06 (HU-DET-04): el historial de un turno, para «Ver historial» del detalle. Lo ve el
+     * ADMINISTRADOR, la gestión del servicio del turno y quien tiene hoy el turno, aunque sea
+     * médico; cualquier otro recibe 403. Si el turno no existe, 404. Antes se revisaba el servicio
+     * solo si había eventos: un turno sin eventos de otro servicio respondía 200 con la lista vacía.
+     */
     @Transactional(readOnly = true)
     public List<BitacoraEntity> findByTurno(Long idTurno) {
-        List<BitacoraEntity> eventos = bitacoraRepository.findByTurno_IdTurno(idTurno);
-        if (!eventos.isEmpty()) {
-            seguridadServicio.exigirMismoServicio(AlcanceServicio.servicioDe(eventos.get(0).getTurno()));
+        TurnoEntity turno = turnoRepository.findById(idTurno)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El turno no existe"));
+        exigirAccesoAlHistorialDelTurno(turno);
+        return bitacoraRepository.findByTurno_IdTurno(idTurno);
+    }
+
+    private void exigirAccesoAlHistorialDelTurno(TurnoEntity turno) {
+        if (seguridadServicio.esAdministrador()) return;
+        boolean esSuyoHoy = turno.getFuncionario() != null
+                && Objects.equals(turno.getFuncionario().getIdFuncionario(), seguridadServicio.idUsuarioActual());
+        if (esSuyoHoy) return;
+        if (seguridadServicio.esGestionDelServicio()) {
+            seguridadServicio.exigirMismoServicio(AlcanceServicio.servicioDe(turno));
+            return;
         }
-        return eventos;
+        throw new AccessDeniedException("Solo puedes ver el historial de tus turnos");
     }
 
     @Transactional(readOnly = true)

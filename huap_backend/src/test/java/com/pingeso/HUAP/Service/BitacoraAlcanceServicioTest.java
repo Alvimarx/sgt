@@ -5,6 +5,7 @@ import com.pingeso.HUAP.Repository.BitacoraRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
+import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -31,10 +32,11 @@ class BitacoraAlcanceServicioTest {
     private final FuncionarioRepository funcionarioRepository = mock(FuncionarioRepository.class);
     private final OfertaGeneralRepository ofertaGeneralRepository = mock(OfertaGeneralRepository.class);
     private final SeguridadServicio seguridadServicio = mock(SeguridadServicio.class);
+    private final TurnoRepository turnoRepository = mock(TurnoRepository.class);
 
     private final BitacoraService service = new BitacoraService(
             bitacoraRepository, mock(SolicitudRepository.class), funcionarioRepository, ofertaGeneralRepository,
-            seguridadServicio);
+            seguridadServicio, turnoRepository);
 
     private static ServicioEntity servicio(long id) {
         return ServicioEntity.builder().idServicio(id).nombre("Servicio " + id).build();
@@ -74,6 +76,8 @@ class BitacoraAlcanceServicioTest {
 
     private void gestionDe(long servicio) {
         when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.esGestionDelServicio()).thenReturn(true);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(305L);
         when(seguridadServicio.idServicioActual()).thenReturn(servicio);
         doAnswer(inv -> {
             Long pedido = inv.getArgument(0);
@@ -115,13 +119,84 @@ class BitacoraAlcanceServicioTest {
     }
 
     @Test
-    void porTurno_deOtroServicio_403() {
+    void porTurno_deOtroServicio_403_aunqueNoTengaEventos() {
         gestionDe(ENFERMERIA);
+        when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDe(100L, URGENCIAS)));
+        when(turnoRepository.findById(101L)).thenReturn(Optional.of(turnoDe(101L, URGENCIAS)));
         when(bitacoraRepository.findByTurno_IdTurno(100L)).thenReturn(List.of(generacionUrgencias));
-        when(bitacoraRepository.findByTurno_IdTurno(999L)).thenReturn(List.of());
 
         assertThrows(AccessDeniedException.class, () -> service.findByTurno(100L));
-        assertTrue(service.findByTurno(999L).isEmpty());
+        assertThrows(AccessDeniedException.class, () -> service.findByTurno(101L));
+        verify(bitacoraRepository, never()).findByTurno_IdTurno(any());
+    }
+
+    // ============================ C-06: «Ver historial» del turno ============================
+
+    private void medico(long id, long servicio) {
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.esGestionDelServicio()).thenReturn(false);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(id);
+        when(seguridadServicio.idServicioActual()).thenReturn(servicio);
+    }
+
+    private static TurnoEntity turnoDeServicioYDueno(long id, long idServicio, Long idDueno) {
+        TurnoEntity t = turnoDe(id, idServicio);
+        t.setFuncionario(idDueno != null ? funcionario(idDueno, idServicio) : null);
+        return t;
+    }
+
+    @Test
+    void historialDelTurno_elMedicoVeElDeSuTurnoDeHoy() {
+        medico(369L, URGENCIAS);
+        when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDeServicioYDueno(100L, URGENCIAS, 369L)));
+        when(bitacoraRepository.findByTurno_IdTurno(100L)).thenReturn(List.of(generacionUrgencias));
+
+        assertEquals(List.of(generacionUrgencias), service.findByTurno(100L));
+    }
+
+    @Test
+    void historialDelTurno_elMedico_conUnTurnoAjenoOLibre_403SinLeerLaBitacora() {
+        medico(369L, URGENCIAS);
+        when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDeServicioYDueno(100L, URGENCIAS, 368L)));
+        when(turnoRepository.findById(101L)).thenReturn(Optional.of(turnoDeServicioYDueno(101L, URGENCIAS, null)));
+
+        AccessDeniedException ajeno = assertThrows(AccessDeniedException.class, () -> service.findByTurno(100L));
+        assertEquals("Solo puedes ver el historial de tus turnos", ajeno.getMessage());
+        assertThrows(AccessDeniedException.class, () -> service.findByTurno(101L));
+        verify(bitacoraRepository, never()).findByTurno_IdTurno(any());
+    }
+
+    @Test
+    void historialDelTurno_laGestionVeLosDeSuServicio_yElAdministradorTodos() {
+        gestionDe(URGENCIAS);
+        when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDeServicioYDueno(100L, URGENCIAS, 368L)));
+        when(bitacoraRepository.findByTurno_IdTurno(100L)).thenReturn(List.of(generacionUrgencias));
+        assertEquals(List.of(generacionUrgencias), service.findByTurno(100L));
+
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        when(turnoRepository.findById(200L)).thenReturn(Optional.of(turnoDeServicioYDueno(200L, ENFERMERIA, 20L)));
+        assertTrue(service.findByTurno(200L).isEmpty());
+    }
+
+    @Test
+    void historialDelTurno_turnoInexistente_404() {
+        medico(369L, URGENCIAS);
+        when(turnoRepository.findById(999L)).thenReturn(Optional.empty());
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> service.findByTurno(999L));
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void historialDelTurno_esLaUnicaRutaDeLaBitacoraAbiertaAlMedico() {
+        for (java.lang.reflect.Method m : com.pingeso.HUAP.Controller.BitacoraController.class.getDeclaredMethods()) {
+            org.springframework.security.access.prepost.PreAuthorize regla =
+                    m.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+            if (regla == null) continue;
+            boolean abiertaAlMedico = regla.value().contains("MEDICO");
+            assertEquals(m.getName().equals("getByTurno"), abiertaAlMedico, m.getName() + ": " + regla.value());
+        }
     }
 
     @Test
