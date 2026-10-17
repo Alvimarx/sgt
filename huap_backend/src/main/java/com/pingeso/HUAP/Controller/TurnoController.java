@@ -149,9 +149,10 @@ public class TurnoController {
                     + "Requiere rol ADMINISTRADOR, JEFATURA o SUBROGANTE.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Turno alterado"),
-            @ApiResponse(responseCode = "400", description = "Operación inválida o conflicto"),
-            @ApiResponse(responseCode = "403", description = "Sin permisos"),
-            @ApiResponse(responseCode = "500", description = "Error interno")
+            @ApiResponse(responseCode = "400", description = "Operación o datos inválidos"),
+            @ApiResponse(responseCode = "403", description = "Sin permisos o turno de otro servicio"),
+            @ApiResponse(responseCode = "409", description = "La persona ya tiene un turno que se cruza, "
+                    + "o quedaría con una noche seguida de día (R13)")
     })
     @PostMapping("/alterar")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFATURA', 'SUBROGANTE')")
@@ -159,14 +160,13 @@ public class TurnoController {
         try {
             Map<String, Object> resultado = gestionTurnoService.alterarTurno(request);
             return ResponseEntity.ok(resultado);
-        } catch (AccessDeniedException e) {
+        } catch (AccessDeniedException | ResponseStatusException e) {
             // C-20 (HU-ASG-02, criterio 5): la negación por servicio es un 403, no una regla de
-            // negocio; antes el catch de abajo la convertía en 400.
+            // negocio; antes el catch de abajo la convertía en 400. Los conflictos con el
+            // calendario de la persona (cruce y R13, C-04) salen como 409 por el mismo camino.
             throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 

@@ -172,6 +172,24 @@ class ValidadorAsignacionTurnoServiceTest {
         assertEquals(List.of(a, c), resultado);
     }
 
+    // ============================ C-04: solo R13, para la asignación manual ============================
+
+    @Test
+    void soloR13_noMiraElSolape_yRechazaLaNocheSeguidaDeDia() {
+        TurnoEntity noche = turnoDe12h(1L, LUNES, LocalTime.of(20, 0));
+
+        // Se cruza con la noche, pero el cruce lo revisa la asignación manual con su propio mensaje.
+        assertDoesNotThrow(() -> validador.validarDescansoPostNocturno(
+                "Juan", LUNES.atTime(22, 0), LUNES.plusDays(1).atTime(6, 0), 2L, List.of(noche)));
+
+        LocalDateTime dia = LUNES.plusDays(1).atTime(8, 0);
+        var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> validador.validarDescansoPostNocturno("Juan", dia, dia.plusHours(12), 2L, List.of(noche)));
+        assertTrue(ex.getMessage().startsWith("No es posible asignar el turno a Juan porque sale de su turno de noche"));
+        // El mismo turno, si viene en la lista, no se compara consigo mismo.
+        assertDoesNotThrow(() -> validador.validarDescansoPostNocturno("Juan", dia, dia.plusHours(12), 1L, List.of(noche)));
+    }
+
     // ============================ P-01: el turno que choca, con fecha legible ============================
 
     @Test

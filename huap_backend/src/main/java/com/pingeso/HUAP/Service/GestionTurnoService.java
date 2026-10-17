@@ -11,10 +11,13 @@ import com.pingeso.HUAP.Utils.FormatoFecha;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import com.pingeso.HUAP.Repository.ServiciosFuncionarioRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,6 +39,7 @@ public class GestionTurnoService {
     private final NotificacionService notificacionService;
     private final ServiciosFuncionarioRepository serviciosFuncionarioRepository;
     private final SeguridadServicio seguridadServicio;
+    private final ValidadorAsignacionTurnoService validadorAsignacion;
 
     /**
      * Kill-switch del lock pesimista (por defecto activado). Existe para poder medir A/B el costo del
@@ -45,8 +49,13 @@ public class GestionTurnoService {
     @Value("${huap.concurrencia.lock-pesimista:true}")
     private boolean lockPesimista;
 
+    /**
+     * Asigna, libera, reasigna o cambia el horario de un turno. Los conflictos con el calendario
+     * de la persona (cruce de horario, R13 y el cruce que detecta el cambio de horario) salen como
+     * 409 con su mensaje; antes el cruce se lanzaba como {@code Exception} y respondía 500.
+     */
     @Transactional
-    public Map<String, Object> alterarTurno(AlterarTurnoRequest request) throws Exception {
+    public Map<String, Object> alterarTurno(AlterarTurnoRequest request) {
 
         // Lock pesimista de la fila del turno: serializa cualquier par de operaciones sobre el MISMO
         // turno, evitando el lost-update de dos asignaciones concurrentes (el 2º hilo espera, re-lee
@@ -90,7 +99,7 @@ public class GestionTurnoService {
     // ---------------------------------------------------------------
 
     private Map<String, Object> accionAsignar(AlterarTurnoRequest request, TurnoEntity turno,
-            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior) throws Exception {
+            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior) {
 
         if (funcionarioAnterior != null)
             throw new RuntimeException("El turno ya tiene un funcionario asignado. Use REASIGNAR.");
@@ -101,7 +110,7 @@ public class GestionTurnoService {
                 .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: " + request.getIdNuevoMedico()));
 
         validarFuncionarioAsignable(nuevo, turno);
-        validarConflictoFuncionario(nuevo.getIdFuncionario(), turno);
+        validarConflictoFuncionario(nuevo, turno);
 
         turno.setFuncionario(nuevo);
         turnoRepository.save(turno);
@@ -136,7 +145,7 @@ public class GestionTurnoService {
     }
 
     private Map<String, Object> accionReasignar(AlterarTurnoRequest request, TurnoEntity turno,
-            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior) throws Exception {
+            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior) {
 
         if (request.getIdNuevoMedico() == null)
             throw new RuntimeException("Debe especificar el ID del nuevo funcionario.");
@@ -145,7 +154,7 @@ public class GestionTurnoService {
                 .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: " + request.getIdNuevoMedico()));
 
         validarFuncionarioAsignable(nuevo, turno);
-        validarConflictoFuncionario(nuevo.getIdFuncionario(), turno);
+        validarConflictoFuncionario(nuevo, turno);
 
         String anteriorNombre = funcionarioAnterior != null ? nombreCompleto(funcionarioAnterior) : "N/A";
 
@@ -168,7 +177,7 @@ public class GestionTurnoService {
     }
 
     private Map<String, Object> accionCambiarHoras(AlterarTurnoRequest request,
-            TurnoEntity turno, FuncionarioEntity admin) throws Exception {
+            TurnoEntity turno, FuncionarioEntity admin) {
 
         if (request.getNuevaHoraInicio() == null || request.getNuevaHoraFin() == null)
             throw new RuntimeException("Debe especificar nueva hora de inicio y fin.");
@@ -179,7 +188,15 @@ public class GestionTurnoService {
 
         turno.setHoraInicio(request.getNuevaHoraInicio());
         turno.setHoraFin(request.getNuevaHoraFin());
-        turnoService.saveTurno(turno); // aplica ajustes de feriados/fines de semana
+        try {
+            turnoService.saveTurno(turno); // aplica ajustes de feriados/fines de semana
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            // §5.1 (P-01): saveTurno lanza Exception solo por el cruce con otro turno de la persona;
+            // es un conflicto (409), no un error interno (antes respondía 500).
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
 
         registrarEnBitacora(admin, turno, "MODIFICACION_HORARIO",
                 "Horario cambiado de " + horasAnteriores + " a " + horasNuevas,
@@ -201,7 +218,12 @@ public class GestionTurnoService {
     // Helpers
     // ---------------------------------------------------------------
 
-    private void validarConflictoFuncionario(Long idFuncionario, TurnoEntity turno) throws Exception {
+    /**
+     * Revisa el calendario de quien recibe el turno a mano (asignar o reasignar): ni cruce de
+     * horario ni noche seguida de día (R13). Los dos son conflictos de estado: 409 con el mensaje.
+     */
+    private void validarConflictoFuncionario(FuncionarioEntity funcionario, TurnoEntity turno) {
+        Long idFuncionario = funcionario.getIdFuncionario();
         // Lock pesimista del funcionario ANTES del chequeo: serializa validación+asignación para un
         // mismo funcionario (cubre ASIGNAR y REASIGNAR), cerrando la carrera check-then-act que
         // permitía doble-reserva entre acciones concurrentes. Se libera al commit de alterarTurno.
@@ -212,7 +234,9 @@ public class GestionTurnoService {
         LocalDateTime inicioObjetivo = turno.getDiaInicioTurno().atTime(turno.getHoraInicio());
         LocalDateTime finObjetivo = turno.getDiaFinalTurno().atTime(turno.getHoraFin());
 
-        boolean hayConflicto = turnoRepository
+        // Trae los turnos de la persona que tocan los días del turno: alcanza para el cruce y para
+        // R13, cuya noche termina (o cuyo día empieza) en uno de esos días.
+        List<TurnoEntity> cercanos = turnoRepository
                 .findConflictosByFuncionario(
                         idFuncionario,
                         turno.getDiaInicioTurno(),
@@ -220,15 +244,29 @@ public class GestionTurnoService {
                 )
                 .stream()
                 .filter(t -> !t.getIdTurno().equals(turno.getIdTurno()))
-                .anyMatch(t -> {
-                        LocalDateTime inicioExistente = t.getDiaInicioTurno().atTime(t.getHoraInicio());
-                        LocalDateTime finExistente = t.getDiaFinalTurno().atTime(t.getHoraFin());
+                .toList();
 
-                        return solapan(inicioObjetivo, finObjetivo, inicioExistente, finExistente);
-                });
+        boolean hayConflicto = cercanos.stream().anyMatch(t -> {
+                LocalDateTime inicioExistente = t.getDiaInicioTurno().atTime(t.getHoraInicio());
+                LocalDateTime finExistente = t.getDiaFinalTurno().atTime(t.getHoraFin());
 
+                return solapan(inicioObjetivo, finObjetivo, inicioExistente, finExistente);
+        });
+
+        // §5.1 (P-01): antes se lanzaba como Exception y /turnos/alterar respondía 500.
         if (hayConflicto) {
-                throw new Exception("El funcionario ya tiene otro turno asignado en este rango horario.");
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "El funcionario ya tiene otro turno asignado en este rango horario.");
+        }
+
+        // C-04 (HU-SOL-14, criterio 5): R13 también al asignar y reasignar a mano, con el mismo
+        // validador y el mismo mensaje de las solicitudes y las ofertas. No hay excepción de
+        // emergencia. La generación de la planificación no lo aplica (limitación conocida).
+        try {
+            validadorAsignacion.validarDescansoPostNocturno(
+                    nombreParaMensaje(funcionario), inicioObjetivo, finObjetivo, turno.getIdTurno(), cercanos);
+        } catch (ValidadorAsignacionTurnoService.ConflictoAsignacionException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
         }
 
@@ -262,6 +300,11 @@ public class GestionTurnoService {
 
     private String nombreCompleto(FuncionarioEntity f) {
         return f.getNombre() + " " + f.getApelPat();
+    }
+
+    /** Nombre y apellido paterno, como lo nombran los mensajes de R13 de las solicitudes. */
+    private static String nombreParaMensaje(FuncionarioEntity f) {
+        return (f.getNombre() + (f.getApelPat() != null ? " " + f.getApelPat() : "")).trim();
     }
 
     /** «lun 19 oct (08:00 - 20:00)»: el turno en los avisos al funcionario, sin fechas ISO (P-01). */

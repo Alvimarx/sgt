@@ -82,16 +82,55 @@ public class ValidadorAsignacionTurnoService {
             }
 
             if (esDescansoPostNocturnoViolado(nuevoInicio, nuevoFin, existenteInicio, existenteFin)) {
-                boolean existenteEsElNocturno = existenteInicio.toLocalDate().isBefore(existenteFin.toLocalDate());
-                String motivo = existenteEsElNocturno
-                        ? "sale de su turno de noche (" + turnoQueChoca + ") la mañana de ese mismo día"
-                        : "saldría de ese turno de noche la misma mañana en que empieza su turno de día ("
-                          + turnoQueChoca + ")";
                 throw new ConflictoAsignacionException(
-                        "No es posible asignar el turno a " + nombreFuncionario + " porque " + motivo
-                        + ". Se permite un día seguido de su noche (24 horas corridas), pero no una noche seguida de día.");
+                        mensajeDescansoPostNocturno(nombreFuncionario, existenteInicio, existenteFin));
             }
         }
+    }
+
+    /**
+     * Solo la regla de descanso post-nocturno (R13), sin el solapamiento. La usa la asignación
+     * manual ({@code GestionTurnoService}, C-04), que revisa el cruce de horario por su cuenta y
+     * con su propio mensaje; el mensaje de R13 es el mismo de las solicitudes y las ofertas.
+     *
+     * @throws ConflictoAsignacionException si el turno queda como noche seguida de día con alguno
+     *                                      de {@code turnosVigentes}.
+     */
+    public void validarDescansoPostNocturno(
+            String nombreFuncionario,
+            LocalDateTime nuevoInicio,
+            LocalDateTime nuevoFin,
+            Long idTurnoCandidato,
+            List<TurnoEntity> turnosVigentes
+    ) {
+        if (nuevoInicio == null || nuevoFin == null || turnosVigentes == null) return;
+
+        for (TurnoEntity existente : turnosVigentes) {
+            if (idTurnoCandidato != null && idTurnoCandidato.equals(existente.getIdTurno())) continue;
+            if (existente.getDiaInicioTurno() == null || existente.getHoraInicio() == null
+                    || existente.getDiaFinalTurno() == null || existente.getHoraFin() == null) continue;
+
+            LocalDateTime existenteInicio = existente.getDiaInicioTurno().atTime(existente.getHoraInicio());
+            LocalDateTime existenteFin = existente.getDiaFinalTurno().atTime(existente.getHoraFin());
+
+            if (esDescansoPostNocturnoViolado(nuevoInicio, nuevoFin, existenteInicio, existenteFin)) {
+                throw new ConflictoAsignacionException(
+                        mensajeDescansoPostNocturno(nombreFuncionario, existenteInicio, existenteFin));
+            }
+        }
+    }
+
+    /** Mensaje de R13, que cita el turno ya asignado con que choca el candidato. */
+    private String mensajeDescansoPostNocturno(String nombreFuncionario,
+            LocalDateTime existenteInicio, LocalDateTime existenteFin) {
+        String turnoQueChoca = FormatoFecha.intervalo(existenteInicio, existenteFin);
+        boolean existenteEsElNocturno = existenteInicio.toLocalDate().isBefore(existenteFin.toLocalDate());
+        String motivo = existenteEsElNocturno
+                ? "sale de su turno de noche (" + turnoQueChoca + ") la mañana de ese mismo día"
+                : "saldría de ese turno de noche la misma mañana en que empieza su turno de día ("
+                  + turnoQueChoca + ")";
+        return "No es posible asignar el turno a " + nombreFuncionario + " porque " + motivo
+                + ". Se permite un día seguido de su noche (24 horas corridas), pero no una noche seguida de día.";
     }
 
     /**

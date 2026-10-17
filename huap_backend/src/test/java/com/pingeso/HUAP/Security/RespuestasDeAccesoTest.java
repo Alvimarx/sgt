@@ -88,5 +88,12 @@ class RespuestasDeAccesoTest {
         reset(gestion);
         when(gestion.alterarTurno(any())).thenThrow(new RuntimeException("El turno ya tiene un funcionario asignado. Use REASIGNAR."));
         assertEquals(HttpStatus.BAD_REQUEST, controller.alterarTurno(request).getStatusCode());
+
+        // §5.1 y C-04: el cruce de horario y R13 son 409 y llegan al GlobalExceptionHandler con su código.
+        reset(gestion);
+        when(gestion.alterarTurno(any())).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT,
+                "El funcionario ya tiene otro turno asignado en este rango horario."));
+        ResponseStatusException conflicto = assertThrows(ResponseStatusException.class, () -> controller.alterarTurno(request));
+        assertEquals(HttpStatus.CONFLICT, conflicto.getStatusCode());
     }
 }
