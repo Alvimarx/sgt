@@ -4,18 +4,9 @@ import { mensajeDeError } from '../utils/errores';
 
 const API_BASE = '/turnos';
 
-/**
- * Obtiene todos los turnos disponibles en el sistema
- */
-export const getTurnos = async () => {
-    try {
-        const response = await axiosInstance.get(API_BASE);
-        return { success: true, data: response.data };
-    } catch (error) {
-        const mensaje = error.response?.data?.error || 'Error al obtener los turnos';
-        return { success: false, error: mensaje };
-    }
-};
+// GET /turnos (todos los turnos del hospital) es solo del administrador desde
+// C-17 y ninguna vista lo usaba: se retiró getTurnos para que nadie lo llame
+// por error. Las vistas leen los turnos del servicio de la sesión.
 
 /**
  * Obtiene todos los turnos de un servicio disponibles en el sistema
