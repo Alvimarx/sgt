@@ -114,8 +114,10 @@ const JerarquiaJefaturaView = ({ onBack }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const searchWrapperRef = useRef(null);
 
-  // Estados de selección
-  const [selectedRole, setSelectedRole] = useState('jefe');
+  // C-07 (17 oct 2026): la jefatura solo designa subrogantes de su servicio. La
+  // jefatura de un servicio la designa el administrador (Jerarquía de
+  // funcionarios), así que aquí el nivel parte, y queda, en «Subrogante».
+  const [selectedRole, setSelectedRole] = useState('subrogante');
 
   // ---------------------------------------------------------------------------
   // EFECTOS
@@ -228,7 +230,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
     setGuardando(true);
     setShowConfirm(false);
 
-    const idRolReal = selectedRole === 'jefe' ? ID_ROL_SERVICIO.jefatura : ID_ROL_SERVICIO.subrogante;
+    const idRolReal = ID_ROL_SERVICIO.subrogante;
     const idFunc = selectedUser.idFuncionario || selectedUser.id || selectedUser.rutCompleto;
 
     const result = await asignarRolJerarquia(idFunc, servicioActivoId, idRolReal);
@@ -273,7 +275,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
       <>
         <EncabezadoDesktop
           titulo="Jerarquía de Funcionarios"
-          subtitulo="Designa quién es la jefatura oficial de tu servicio actual o nombra a un subrogante temporal."
+          subtitulo="Nombra a un subrogante temporal de tu servicio actual. La jefatura del servicio la designa el administrador."
         />
         <PaginaDesktop ancho="medio">
           {errorCarga && (
@@ -392,7 +394,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
           onCancel={() => setShowConfirm(false)}
         >
           ¿Deseas designar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> como{' '}
-          <strong style={{ color: PA.ink }}>{selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante'}</strong> de{' '}
+          <strong style={{ color: PA.ink }}>Subrogante</strong> de{' '}
           <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
         </ConfirmDialog>
       </>
@@ -414,7 +416,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
 
       <div style={{ flex: 1, padding: '20px 16px', overflow: 'auto' }}>
         <p style={{ color: PA.ink2, fontSize: 14, marginBottom: 24, fontWeight: 600, lineHeight: 1.5 }}>
-          Designa quién es la jefatura oficial de tu servicio actual o nombra a un subrogante temporal.
+          Nombra a un subrogante temporal de tu servicio actual. La jefatura del servicio la designa el administrador.
         </p>
 
         {/* Error de carga inicial */}
@@ -582,7 +584,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
         onCancel={() => setShowConfirm(false)}
       >
         ¿Deseas designar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> como{' '}
-        <strong style={{ color: PA.ink }}>{selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante'}</strong> de{' '}
+        <strong style={{ color: PA.ink }}>Subrogante</strong> de{' '}
         <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
       </ConfirmDialog>
     </div>
