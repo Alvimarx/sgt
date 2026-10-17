@@ -68,6 +68,7 @@ class FuncionarioControllerTest {
                 new UsernamePasswordAuthenticationToken(principal, null, authorities));
 
         boolean esAdmin = "ADMINISTRADOR".equals(rolSistema);
+        lenient().when(seguridadServicio.actual()).thenReturn(principal);
         lenient().when(seguridadServicio.idServicioActual()).thenReturn(servicioId);
         lenient().when(seguridadServicio.esAdministrador()).thenReturn(esAdmin);
         stubExigirMismoServicio(servicioId, esAdmin);
@@ -408,6 +409,65 @@ class FuncionarioControllerTest {
 
         assertEquals(HttpStatus.OK, controller.update(50L, Map.of("servicioId", SERVICIO_A, "rol", 2)).getStatusCode());
         verify(funcionarioService, never()).rolEnServicio(any(), any());
+    }
+
+    // ============================ Quitar la subrogancia (17 oct) ============================
+
+    @Test
+    void quitarSubrogancia_declaraJefaturaOAdministrador() throws NoSuchMethodException {
+        org.springframework.security.access.prepost.PreAuthorize regla = FuncionarioController.class
+                .getMethod("quitarSubrogancia", Long.class, Long.class)
+                .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(regla, "PUT /funcionarios/{id}/quitar-subrogancia debe declarar @PreAuthorize");
+        assertEquals("hasAnyRole('JEFATURA','ADMINISTRADOR')", regla.value());
+    }
+
+    @Test
+    void quitarSubrogancia_laJefaturaEnSuServicio_200() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+        FuncionarioSummaryDTO actualizado = new FuncionarioSummaryDTO();
+        when(funcionarioService.quitarSubrogancia(50L, SERVICIO_A, 305L)).thenReturn(actualizado);
+
+        ResponseEntity<FuncionarioSummaryDTO> resp = controller.quitarSubrogancia(50L, SERVICIO_A);
+
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        assertSame(actualizado, resp.getBody());
+    }
+
+    @Test
+    void quitarSubrogancia_laJefaturaEnOtroServicio_403SinTocarNada() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+
+        assertThrows(AccessDeniedException.class, () -> controller.quitarSubrogancia(50L, SERVICIO_B));
+        verify(funcionarioService, never()).quitarSubrogancia(any(), any(), any());
+    }
+
+    @Test
+    void quitarSubrogancia_subroganteOMedico_403() {
+        for (String rol : new String[]{"SUBROGANTE", "MEDICO"}) {
+            autenticar(9L, rol, "USUARIO", SERVICIO_A);
+            AccessDeniedException ex = assertThrows(AccessDeniedException.class,
+                    () -> controller.quitarSubrogancia(50L, SERVICIO_A), rol);
+            assertEquals("Solo la jefatura del servicio o un administrador puede quitar una subrogancia", ex.getMessage());
+        }
+        verify(funcionarioService, never()).quitarSubrogancia(any(), any(), any());
+    }
+
+    @Test
+    void quitarSubrogancia_elAdministradorEnCualquierServicio_200() {
+        autenticar(1L, "MEDICO", "ADMINISTRADOR", SERVICIO_A);
+        when(funcionarioService.quitarSubrogancia(50L, SERVICIO_B, 1L)).thenReturn(new FuncionarioSummaryDTO());
+
+        assertEquals(HttpStatus.OK, controller.quitarSubrogancia(50L, SERVICIO_B).getStatusCode());
+    }
+
+    @Test
+    void quitarSubrogancia_sinServicio_400() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> controller.quitarSubrogancia(50L, null));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
     }
 
     // ============================ C-23 y C-19: la jefatura suma a su servicio como Médico ============================

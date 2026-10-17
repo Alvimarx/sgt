@@ -210,6 +210,24 @@ class BitacoraAlcanceServicioTest {
     }
 
     @Test
+    void eventoDeServicio_quitarSubrogancia_loVeLaGestionDeEseServicioYNoLaDeOtro() {
+        service.registrarEventoDeServicio("SUBROGANCIA_QUITADA", URGENCIAS, funcionario(305L, URGENCIAS),
+                "Ana Rojas deja de ser subrogante de Urgencias y queda como Médico");
+        org.mockito.ArgumentCaptor<BitacoraEntity> guardado = org.mockito.ArgumentCaptor.forClass(BitacoraEntity.class);
+        verify(bitacoraRepository).save(guardado.capture());
+        BitacoraEntity evento = guardado.getValue();
+        assertEquals("idServicio=4", evento.getMotivo());
+        assertEquals(305L, evento.getFuncionario().getIdFuncionario());
+        assertNotNull(evento.getFechaModificacion());
+
+        when(bitacoraRepository.findAll()).thenReturn(List.of(evento, resumenPlanificacion));
+        gestionDe(URGENCIAS);
+        assertEquals(List.of(evento), service.findAll());
+        gestionDe(ENFERMERIA);
+        assertTrue(service.findAll().isEmpty());
+    }
+
+    @Test
     void porFuncionario_personaDeOtroServicio_403() {
         gestionDe(ENFERMERIA);
         when(funcionarioRepository.findById(11L)).thenReturn(Optional.of(funcionario(11L, URGENCIAS)));

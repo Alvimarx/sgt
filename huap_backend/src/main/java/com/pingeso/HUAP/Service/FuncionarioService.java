@@ -49,6 +49,7 @@ public class FuncionarioService {
     private final RolServicioRepository rolServicioRepository;
     private final ServicioRepository servicioRepository;
     private final RolSistemaRepository rolSistemaRepository;
+    private final BitacoraService bitacoraService;
 
     // SEC-013: hash BCrypt señuelo, de formato válido pero sin usuario real asociado.
     // Se compara contra él cuando el RUT no existe, para que esa rama tome un tiempo
@@ -476,6 +477,48 @@ public class FuncionarioService {
                         && !sf.getServicio().isEliminado()
                         && idServicio.equals(sf.getServicio().getIdServicio()));
     }
+
+    /**
+     * Quitar la subrogancia (Álvaro, 17 oct): quien es SUBROGANTE en ese servicio vuelve a MEDICO
+     * allí, sin tocar sus relaciones con otros servicios. Es una acción aparte de
+     * {@link #updateUser}, donde sumar como Médico a quien ya pertenece no cambia el rol (C-19).
+     * Deja el evento {@code SUBROGANCIA_QUITADA} en la bitácora del servicio. Quién puede pedirlo
+     * lo controla {@code FuncionarioController.quitarSubrogancia}.
+     *
+     * @return el funcionario actualizado.
+     * @throws ResponseStatusException 404 si la persona no existe; 409 si no es subrogante de ese servicio.
+     */
+    @Transactional
+    public FuncionarioSummaryDTO quitarSubrogancia(Long idFuncionario, Long idServicio, Long idActor) {
+        FuncionarioEntity funcionario = funcionarioRepository.findById(idFuncionario)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El funcionario no existe"));
+
+        ServiciosFuncionarioEntity relacion = funcionario.getServiciosFuncionario().stream()
+                .filter(sf -> sf.getServicio() != null && idServicio.equals(sf.getServicio().getIdServicio()))
+                .filter(sf -> sf.getRolServicio() != null && ROL_SUBROGANTE.equals(sf.getRolServicio().getNombreRol()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Esa persona no es subrogante de este servicio"));
+
+        RolServicioEntity medico = rolServicioRepository.findAll().stream()
+                .filter(r -> ROL_SERVICIO_DEFECTO.equals(r.getNombreRol()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No está definido el rol de servicio MEDICO"));
+
+        relacion.setRolServicio(medico);
+        funcionarioRepository.save(funcionario);
+
+        FuncionarioEntity actor = idActor != null ? funcionarioRepository.findById(idActor).orElse(null) : null;
+        String nombre = (funcionario.getNombre()
+                + (funcionario.getApelPat() != null ? " " + funcionario.getApelPat() : "")).trim();
+        String servicio = relacion.getServicio().getNombre() != null ? relacion.getServicio().getNombre() : "el servicio";
+        bitacoraService.registrarEventoDeServicio("SUBROGANCIA_QUITADA", idServicio, actor,
+                nombre + " deja de ser subrogante de " + servicio + " y queda como Médico");
+
+        return getUserSummary(funcionario.getIdFuncionario());
+    }
+
+    private static final String ROL_SUBROGANTE = "SUBROGANTE";
 
     /**
      * Nombre del rol que tiene hoy el funcionario en ese servicio (JEFATURA, SUBROGANTE o MEDICO),

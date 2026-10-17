@@ -135,25 +135,31 @@ public class BitacoraService {
 
     /**
      * Un evento es del servicio de su turno, de su solicitud (la regla de
-     * {@link AlcanceServicio#solicitudEsDelServicio}) o del turno de su oferta general
-     * ({@code "idOferta=X"} en el motivo). Los que no se pueden atribuir a un servicio, como los
-     * resúmenes de planificación, solo los ve el ADMINISTRADOR.
+     * {@link AlcanceServicio#solicitudEsDelServicio}), del turno de su oferta general
+     * ({@code "idOferta=X"} en el motivo) o del servicio que nombra su motivo
+     * ({@code "idServicio=X"}, ver {@link #registrarEventoDeServicio}). Los que no se pueden
+     * atribuir a un servicio, como los resúmenes de planificación, solo los ve el ADMINISTRADOR.
      */
     private boolean esDelServicio(BitacoraEntity evento, Long idServicio) {
         if (idServicio == null) return false;
         if (evento.getTurno() != null) return idServicio.equals(AlcanceServicio.servicioDe(evento.getTurno()));
         if (evento.getSolicitud() != null) return AlcanceServicio.solicitudEsDelServicio(evento.getSolicitud(), idServicio);
-        Long idOferta = idOfertaDelMotivo(evento.getMotivo());
+        Long servicioDelMotivo = idDelMotivo(evento.getMotivo(), PREFIJO_SERVICIO);
+        if (servicioDelMotivo != null) return idServicio.equals(servicioDelMotivo);
+        Long idOferta = idDelMotivo(evento.getMotivo(), PREFIJO_OFERTA);
         if (idOferta == null) return false;
         return ofertaGeneralRepository.findById(idOferta)
                 .map(oferta -> idServicio.equals(AlcanceServicio.servicioDe(oferta.getTurno())))
                 .orElse(false);
     }
 
-    private static Long idOfertaDelMotivo(String motivo) {
-        if (motivo == null || !motivo.startsWith("idOferta=")) return null;
+    private static final String PREFIJO_OFERTA = "idOferta=";
+    private static final String PREFIJO_SERVICIO = "idServicio=";
+
+    private static Long idDelMotivo(String motivo, String prefijo) {
+        if (motivo == null || !motivo.startsWith(prefijo)) return null;
         try {
-            return Long.parseLong(motivo.substring("idOferta=".length()));
+            return Long.parseLong(motivo.substring(prefijo.length()));
         } catch (NumberFormatException e) {
             return null;
         }
@@ -347,6 +353,25 @@ public class BitacoraService {
         BitacoraEntity log = BitacoraEntity.builder()
                 .tipoEvento(tipoEvento)
                 .funcionario(actor)
+                .observaciones(observaciones)
+                .fechaModificacion(LocalDateTime.now())
+                .activo(true)
+                .build();
+        bitacoraRepository.save(log);
+    }
+
+    /**
+     * Registra un evento de un servicio que no tiene turno ni solicitud, como quitar una
+     * subrogancia. El servicio va en {@code motivo} como {@code "idServicio=X"}, igual que las
+     * ofertas generales ({@code "idOferta=X"}), para que la gestión de ese servicio lo vea en su
+     * bitácora (ver {@link #esDelServicio}); el detalle legible va en {@code observaciones}.
+     */
+    @Transactional
+    public void registrarEventoDeServicio(String tipoEvento, Long idServicio, FuncionarioEntity actor, String observaciones) {
+        BitacoraEntity log = BitacoraEntity.builder()
+                .tipoEvento(tipoEvento)
+                .funcionario(actor)
+                .motivo(PREFIJO_SERVICIO + idServicio)
                 .observaciones(observaciones)
                 .fechaModificacion(LocalDateTime.now())
                 .activo(true)

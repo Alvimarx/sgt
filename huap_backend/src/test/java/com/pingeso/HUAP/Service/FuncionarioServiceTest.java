@@ -41,6 +41,7 @@ class FuncionarioServiceTest {
     @Mock private RolServicioRepository rolServicioRepository;
     @Mock private ServicioRepository servicioRepository;
     @Mock private RolSistemaRepository rolSistemaRepository;
+    @Mock private BitacoraService bitacoraService;
 
     @InjectMocks private FuncionarioService funcionarioService;
 
@@ -271,5 +272,56 @@ class FuncionarioServiceTest {
         assertEquals("MEDICO", funcionarioService.rolEnServicio(50L, 3L));
         assertNull(funcionarioService.rolEnServicio(50L, 2L));
         assertNull(funcionarioService.rolEnServicio(99L, 4L));
+    }
+
+    // ============================ Quitar la subrogancia (17 oct) ============================
+
+    @Test
+    void quitarSubrogancia_quedaMedicoEnEseServicio_sinTocarLosOtros_yDejaElEvento() {
+        RolServicioEntity subrogante = rol(2L, "SUBROGANTE");
+        RolServicioEntity medico = rol(3L, "MEDICO");
+        FuncionarioEntity f = conRelacion(50L, URGENCIAS, subrogante);
+        f.getServiciosFuncionario().add(new ServiciosFuncionarioEntity(f, CIRUGIA, subrogante));
+        FuncionarioEntity jefatura = funcionario(305L);
+        when(funcionarioRepository.findById(50L)).thenReturn(Optional.of(f));
+        when(funcionarioRepository.findById(305L)).thenReturn(Optional.of(jefatura));
+        when(funcionarioRepository.findByIdFuncionario(50L)).thenReturn(f);
+        when(rolServicioRepository.findAll()).thenReturn(List.of(rol(1L, "JEFATURA"), subrogante, medico));
+
+        FuncionarioSummaryDTO dto = funcionarioService.quitarSubrogancia(50L, 4L, 305L);
+
+        assertEquals(50L, dto.getIdFuncionario());
+        assertSame(medico, f.getServiciosFuncionario().get(0).getRolServicio(), "en Urgencias queda Médico");
+        assertSame(subrogante, f.getServiciosFuncionario().get(1).getRolServicio(), "en Cirugía no cambia");
+        verify(funcionarioRepository).save(f);
+        verify(bitacoraService).registrarEventoDeServicio("SUBROGANCIA_QUITADA", 4L, jefatura,
+                "Juan Pérez deja de ser subrogante de Urgencias y queda como Médico");
+    }
+
+    @Test
+    void quitarSubrogancia_aQuienNoEsSubroganteDeEseServicio_409() {
+        FuncionarioEntity f = conRelacion(50L, URGENCIAS, rol(3L, "MEDICO"));
+        f.getServiciosFuncionario().add(new ServiciosFuncionarioEntity(f, CIRUGIA, rol(2L, "SUBROGANTE")));
+        when(funcionarioRepository.findById(50L)).thenReturn(Optional.of(f));
+
+        for (long servicio : new long[]{4L, 9L}) { // Médico en Urgencias; sin relación con el 9
+            org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                    org.springframework.web.server.ResponseStatusException.class,
+                    () -> funcionarioService.quitarSubrogancia(50L, servicio, 305L));
+            assertEquals(409, ex.getStatusCode().value());
+            assertEquals("Esa persona no es subrogante de este servicio", ex.getReason());
+        }
+        verify(funcionarioRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService);
+    }
+
+    @Test
+    void quitarSubrogancia_aQuienNoExiste_404() {
+        when(funcionarioRepository.findById(99L)).thenReturn(Optional.empty());
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> funcionarioService.quitarSubrogancia(99L, 4L, 305L));
+        assertEquals(404, ex.getStatusCode().value());
     }
 }

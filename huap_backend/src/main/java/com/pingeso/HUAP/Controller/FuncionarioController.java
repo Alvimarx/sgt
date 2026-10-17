@@ -396,6 +396,44 @@ public class FuncionarioController {
     private static final String ROL_MEDICO = "MEDICO";
 
     /**
+     * Quitar la subrogancia (Álvaro, 17 oct): devuelve a Médico, en ese servicio, a quien es
+     * SUBROGANTE. Es una acción aparte de {@link #update} porque ahí sumar como Médico a quien ya
+     * pertenece no cambia el rol (C-19). La pide la JEFATURA del servicio de su sesión o el
+     * ADMINISTRADOR, en cualquier servicio; el SUBROGANTE y el MEDICO reciben 403.
+     */
+    @Operation(summary = "Quitar la subrogancia",
+            description = "La persona deja de ser SUBROGANTE en ese servicio y queda como MEDICO, sin tocar sus "
+                    + "otros servicios. JEFATURA del servicio de la sesión o ADMINISTRADOR. Deja un evento "
+                    + "SUBROGANCIA_QUITADA en la bitácora.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Funcionario actualizado"),
+            @ApiResponse(responseCode = "400", description = "Falta servicioId"),
+            @ApiResponse(responseCode = "403", description = "Sin permiso, o servicio distinto del de la sesión"),
+            @ApiResponse(responseCode = "404", description = "El funcionario no existe"),
+            @ApiResponse(responseCode = "409", description = "La persona no es subrogante de ese servicio")
+    })
+    @PutMapping("/{id}/quitar-subrogancia")
+    @PreAuthorize("hasAnyRole('JEFATURA','ADMINISTRADOR')")
+    public ResponseEntity<FuncionarioSummaryDTO> quitarSubrogancia(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long servicioId) {
+        if (servicioId == null) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Indica el servicio (servicioId)");
+        }
+        // El filtro (@PreAuthorize) ya deja fuera al SUBROGANTE y al MEDICO; se repite aquí para
+        // que la regla no dependa solo de la anotación.
+        AuthenticatedUser actual = seguridadServicio.actual();
+        if (!actual.esAdministrador()) {
+            if (!ROL_JEFATURA.equals(actual.rol())) {
+                throw new AccessDeniedException("Solo la jefatura del servicio o un administrador puede quitar una subrogancia");
+            }
+            seguridadServicio.exigirMismoServicio(servicioId);
+        }
+        return ResponseEntity.ok(funcionarioService.quitarSubrogancia(id, servicioId, actual.id()));
+    }
+
+    /**
      * ¿El payload solo suma a la persona al servicio de la sesión con rol Médico? Es lo que envía
      * la asignación de funcionarios ({@code {servicioId, rol: 3}}). Cualquier otro campo (nombre,
      * estado, otro rol u otro servicio) sobre alguien que no es del servicio sigue negado (C-23).
