@@ -21,6 +21,14 @@ exigir_subido() {
     exit 1
   fi
   git -C "$RAIZ" fetch -q origin
+  # Una carpeta que solo está atrasada respecto de GitHub, sin commits ni cambios
+  # propios (como ~/Projects/SGT-ramas/despliegue), se pone al día sola.
+  if [[ -z "$(git -C "$RAIZ" status --porcelain --untracked-files=no)" ]] \
+     && [[ "$(git -C "$RAIZ" rev-list --count "$upstream..HEAD")" == 0 ]] \
+     && [[ "$(git -C "$RAIZ" rev-list --count "HEAD..$upstream")" != 0 ]]; then
+    echo "→ Trayendo lo último de $upstream"
+    git -C "$RAIZ" merge -q --ff-only "$upstream"
+  fi
   if ! git -C "$RAIZ" diff --quiet "$upstream" HEAD -- "$@"; then
     echo "✗ Lo que se va a desplegar no es igual a $upstream:" >&2
     git -C "$RAIZ" diff --stat "$upstream" HEAD -- "$@" >&2

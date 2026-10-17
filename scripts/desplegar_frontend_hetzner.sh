@@ -30,13 +30,13 @@ DATOS_DEMO="${DATOS_DEMO:-0}"
 RAIZ=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 # shellcheck source=scripts/_hetzner_comun.sh
 source "$RAIZ/scripts/_hetzner_comun.sh"
-SHA=$(git -C "$RAIZ" rev-parse --short HEAD)
-ETIQUETA="sgt-frontend:$SHA"
-SELLO=$(date +%Y%m%d-%H%M)
-
 # Las pruebas E2E y su configuración no entran en la imagen: no cuentan.
 exigir_subido sgt-huap_frontend ':!sgt-huap_frontend/e2e' ':!sgt-huap_frontend/playwright.config.js' \
   apache/dev/httpd.conf docker-compose.hetzner.yml
+
+SHA=$(git -C "$RAIZ" rev-parse --short HEAD)
+ETIQUETA="sgt-frontend:$SHA"
+SELLO=$(date +%Y%m%d-%H%M)
 
 echo "→ 1/6 Construyendo $ETIQUETA desde $RAMA_GH@$SHA (en este equipo)"
 TMP=$(mktemp -d)

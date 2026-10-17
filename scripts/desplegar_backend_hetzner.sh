@@ -26,12 +26,12 @@ RAIZ=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 # shellcheck source=scripts/_hetzner_comun.sh
 source "$RAIZ/scripts/_hetzner_comun.sh"
 
+exigir_subido huap_backend docker-compose.hetzner.yml BaseDatosMySQL/migraciones
+
 SHA=$(git -C "$RAIZ" rev-parse --short HEAD)
 ETIQUETA="sgt-backend:$SHA"
 SELLO=$(date +%Y%m%d-%H%M)
 MARCA="$DIR_REMOTO/.sgt-backend-desplegado"
-
-exigir_subido huap_backend docker-compose.hetzner.yml BaseDatosMySQL/migraciones
 
 echo "→ 1/5 Construyendo $ETIQUETA desde $RAMA_GH@$SHA (en este equipo; Maven dentro de Docker, unos minutos)"
 TMP=$(mktemp -d)

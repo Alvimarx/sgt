@@ -24,11 +24,15 @@ Las imágenes se construyen en el equipo de desarrollo y se suben ya hechas. El 
 Vite pide hasta 2,5 GB y el de Maven algo parecido: hacerlo en la VM puede dejar sin
 memoria al otro sistema.
 
-| Qué | Comando, desde la raíz del repo en el equipo de desarrollo |
+| Qué | Comando, en el equipo de desarrollo |
 |---|---|
 | Frontend | `bash scripts/desplegar_frontend_hetzner.sh` |
 | Backend | `bash scripts/desplegar_backend_hetzner.sh` |
 | Frontend y turnos de demostración vigentes | `DATOS_DEMO=1 bash scripts/desplegar_frontend_hetzner.sh` |
+
+Conviene correrlos desde un clon que sea solo copia de GitHub, sin commits propios: el
+script lo pone al día solo antes de construir. Desde un clon con trabajo local también
+funcionan, siempre que lo que se despliega ya esté subido.
 
 Los dos scripts usan la sesión SSH `efeso` (variable `SSH_HOST`) y la carpeta `/opt/sgt`
 de la VM (`DIR_REMOTO`). Cada uno:
