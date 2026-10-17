@@ -351,6 +351,16 @@
 .sgt-da-mant-persona--subrogante .sgt-da-mant-persona__avatar { background: var(--primary-soft); color: var(--primary); }
 .sgt-da-mant-persona__nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sgt-da-mant-nivel__vacio { font-size: 11.5px; font-weight: 600; color: var(--ink3); }
+/* Personas con una acción (por ejemplo, «Quitar subrogancia»): una por fila. */
+.sgt-da-mant-personas--filas { flex-direction: column; flex-wrap: nowrap; }
+.sgt-da-mant-persona-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.sgt-da-mant-persona-fila .sgt-da-mant-persona { min-width: 0; }
 
 /* ---------- Reglas de horario ---------- */
 .sgt-da-mant-reglas { display: flex; flex-direction: column; gap: 10px; }

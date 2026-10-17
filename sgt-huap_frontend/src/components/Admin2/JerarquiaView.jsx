@@ -3,11 +3,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SGT_DATA } from './data';
 import { SGTIcon, TopHeader, ConfirmDialog } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
-import { getFuncionariosSummary, asignarRolJerarquia } from '../../services/funcionarioService';
+import { getFuncionariosSummary, asignarRolJerarquia, quitarSubrogancia } from '../../services/funcionarioService';
 import { useLayout } from '../../layout/layout';
 import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop } from '../Desktop/ui';
 import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
 import { AvisoMantenedorDesktop, OpcionesTarjetaDesktop, PersonasNivelDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
+import JerarquiaActual, { ConfirmarQuitarSubrogancia } from '../ComunAdministracion/JerarquiaActual';
 import { esRolJefatura, esRolSubrogante, relacionEnServicio, rolEnServicio } from '../../utils/rolesServicio';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +62,11 @@ const JerarquiaView = ({ onBack }) => {
   // Estados de selección
   const [selectedRole, setSelectedRole] = useState('jefe');
   const [selectedServicioId, setSelectedServicioId] = useState('');
+
+  // «Quitar subrogancia» (17 oct 2026): el subrogante que se está por quitar
+  // (la confirmación está abierta) y si la llamada está en curso.
+  const [subroganteAQuitar, setSubroganteAQuitar] = useState(null);
+  const [quitandoSubrogancia, setQuitandoSubrogancia] = useState(false);
 
   // ---------------------------------------------------------------------------
   // EFECTOS
@@ -123,12 +129,17 @@ const JerarquiaView = ({ onBack }) => {
       return () => clearTimeout(timer);
   }, [mensaje.texto]);
 
-  // Después de designar se vuelve a pedir el personal: la "Jerarquía actual"
-  // (desktop) y el rol que se muestra al elegir a alguien quedan al día. Si la
-  // recarga falla, quedan los datos anteriores.
+  // Después de designar o de quitar una subrogancia se vuelve a pedir el
+  // personal: la "Jerarquía actual" y el rol que se muestra de la persona
+  // elegida quedan al día. Si la recarga falla, quedan los datos anteriores.
   const recargarFuncionarios = async () => {
     const res = await getFuncionariosSummary();
-    if (res.success) setFuncionarios(Array.isArray(res.data) ? res.data : []);
+    if (!res.success) return;
+    const lista = Array.isArray(res.data) ? res.data : [];
+    setFuncionarios(lista);
+    setSelectedUser((elegido) => (elegido
+      ? lista.find((u) => u.idFuncionario != null && u.idFuncionario === elegido.idFuncionario) || elegido
+      : elegido));
   };
 
   // ---------------------------------------------------------------------------
@@ -200,8 +211,44 @@ const JerarquiaView = ({ onBack }) => {
   const servicioSeleccionado = servicios.find(
       (s) => String(s.idServicio || s.id) === String(selectedServicioId)
   ) ?? null;
+  const nombreServicioSeleccionado = servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre;
 
   const canSubmit = Boolean(selectedUser && selectedServicioId && !guardando);
+
+  // Jerarquía actual del servicio elegido, en móvil y desktop: los
+  // funcionarios que la vista cargó (y recarga), con el mismo criterio que la
+  // Jerarquía del servicio de jefatura (utils/rolesServicio.js).
+  const relEnServicio = (u) => relacionEnServicio(u, selectedServicioId);
+  const miembros = selectedServicioId ? funcionarios.filter((u) => relEnServicio(u)) : [];
+  const jefaturasServicio = miembros.filter((u) => esRolJefatura(rolEnServicio(u, selectedServicioId)));
+  const subrogantesServicio = miembros.filter((u) => esRolSubrogante(rolEnServicio(u, selectedServicioId)));
+
+  // Quitar la subrogancia en el servicio elegido: la persona vuelve a ser
+  // médico de ese servicio. Con éxito o con error (por ejemplo, el 409 de quien
+  // ya no es subrogante), se vuelve a pedir el personal para que la jerarquía
+  // quede al día sin refrescar.
+  const confirmarQuitarSubrogancia = async () => {
+    const persona = subroganteAQuitar;
+    if (!persona || !selectedServicioId || quitandoSubrogancia) return;
+    setQuitandoSubrogancia(true);
+    const result = await quitarSubrogancia(persona.idFuncionario, selectedServicioId);
+    setQuitandoSubrogancia(false);
+    setSubroganteAQuitar(null);
+    setMensaje(result.success
+      ? { tipo: 'success', texto: `${getNombreCompleto(persona)} ya no es subrogante: vuelve a ser médico del servicio.` }
+      : { tipo: 'error', texto: result.error });
+    await recargarFuncionarios();
+  };
+
+  const confirmacionQuitar = (
+    <ConfirmarQuitarSubrogancia
+      persona={subroganteAQuitar}
+      servicioNombre={nombreServicioSeleccionado}
+      quitando={quitandoSubrogancia}
+      onConfirmar={confirmarQuitarSubrogancia}
+      onCancelar={() => setSubroganteAQuitar(null)}
+    />
+  );
 
   // ---------------------------------------------------------------------------
   // ESTILOS
@@ -219,17 +266,19 @@ const JerarquiaView = ({ onBack }) => {
   // servicio elegido; la misma confirmación y los mismos mensajes.
   // ---------------------------------------------------------------------------
   if (esDesktop) {
-    const nombreServicio = servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre;
-    // Jerarquía actual del servicio elegido, armada con los funcionarios que la
-    // vista cargó (y recarga después de designar), con el mismo criterio que la
-    // vista previa de Jerarquía del servicio de jefatura (utils/rolesServicio.js).
-    const relEnServicio = (u) => relacionEnServicio(u, selectedServicioId);
-    const miembros = selectedServicioId ? funcionarios.filter((u) => relEnServicio(u)) : [];
-    const conRol = (esRol) => miembros
-      .filter((u) => esRol(rolEnServicio(u, selectedServicioId)))
-      .map((u) => ({ clave: String(getUserId(u)), nombre: getNombreCompleto(u) }));
-    const jefaturas = conRol(esRolJefatura);
-    const subrogantes = conRol(esRolSubrogante);
+    const nombreServicio = nombreServicioSeleccionado;
+    // La jerarquía actual (calculada arriba, la misma del móvil) como personas
+    // del panel; cada subrogante con «Quitar subrogancia».
+    const comoPersona = (u) => ({ clave: String(getUserId(u)), nombre: getNombreCompleto(u) });
+    const jefaturas = jefaturasServicio.map(comoPersona);
+    const subrogantes = subrogantesServicio.map((u) => ({
+      ...comoPersona(u),
+      accion: {
+        etiqueta: 'Quitar subrogancia',
+        ariaLabel: `Quitar subrogancia a ${getNombreCompleto(u)}`,
+        onClick: () => setSubroganteAQuitar(u),
+      },
+    }));
     const nivel = selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante';
     const rolActual = selectedUser ? relEnServicio(selectedUser)?.rolServicioNombre : null;
     const ETIQUETA_ROL = { JEFATURA: 'Jefatura', SUBROGANTE: 'Subrogante', MEDICO: 'Médico' };
@@ -392,6 +441,7 @@ const JerarquiaView = ({ onBack }) => {
           <strong style={{ color: PA.ink }}>{selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante'}</strong> del servicio{' '}
           <strong style={{ color: PA.ink }}>{servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre}</strong>?
         </ConfirmDialog>
+        {confirmacionQuitar}
       </>
     );
   }
@@ -466,6 +516,17 @@ const JerarquiaView = ({ onBack }) => {
             <SGTIcon name="chevron-down" size={16} color={PA.ink3} style={{ position: 'absolute', right: 14, top: 20, pointerEvents: 'none' }}/>
           </div>
         </div>
+
+        {/* Jerarquía actual del servicio elegido (la misma que desktop muestra
+            al lado), con «Quitar subrogancia» en cada subrogante. */}
+        {!loadingDatos && selectedServicioId && (
+          <JerarquiaActual
+            jefaturas={jefaturasServicio}
+            subrogantes={subrogantesServicio}
+            totalFuncionarios={miembros.length}
+            onQuitarSubrogancia={setSubroganteAQuitar}
+          />
+        )}
 
         {/* 2. BUSCADOR DE FUNCIONARIO */}
         <div style={{ marginBottom: 20 }} ref={searchWrapperRef}>
@@ -592,6 +653,7 @@ const JerarquiaView = ({ onBack }) => {
         <strong style={{ color: PA.ink }}>{selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante'}</strong> del servicio{' '}
         <strong style={{ color: PA.ink }}>{servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre}</strong>?
       </ConfirmDialog>
+      {confirmacionQuitar}
     </div>
   );
 };

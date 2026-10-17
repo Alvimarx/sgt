@@ -2,11 +2,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon, TopHeader, IconBadge3D, ConfirmDialog } from '../Style/UIPrimitives';
-import { getFuncionariosSummary, asignarRolJerarquia } from '../../services/funcionarioService';
+import { getFuncionariosSummary, asignarRolJerarquia, quitarSubrogancia } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
 import { useLayout } from '../../layout/layout';
 import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop, AvisoDesktop } from '../Desktop/ui';
 import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
+import JerarquiaActual, { ConfirmarQuitarSubrogancia } from '../ComunAdministracion/JerarquiaActual';
 import { ID_ROL_SERVICIO, esRolJefatura, esRolSubrogante, rolEnServicio } from '../../utils/rolesServicio';
 
 // ---------------------------------------------------------------------------
@@ -35,56 +36,11 @@ const maskRut = (rut = '') => {
     return `***${clean.slice(-5)}`;
 };
 
-// ---------------------------------------------------------------------------
-// VISTA PREVIA DE JERARQUÍA
-// Agrupación puramente presentacional de la misma lista de funcionarios ya
-// obtenida (getFuncionariosSummary): no hay una nueva llamada ni un campo
-// nuevo, solo se agrupan por el rol que cada uno ya tiene en este servicio
-// (mismo criterio que usa "Personal del Servicio" para sus badges de rol).
-// ---------------------------------------------------------------------------
-const JerarquiaPreview = ({ jefaturas, subrogantes, totalFuncionarios, PA }) => (
-    <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 16, padding: 16, marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-            Jerarquía actual del servicio
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <IconBadge3D icon="crown" theme="amber" size={36} iconSize={17} radius={10} />
-            <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>
-                    Jefatura{jefaturas.length > 1 ? 's' : ''}
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {jefaturas.length > 0 ? jefaturas.map(getNombreCompleto).join(', ') : 'Sin jefatura designada'}
-                </div>
-            </div>
-        </div>
-
-        <div style={{ marginLeft: 17, width: 1, height: 16, background: PA.line }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <IconBadge3D icon="shield-check" theme="blue" size={36} iconSize={17} radius={10} />
-            <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>
-                    Subrogante{subrogantes.length !== 1 ? 's' : ''}
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {subrogantes.length > 0 ? subrogantes.map(getNombreCompleto).join(', ') : 'Sin subrogante designado'}
-                </div>
-            </div>
-        </div>
-
-        <div style={{ marginLeft: 17, width: 1, height: 16, background: PA.line }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <IconBadge3D icon="users" theme="green" size={36} iconSize={17} radius={10} />
-            <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>Funcionarios</div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: PA.ink }}>{totalFuncionarios} en el servicio</div>
-            </div>
-        </div>
-    </div>
-);
+// La vista previa de la jerarquía (jefaturas, subrogantes y cuántos son) y la
+// confirmación de «Quitar subrogancia» están en ComunAdministracion/
+// JerarquiaActual.jsx: las comparte la Jerarquía del administrador. Agrupan la
+// misma lista de funcionarios ya obtenida (getFuncionariosSummary) por el rol
+// que cada uno tiene en este servicio.
 
 // ---------------------------------------------------------------------------
 // VISTA PRINCIPAL
@@ -118,6 +74,11 @@ const JerarquiaJefaturaView = ({ onBack }) => {
   // jefatura de un servicio la designa el administrador (Jerarquía de
   // funcionarios), así que aquí el nivel parte, y queda, en «Subrogante».
   const [selectedRole, setSelectedRole] = useState('subrogante');
+
+  // «Quitar subrogancia» (17 oct 2026): el subrogante que se está por quitar
+  // (la confirmación está abierta) y si la llamada está en curso.
+  const [subroganteAQuitar, setSubroganteAQuitar] = useState(null);
+  const [quitandoSubrogancia, setQuitandoSubrogancia] = useState(false);
 
   // ---------------------------------------------------------------------------
   // EFECTOS
@@ -249,6 +210,32 @@ const JerarquiaJefaturaView = ({ onBack }) => {
 
   const canSubmit = Boolean(selectedUser && servicioActivoId && !guardando);
 
+  // Quitar la subrogancia: la persona vuelve a ser médico del servicio. Con
+  // éxito o con error (por ejemplo, el 409 de quien ya no es subrogante), se
+  // vuelve a pedir el personal para que la jerarquía quede al día sin refrescar.
+  const confirmarQuitarSubrogancia = async () => {
+    const persona = subroganteAQuitar;
+    if (!persona || quitandoSubrogancia) return;
+    setQuitandoSubrogancia(true);
+    const result = await quitarSubrogancia(persona.idFuncionario, servicioActivoId);
+    setQuitandoSubrogancia(false);
+    setSubroganteAQuitar(null);
+    setMensaje(result.success
+      ? { tipo: 'success', texto: `${getNombreCompleto(persona)} ya no es subrogante: vuelve a ser médico del servicio.` }
+      : { tipo: 'error', texto: result.error });
+    await recargarFuncionarios();
+  };
+
+  const confirmacionQuitar = (
+    <ConfirmarQuitarSubrogancia
+      persona={subroganteAQuitar}
+      servicioNombre={servicioActivoNombre}
+      quitando={quitandoSubrogancia}
+      onConfirmar={confirmarQuitarSubrogancia}
+      onCancelar={() => setSubroganteAQuitar(null)}
+    />
+  );
+
   // ---------------------------------------------------------------------------
   // ESTILOS
   // ---------------------------------------------------------------------------
@@ -372,8 +359,27 @@ const JerarquiaJefaturaView = ({ onBack }) => {
                   {filaJerarquia('crown', 'amber', `Jefatura${jefaturasActuales.length > 1 ? 's' : ''}`,
                     jefaturasActuales.length > 0 ? jefaturasActuales.map(getNombreCompleto).join(', ') : 'Sin jefatura designada')}
                   <div className="sgt-dg-jerarquia__linea" />
-                  {filaJerarquia('shield-check', 'blue', `Subrogante${subrogantesActuales.length !== 1 ? 's' : ''}`,
-                    subrogantesActuales.length > 0 ? subrogantesActuales.map(getNombreCompleto).join(', ') : 'Sin subrogante designado')}
+                  {/* Un subrogante por fila, cada uno con «Quitar subrogancia». */}
+                  <div className="sgt-dg-jerarquia__fila" style={subrogantesActuales.length > 1 ? { alignItems: 'flex-start' } : undefined}>
+                    <IconBadge3D icon="shield-check" theme="blue" size={30} iconSize={15} radius={9} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="sgt-dg-jerarquia__nivel">Subrogante{subrogantesActuales.length !== 1 ? 's' : ''}</div>
+                      {subrogantesActuales.length === 0 && <div className="sgt-dg-jerarquia__nombre">Sin subrogante designado</div>}
+                      {subrogantesActuales.map((s) => (
+                        <div key={s.idFuncionario ?? getUserId(s)} className="sgt-dg-jerarquia__persona">
+                          <span className="sgt-dg-jerarquia__nombre sgt-dg-jerarquia__nombre--fila">{getNombreCompleto(s)}</span>
+                          <BotonDesktop
+                            variante="peligro"
+                            tamano="sm"
+                            aria-label={`Quitar subrogancia a ${getNombreCompleto(s)}`}
+                            onClick={() => setSubroganteAQuitar(s)}
+                          >
+                            Quitar subrogancia
+                          </BotonDesktop>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <div className="sgt-dg-jerarquia__linea" />
                   {filaJerarquia('users', 'green', 'Funcionarios', `${funcionarios.length} en el servicio`)}
                 </div>
@@ -397,6 +403,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
           <strong style={{ color: PA.ink }}>Subrogante</strong> de{' '}
           <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
         </ConfirmDialog>
+        {confirmacionQuitar}
       </>
     );
   }
@@ -445,13 +452,13 @@ const JerarquiaJefaturaView = ({ onBack }) => {
           </div>
         )}
 
-        {/* Vista previa de la jerarquía actual */}
+        {/* Vista previa de la jerarquía actual, con «Quitar subrogancia» */}
         {!loadingDatos && !errorCarga && servicioActivoId && (
-          <JerarquiaPreview
+          <JerarquiaActual
             jefaturas={jefaturasActuales}
             subrogantes={subrogantesActuales}
             totalFuncionarios={funcionarios.length}
-            PA={PA}
+            onQuitarSubrogancia={setSubroganteAQuitar}
           />
         )}
 
@@ -587,6 +594,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
         <strong style={{ color: PA.ink }}>Subrogante</strong> de{' '}
         <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
       </ConfirmDialog>
+      {confirmacionQuitar}
     </div>
   );
 };

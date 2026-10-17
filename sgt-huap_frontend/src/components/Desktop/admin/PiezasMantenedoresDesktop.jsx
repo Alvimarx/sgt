@@ -6,7 +6,7 @@
 // validaciones y sus mensajes, y les pasa datos y callbacks.
 import React from 'react';
 import { SGTIcon } from '../../Style/UIPrimitives';
-import { ChipDesktop } from '../ui';
+import { BotonDesktop, ChipDesktop } from '../ui';
 import './mantenedores.css';
 
 const cx = (...clases) => clases.filter(Boolean).join(' ');
@@ -96,27 +96,46 @@ export const RolesServicioDesktop = ({ servicios }) => {
 };
 
 // Personas de un nivel de la jerarquía (jefatura o subrogantes).
-//   personas: [{ clave, nombre }]
-export const PersonasNivelDesktop = ({ titulo, icono, nivel, personas, vacio }) => (
-  <div>
-    <div className="sgt-da-mant-nivel__cabecera">
-      <SGTIcon name={icono} size={13} color="var(--ink3)" strokeWidth={2.2} />
-      <span className="sgt-da-mant-nivel__titulo">{titulo}</span>
-    </div>
-    {personas.length > 0 ? (
-      <div className="sgt-da-mant-personas">
-        {personas.map((p) => (
-          <span key={p.clave} className={cx('sgt-da-mant-persona', nivel && `sgt-da-mant-persona--${nivel}`)} title={p.nombre}>
-            <span className="sgt-da-mant-persona__avatar" aria-hidden="true">{inicialesDe(p.nombre)}</span>
-            <span className="sgt-da-mant-persona__nombre">{p.nombre}</span>
-          </span>
-        ))}
+//   personas: [{ clave, nombre, accion?: { etiqueta, ariaLabel, onClick } }]
+// Si alguna trae acción (por ejemplo, «Quitar subrogancia»), van una por fila,
+// con el botón a la derecha; si no, como chips seguidos.
+export const PersonasNivelDesktop = ({ titulo, icono, nivel, personas, vacio }) => {
+  const chip = (p) => (
+    <span className={cx('sgt-da-mant-persona', nivel && `sgt-da-mant-persona--${nivel}`)} title={p.nombre}>
+      <span className="sgt-da-mant-persona__avatar" aria-hidden="true">{inicialesDe(p.nombre)}</span>
+      <span className="sgt-da-mant-persona__nombre">{p.nombre}</span>
+    </span>
+  );
+  const conAcciones = personas.some((p) => p.accion);
+  return (
+    <div>
+      <div className="sgt-da-mant-nivel__cabecera">
+        <SGTIcon name={icono} size={13} color="var(--ink3)" strokeWidth={2.2} />
+        <span className="sgt-da-mant-nivel__titulo">{titulo}</span>
       </div>
-    ) : (
-      <div className="sgt-da-mant-nivel__vacio">{vacio}</div>
-    )}
-  </div>
-);
+      {personas.length === 0 && <div className="sgt-da-mant-nivel__vacio">{vacio}</div>}
+      {personas.length > 0 && !conAcciones && (
+        <div className="sgt-da-mant-personas">
+          {personas.map((p) => <React.Fragment key={p.clave}>{chip(p)}</React.Fragment>)}
+        </div>
+      )}
+      {personas.length > 0 && conAcciones && (
+        <div className="sgt-da-mant-personas sgt-da-mant-personas--filas">
+          {personas.map((p) => (
+            <div key={p.clave} className="sgt-da-mant-persona-fila">
+              {chip(p)}
+              {p.accion && (
+                <BotonDesktop variante="peligro" tamano="sm" aria-label={p.accion.ariaLabel} onClick={p.accion.onClick}>
+                  {p.accion.etiqueta}
+                </BotonDesktop>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Una línea "Entrada · Día 08:00–20:00 → 09:00–20:00" de una regla de horario,
 // con el extremo que cambia resaltado. Las horas las calcula la vista.

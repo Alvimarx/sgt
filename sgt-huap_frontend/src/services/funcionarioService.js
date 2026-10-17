@@ -444,6 +444,25 @@ export const asignarRolJerarquia = async (funcionarioId, idServicio, idRol) => {
     }
 };
 
+/**
+ * Quita la subrogancia de una persona en un servicio: vuelve a ser Médico de
+ * ese servicio (17 oct 2026). PUT /funcionarios/{id}/quitar-subrogancia?servicioId=,
+ * para la jefatura de ese servicio y el administrador. Si la persona no es
+ * subrogante del servicio, el backend responde 409 con su mensaje, que se
+ * devuelve tal cual. No se usa asignarRolJerarquia con rol 3: esa ruta responde
+ * 409 a propósito a quien ya pertenece al servicio (C-19).
+ */
+export const quitarSubrogancia = async (funcionarioId, idServicio) => {
+    try {
+        const response = await axiosInstance.put(
+            `${API_BASE}/${funcionarioId}/quitar-subrogancia?servicioId=${Number(idServicio)}`
+        );
+        return { success: true, data: response.data };
+    } catch (error) {
+        return { success: false, error: mensajeDeError(error, 'No se pudo quitar la subrogancia. Intenta de nuevo.') };
+    }
+};
+
 
 /**
  * Obtener al personal del hospital
