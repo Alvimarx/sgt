@@ -78,15 +78,17 @@ const VISTAS_COMUNES = [
   "agenda", "calendar_view", "perfil", "personal_dashboard",
   "notifications", "solicitudes", "bitacora",
 ];
+// C-10 (17 oct 2026): las reglas de horario son del administrador, como los
+// tipos de turno (C-01); el backend exige ADMINISTRADOR para escribirlas.
 const VISTAS_SOLO_ADMIN = [
   "admin", "funcionarios_sistema", "planificacion", "servicios",
-  "asignacion", "jerarquia", "tipos_turno", "plantillas",
+  "asignacion", "jerarquia", "tipos_turno", "plantillas", "reglas",
 ];
 const VISTAS_SOLO_JEFATURA = [
   "jefatura", "funcionarios_servicio_jefatura", "asignacionJefatura", "jerarquiaJefatura",
 ];
 const VISTAS_SOLO_SUBROGANTE = ["subrogante"];
-const VISTAS_GESTION = ["admin_stats", "puestos", "auditoria", "reglas"];
+const VISTAS_GESTION = ["admin_stats", "puestos", "auditoria"];
 
 // ¿Puede este usuario (ya rehidratado) ver esta vista? Mismos gates que usa
 // Perfil.jsx para mostrar los paneles. Importante en multi-pestaña: si en otra
