@@ -15,8 +15,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Ofertas generales de turno: un funcionario ofrece un turno propio para que cualquiera del
@@ -280,11 +282,30 @@ public class OfertaGeneralService {
         validadorAsignacion.validarAsignacion(nombre, nuevoInicio, nuevoFin, turno.getIdTurno(), vigentes);
     }
 
-    /** SEC (C-17): las ofertas de un servicio solo las lee ese servicio (o el ADMINISTRADOR). */
+    /**
+     * C-16: estados de una oferta que, fuera de la gestión y del ADMINISTRADOR, solo ve su ofertor.
+     * Si se suma el estado RETIRADA (exige migrar la columna Estado), va aquí también.
+     */
+    private static final Set<OfertaGeneralEntity.EstadoOferta> SOLO_LAS_VE_SU_OFERTOR =
+            EnumSet.of(OfertaGeneralEntity.EstadoOferta.RECHAZADA);
+
+    /**
+     * SEC (C-17): las ofertas de un servicio solo las lee ese servicio (o el ADMINISTRADOR).
+     * C-16: al médico no se le entregan las ofertas rechazadas de otras personas; las suyas, sí,
+     * para que sepa qué pasó con ellas. La gestión y el ADMINISTRADOR siguen viendo todas.
+     */
     @Transactional
     public List<OfertaGeneralEntity> findByServicio(Long idServicio) {
         seguridadServicio.exigirMismoServicio(idServicio);
-        return ofertaGeneralRepository.findByTurno_Servicio_IdServicio(idServicio);
+        List<OfertaGeneralEntity> ofertas = ofertaGeneralRepository.findByTurno_Servicio_IdServicio(idServicio);
+        if (seguridadServicio.esAdministrador() || seguridadServicio.esGestionDelServicio()) {
+            return ofertas;
+        }
+        Long idUsuario = seguridadServicio.idUsuarioActual();
+        return ofertas.stream()
+                .filter(o -> !SOLO_LAS_VE_SU_OFERTOR.contains(o.getEstado())
+                        || (o.getOfertor() != null && Objects.equals(o.getOfertor().getIdFuncionario(), idUsuario)))
+                .toList();
     }
 
     /**

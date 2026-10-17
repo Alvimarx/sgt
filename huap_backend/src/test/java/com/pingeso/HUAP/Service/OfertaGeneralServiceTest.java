@@ -542,4 +542,29 @@ class OfertaGeneralServiceTest {
         actorAutenticado(5L);
         assertEquals(List.of(deUrgencias, deEnfermeria), service.findByOfertor(5L));
     }
+
+    // ============================ C-16: el médico no ve las ofertas rechazadas de otros ============================
+
+    @Test
+    void findByServicio_alMedico_sinLasRechazadasDeOtros_conLasSuyas() {
+        OfertaGeneralEntity rechazadaAjena = oferta(1L, funcionario(6L), turno(1L), RECHAZADA);
+        OfertaGeneralEntity rechazadaPropia = oferta(2L, funcionario(5L), turno(2L), RECHAZADA);
+        OfertaGeneralEntity abiertaAjena = oferta(3L, funcionario(6L), turno(3L), ABIERTA);
+        OfertaGeneralEntity pendienteAjena = oferta(4L, funcionario(6L), turno(4L), PENDIENTE_APROBACION);
+        OfertaGeneralEntity cerradaAjena = oferta(5L, funcionario(6L), turno(5L), CERRADA);
+        when(ofertaGeneralRepository.findByTurno_Servicio_IdServicio(4L)).thenReturn(
+                List.of(rechazadaAjena, rechazadaPropia, abiertaAjena, pendienteAjena, cerradaAjena));
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.esGestionDelServicio()).thenReturn(false);
+        actorAutenticado(5L);
+
+        assertEquals(List.of(rechazadaPropia, abiertaAjena, pendienteAjena, cerradaAjena), service.findByServicio(4L));
+
+        // La gestión y el ADMINISTRADOR siguen viendo todas.
+        when(seguridadServicio.esGestionDelServicio()).thenReturn(true);
+        assertEquals(5, service.findByServicio(4L).size());
+        when(seguridadServicio.esGestionDelServicio()).thenReturn(false);
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        assertEquals(5, service.findByServicio(4L).size());
+    }
 }

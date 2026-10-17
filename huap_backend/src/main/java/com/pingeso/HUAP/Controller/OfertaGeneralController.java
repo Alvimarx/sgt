@@ -82,7 +82,9 @@ public class OfertaGeneralController {
         return ResponseEntity.ok(ofertaGeneralService.seleccionarPostulante(id, idPostulacion));
     }
 
-    @Operation(summary = "Listar ofertas de un servicio")
+    @Operation(summary = "Listar ofertas de un servicio",
+            description = "Solo del servicio de la sesión (el ADMINISTRADOR, de cualquiera). La gestión y el "
+                    + "ADMINISTRADOR ven todas; el médico, todas menos las rechazadas de otras personas.")
     @GetMapping("/servicio/{idServicio}")
     public ResponseEntity<List<OfertaGeneralEntity>> getByServicio(@PathVariable Long idServicio) {
         return ResponseEntity.ok(ofertaGeneralService.findByServicio(idServicio));
