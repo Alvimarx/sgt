@@ -77,6 +77,9 @@ test('pantallas de entrada', async ({ page }) => {
   await page.getByPlaceholder('Ej: 12.345.678-9').fill('11111113-3');
   await page.getByPlaceholder('••••••••').fill(process.env.SGT_CLAVE_DEV || 'huap2025');
   await page.locator('button[type="submit"]').click();
+  // Se espera a que aparezcan los servicios: antes, el login muestra un
+  // instante su animación de éxito.
+  await page.getByRole('button', { name: /Medicina Interna/i }).waitFor();
   await esperarQuieta(page);
   await expect.soft(page).toHaveScreenshot('entrada-elegir-servicio.png');
 });

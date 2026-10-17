@@ -44,6 +44,13 @@ export async function iniciarSesion(page, quien, { servicio = USUARIOS[quien].se
     await page.getByRole('button', { name: new RegExp(servicio, 'i') }).click();
   }
   await expect.poll(() => page.evaluate(() => !!localStorage.getItem('jwt_token')), { timeout: 15_000 }).toBe(true);
+  // El login y la elección de servicio pasan al home con un temporizador (la
+  // animación de éxito). Hasta que la app guarde que está en el home, un
+  // irAVista posterior podría ser pisado por ese cambio de vista.
+  await expect.poll(
+    () => page.evaluate(() => JSON.parse(sessionStorage.getItem('sgt_nav_state') || '{}').view),
+    { timeout: 15_000 },
+  ).toBe('agenda');
   await esperarQuieta(page);
 }
 

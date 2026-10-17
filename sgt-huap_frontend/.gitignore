@@ -29,6 +29,6 @@ dist-ssr
 *.sw?
 
 # Playwright: resultados, reporte y fotos de referencia (dependen de los datos locales)
-e2e-results/
+e2e-results*/
 e2e-report/
 e2e/__pantallas__/
