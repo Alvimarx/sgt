@@ -493,13 +493,35 @@ function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onR
   );
 }
 
+/* ─── ConfirmacionMovil (bottom sheet) ───────────────────────────────────────
+   Mismo aspecto que las confirmaciones de Vigencias y de Eliminar turnos
+   generados. La usan «Eliminar molde» y «Molde nuevo» con cambios sin guardar
+   (R18-6e); en desktop, las mismas preguntas van en ConfirmacionPlan. */
+function ConfirmacionMovil({titulo,children,etiquetaConfirmar,icono='trash',onConfirmar,onCancelar}){
+  return(
+    <div onClick={onCancelar} style={{position:'fixed',inset:0,background:'rgba(15,23,42,0.4)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:300}}>
+      <div role="alertdialog" aria-modal="true" aria-label={titulo} onClick={e=>e.stopPropagation()} style={{background:'#fff',borderRadius:'20px 20px 0 0',padding:'8px 20px 32px',width:'100%',maxWidth:480,boxShadow:'0 -8px 40px rgba(0,0,0,0.18)'}}>
+        <div style={{display:'flex',justifyContent:'center',paddingBottom:14}}><div style={{width:40,height:4,background:'var(--line)',borderRadius:99}}/></div>
+        <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><div style={{width:56,height:56,borderRadius:16,background:'var(--warn-soft)',display:'grid',placeItems:'center'}}><SGTIcon name={icono} size={26} color="var(--warn)"/></div></div>
+        <div style={{fontWeight:800,fontSize:18,color:'var(--ink)',textAlign:'center',marginBottom:10}}>{titulo}</div>
+        <div style={{fontSize:14,color:'var(--ink2)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center'}}>{children}</div>
+        <div style={{display:'flex',gap:10}}>
+          <button onClick={onCancelar} style={{flex:1,padding:'13px 0',borderRadius:12,border:'1.5px solid var(--line)',background:'none',color:'var(--ink2)',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Cancelar</button>
+          <button onClick={onConfirmar} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--warn)',color:'#fff',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{etiquetaConfirmar}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── MoldesSheet (guardar / cargar / eliminar contra el backend) ───────────── */
 function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,loading,nombreInicial,planActualId}){
   const{esDesktop}=useLayout();
   const[tab,setTab]=useState('guardar');
   const[nombre,setNombre]=useState('');
   const[err,setErr]=useState('');
-  // Desktop: confirmación antes de eliminar un molde (patrón de la guía).
+  // Confirmación antes de eliminar un molde, en desktop y en móvil (R18-6e):
+  // eliminar borra el molde en el backend.
   const[porEliminar,setPorEliminar]=useState(null);
   useEffect(()=>{ if(open){ setTab('guardar'); setNombre(nombreInicial||''); setErr(''); } },[open,nombreInicial]);
   useEffect(()=>{ if(!open)setPorEliminar(null); },[open]);
@@ -589,6 +611,7 @@ function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,load
   }
 
   return(
+    <>
     <Sheet open={open} onClose={onClose} title="Moldes de planificación" maxHeight="88%">
       <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:14}}>
         <div style={{display:'flex',gap:4,background:'var(--surface2)',borderRadius:12,padding:4}}>
@@ -627,7 +650,7 @@ function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,load
                       <div style={{fontSize:13.5,fontWeight:800,color:'var(--ink)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pl.nombre}</div>
                       <div style={{fontSize:11,fontWeight:700,color:'var(--ink3)',marginTop:2}}>{(pl.asignaciones||[]).length} rotativas · {asignadas} asignadas</div>
                     </button>
-                    <button onClick={()=>onDelete(pl)} title="Eliminar molde" style={{background:'var(--warn-soft)',border:'none',borderRadius:9,width:32,height:32,display:'grid',placeItems:'center',cursor:'pointer',flexShrink:0}}><SGTIcon name="trash" size={15} color="var(--warn)"/></button>
+                    <button onClick={()=>setPorEliminar(pl)} title="Eliminar molde" aria-label={`Eliminar molde ${pl.nombre}`} style={{background:'var(--warn-soft)',border:'none',borderRadius:9,width:32,height:32,display:'grid',placeItems:'center',cursor:'pointer',flexShrink:0}}><SGTIcon name="trash" size={15} color="var(--warn)"/></button>
                   </div>
                 );})}
               </div>
@@ -636,6 +659,17 @@ function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,load
         )}
       </div>
     </Sheet>
+    {porEliminar&&(
+      <ConfirmacionMovil
+        titulo="¿Eliminar molde?"
+        etiquetaConfirmar="Sí, eliminar"
+        onCancelar={()=>setPorEliminar(null)}
+        onConfirmar={()=>{ const pl=porEliminar; setPorEliminar(null); onDelete(pl); }}
+      >
+        Se eliminará el molde <strong style={{color:'var(--ink)'}}>{porEliminar.nombre}</strong> con sus {(porEliminar.asignaciones||[]).length} rotativas asignadas. Si tiene una vigencia activa, el sistema no lo permitirá: primero hay que anularla en «Vigencias».
+      </ConfirmacionMovil>
+    )}
+    </>
   );
 }
 
@@ -1729,6 +1763,10 @@ function PlanGuardarBase({onBack}){
   const[assignInstance,setAssignInstance]=useState(null);
   const[detailDia,setDetailDia]=useState(null);
   const[toast,setToast]=useState('');
+  // R18-6e: asignaciones del último molde guardado o cargado, para saber si el
+  // molde en pantalla tiene cambios sin guardar.
+  const[asignacionesGuardadas,setAsignacionesGuardadas]=useState('[]');
+  const[confirmarMoldeNuevo,setConfirmarMoldeNuevo]=useState(false);
 
   const flash=(msg)=>{ setToast(msg); setTimeout(()=>setToast(''),3800); };
 
@@ -1775,6 +1813,7 @@ function PlanGuardarBase({onBack}){
       else { guardado=await planificacionService.create({ idServicio:servicioId, ...payload }); }
       setPlanActualId(guardado?.idPlanificacion??planActualId);
       setPlanNombre(nombre);
+      setAsignacionesGuardadas(JSON.stringify(payload.asignaciones));
       setMoldesOpen(false);
       flash(`Molde "${nombre}" guardado`);
     }catch(e){ setError(e?.response?.data?.error||e.message||'Error al guardar el molde.'); }
@@ -1786,6 +1825,8 @@ function PlanGuardarBase({onBack}){
       loadMolde(pl);
       setPlanActualId(pl.idPlanificacion);
       setPlanNombre(pl.nombre);
+      // Mismo formato que toAsignaciones() de las instancias que arma loadMolde.
+      setAsignacionesGuardadas(JSON.stringify((pl.asignaciones||[]).map(a=>({ idRotativa:a.idRotativa, idFuncionario:a.idFuncionario||null, idPuesto:a.idPuesto||null }))));
       setMoldesOpen(false);
       flash(`Molde "${pl.nombre}" cargado`);
     }catch(e){ setError(e?.response?.data?.error||e.message||'Error al cargar el molde.'); }
@@ -1794,7 +1835,8 @@ function PlanGuardarBase({onBack}){
   const onDeleteMolde=async(pl)=>{
     try{
       await planificacionService.remove(pl.idPlanificacion);
-      if(planActualId===pl.idPlanificacion){ setPlanActualId(null); setPlanNombre(null); }
+      // Si era el molde en pantalla, lo que se ve queda como un molde sin guardar.
+      if(planActualId===pl.idPlanificacion){ setPlanActualId(null); setPlanNombre(null); setAsignacionesGuardadas('[]'); }
       await cargarMoldes();
       flash(`Molde "${pl.nombre}" eliminado`);
     }catch(e){ setError(e?.response?.data?.error||e.message||'Error al eliminar el molde.'); }
@@ -1865,7 +1907,11 @@ function PlanGuardarBase({onBack}){
   };
 
   const openMoldes=()=>{ cargarMoldes(); setMoldesOpen(true); };
-  const nuevoMolde=()=>{ reset(); setPlanActualId(null); setPlanNombre(null); flash('Molde nuevo'); };
+  const empezarMoldeNuevo=()=>{ reset(); setPlanActualId(null); setPlanNombre(null); setAsignacionesGuardadas('[]'); setConfirmarMoldeNuevo(false); flash('Molde nuevo'); };
+  // R18-6e: «Molde nuevo» vacía la pantalla; si hay cambios sin guardar, primero pregunta.
+  const haySinGuardar=JSON.stringify(toAsignaciones())!==asignacionesGuardadas;
+  const nuevoMolde=()=>{ if(haySinGuardar){ setConfirmarMoldeNuevo(true); return; } empezarMoldeNuevo(); };
+  const textoMoldeNuevo='El molde en pantalla tiene cambios sin guardar. Si empiezas uno nuevo, se pierden.';
 
   const dayEntradas=detailDia!=null?(daysIndex[detailDia]||[]):[];
 
@@ -1930,6 +1976,17 @@ function PlanGuardarBase({onBack}){
         />
         <AsignarFuncionarioSheet open={!!assignInstance} onClose={()=>setAssignInstance(null)} instancia={assignInstance?instancias.find(i=>i.id===assignInstance.id):null} instancias={instancias} funcionarios={funcionarios} onAssign={onAssign} onUnassign={(id)=>{ unassign(id); flash('Asignación retirada'); }} onRemove={(id)=>{ removeInstancia(id); flash('Rotativa quitada'); }}/>
         <DetalleDiaSheet open={detailDia!=null} onClose={()=>setDetailDia(null)} diaIndex={detailDia} entradasDelDia={dayEntradas} tipoColor={tipoColor} tonoTipo={tonoTipo} funcionarios={funcionarios} onAssignInstance={(inst)=>{ setDetailDia(null); setTimeout(()=>setAssignInstance(inst),220); }}/>
+        {confirmarMoldeNuevo&&(
+          <ConfirmacionPlan
+            titulo="¿Empezar un molde nuevo?"
+            tono="peligro"
+            etiquetaConfirmar="Sí, empezar de nuevo"
+            onCancelar={()=>setConfirmarMoldeNuevo(false)}
+            onConfirmar={empezarMoldeNuevo}
+          >
+            <p>{textoMoldeNuevo}</p>
+          </ConfirmacionPlan>
+        )}
       </>
     );
   }
@@ -1998,6 +2055,17 @@ function PlanGuardarBase({onBack}){
       />
       <AsignarFuncionarioSheet open={!!assignInstance} onClose={()=>setAssignInstance(null)} instancia={assignInstance?instancias.find(i=>i.id===assignInstance.id):null} instancias={instancias} funcionarios={funcionarios} onAssign={onAssign} onUnassign={(id)=>{ unassign(id); flash('Asignación retirada'); }} onRemove={(id)=>{ removeInstancia(id); flash('Rotativa quitada'); }}/>
       <DetalleDiaSheet open={detailDia!=null} onClose={()=>setDetailDia(null)} diaIndex={detailDia} entradasDelDia={dayEntradas} tipoColor={tipoColor} onAssignInstance={(inst)=>{ setDetailDia(null); setTimeout(()=>setAssignInstance(inst),220); }}/>
+      {confirmarMoldeNuevo&&(
+        <ConfirmacionMovil
+          titulo="¿Empezar un molde nuevo?"
+          icono="alert"
+          etiquetaConfirmar="Sí, empezar de nuevo"
+          onCancelar={()=>setConfirmarMoldeNuevo(false)}
+          onConfirmar={empezarMoldeNuevo}
+        >
+          {textoMoldeNuevo}
+        </ConfirmacionMovil>
+      )}
     </div>
   );
 }
