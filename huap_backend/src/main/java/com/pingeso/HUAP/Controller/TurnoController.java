@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -158,6 +159,10 @@ public class TurnoController {
         try {
             Map<String, Object> resultado = gestionTurnoService.alterarTurno(request);
             return ResponseEntity.ok(resultado);
+        } catch (AccessDeniedException e) {
+            // C-20 (HU-ASG-02, criterio 5): la negación por servicio es un 403, no una regla de
+            // negocio; antes el catch de abajo la convertía en 400.
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {

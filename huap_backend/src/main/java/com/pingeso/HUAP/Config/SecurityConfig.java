@@ -1,5 +1,6 @@
 package com.pingeso.HUAP.Config;
 
+import com.pingeso.HUAP.Security.JwtAccessDeniedHandler;
 import com.pingeso.HUAP.Security.JwtAuthenticationEntryPoint;
 import com.pingeso.HUAP.Security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,9 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthenticationEntryPoint unauthorizedHandler;
+
+    @Autowired
+    private JwtAccessDeniedHandler accessDeniedHandler;
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -78,7 +82,12 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // API stateless con Bearer token en header (no cookies)
                 .cors(cors -> {
                 })
-                .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
+                // SEC (C-20, BUG-001): sin sesión o con token inválido, 401 (entry point); con
+                // sesión válida y sin el rol, 403 (antes también salía 401 y el frontend cerraba
+                // la sesión).
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(unauthorizedHandler)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
                         .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
@@ -90,6 +99,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // --- Públicos (sin token) ---
                         .requestMatchers("/api/v2/health", "/api/v2/info").permitAll()
+                        // Página de error de Spring Boot: el reenvío a /error llega sin el JWT, y
+                        // si no fuera pública cualquier error terminaría en 401 (C-20).
+                        .requestMatchers("/error").permitAll()
                         // Documentación de la API (OpenAPI / Swagger UI)
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v2/funcionarios/login").permitAll()

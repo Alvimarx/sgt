@@ -51,12 +51,19 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "Error interno del servidor"));
     }
 
-    /** Autorización: el recurso existe pero el usuario autenticado no tiene acceso a él. */
+    /**
+     * Autorización: el recurso existe pero el usuario autenticado no tiene acceso a él. Los
+     * {@code @PreAuthorize} niegan con el mensaje genérico de Spring («Access Denied»), que se
+     * cambia por uno en español para el aviso de la interfaz (C-20).
+     */
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, String>> handleAccessDenied(AccessDeniedException ex) {
         logger.warn("Acceso denegado: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("error", ex.getMessage() != null ? ex.getMessage() : "No tienes permiso para esta operación"));
+        String mensaje = ex.getMessage();
+        if (mensaje == null || mensaje.isBlank() || "Access Denied".equals(mensaje)) {
+            mensaje = "No tienes permiso para realizar esta acción";
+        }
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", mensaje));
     }
 
     /**
