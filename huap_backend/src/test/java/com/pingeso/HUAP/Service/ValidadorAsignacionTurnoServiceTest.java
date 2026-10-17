@@ -171,4 +171,24 @@ class ValidadorAsignacionTurnoServiceTest {
 
         assertEquals(List.of(a, c), resultado);
     }
+
+    // ============================ P-01: el turno que choca, con fecha legible ============================
+
+    @Test
+    void mensajes_citanElTurnoQueChocaConFechaLegible_noEnIso() {
+        // LUNES es el lunes 8 de junio de 2026: la noche va del lun 8 a las 20:00 al mar 9 a las 08:00.
+        TurnoEntity noche = turnoDe12h(1L, LUNES, LocalTime.of(20, 0));
+        LocalDateTime diaInicio = LUNES.plusDays(1).atTime(8, 0);
+
+        var r13 = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> validador.validarAsignacion("Juan Pérez", diaInicio, diaInicio.plusHours(12), 2L, List.of(noche)));
+        assertEquals("No es posible asignar el turno a Juan Pérez porque sale de su turno de noche "
+                + "(lun 8 jun, 20:00 a mar 9 jun, 08:00) la mañana de ese mismo día. Se permite un día seguido "
+                + "de su noche (24 horas corridas), pero no una noche seguida de día.", r13.getMessage());
+
+        var solape = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> validador.validarAsignacion("Juan Pérez", LUNES.atTime(22, 0), LUNES.plusDays(1).atTime(6, 0), 2L, List.of(noche)));
+        assertTrue(solape.getMessage().endsWith("(lun 8 jun, 20:00 a mar 9 jun, 08:00)."), solape.getMessage());
+        assertFalse(solape.getMessage().contains("T20:00"));
+    }
 }

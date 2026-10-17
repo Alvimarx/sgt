@@ -1,6 +1,7 @@
 package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.TurnoEntity;
+import com.pingeso.HUAP.Utils.FormatoFecha;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -70,19 +71,22 @@ public class ValidadorAsignacionTurnoService {
             LocalDateTime existenteInicio = existente.getDiaInicioTurno().atTime(existente.getHoraInicio());
             LocalDateTime existenteFin = existente.getDiaFinalTurno().atTime(existente.getHoraFin());
 
+            // P-01: el turno que choca se cita con fecha legible («mar 20 oct, 20:00 a mié 21 oct,
+            // 08:00»); antes salía en ISO («2026-10-20T20:00 a 2026-10-21T08:00»).
+            String turnoQueChoca = FormatoFecha.intervalo(existenteInicio, existenteFin);
+
             if (solapan(nuevoInicio, nuevoFin, existenteInicio, existenteFin)) {
                 throw new ConflictoAsignacionException(
                         "No es posible asignar el turno a " + nombreFuncionario + " porque ya tiene otro turno "
-                        + "asignado que se superpone (" + existenteInicio + " a " + existenteFin + ").");
+                        + "asignado que se superpone (" + turnoQueChoca + ").");
             }
 
             if (esDescansoPostNocturnoViolado(nuevoInicio, nuevoFin, existenteInicio, existenteFin)) {
                 boolean existenteEsElNocturno = existenteInicio.toLocalDate().isBefore(existenteFin.toLocalDate());
                 String motivo = existenteEsElNocturno
-                        ? "sale de su turno de noche (" + existenteInicio + " a " + existenteFin
-                          + ") la mañana de ese mismo día"
+                        ? "sale de su turno de noche (" + turnoQueChoca + ") la mañana de ese mismo día"
                         : "saldría de ese turno de noche la misma mañana en que empieza su turno de día ("
-                          + existenteInicio + " a " + existenteFin + ")";
+                          + turnoQueChoca + ")";
                 throw new ConflictoAsignacionException(
                         "No es posible asignar el turno a " + nombreFuncionario + " porque " + motivo
                         + ". Se permite un día seguido de su noche (24 horas corridas), pero no una noche seguida de día.");

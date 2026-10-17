@@ -24,6 +24,7 @@ import com.pingeso.HUAP.Repository.RotativaRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
+import com.pingeso.HUAP.Utils.FormatoFecha;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -255,7 +256,7 @@ public class PlanificacionService {
 
         bitacoraService.registrarEventoPlanificacion("GENERACION_PLANIFICACION", actor,
                 "Ejecución " + ejecucion.getIdEjecucion() + " de '" + plan.getNombre() + "': "
-                + fechaInicioEfectiva + " a " + fechaFinEfectiva);
+                + FormatoFecha.diaConAnio(fechaInicioEfectiva) + " a " + FormatoFecha.diaConAnio(fechaFinEfectiva));
 
         return resultado;
     }
@@ -340,7 +341,7 @@ public class PlanificacionService {
         LocalDate nuevaInicioEfectiva = vigente.getFechaFinEfectiva().plusDays(1);
         if (nuevaFechaFinEfectiva.isBefore(nuevaInicioEfectiva)) {
             throw new RuntimeException("La nueva fecha de término debe ser posterior al fin de la vigencia actual ("
-                    + vigente.getFechaFinEfectiva() + ").");
+                    + FormatoFecha.diaConAnio(vigente.getFechaFinEfectiva()) + ").");
         }
 
         return generarTurnos(idPlanificacion, vigente.getFechaInicioRotativa(), nuevaInicioEfectiva,
@@ -374,11 +375,12 @@ public class PlanificacionService {
         }
         if (!fechaDesde.isAfter(ejecucion.getFechaInicioEfectiva())) {
             throw new RuntimeException("La fecha desde la cual eliminar debe ser posterior al inicio efectivo de la vigencia ("
-                    + ejecucion.getFechaInicioEfectiva() + "). Para eliminar toda la vigencia, use anularEjecucion.");
+                    + FormatoFecha.diaConAnio(ejecucion.getFechaInicioEfectiva())
+                    + "). Para eliminar toda la vigencia, use anularEjecucion.");
         }
         if (fechaDesde.isAfter(ejecucion.getFechaFinEfectiva())) {
             throw new RuntimeException("La fecha desde la cual eliminar es posterior al fin actual de la vigencia ("
-                    + ejecucion.getFechaFinEfectiva() + "); no hay turnos que eliminar.");
+                    + FormatoFecha.diaConAnio(ejecucion.getFechaFinEfectiva()) + "); no hay turnos que eliminar.");
         }
 
         LocalDate nuevaFechaFinEfectiva = fechaDesde.minusDays(1);
@@ -397,7 +399,7 @@ public class PlanificacionService {
 
         FuncionarioEntity actor = (actorId != null) ? funcionarioRepository.findById(actorId).orElse(null) : null;
         bitacoraService.registrarEventoPlanificacion("ACORTAR_PLANIFICACION", actor,
-                "Ejecución " + idEjecucion + " acortada a " + nuevaFechaFinEfectiva
+                "Ejecución " + idEjecucion + " acortada a " + FormatoFecha.diaConAnio(nuevaFechaFinEfectiva)
                 + " (" + desactivados + " turnos futuros desactivados)");
 
         Map<String, Object> resultado = new HashMap<>();
@@ -499,7 +501,7 @@ public class PlanificacionService {
 
         FuncionarioEntity actor = (actorId != null) ? funcionarioRepository.findById(actorId).orElse(null) : null;
         bitacoraService.registrarEventoPlanificacion("EDICION_PLANIFICACION_DESDE_FECHA", actor,
-                "Planificación '" + plan.getNombre() + "' editada desde " + fechaDesde);
+                "Planificación '" + plan.getNombre() + "' editada desde " + FormatoFecha.diaConAnio(fechaDesde));
 
         return resultado;
     }
@@ -664,7 +666,8 @@ public class PlanificacionService {
             boolean solapa = !inicio.isAfter(e.getFechaFinEfectiva()) && !fin.isBefore(e.getFechaInicioEfectiva());
             if (solapa) {
                 throw new RuntimeException("Ya existe una planificación vigente en este servicio entre "
-                        + e.getFechaInicioEfectiva() + " y " + e.getFechaFinEfectiva()
+                        + FormatoFecha.diaConAnio(e.getFechaInicioEfectiva()) + " y "
+                        + FormatoFecha.diaConAnio(e.getFechaFinEfectiva())
                         + ". No se permiten vigencias efectivas superpuestas en un mismo servicio.");
             }
         }

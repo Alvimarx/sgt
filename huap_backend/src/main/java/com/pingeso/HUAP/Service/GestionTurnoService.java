@@ -7,6 +7,7 @@ import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Security.SeguridadServicio;
+import com.pingeso.HUAP.Utils.FormatoFecha;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -109,8 +110,7 @@ public class GestionTurnoService {
                 "Turno asignado manualmente a " + nombreCompleto(nuevo), request.getMotivo());
 
         notificacionService.crearNotificacionSistema(nuevo,
-                "Se te ha asignado un turno del " + turno.getDiaInicioTurno()
-                + " (" + turno.getHoraInicio() + " - " + turno.getHoraFin() + ").");
+                "Se te ha asignado un turno del " + diaYHorario(turno) + ".");
 
         return Map.of("accion", "asignado", "funcionario", nombreCompleto(nuevo));
     }
@@ -128,7 +128,7 @@ public class GestionTurnoService {
 
         if (funcionarioAnterior != null) {
             notificacionService.crearNotificacionSistema(funcionarioAnterior,
-                    "Tu turno del " + turno.getDiaInicioTurno()
+                    "Tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
                     + " ha sido desasignado. Motivo: " + request.getMotivo());
         }
 
@@ -158,12 +158,11 @@ public class GestionTurnoService {
 
         if (funcionarioAnterior != null) {
             notificacionService.crearNotificacionSistema(funcionarioAnterior,
-                    "Tu turno del " + turno.getDiaInicioTurno()
+                    "Tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
                     + " ha sido reasignado a otro funcionario. Motivo: " + request.getMotivo());
         }
         notificacionService.crearNotificacionSistema(nuevo,
-                "Se te ha reasignado el turno del " + turno.getDiaInicioTurno()
-                + " (" + turno.getHoraInicio() + " - " + turno.getHoraFin() + ").");
+                "Se te ha reasignado el turno del " + diaYHorario(turno) + ".");
 
         return Map.of("accion", "reasignado", "anterior", anteriorNombre, "nuevo", nombreCompleto(nuevo));
     }
@@ -174,7 +173,8 @@ public class GestionTurnoService {
         if (request.getNuevaHoraInicio() == null || request.getNuevaHoraFin() == null)
             throw new RuntimeException("Debe especificar nueva hora de inicio y fin.");
 
-        String horasAnteriores = turno.getHoraInicio() + " - " + turno.getHoraFin();
+        String horasAnteriores = FormatoFecha.hora(turno.getHoraInicio()) + " - " + FormatoFecha.hora(turno.getHoraFin());
+        String horasNuevas = FormatoFecha.hora(request.getNuevaHoraInicio()) + " - " + FormatoFecha.hora(request.getNuevaHoraFin());
         FuncionarioEntity asignado = turno.getFuncionario();
 
         turno.setHoraInicio(request.getNuevaHoraInicio());
@@ -182,15 +182,13 @@ public class GestionTurnoService {
         turnoService.saveTurno(turno); // aplica ajustes de feriados/fines de semana
 
         registrarEnBitacora(admin, turno, "MODIFICACION_HORARIO",
-                "Horario cambiado de " + horasAnteriores
-                + " a " + request.getNuevaHoraInicio() + " - " + request.getNuevaHoraFin(),
+                "Horario cambiado de " + horasAnteriores + " a " + horasNuevas,
                 request.getMotivo());
 
         if (asignado != null) {
             notificacionService.crearNotificacionSistema(asignado,
-                    "El horario de tu turno del " + turno.getDiaInicioTurno()
-                    + " fue modificado. Nuevo horario: "
-                    + request.getNuevaHoraInicio() + " - " + request.getNuevaHoraFin()
+                    "El horario de tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
+                    + " fue modificado. Nuevo horario: " + horasNuevas
                     + (request.getMotivo() != null ? ". Motivo: " + request.getMotivo() : ""));
         }
 
@@ -264,6 +262,12 @@ public class GestionTurnoService {
 
     private String nombreCompleto(FuncionarioEntity f) {
         return f.getNombre() + " " + f.getApelPat();
+    }
+
+    /** «lun 19 oct (08:00 - 20:00)»: el turno en los avisos al funcionario, sin fechas ISO (P-01). */
+    private static String diaYHorario(TurnoEntity turno) {
+        return FormatoFecha.dia(turno.getDiaInicioTurno())
+                + " (" + FormatoFecha.hora(turno.getHoraInicio()) + " - " + FormatoFecha.hora(turno.getHoraFin()) + ")";
     }
 
     private void validarFuncionarioAsignable(FuncionarioEntity funcionario, TurnoEntity turno) {
