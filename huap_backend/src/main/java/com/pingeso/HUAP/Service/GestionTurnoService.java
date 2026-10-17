@@ -40,6 +40,13 @@ public class GestionTurnoService {
     private final ServiciosFuncionarioRepository serviciosFuncionarioRepository;
     private final SeguridadServicio seguridadServicio;
     private final ValidadorAsignacionTurnoService validadorAsignacion;
+    private final SolicitudService solicitudService;
+
+    // §5.1 (P-01): motivos con que quedan RECHAZADAS las solicitudes pendientes sobre un turno que
+    // la gestión asigna, reasigna o libera a mano (mismo estilo que el rechazo automático de R10).
+    static final String MOTIVO_ASIGNADO = "Rechazo automático: El turno fue asignado manualmente.";
+    static final String MOTIVO_REASIGNADO = "Rechazo automático: El turno fue reasignado manualmente.";
+    static final String MOTIVO_LIBERADO = "Rechazo automático: El turno fue liberado manualmente.";
 
     /**
      * Kill-switch del lock pesimista (por defecto activado). Existe para poder medir A/B el costo del
@@ -117,6 +124,7 @@ public class GestionTurnoService {
 
         registrarEnBitacora(admin, turno, "ASIGNACION_MANUAL_TURNO",
                 "Turno asignado manualmente a " + nombreCompleto(nuevo), request.getMotivo());
+        solicitudService.rechazarPendientesPorCambioManual(turno.getIdTurno(), admin.getIdFuncionario(), MOTIVO_ASIGNADO);
 
         notificacionService.crearNotificacionSistema(nuevo,
                 "Se te ha asignado un turno del " + diaYHorario(turno) + ".");
@@ -136,6 +144,8 @@ public class GestionTurnoService {
           "Funcionario eliminado manualmente del turno: " + anteriorNombre, request.getMotivo());
 
         if (funcionarioAnterior != null) {
+            // Liberar un cupo que ya estaba libre no cambia nada: sus coberturas pendientes siguen.
+            solicitudService.rechazarPendientesPorCambioManual(turno.getIdTurno(), admin.getIdFuncionario(), MOTIVO_LIBERADO);
             notificacionService.crearNotificacionSistema(funcionarioAnterior,
                     "Tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
                     + " ha sido desasignado. Motivo: " + request.getMotivo());
@@ -164,6 +174,12 @@ public class GestionTurnoService {
         registrarEnBitacora(admin, turno, "REASIGNACION_MANUAL_TURNO",
                 "Turno reasignado manualmente de " + anteriorNombre + " a " + nombreCompleto(nuevo),
                 request.getMotivo());
+        // Reasignar a quien ya lo tiene no cambia de dueño: sus solicitudes siguen en pie.
+        boolean cambiaDeDueno = funcionarioAnterior == null
+                || !funcionarioAnterior.getIdFuncionario().equals(nuevo.getIdFuncionario());
+        if (cambiaDeDueno) {
+            solicitudService.rechazarPendientesPorCambioManual(turno.getIdTurno(), admin.getIdFuncionario(), MOTIVO_REASIGNADO);
+        }
 
         if (funcionarioAnterior != null) {
             notificacionService.crearNotificacionSistema(funcionarioAnterior,

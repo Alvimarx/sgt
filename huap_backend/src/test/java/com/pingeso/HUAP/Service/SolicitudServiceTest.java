@@ -1444,4 +1444,52 @@ class SolicitudServiceTest {
         assertEquals(RECHAZADA, service.cambiarEstado(1L, RECHAZADA).getEstado());
         verify(turnoRepository, never()).save(any());
     }
+
+    // ============================ §5.1: la asignación manual cierra las solicitudes pendientes ============================
+
+    @Test
+    void cambioManual_rechazaLasPendientesQuePidenOEntreganElTurno_conMotivoYBitacora() {
+        SolicitudEntity cobertura = SolicitudEntity.builder().idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 3))
+                .funcionario(funcionario(5L)).turno(turno(30L)).estado(PENDIENTE).motivo("Puedo cubrirlo").build();
+        SolicitudEntity intercambio = SolicitudEntity.builder().idSolicitud(2L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(funcionario(6L)).turno(turno(31L)).turnoReceptor(turno(30L)).estado(PENDIENTE).build();
+        SolicitudEntity yaAprobada = SolicitudEntity.builder().idSolicitud(3L).tipoSolicitud(tipoSolicitud(10L, 3))
+                .funcionario(funcionario(7L)).turno(turno(30L)).estado(APROBADA).build();
+        when(solicitudRepository.findByTurno_IdTurno(30L)).thenReturn(List.of(cobertura, yaAprobada));
+        when(solicitudRepository.findByTurnoReceptor_IdTurno(30L)).thenReturn(List.of(intercambio));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(cobertura));
+        when(solicitudRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(intercambio));
+        solicitudSaveDevuelveArgumento();
+
+        int rechazadas = service.rechazarPendientesPorCambioManual(30L, 9L,
+                "Rechazo automático: El turno fue asignado manualmente.");
+
+        assertEquals(2, rechazadas);
+        assertEquals(RECHAZADA, cobertura.getEstado());
+        assertEquals("Rechazo automático: El turno fue asignado manualmente. · motivo original: Puedo cubrirlo",
+                cobertura.getMotivo());
+        assertEquals(RECHAZADA, intercambio.getEstado());
+        assertEquals("Rechazo automático: El turno fue asignado manualmente.", intercambio.getMotivo());
+        assertEquals(APROBADA, yaAprobada.getEstado());
+        verify(bitacoraService).registrarEvento("RECHAZO_AUTOMATICO", 1L, 9L);
+        verify(bitacoraService).registrarEvento("RECHAZO_AUTOMATICO", 2L, 9L);
+        verify(bitacoraService, never()).registrarEvento("RECHAZO_AUTOMATICO", 3L, 9L);
+    }
+
+    @Test
+    void cambioManual_unaQueSeResolvioEntreMedio_noSeToca() {
+        SolicitudEntity listada = SolicitudEntity.builder().idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 2))
+                .funcionario(funcionario(5L)).turno(turno(30L)).estado(PENDIENTE).build();
+        SolicitudEntity yaCancelada = SolicitudEntity.builder().idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 2))
+                .funcionario(funcionario(5L)).turno(turno(30L)).estado(RECHAZADA)
+                .motivo("Cancelada por el solicitante").build();
+        when(solicitudRepository.findByTurno_IdTurno(30L)).thenReturn(List.of(listada));
+        when(solicitudRepository.findByTurnoReceptor_IdTurno(30L)).thenReturn(List.of());
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(yaCancelada));
+
+        assertEquals(0, service.rechazarPendientesPorCambioManual(30L, 9L, "Rechazo automático: El turno fue liberado manualmente."));
+        assertEquals("Cancelada por el solicitante", yaCancelada.getMotivo());
+        verify(solicitudRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService);
+    }
 }

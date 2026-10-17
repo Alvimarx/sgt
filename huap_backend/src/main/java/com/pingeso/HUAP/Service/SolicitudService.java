@@ -674,6 +674,45 @@ public class SolicitudService {
                 });
     }
 
+    /**
+     * §5.1 (P-01): la gestión asignó, reasignó o liberó el turno a mano
+     * ({@code GestionTurnoService}). Las solicitudes PENDIENTES que lo piden o lo entregan quedan
+     * sin sustento, igual que las competidoras de una aprobación (R10): pasan a RECHAZADA con un
+     * motivo automático, que conserva el motivo original como en una cancelación (R15), y cada
+     * una deja su evento {@code RECHAZO_AUTOMATICO} en la bitácora. Antes seguían pendientes y la
+     * jefatura podía aprobar después sobre un turno que ya había cambiado de dueño.
+     *
+     * <p>Se llama con el turno ya bloqueado por {@code alterarTurno}; cada solicitud se relee con
+     * lock por si una cancelación o la respuesta del receptor la resolvió entre medio.
+     *
+     * @param motivoAutomatico p. ej. «Rechazo automático: El turno fue asignado manualmente.».
+     * @return cuántas solicitudes quedaron rechazadas.
+     */
+    @Transactional
+    public int rechazarPendientesPorCambioManual(Long idTurno, Long idActor, String motivoAutomatico) {
+        java.util.Set<Long> pendientes = new java.util.LinkedHashSet<>();
+        Stream.concat(
+                        solicitudRepository.findByTurno_IdTurno(idTurno).stream(),
+                        solicitudRepository.findByTurnoReceptor_IdTurno(idTurno).stream())
+                .filter(s -> s.getEstado() == SolicitudEntity.EstadoSolicitud.PENDIENTE)
+                .forEach(s -> pendientes.add(s.getIdSolicitud()));
+
+        int rechazadas = 0;
+        for (Long idSolicitud : pendientes) {
+            SolicitudEntity solicitud = solicitudRepository.findByIdForUpdate(idSolicitud).orElse(null);
+            if (solicitud == null || solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) continue;
+
+            solicitud.setEstado(SolicitudEntity.EstadoSolicitud.RECHAZADA);
+            solicitud.setMotivo(motivoAutomatico
+                    + (solicitud.getMotivo() != null && !solicitud.getMotivo().isBlank()
+                            ? " · motivo original: " + solicitud.getMotivo() : ""));
+            solicitudRepository.save(solicitud);
+            agendarBitacora("RECHAZO_AUTOMATICO", idSolicitud, idActor);
+            rechazadas++;
+        }
+        return rechazadas;
+    }
+
     /** Solo permitido mientras la solicitud está {@code PENDIENTE}, y solo por quien la emitió. */
     @Transactional
     public SolicitudEntity modificarMotivo(Long idSolicitud, String nuevoMotivo) {

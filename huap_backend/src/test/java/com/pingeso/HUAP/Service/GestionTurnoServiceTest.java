@@ -54,10 +54,11 @@ class GestionTurnoServiceTest {
     private final NotificacionService notificacionService = mock(NotificacionService.class);
     private final ServiciosFuncionarioRepository serviciosFuncionarioRepository = mock(ServiciosFuncionarioRepository.class);
     private final SeguridadServicio seguridadServicio = mock(SeguridadServicio.class);
+    private final SolicitudService solicitudService = mock(SolicitudService.class);
 
     private final GestionTurnoService service = new GestionTurnoService(
             turnoRepository, funcionarioRepository, turnoService, bitacoraService, notificacionService,
-            serviciosFuncionarioRepository, seguridadServicio, new ValidadorAsignacionTurnoService());
+            serviciosFuncionarioRepository, seguridadServicio, new ValidadorAsignacionTurnoService(), solicitudService);
 
     {
         when(seguridadServicio.idUsuarioActual()).thenReturn(JEFATURA);
@@ -122,7 +123,7 @@ class GestionTurnoServiceTest {
         assertEquals(R13_NOCHE_DIA, ex.getReason());
         assertNull(dia.getFuncionario(), "el cupo sigue libre");
         verify(turnoRepository, never()).save(any());
-        verifyNoInteractions(bitacoraService, notificacionService);
+        verifyNoInteractions(bitacoraService, notificacionService, solicitudService);
     }
 
     @Test
@@ -204,5 +205,61 @@ class GestionTurnoServiceTest {
         assertEquals("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas.",
                 ex.getReason());
         verify(notificacionService, never()).crearNotificacionSistema(any(), anyString());
+    }
+
+    // ============================ §5.1: la asignación manual cierra las solicitudes pendientes ============================
+
+    @Test
+    void asignar_rechazaLasSolicitudesPendientesDelTurno() {
+        existe(turno(10L, LUNES, 8, null));
+        calendario(MEDICO);
+
+        service.alterarTurno(pedido(10L, "ASIGNAR", MEDICO));
+
+        verify(solicitudService).rechazarPendientesPorCambioManual(10L, JEFATURA,
+                "Rechazo automático: El turno fue asignado manualmente.");
+    }
+
+    @Test
+    void reasignarAOtraPersona_rechazaLasPendientes_yAQuienYaLoTiene_no() {
+        existe(turno(10L, LUNES, 8, persona(OTRO_MEDICO, "Luis", "Soto")));
+        calendario(MEDICO);
+        calendario(OTRO_MEDICO);
+
+        service.alterarTurno(pedido(10L, "REASIGNAR", MEDICO));
+        verify(solicitudService).rechazarPendientesPorCambioManual(10L, JEFATURA,
+                "Rechazo automático: El turno fue reasignado manualmente.");
+
+        reset(solicitudService);
+        existe(turno(20L, LUNES, 8, persona(OTRO_MEDICO, "Luis", "Soto")));
+        service.alterarTurno(pedido(20L, "REASIGNAR", OTRO_MEDICO));
+        verifyNoInteractions(solicitudService);
+    }
+
+    @Test
+    void liberar_rechazaLasPendientes_yLiberarUnCupoYaLibre_noLasToca() {
+        existe(turno(10L, LUNES, 8, persona(MEDICO, "Ana", "Rojas")));
+
+        service.alterarTurno(pedido(10L, "DESASIGNAR", null));
+        verify(solicitudService).rechazarPendientesPorCambioManual(10L, JEFATURA,
+                "Rechazo automático: El turno fue liberado manualmente.");
+
+        reset(solicitudService);
+        existe(turno(20L, LUNES, 8, null));
+        service.alterarTurno(pedido(20L, "DESASIGNAR", null));
+        verifyNoInteractions(solicitudService);
+    }
+
+    @Test
+    void cambiarHoras_noTocaLasSolicitudes() throws Exception {
+        TurnoEntity t = existe(turno(10L, LUNES, 8, persona(MEDICO, "Ana", "Rojas")));
+        when(turnoService.saveTurno(any())).thenReturn(t);
+        AlterarTurnoRequest r = pedido(10L, "CAMBIAR_HORAS", null);
+        r.setNuevaHoraInicio(LocalTime.of(9, 0));
+        r.setNuevaHoraFin(LocalTime.of(21, 0));
+
+        service.alterarTurno(r);
+
+        verifyNoInteractions(solicitudService);
     }
 }
