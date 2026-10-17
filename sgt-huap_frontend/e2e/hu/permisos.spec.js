@@ -3,7 +3,9 @@
 // sesión: no pasan por el filtro de seguridad, así que BUG-001 (C-20) no los toca.
 //  - Por API, una vez y en el proyecto desktop: AUT-02 (criterio 6), CAL-08 (4),
 //    NOT-01 (5), PER-01 (4), SOL-08 (4), SOL-11 (6, solicitud ajena), SOL-12 (4),
-//    OFE-02 (3) y ASG-02 (5).
+//    OFE-02 (2 y 3), ASG-02 (5) y la mitad «otro servicio» de SOL-09 (8). Las dos
+//    últimas que se sumaron (OFE-02, criterio 2, y SOL-09, criterio 8) son de la
+//    fase 4: caben aquí porque el backend las niega antes de escribir.
 //  - Por la interfaz, en móvil y en desktop: AUT-07 (criterio 3) y la parte de
 //    OFE-02 (criterio 3) que se ve en pantalla.
 //  - Omitida: JER-02 (criterio 2). Hoy el backend lo permite y la prueba
@@ -18,9 +20,10 @@
 // escritura respondiera 2xx, la base cambió: restaurarla.
 //
 // Datos del seed de Urgencias, ninguno del médico 369: las solicitudes 14
-// (APROBADA, botar turno), 15 (PENDIENTE, cobertura), 16 (intercambio) y 17
-// (oferta particular), la oferta general 1 (ABIERTA) y, de Enfermería, un cupo
-// libre. Las personas van por id; los listados con nombres solo se cuentan.
+// (APROBADA, botar turno), 15 (PENDIENTE, cobertura), 16 (intercambio), 17
+// (oferta particular) y 18 (oferta particular RECHAZADA), las ofertas generales 1
+// (ABIERTA), 2 (CERRADA) y 3 (RECHAZADA) y, de Enfermería, un cupo libre. Las
+// personas van por id; los listados con nombres solo se cuentan.
 import {
   test, expect, fallaConocida, ID, SERVICIO, APOYO, USUARIOS, esDesktop, soloPorApi, hoyChile, mesDe, anioDe,
   loginApi, apiGet, tokenRol, apiLlamar, solicitudesDeUrgencias, entrar, irA, vistaActual, menuLateral,
@@ -30,8 +33,9 @@ import { ofertaSimulada, participantesSolicitud } from '../helpers/datos.js';
 
 const URGENCIAS = { idServicio: SERVICIO.urgencias, nombre: 'Urgencias' };
 const OTRO_SERVICIO = 'No tienes acceso a datos de otro servicio';
-const SOL = { aprobada: 14, pendiente: 15, intercambio: 16, ofertaParticular: 17 };
+const SOL = { aprobada: 14, pendiente: 15, intercambio: 16, ofertaParticular: 17, rechazada: 18 };
 const OFERTA_ABIERTA = 1;
+const OFERTAS_RESUELTAS = { 2: 'CERRADA', 3: 'RECHAZADA' };
 const MOTIVO_PRUEBA = 'Prueba E2E fase 2a: el backend debe negarlo';
 
 // Precondición de toda escritura que debe ser negada: la solicitud está en el
@@ -173,6 +177,32 @@ test('HU-SOL-08 · criterio 4: si responde quien no es el receptor, 400 «No ere
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// HU-SOL-09 · Aprobar o rechazar solicitudes
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('HU-SOL-09 · criterio 8: aprobar una solicitud de otro servicio responde 403 «No tienes acceso a solicitudes de otro servicio»', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SolicitudService.cambiarEstado (:370-395): fuera del intercambio, la solicitud es del
+  // servicio de la sesión si su turno o su emisor lo son; si no, AccessDeniedException (403)
+  // antes de bloquear turnos o guardar. El subrogante es de Enfermería; la solicitud 18, de
+  // Urgencias. Segunda red: está RECHAZADA, así que si el permiso fallara la aprobación
+  // igual se cortaría al releerla («Esta solicitud ya no está pendiente…», :411-414).
+  const s = (await solicitudesDeUrgencias(request)).get(SOL.rechazada);
+  expect(s, `la solicitud ${SOL.rechazada} está en el seed de Urgencias`).toBeTruthy();
+  expect(s.estado, 'segunda red: ya está resuelta').toBe('RECHAZADA');
+  expect(s.tipoSolicitud?.tipo, 'no es un intercambio (su negación tiene otro mensaje)').not.toBe(4);
+  const subrogante = await tokenRol(request, 'subrogante');
+  const enfermeria = (await apiGet(request, subrogante, `/funcionarios/summary?servicioId=${SERVICIO.enfermeria}`)).map((f) => f.idFuncionario);
+  expect(enfermeria.includes(s.funcionario?.idFuncionario), 'el emisor no es de Enfermería').toBe(false);
+  expect([...participantesSolicitud(s), s.turno?.funcionario?.idFuncionario, s.turnoReceptor?.funcionario?.idFuncionario], 'el subrogante no participa').not.toContain(ID.subrogante);
+
+  const r = await apiLlamar(request, subrogante, 'PUT', `/solicitudes/${SOL.rechazada}/estado?nuevoEstado=APROBADA`);
+  expect(r.status).toBe(403);
+  expect(r.cuerpo.error).toBe('No tienes acceso a solicitudes de otro servicio');
+  expect((await solicitudesDeUrgencias(request)).get(SOL.rechazada).estado, 'sin cambios').toBe('RECHAZADA');
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // HU-SOL-11 · Cancelar mi solicitud pendiente (R15)
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -227,6 +257,30 @@ async function comprobarOfertaNoPendiente(request) {
   expect(oferta, `la oferta ${OFERTA_ABIERTA} está en el seed de Urgencias`).toBeTruthy();
   expect(oferta.estado, 'segunda red: no está pendiente de apertura').not.toBe('PENDIENTE_APROBACION');
 }
+
+test('HU-OFE-02 · criterio 2: abrir o rechazar una oferta que no está pendiente de apertura responde «La oferta no está en estado PENDIENTE_APROBACION»', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // OfertaGeneralService.aprobarOferta (:90-92) y rechazarOferta (:109-111): la jefatura es del
+  // servicio de la oferta, así que pasa el permiso, y el estado se revisa antes de guardar
+  // (RuntimeException, 400). Aquí no hay segunda red: el estado es la única guarda, y se
+  // confirma antes de cada llamada. Si respondiera 2xx, la base cambió: restaurarla.
+  const jefatura = await tokenRol(request, 'jefatura');
+  const ofertas = await apiGet(request, jefatura, `/ofertas-generales/servicio/${SERVICIO.urgencias}`);
+  for (const [id, estado] of Object.entries(OFERTAS_RESUELTAS)) {
+    expect(ofertas.find((o) => o.idOfertaGeneral === Number(id))?.estado, `la oferta ${id} está ${estado} en el seed de Urgencias`).toBe(estado);
+  }
+  for (const [id, estado] of Object.entries(OFERTAS_RESUELTAS)) {
+    for (const accion of ['aprobar', 'rechazar']) {
+      const r = await apiLlamar(request, jefatura, 'PUT', `/ofertas-generales/${id}/${accion}`);
+      expect(r.status, `${accion} la oferta ${id} (${estado})`).toBe(400);
+      expect(r.cuerpo.error).toBe('La oferta no está en estado PENDIENTE_APROBACION');
+    }
+  }
+  const despues = await apiGet(request, jefatura, `/ofertas-generales/servicio/${SERVICIO.urgencias}`);
+  for (const [id, estado] of Object.entries(OFERTAS_RESUELTAS)) {
+    expect(despues.find((o) => o.idOfertaGeneral === Number(id))?.estado, `la oferta ${id} sigue ${estado}`).toBe(estado);
+  }
+});
 
 test('HU-OFE-02 · criterio 3: el médico que aprueba o rechaza una oferta por API recibe 403', async ({ request }, testInfo) => {
   soloPorApi(testInfo);

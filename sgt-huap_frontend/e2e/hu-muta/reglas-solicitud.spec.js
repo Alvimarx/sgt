@@ -3,10 +3,11 @@
 // deshacen en la misma prueba, en móvil y en desktop.
 //  - HU-SOL-13 (R12 y R15): no pedir dos veces el mismo turno ni comprometerlo
 //    en dos solicitudes. Criterios 1 a 4; del 3 queda fuera «si rechazaron mi
-//    solicitud» (la rechaza la jefatura: fase 4).
+//    solicitud» (la rechaza la jefatura: fase 4, aprobaciones.spec.js).
 //  - HU-SOL-14 (R13, descanso post nocturno): criterios 1 a 3. El 4 (revalidar al
 //    aceptar, aprobar y seleccionar) y el 5 (asignación manual, C-04) son de la
-//    fase 4. La regla de 12 horas de RN-SGT-039 no se prueba: R13 la reemplazó (C-04).
+//    fase 4 (propuestas.spec.js, ofertas-generales.spec.js y asignacion.spec.js).
+//    La regla de 12 horas de RN-SGT-039 no se prueba: R13 la reemplazó (C-04).
 //
 // Los casos se buscan en los datos del día (turnos generados de Urgencias, desde
 // mañana): primero con el médico 369 y, si ya no tiene el caso, con los médicos de
@@ -19,10 +20,10 @@ import {
   testMuta, expect, fallaConocida, SERVICIO, APOYO, soloPorApi, hoyChile,
   entrar, vistaActual, esperarQuieta, nuevaSolicitud, asistente, campoAsistente, elegirTurnoAsistente, elegirPersonaAsistente,
   escribirMotivo, enviarSolicitud, enviarYCrear, enviarYRechazar, errorAsistente, leerSolicitud, abrirCancelacion, confirmarCancelacion,
-  esperarSolicitudes, motivoPrueba, sinNombre, idDe, apiComo, solicitudesDe, calendarioDe, comprometidosDe, personaDe,
-  cuposParaPedir, cupoDelSelector, intercambioPosible, hhmm,
+  esperarSolicitudes, motivoPrueba, idDe, apiComo, solicitudesDe, calendarioDe, comprometidosDe, personaDe,
+  cuposParaPedir, cupoDelSelector, intercambioPosible, hhmm, comprobarMensajeR13,
 } from '../helpers/hu.js';
-import { inicioDe, esNoche, choquesR13, encadenamientoR13, nombreMensajeR13, patronMensajeR13 } from '../helpers/datos.js';
+import { inicioDe, esNoche, choquesR13, encadenamientoR13 } from '../helpers/datos.js';
 
 const YA_SOLICITO = 'Ud. ya solicitó este turno. Cancele la solicitud pendiente desde Solicitudes si desea cambiarla.';
 const COMPROMETIDO = 'Ese turno ya está comprometido en otra solicitud pendiente suya. Cancélela desde Solicitudes para pedir otra cosa sobre él.';
@@ -232,13 +233,6 @@ const soloLaRegla = (regla) => (cupo, calendario) => {
   return choques.length === 1 && choques[0].regla === regla ? { choque: choques[0] } : null;
 };
 
-/** Compara un mensaje de R13 con el del catálogo y comprueba que nombre a `quien`, sin escribir el nombre. */
-async function comprobarMensajeR13(request, texto, quien, regla, turno) {
-  expect(sinNombre(texto)).toMatch(patronMensajeR13(regla, turno));
-  const nombre = nombreMensajeR13(await personaDe(request, quien));
-  expect(texto.startsWith(`No es posible asignar el turno a ${nombre} porque `), `el mensaje nombra al funcionario ${idDe(quien)}`).toBe(true);
-}
-
 for (const [criterio, regla, descripcion] of [
   [1, 'noche-dia', 'pedir el cupo de día de la mañana en que salgo de mi noche'],
   [2, 'dia-noche', 'pedir una noche que termina la mañana en que empieza mi turno de día'],
@@ -330,11 +324,3 @@ for (const [encadenamiento, descripcion] of [
     expect((await muta.cancelar(caso.quien, creada.idSolicitud)).status, 'deshacer').toBe(200);
   });
 }
-
-testMuta('HU-SOL-14 · criterio 4: la regla se revalida al aceptar, al aprobar y al seleccionar al postulante', async () => {
-  testMuta.skip(true, 'Fase 4: necesita un receptor que acepte, una jefatura que apruebe o que seleccione al postulante de una oferta.');
-});
-
-testMuta('HU-SOL-14 · criterio 5: la jefatura no puede asignar a mano a quien sale de su noche', async () => {
-  testMuta.skip(true, 'Fase 4 (asignación manual, HU-ASG-02) y C-04: hoy GestionTurnoService.validarConflictoFuncionario solo revisa el solape.');
-});

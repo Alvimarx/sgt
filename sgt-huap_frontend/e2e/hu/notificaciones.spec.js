@@ -9,35 +9,9 @@
 // Una notificación leída no está en el seed para esta usuaria: se simula
 // respondiendo la consulta GET (nada se guarda).
 import {
-  test, expect, APOYO, ID, esMovil, esDesktop, hoyChile, sumarDias, entrar, itemMenu, esperarQuieta,
+  test, expect, APOYO, ID, esMovil, esDesktop, hoyChile, sumarDias, entrar, itemMenu,
+  ICONO_BANDEJA, abrirBandeja, leerNotificaciones,
 } from '../helpers/hu.js';
-
-const ICONO_BANDEJA = 'path[d="M3 7h5l2 3h4l2-3h5"]';
-
-async function abrirBandeja(page, testInfo) {
-  if (esDesktop(testInfo)) await itemMenu(page, 'Notificaciones').click();
-  else await page.locator(`button:has(${ICONO_BANDEJA})`).first().click();
-  if (esDesktop(testInfo)) await expect(page.getByRole('heading', { name: 'Notificaciones' })).toBeVisible();
-  else await expect(page.locator('.top-header__title', { hasText: /^Bandeja$/ })).toBeVisible();
-  await esperarQuieta(page);
-}
-
-// Cada notificación: texto, fecha y marca, como la dibuja cada presentación.
-const leerNotificaciones = (page, testInfo) => (esDesktop(testInfo)
-  ? page.locator('li.sgt-dt-notif').evaluateAll((lis) => lis.map((li) => ({
-    texto: li.querySelector('.sgt-dt-notif__texto').textContent.trim(),
-    fecha: li.querySelector('.sgt-dt-notif__fecha').textContent.trim(),
-    marca: li.querySelector('.sgt-dt-notif__linea .sgt-d-chip').textContent.trim(),
-  })))
-  : page.getByRole('button', { name: 'Eliminar' }).evaluateAll((bs) => bs.map((b) => {
-    const tarjeta = b.parentElement.parentElement;
-    const cuerpo = tarjeta.firstElementChild.lastElementChild;
-    return {
-      texto: cuerpo.children[1].textContent.trim(),
-      fecha: cuerpo.children[2].textContent.trim(),
-      marca: cuerpo.children[0].lastElementChild.textContent.trim(),
-    };
-  })));
 
 // Fecha de envío como la formatea la bandeja (es-CL, fecha y hora cortas).
 const fechaEnvio = (page, iso) => page.evaluate((v) => new Date(v).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }), iso);

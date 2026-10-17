@@ -13,18 +13,19 @@
 //   estado (el de una pestaña refrescada).
 // - `api`: lecturas de la API con el JWT de la página, para calcular lo
 //   esperado a partir de los datos del día (las fechas cambian: nada en duro).
-// - `testMuta` (fase 3, e2e/hu-muta/): el mismo `test`, pero deja escribir. Ver
-//   su comentario más abajo.
+// - `testMuta` (fases 3 y 4, e2e/hu-muta/): el mismo `test`, pero deja escribir.
+//   Ver su comentario más abajo.
 // - Piezas de la interfaz que comparten varias fases: calendario y detalle del
 //   turno, agenda móvil, paneles y bitácora, solicitudes y el asistente «Nueva
-//   solicitud».
+//   solicitud», decidir y responder, postulaciones, ofertas, el panel de
+//   asignación y la bandeja de notificaciones.
 //
 // Los usuarios son los del seed de desarrollo (catálogo §2.1). Las pruebas no
 // escriben nombres de personas: identifican a cada una por RUT o por id y, si
 // necesitan un nombre, lo leen de la sesión o de la API durante la prueba.
 import { test as base, expect } from '@playwright/test';
 import { CLAVE_DEV, USUARIOS, iniciarSesion, esperarQuieta } from './sesion.js';
-import { choquesR13, inicioDe } from './datos.js';
+import { choquesR13, inicioDe, nombreMensajeR13, patronMensajeR13, patronMensajeSolape } from './datos.js';
 
 export { expect, esperarQuieta, USUARIOS, CLAVE_DEV };
 
@@ -167,6 +168,16 @@ export const sinNombre = (texto) => String(texto ?? '').replace(/(asignar el tur
  * siguen en la base como RECHAZADAS, y las ofertas generales quedan pendientes
  * de apertura porque su ofertor no tiene cómo retirarlas.
  *
+ * Fase 4 (flujos con aprobación): `muta` también decide, responde, abre y
+ * rechaza ofertas, postula, selecciona, asigna a mano y crea notificaciones. Lo
+ * que mueve turnos se anota antes (recordarTurnos) y se devuelve a su dueño con
+ * la asignación directa de la jefatura (devolverTurnos). La red de seguridad
+ * además rechaza las ofertas de muta.ofertar que sigan pendientes de apertura,
+ * devuelve los turnos anotados que no volvieron y elimina las notificaciones de
+ * muta.notificar que queden; si tuvo que hacerlo y la prueba pasó, la hace fallar.
+ * Quedan los eventos de bitácora y las notificaciones del sistema que crea cada
+ * asignación directa.
+ *
  * Como dejan filas en la base, corren solo si se piden (SGT_MUTA=1) y solo
  * contra el ambiente local: sin la variable se omiten, así que
  * `npx playwright test` («todo») no escribe. Ojo con el filtro de archivos:
@@ -175,6 +186,9 @@ export const sinNombre = (texto) => String(texto ?? '').replace(/(asignar el tur
  * esta, con `SGT_MUTA=1 … e2e/hu-muta/`, y después se restaura la base.
  */
 const HOSTS_LOCALES = ['localhost', '127.0.0.1', '[::1]'];
+
+/** Motivo de la asignación directa con que la fase 4 devuelve un turno a su dueño (queda en la bitácora). */
+const MOTIVO_DEVOLVER = 'E2E fase 4: devolver el turno a su dueño de antes de la prueba';
 
 export const testMuta = test.extend({
   // La guarda de solo lectura no aplica: estas pruebas escriben.
@@ -244,6 +258,42 @@ export const testMuta = test.extend({
       escrituras.push(`API ${metodo} /api/v2${ruta} (${quien}) → ${r.status}`);
       return { ...r, token };
     };
+
+    // Fase 4: lo que mueve turnos se devuelve con la asignación directa de la
+    // jefatura (POST /turnos/alterar), y lo que abre ofertas o crea notificaciones
+    // se cierra. La prueba anota antes de moverlos los turnos que va a tocar
+    // (recordarTurnos); al terminar, devolverTurnos los deja con su dueño de antes.
+    const turnosOriginales = new Map(); // idTurno → dueño antes de la prueba (null: cupo libre)
+    const turnosMovidos = new Set();
+    const ofertasADeshacer = new Set(); // creadas con muta.ofertar: la limpieza rechaza las que sigan pendientes de apertura
+    const notificaciones = new Map(); // idNotificación → quien la creó (muta.notificar)
+    const duenoActual = async (idTurno) => {
+      const r = await apiLlamar(request, await tokenRol(request, 'jefatura'), 'GET', `/turnos/${idTurno}`);
+      expect(r.status, `GET /turnos/${idTurno}`).toBe(200);
+      return r.cuerpo?.funcionario?.idFuncionario ?? null;
+    };
+    const alterarComoJefatura = (data) => llamar('jefatura', 'POST', '/turnos/alterar', { data: { motivo: MOTIVO_DEVOLVER, ...data } });
+    const devolver = async () => {
+      const actuales = new Map();
+      for (const id of turnosOriginales.keys()) actuales.set(id, await duenoActual(id));
+      const cambiados = [...turnosOriginales.keys()].filter((id) => actuales.get(id) !== turnosOriginales.get(id));
+      const fallas = [];
+      // Primero se liberan todos y después se asignan a su dueño de antes: así un
+      // canje (dos turnos cruzados) se deshace sin que la asignación choque con el
+      // turno que la persona todavía tiene.
+      for (const id of cambiados.filter((x) => actuales.get(x) != null)) {
+        const r = await alterarComoJefatura({ idTurno: id, accion: 'DESASIGNAR' });
+        if (r.status !== 200) fallas.push(`liberar el turno ${id} → ${r.status} ${sinNombre(r.cuerpo?.error)}`);
+      }
+      for (const id of cambiados.filter((x) => turnosOriginales.get(x) != null)) {
+        const r = await alterarComoJefatura({ idTurno: id, accion: 'ASIGNAR', idNuevoMedico: turnosOriginales.get(id) });
+        if (r.status !== 200) fallas.push(`devolver el turno ${id} al funcionario ${turnosOriginales.get(id)} → ${r.status} ${sinNombre(r.cuerpo?.error)}`);
+      }
+      cambiados.forEach((id) => turnosMovidos.add(id));
+      if (fallas.length) throw new Error(`No se pudo devolver un turno a su dueño: ${fallas.join(' · ')}`);
+      return cambiados;
+    };
+
     const muta = {
       /** POST /solicitudes con el JWT de `quien` (USUARIOS o APOYO). Devuelve { status, cuerpo }; si se creó, queda registrada. */
       async solicitar(quien, dto, { servicioId } = {}) {
@@ -267,6 +317,54 @@ export const testMuta = test.extend({
         const { status, cuerpo } = await llamar(quien, 'PATCH', `/solicitudes/${id}/motivo?motivo=${encodeURIComponent(motivo)}`, { servicioId });
         return { status, cuerpo };
       },
+
+      // ── Fase 4 ──
+      /** Cualquier llamada con el JWT de `quien`, anotada en «escrituras». Devuelve { status, cuerpo }. */
+      async api(quien, metodo, ruta, { data, servicioId } = {}) {
+        const { status, cuerpo } = await llamar(quien, metodo, ruta, { data, servicioId });
+        return { status, cuerpo };
+      },
+      /** PUT /solicitudes/{id}/estado (APROBADA o RECHAZADA) con el JWT de `quien`. */
+      decidir: (quien, id, estado, opciones) => muta.api(quien, 'PUT', `/solicitudes/${id}/estado?nuevoEstado=${estado}`, opciones),
+      /** Respuesta del receptor a una propuesta (intercambio u oferta particular, según el tipo de `sol`). */
+      responder: (quien, sol, acepta) => muta.api(quien, 'PUT',
+        `/solicitudes/${sol.idSolicitud}/${sol.tipoSolicitud?.tipo === 4 ? 'intercambio' : 'oferta-particular'}?respuesta=${acepta}`),
+      /** POST /ofertas-generales: exige que se cree. La limpieza rechaza la oferta si sigue pendiente de apertura. */
+      async ofertar(quien, idTurno, motivo) {
+        const r = await llamar(quien, 'POST', '/ofertas-generales', { data: { idTurno, motivo } });
+        expect(r.status, `${quien} publica la oferta general del turno ${idTurno}`).toBe(200);
+        registrar('/ofertas-generales', r.cuerpo, r.token);
+        ofertasADeshacer.add(r.cuerpo.idOfertaGeneral);
+        return r.cuerpo;
+      },
+      /** PUT /ofertas-generales/{id}/aprobar|rechazar con el JWT de `quien` (gestión). */
+      abrirOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/aprobar`),
+      rechazarOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/rechazar`),
+      /** POST /ofertas-generales/{id}/postular con el JWT de `quien`. El cuerpo es la postulación. */
+      postular: (quien, idOferta) => muta.api(quien, 'POST', `/ofertas-generales/${idOferta}/postular`),
+      retirarPostulacion: (quien, idOferta, idPostulacion) => muta.api(quien, 'DELETE', `/ofertas-generales/${idOferta}/postular/${idPostulacion}`),
+      seleccionar: (quien, idOferta, idPostulacion) => muta.api(quien, 'PUT', `/ofertas-generales/${idOferta}/seleccionar/${idPostulacion}`),
+      /** POST /turnos/alterar con el JWT de `quien`. Anota antes el dueño del turno, para devolverlo al terminar. */
+      async alterar(quien, data, { servicioId } = {}) {
+        await muta.recordarTurnos(data.idTurno);
+        return muta.api(quien, 'POST', '/turnos/alterar', { data: { motivo: motivoPrueba('asignación directa', 4), ...data }, servicioId });
+      },
+      /** Anota el dueño actual de estos turnos (ids o turnos de la API): devolverTurnos los deja así. Llamar ANTES de moverlos. */
+      async recordarTurnos(...turnos) {
+        for (const t of turnos.flat()) {
+          const id = typeof t === 'object' ? (t.id ?? t.idTurno) : t;
+          if (id != null && !turnosOriginales.has(id)) turnosOriginales.set(id, await duenoActual(id));
+        }
+      },
+      /** Devuelve cada turno anotado a su dueño de antes (asignación directa de la jefatura). Devuelve los ids que hubo que mover. */
+      devolverTurnos: () => devolver(),
+      /** POST /notificaciones (sin pantalla, §1.5): una notificación ligada a una solicitud. La limpieza la elimina si queda. */
+      async notificar(quien, idSolicitud, mensaje) {
+        const r = await llamar(quien, 'POST', '/notificaciones', { data: { idSolicitud, mensaje } });
+        expect(r.status, `${quien} crea la notificación de la solicitud ${idSolicitud}`).toBe(200);
+        notificaciones.set(r.cuerpo.idNotificacion, quien);
+        return r.cuerpo;
+      },
     };
 
     await usar(muta);
@@ -279,26 +377,78 @@ export const testMuta = test.extend({
       porToken.get(token).ids.push(id);
     });
     const sinDeshacer = [];
+    const estadoFinal = new Map(); // idSolicitud → estado con que queda
     for (const [token, { emisor, ids }] of porToken) {
       const propias = await apiLlamar(request, token, 'GET', `/solicitudes/funcionario/${emisor}`);
-      const abiertas = (Array.isArray(propias.cuerpo) ? propias.cuerpo : [])
-        .filter((s) => ids.includes(s.idSolicitud) && s.estado === 'PENDIENTE');
-      for (const s of abiertas) {
+      const delaPrueba = (Array.isArray(propias.cuerpo) ? propias.cuerpo : []).filter((s) => ids.includes(s.idSolicitud));
+      for (const s of delaPrueba) {
+        estadoFinal.set(s.idSolicitud, s.estado);
+        if (s.estado !== 'PENDIENTE') continue;
         const r = await apiLlamar(request, token, 'PUT', `/solicitudes/${s.idSolicitud}/cancelar`);
         escrituras.push(`limpieza PUT /api/v2/solicitudes/${s.idSolicitud}/cancelar → ${r.status}`);
-        sinDeshacer.push(s.idSolicitud);
+        sinDeshacer.push(`solicitud ${s.idSolicitud} PENDIENTE (la canceló)`);
+        estadoFinal.set(s.idSolicitud, 'RECHAZADA');
       }
     }
+    // Fase 4: ofertas abiertas con muta.ofertar que sigan pendientes de apertura (las rechaza la jefatura).
+    const estadoOfertas = new Map();
+    if (ofertas.length) {
+      const jefatura = await tokenRol(request, 'jefatura');
+      const leer = async () => {
+        const r = await apiLlamar(request, jefatura, 'GET', `/ofertas-generales/servicio/${SERVICIO.urgencias}`);
+        (Array.isArray(r.cuerpo) ? r.cuerpo : []).filter((o) => ofertas.includes(o.idOfertaGeneral)).forEach((o) => estadoOfertas.set(o.idOfertaGeneral, o.estado));
+      };
+      await leer();
+      for (const id of ofertasADeshacer) {
+        if (estadoOfertas.get(id) === 'PENDIENTE_APROBACION') {
+          const r = await apiLlamar(request, jefatura, 'PUT', `/ofertas-generales/${id}/rechazar`);
+          escrituras.push(`limpieza PUT /api/v2/ofertas-generales/${id}/rechazar → ${r.status}`);
+          sinDeshacer.push(`oferta ${id} pendiente de apertura (la rechazó la jefatura)`);
+        } else if (estadoOfertas.get(id) === 'ABIERTA') {
+          sinDeshacer.push(`oferta ${id} ABIERTA (sigue abierta: hay que elegir a un postulante para cerrarla)`);
+        }
+      }
+      await leer();
+    }
+    // Fase 4: turnos movidos que no volvieron a su dueño.
+    let errorDevolver = null;
+    if (turnosOriginales.size) {
+      try {
+        const cambiados = await devolver();
+        cambiados.forEach((id) => sinDeshacer.push(`turno ${id} (lo devolvió a su dueño)`));
+      } catch (e) { errorDevolver = e; }
+    }
+    // Fase 4: notificaciones creadas que no quedaron eliminadas.
+    for (const [id, quien] of notificaciones) {
+      const token = await tokenRol(request, quien);
+      const r = await apiLlamar(request, token, 'GET', `/notificaciones/${id}`);
+      if (r.cuerpo?.estado === 'ELIMINADO') continue;
+      const borrar = await apiLlamar(request, token, 'DELETE', `/notificaciones/${id}`);
+      escrituras.push(`limpieza DELETE /api/v2/notificaciones/${id} → ${borrar.status}`);
+      sinDeshacer.push(`notificación ${id} (la eliminó)`);
+    }
+
     testInfo.annotations.push({ type: 'escrituras', description: escrituras.join(' · ') || 'ninguna' });
     const quedan = [];
-    if (solicitudes.size) quedan.push(`solicitudes ${[...solicitudes.keys()].join(', ')}: canceladas, quedan RECHAZADAS`);
-    if (ofertas.length) quedan.push(`ofertas generales ${ofertas.join(', ')}: quedan pendientes de apertura (su ofertor no puede retirarlas)`);
+    const porEstado = (mapa) => {
+      const grupos = new Map();
+      mapa.forEach((estado, id) => grupos.set(estado, [...(grupos.get(estado) || []), id]));
+      return [...grupos].map(([estado, ids]) => `${ids.join(', ')}: ${estado}`).join('; ');
+    };
+    if (solicitudes.size) quedan.push(`solicitudes ${porEstado(estadoFinal)} (una cancelada queda RECHAZADA)`);
+    if (ofertas.length) {
+      const propias = [...ofertasADeshacer];
+      quedan.push(`ofertas generales ${porEstado(estadoOfertas)}${propias.length < ofertas.length ? ' (el ofertor no puede retirar las pendientes de apertura)' : ''}`);
+    }
+    if (turnosMovidos.size) quedan.push(`turnos ${[...turnosMovidos].join(', ')}: movidos y devueltos con la asignación directa (quedan sus eventos de bitácora y las notificaciones del sistema)`);
+    if (notificaciones.size) quedan.push(`notificaciones ${[...notificaciones.keys()].join(', ')}: quedan ELIMINADO`);
     if (quedan.length) testInfo.annotations.push({ type: 'no se deshace', description: quedan.join(' · ') });
 
+    if (errorDevolver) throw errorDevolver;
     expect(remotas, 'la página llamó a la API de otro servidor (se cortó)').toEqual([]);
     expect(erroresPagina, 'excepciones no capturadas en la página').toEqual([]);
     if (sinDeshacer.length && testInfo.status === 'passed' && testInfo.expectedStatus === 'passed') {
-      throw new Error(`La prueba dejó solicitudes PENDIENTES (las canceló la limpieza): ${sinDeshacer.join(', ')}. Cada prueba deshace lo que crea.`);
+      throw new Error(`La prueba no deshizo todo lo suyo (lo hizo la limpieza): ${sinDeshacer.join(' · ')}. Cada prueba deshace lo que crea o mueve.`);
     }
   }, { auto: true }],
 });
@@ -879,8 +1029,8 @@ export async function abrirModificarMotivo(page, testInfo, sol) {
   return hoja;
 }
 
-/** Motivo único para reconocer en la interfaz lo que crea la prueba. */
-export const motivoPrueba = (etiqueta) => `E2E fase 3 · ${etiqueta} · ${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
+/** Motivo único para reconocer en la interfaz lo que crea la prueba (`fase`: la del catálogo que la escribe). */
+export const motivoPrueba = (etiqueta, fase = 3) => `E2E fase ${fase} · ${etiqueta} · ${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 
 // ── Fase 3: datos del día por API (solo lectura) ─────────────────────────────
 /** Id en el SGT de un usuario de USUARIOS o de APOYO. */
@@ -945,10 +1095,10 @@ export async function cupoDelSelector(request, cupo) {
  * Dato de partida de una prueba: una cobertura PENDIENTE de `quien`, creada por API
  * con el fixture `muta` sobre el primer cupo que puede pedir. Devuelve { sol, cupo, motivo }.
  */
-export async function coberturaPorApi(request, muta, quien, etiqueta) {
+export async function coberturaPorApi(request, muta, quien, etiqueta, { fase = 3 } = {}) {
   const [cupo] = await cuposParaPedir(request, quien);
   expect(cupo, `hay un cupo libre que ${quien} puede pedir`).toBeTruthy();
-  const motivo = motivoPrueba(etiqueta);
+  const motivo = motivoPrueba(etiqueta, fase);
   return { sol: await muta.crear(quien, { idTipoSolicitud: 3, idTurno: cupo.id, motivo }), cupo, motivo };
 }
 
@@ -974,4 +1124,307 @@ export async function intercambioPosible(request, quien, receptor) {
     if (ofrecidos.length) return { propio, deseado: ofrecidos[0] };
   }
   return null;
+}
+
+// ── Fase 4: datos del día por API (solo lectura) ─────────────────────────────
+// Los flujos de dos o tres usuarios (fase 4) eligen turnos sin trámites encima:
+// sin solicitudes pendientes de nadie y sin una oferta general pendiente de
+// apertura o abierta. Así aprobar o mover un turno no toca nada ajeno a la
+// prueba, y lo que deja una corrida (todo resuelto, los turnos devueltos a su
+// dueño) no cambia lo que elige la siguiente.
+
+/** Motivo único de lo que crea la fase 4. */
+export const motivoF4 = (etiqueta) => motivoPrueba(etiqueta, 4);
+
+/** Dueño actual (id) de un turno, o null si es un cupo libre (GET /turnos/{id}, como la jefatura). */
+export const duenoDe = async (request, idTurno) => (await apiComo(request, 'jefatura', `/turnos/${idTurno}`)).funcionario?.idFuncionario ?? null;
+
+/** Ids de los turnos con algún trámite vivo: solicitudes PENDIENTES de cualquiera y ofertas generales pendientes de apertura o abiertas. */
+export async function turnosEnTramite(request) {
+  const [solicitudes, ofertas] = await Promise.all([
+    apiComo(request, 'jefatura', '/solicitudes'),
+    apiComo(request, 'jefatura', `/ofertas-generales/servicio/${SERVICIO.urgencias}`),
+  ]);
+  return new Set([
+    ...solicitudes.filter((s) => s.estado === 'PENDIENTE').flatMap((s) => [s.turno?.idTurno, s.turnoReceptor?.idTurno]),
+    ...ofertas.filter((o) => ['PENDIENTE_APROBACION', 'ABIERTA'].includes(o.estado)).map((o) => o.turno?.idTurno),
+  ].filter((id) => id != null));
+}
+
+const porInicio = (a, b) => inicioDe(a).localeCompare(inicioDe(b));
+
+/**
+ * Foto del día: los turnos de Urgencias, los cupos libres y los turnos de cada
+ * persona desde mañana (el backend corre en UTC, §2.3) y sin trámites encima, y
+ * el calendario completo de las personas de `quienes` (todos sus turnos, de
+ * cualquier servicio: con ellos valida el backend el solape y R13).
+ */
+export async function fotoDelDia(request, quienes = []) {
+  const [turnos, enTramite, ...calendarios] = await Promise.all([
+    apiComo(request, 'jefatura', `/turnos/servicio/${SERVICIO.urgencias}`),
+    turnosEnTramite(request),
+    ...quienes.map((q) => calendarioDe(request, q)),
+  ]);
+  const hoy = hoyChile();
+  const futuros = turnos.filter((t) => t.diaInicioTurno > hoy && !enTramite.has(t.id)).sort(porInicio);
+  return {
+    turnos,
+    enTramite,
+    cupos: futuros.filter((t) => t.idFuncionario == null),
+    calendario: Object.fromEntries(quienes.map((q, i) => [q, calendarios[i]])),
+    turnosDe: (quien) => futuros.filter((t) => t.idFuncionario === idDe(quien)),
+  };
+}
+
+/** Cupos libres sin trámites que `quien` puede tomar hoy sin choque (ni solape ni R13), en orden de inicio. */
+export async function cuposLibresPara(request, quien) {
+  const foto = await fotoDelDia(request, [quien]);
+  return foto.cupos.filter((c) => choquesR13(c, foto.calendario[quien]).length === 0);
+}
+
+/**
+ * Hasta `n` intercambios disjuntos que `quien` puede proponerle hoy a `receptor`:
+ * un turno suyo sin trámites y uno del receptor, también sin trámites, que
+ * /turnos/intercambiables acepta para él (el backend aplica ahí las mismas reglas
+ * que al crear y al aprobar). Cada par: { propio, deseado }.
+ */
+export async function intercambiosLibres(request, quien, receptor, n = 1) {
+  const foto = await fotoDelDia(request);
+  const pares = [];
+  const usados = new Set();
+  for (const propio of foto.turnosDe(quien)) {
+    if (usados.has(propio.id)) continue;
+    const ofrecidos = (await apiComo(request, quien, `/turnos/intercambiables?idTurnoPropio=${propio.id}&idFuncionarioReceptor=${idDe(receptor)}`))
+      .filter((t) => !foto.enTramite.has(t.id) && !usados.has(t.id));
+    if (!ofrecidos.length) continue;
+    pares.push({ propio, deseado: ofrecidos[0] });
+    [propio.id, ofrecidos[0].id].forEach((id) => usados.add(id));
+    if (pares.length === n) break;
+  }
+  return pares;
+}
+
+/**
+ * Caso para la revalidación de R13 (HU-SOL-14, criterio 4): un turno `turno` de
+ * `dueno` que `receptor` puede recibir hoy, y un cupo libre `cupo` que, asignado a
+ * mano a `receptor` (la asignación directa solo mira el solape, C-04), deja a
+ * `turno` en choque de R13 con su calendario: una noche que sale la mañana de ese
+ * día ('noche-dia') o un día que empieza la mañana en que sale de esa noche
+ * ('dia-noche'). Prueba los pares [dueno, receptor] en orden. null si no hay.
+ */
+export async function casoR13PorAsignacion(request, pares) {
+  const foto = await fotoDelDia(request, [...new Set(pares.flat())]);
+  for (const [dueno, receptor] of pares) {
+    const calendario = foto.calendario[receptor];
+    for (const turno of foto.turnosDe(dueno)) {
+      if (choquesR13(turno, calendario).length) continue;
+      for (const cupo of foto.cupos) {
+        if (choquesR13(cupo, calendario).some((c) => c.regla === 'solape')) continue;
+        const choques = choquesR13(turno, [...calendario, cupo]);
+        if (choques.length === 1 && choques[0].regla !== 'solape') return { dueno, receptor, turno, cupo, regla: choques[0].regla };
+      }
+    }
+  }
+  return null;
+}
+
+/** Eventos de bitácora de un turno (GET /bitacoras/turno/{id}, como la jefatura), del más nuevo al más antiguo. */
+export const bitacoraDeTurno = async (request, idTurno) => (await apiComo(request, 'jefatura', `/bitacoras/turno/${idTurno}`))
+  .sort((a, b) => b.idEvento - a.idEvento);
+
+/** Ofertas generales de Urgencias por id (como la jefatura). */
+export const ofertasDeUrgencias = async (request) => new Map((await apiComo(request, 'jefatura', `/ofertas-generales/servicio/${SERVICIO.urgencias}`))
+  .map((o) => [o.idOfertaGeneral, o]));
+
+// ── Fase 4: decidir y responder en Solicitudes ───────────────────────────────
+const RUTA_DECIDIR = /\/api\/v2\/solicitudes\/\d+\/estado$/;
+const RUTA_RESPONDER = /\/api\/v2\/solicitudes\/\d+\/(intercambio|oferta-particular)$/;
+/** Rutas de las acciones sobre una oferta general (abrir, rechazar, postular, retirar, seleccionar). */
+export const RUTA_OFERTA = /\/api\/v2\/ofertas-generales\/\d+\/(aprobar|rechazar|postular|seleccionar)(\/\d+)?$/;
+
+/** Pulsa `boton` y espera la respuesta del backend a la escritura cuya ruta calza con `ruta`. Devuelve { status, cuerpo }. */
+export async function pulsarYEsperar(page, boton, ruta) {
+  const respuesta = page.waitForResponse((r) => !['GET', 'HEAD', 'OPTIONS'].includes(r.request().method()) && ruta.test(new URL(r.url()).pathname));
+  await boton.click();
+  const r = await respuesta;
+  return { status: r.status(), cuerpo: await r.json().catch(() => null) };
+}
+
+/** «Aprobar» o «Rechazar» de la gestión en una solicitud leída con leerSolicitud. Devuelve la respuesta del backend. */
+export const decidirEnPantalla = (page, sol, accion) => pulsarYEsperar(page, sol.zona.getByRole('button', { name: accion, exact: true }), RUTA_DECIDIR);
+
+/** «Aceptar» o «Rechazar» del receptor en una propuesta recibida, leída con leerSolicitud. Devuelve la respuesta del backend. */
+export const responderEnPantalla = (page, sol, accion) => pulsarYEsperar(page, sol.zona.getByRole('button', { name: accion, exact: true }), RUTA_RESPONDER);
+
+/**
+ * Aviso de error de la vista Solicitudes: en desktop, el aviso con role=alert de
+ * arriba de la lista; en móvil, el recuadro sobre las tarjetas, que se ubica por su
+ * comienzo (`patron`). Devuelve el texto.
+ */
+export async function avisoSolicitudes(page, testInfo, patron) {
+  const caja = esDesktop(testInfo) ? page.locator('.sgt-d-aviso').getByRole('alert') : page.getByText(patron);
+  await expect(caja).toBeVisible();
+  return (await caja.textContent()).trim();
+}
+
+/**
+ * Lee la tarjeta (móvil) o el detalle (desktop) «Postulaciones al mismo turno»
+ * (R10) que incluye la postulación con `motivo`. Devuelve sus textos, los
+ * postulantes en el orden en que se muestran (motivo, «Postuló el …» y botones) y
+ * `fila(motivo)`: la zona de un postulante, donde están «Elegir» y «Rechazar».
+ */
+export async function leerPostulaciones(page, testInfo, motivo) {
+  if (esDesktop(testInfo)) {
+    await page.getByRole('searchbox').fill(motivo);
+    const opciones = page.getByRole('listbox').getByRole('option');
+    await expect(opciones, `un solo ítem con «${motivo}»`).toHaveCount(1);
+    await opciones.first().click();
+    const zona = page.getByRole('region', { name: 'Detalle' });
+    await expect(zona.locator('h2')).toHaveText('Postulaciones al mismo turno');
+    const datos = await zona.evaluate((el) => ({
+      titulo: el.querySelector('h2').textContent.trim(),
+      subtitulo: el.querySelector('.sgt-dt-detalle-sol__subtitulo')?.textContent.trim(),
+      chip: el.querySelector('.sgt-dt-detalle-sol__cabecera .sgt-d-chip')?.textContent.trim(),
+      filas: Object.fromEntries([...el.querySelectorAll('.sgt-dt-ficha__fila')].map((f) => [f.querySelector('dt').textContent.trim(), f.querySelector('dd').textContent.trim()])),
+      seccion: el.querySelector('section')?.getAttribute('aria-label'),
+      postulantes: [...el.querySelectorAll('.sgt-dt-postulante')].map((p) => ({
+        motivo: p.querySelector('.sgt-dt-postulante__motivo')?.textContent.trim().replace(/^“|”$/g, ''),
+        detalle: p.querySelector('.sgt-dt-postulante__detalle')?.textContent.trim(),
+        botones: [...p.querySelectorAll('button')].map((b) => b.textContent.trim()),
+      })),
+      pie: el.querySelector('.sgt-dt-detalle-sol__pie')?.textContent.trim(),
+    }));
+    return { ...datos, zona, fila: (m) => zona.locator('.sgt-dt-postulante').filter({ hasText: m }) };
+  }
+  const zona = page.locator('.sgt-list-row').filter({ hasText: 'Postulaciones al mismo turno' }).filter({ hasText: motivo });
+  await expect(zona, `una sola tarjeta de postulaciones con «${motivo}»`).toHaveCount(1);
+  const datos = await zona.evaluate((el) => {
+    const [cabecera, ...resto] = el.children;
+    const filas = {};
+    resto.filter((c) => c.tagName === 'DIV' && c.children.length === 2 && [...c.children].every((x) => x.tagName === 'SPAN'))
+      .forEach((c) => { filas[c.children[0].textContent.trim()] = c.children[1].textContent.trim(); });
+    const lista = resto.find((c) => c.querySelector('button'));
+    return {
+      titulo: cabecera.children[1].children[0].textContent.trim(),
+      subtitulo: cabecera.children[1].children[1].textContent.trim(),
+      chip: cabecera.children[2].textContent.trim(),
+      filas,
+      postulantes: [...lista.children].map((p) => ({
+        motivo: p.children[1]?.textContent.trim().replace(/^“|”$/g, ''),
+        detalle: p.children[0].children[0].children[1]?.textContent.trim(),
+        botones: [...p.querySelectorAll('button')].map((b) => b.textContent.trim()),
+      })),
+      pie: resto.at(-1).textContent.trim(),
+    };
+  });
+  return { ...datos, zona, fila: (m) => zona.getByText(`“${m}”`, { exact: true }).locator('xpath=..') };
+}
+
+/** «Elegir» o «Rechazar» de un postulante (zona de leerPostulaciones().fila): en desktop llevan el nombre en su etiqueta; en móvil, «Rechazar» es solo un ícono. */
+export const botonPostulante = (fila, testInfo, accion) => {
+  if (esDesktop(testInfo)) return fila.getByRole('button', { name: new RegExp(`^${accion} a `) });
+  return accion === 'Elegir' ? fila.getByRole('button', { name: 'Elegir', exact: true }) : fila.getByRole('button').first();
+};
+
+// ── Fase 4: ofertas generales en pantalla ────────────────────────────────────
+/**
+ * «Seleccionar» del único postulante de una oferta abierta (leída con
+ * leerSolicitud por la gestión) y espera la confirmación «Confirmar selección».
+ * Devuelve el diálogo (alertdialog en desktop, la hoja en móvil) y su texto.
+ */
+export async function abrirSeleccion(page, testInfo, vista) {
+  const boton = esDesktop(testInfo)
+    ? vista.zona.getByRole('button', { name: /^Seleccionar a / })
+    : vista.zona.getByRole('button', { name: 'Seleccionar', exact: true });
+  await expect(boton, 'un solo postulante').toHaveCount(1);
+  await boton.click();
+  const dialogo = esDesktop(testInfo) ? page.getByRole('alertdialog', { name: 'Confirmar selección' }) : hojaMovil(page);
+  const texto = esDesktop(testInfo) ? dialogo.locator('.sgt-dt-confirmacion__texto') : dialogo.locator('p');
+  await expect(texto).toBeVisible();
+  // En desktop el recuadro «Turno» va dentro del mismo texto: la frase se lee sin él.
+  const frase = await texto.evaluate((el) => [...el.childNodes].filter((n) => !(n.nodeType === 1 && n.classList.contains('sgt-dt-motivo')))
+    .map((n) => n.textContent).join(''));
+  return { dialogo, texto: frase.replace(/\s+/g, ' ').trim(), turno: (await dialogo.textContent()).replace(/\s+/g, ' ').trim() };
+}
+
+// ── Fase 4: asignación de turnos (detalle del turno → panel de asignación) ───
+/** Panel «Asignar turno libre» o «Editar asignación de turno»: el panel lateral en desktop, la hoja en móvil. */
+export const panelAsignacion = (page, testInfo, titulo) => (esDesktop(testInfo)
+  ? page.getByRole('dialog', { name: titulo })
+  : hojaMovil(page).filter({ hasText: titulo }));
+
+/** Filas de personas del panel de asignación (un botón por persona, con nombre, rol y RUT), en orden. */
+export const filasAsignacion = (panel, testInfo) => (esDesktop(testInfo)
+  ? panel.locator('button.sgt-dt-asignar__fila')
+  : panel.getByText(/^Resultados \(\d+\)$/).locator('xpath=following-sibling::div[1]').locator('button'));
+
+/** RUT de cada fila del panel de asignación, en orden (el último dato de la fila; solo para cruzarlo con la API: las pruebas no lo escriben). */
+export const rutsAsignacion = (panel, testInfo) => filasAsignacion(panel, testInfo)
+  .evaluateAll((bs) => bs.map((b) => b.textContent.split('·').at(-1).trim()));
+
+/** Buscador del panel de asignación («Nombre o RUT...»). */
+export const buscadorAsignacion = (panel) => panel.getByPlaceholder('Nombre o RUT...');
+
+/**
+ * Confirmación del panel de asignación (asignar, reasignar o quitar): el
+ * alertdialog en desktop; en móvil, el recuadro centrado con ese título. Devuelve
+ * el diálogo y su texto (la pregunta).
+ */
+export async function confirmacionAsignacion(page, testInfo, titulo) {
+  const dialogo = esDesktop(testInfo)
+    ? page.getByRole('alertdialog', { name: titulo })
+    : page.getByText(titulo, { exact: true }).locator('xpath=..');
+  const texto = esDesktop(testInfo) ? dialogo.locator('.sgt-dt-confirmacion__texto') : dialogo.locator('p');
+  await expect(texto).toBeVisible();
+  return { dialogo, texto: (await texto.textContent()).replace(/\s+/g, ' ').trim() };
+}
+
+/** Ruta de la asignación directa. */
+export const RUTA_ALTERAR = /\/api\/v2\/turnos\/alterar$/;
+
+// ── Bandeja de notificaciones ────────────────────────────────────────────────
+// De la fase 1 (notificaciones.spec.js); los usa también la fase 4 (HU-NOT-02).
+/** Ícono de la bandeja en el encabezado del inicio móvil (su botón lleva el contador). */
+export const ICONO_BANDEJA = 'path[d="M3 7h5l2 3h4l2-3h5"]';
+
+export async function abrirBandeja(page, testInfo) {
+  if (esDesktop(testInfo)) await itemMenu(page, 'Notificaciones').click();
+  else await page.locator(`button:has(${ICONO_BANDEJA})`).first().click();
+  if (esDesktop(testInfo)) await expect(page.getByRole('heading', { name: 'Notificaciones' })).toBeVisible();
+  else await expect(page.locator('.top-header__title', { hasText: /^Bandeja$/ })).toBeVisible();
+  await esperarQuieta(page);
+}
+
+/** Cada notificación de la bandeja abierta: texto, fecha y marca, como la dibuja cada presentación. */
+export const leerNotificaciones = (page, testInfo) => (esDesktop(testInfo)
+  ? page.locator('li.sgt-dt-notif').evaluateAll((lis) => lis.map((li) => ({
+    texto: li.querySelector('.sgt-dt-notif__texto').textContent.trim(),
+    fecha: li.querySelector('.sgt-dt-notif__fecha').textContent.trim(),
+    marca: li.querySelector('.sgt-dt-notif__linea .sgt-d-chip').textContent.trim(),
+  })))
+  : page.getByRole('button', { name: 'Eliminar' }).evaluateAll((bs) => bs.map((b) => {
+    const tarjeta = b.parentElement.parentElement;
+    const cuerpo = tarjeta.firstElementChild.lastElementChild;
+    return {
+      texto: cuerpo.children[1].textContent.trim(),
+      fecha: cuerpo.children[2].textContent.trim(),
+      marca: cuerpo.children[0].lastElementChild.textContent.trim(),
+    };
+  })));
+
+/** La notificación con ese texto en la bandeja abierta: su fila (desktop) o su tarjeta (móvil), con «Marcar leída» y «Eliminar». */
+export const notificacionEnBandeja = (page, testInfo, texto) => (esDesktop(testInfo)
+  ? page.locator('li.sgt-dt-notif').filter({ hasText: texto })
+  : page.getByText(texto, { exact: true }).locator('xpath=ancestor::div[3]'));
+
+/**
+ * Compara un mensaje del validador de asignación (R13 o solape) con el del
+ * catálogo, con el nombre oculto, y comprueba aparte, sin escribirlo, que nombre a
+ * `quien`. `regla`: 'noche-dia', 'dia-noche' o 'solape'; `turno`: el que cita.
+ * De la fase 3 (reglas-solicitud.spec.js); la usa también la fase 4.
+ */
+export async function comprobarMensajeR13(request, texto, quien, regla, turno) {
+  expect(sinNombre(texto)).toMatch(regla === 'solape' ? patronMensajeSolape(turno) : patronMensajeR13(regla, turno));
+  const nombre = nombreMensajeR13(await personaDe(request, quien));
+  expect(texto.startsWith(`No es posible asignar el turno a ${nombre} porque `), `el mensaje nombra al funcionario ${idDe(quien)}`).toBe(true);
 }

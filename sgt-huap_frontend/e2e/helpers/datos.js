@@ -209,3 +209,12 @@ export function patronMensajeR13(regla, turno) {
     : `saldría de ese turno de noche la misma mañana en que empieza su turno de día ${turnoCitado}`;
   return new RegExp(`^No es posible asignar el turno a \\{nombre\\} porque ${motivo}\\. Se permite un día seguido de su noche \\(24 horas corridas\\), pero no una noche seguida de día\\.$`);
 }
+
+/**
+ * Mensaje del validador cuando el turno se cruza con otro de la persona (fase 4:
+ * la aprobación revalida el solape, HU-SOL-09 criterio 4), con el nombre oculto
+ * como «{nombre}». Se exige que cite el turno con que choca.
+ */
+export function patronMensajeSolape(turno) {
+  return new RegExp(`^No es posible asignar el turno a \\{nombre\\} porque ya tiene otro turno asignado que se superpone \\([^)]*${escapar(turno.diaInicioTurno)}[^)]*\\)\\.$`);
+}

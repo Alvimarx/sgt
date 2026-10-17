@@ -8,9 +8,10 @@
 //  - Lo que crea usa `testMuta` y lo deshace al final cancelando por API. La
 //    oferta general no se puede retirar (no hay endpoint para el ofertor): queda
 //    pendiente de apertura y la prueba elige cada vez un turno sin oferta suya.
-//  - Fuera, para la fase 4 (necesitan que la jefatura apruebe): HU-SOL-03
+//  - Fuera, en la fase 4 (necesitan que la jefatura apruebe): HU-SOL-03
 //    (criterio 5), la segunda mitad de HU-SOL-04 y HU-SOL-05 (criterio 2, «al
-//    aprobarse…») y la apertura real de HU-OFE-01 (criterio 2, aquí simulada).
+//    aprobarse…»), en aprobaciones.spec.js, y la apertura real de HU-OFE-01
+//    (criterio 2, aquí simulada), en ofertas-generales.spec.js.
 //
 // Los turnos y cupos se eligen con la API del día (desde mañana: el backend corre
 // en UTC, §2.3); nada de ids fijos. Las personas van por id.
@@ -180,10 +181,6 @@ testMuta('HU-SOL-03 · criterio 4: al enviar, el permiso queda PENDIENTE en «Mi
   expect(enBandeja.estado).toBe('PENDIENTE');
 
   expect((await muta.cancelar('medico', creada.idSolicitud)).status, 'deshacer: cancelar el permiso').toBe(200);
-});
-
-test('HU-SOL-03 · criterio 5: al aprobar el permiso no cambia ningún turno', async () => {
-  test.skip(true, 'Fase 4: necesita que la jefatura apruebe el permiso (y C-15 sigue abierta: hoy el permiso de la interfaz no lleva turno).');
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
