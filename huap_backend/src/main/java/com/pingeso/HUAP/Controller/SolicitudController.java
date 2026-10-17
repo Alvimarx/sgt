@@ -51,11 +51,14 @@ public class SolicitudController {
                     + "cobertura, intercambio u oferta particular) determina qué campos del DTO son "
                     + "relevantes: p. ej. en intercambio se usan idTurno (el deseado) e idTurnoIntercambio "
                     + "(el que se entrega); en permiso, fechaInicioPermiso/fechaTerminoPermiso. El turno que "
-                    + "se libera, se cede o se entrega debe ser del emisor.")
+                    + "se libera, se cede o se entrega debe ser del emisor; en un intercambio, el turno pedido "
+                    + "debe ser del receptor. Salvo en un permiso, ninguno de los turnos puede haber empezado.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Solicitud creada"),
-            @ApiResponse(responseCode = "400", description = "Turno ya comprometido, choque de horario u otra regla"),
+            @ApiResponse(responseCode = "400", description = "Turno ya comprometido, choque de horario u otra regla, "
+                    + "o un intercambio sin receptor o sin el turno pedido"),
             @ApiResponse(responseCode = "403", description = "El turno que se libera, se cede o se entrega no es del emisor"),
+            @ApiResponse(responseCode = "409", description = "Un turno ya empezó, o el turno pedido no es del receptor"),
     })
     @PostMapping
     public ResponseEntity<SolicitudEntity> crear(@RequestBody CrearSolicitudDTO dto) {
@@ -69,7 +72,7 @@ public class SolicitudController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Respuesta registrada"),
             @ApiResponse(responseCode = "400", description = "Quien responde no es el receptor"),
-            @ApiResponse(responseCode = "409", description = "La solicitud ya fue resuelta"),
+            @ApiResponse(responseCode = "409", description = "El receptor ya respondió o la solicitud ya fue resuelta"),
     })
     @PutMapping("/{id}/oferta-particular")
     public ResponseEntity<SolicitudEntity> responderOfertaParticular(@PathVariable @Positive Long id,
@@ -83,7 +86,7 @@ public class SolicitudController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Respuesta registrada"),
             @ApiResponse(responseCode = "400", description = "Quien responde no es el receptor"),
-            @ApiResponse(responseCode = "409", description = "La solicitud ya fue resuelta"),
+            @ApiResponse(responseCode = "409", description = "El receptor ya respondió o la solicitud ya fue resuelta"),
     })
     @PutMapping("/{id}/intercambio")
     public ResponseEntity<SolicitudEntity> responderIntercambio(@PathVariable @Positive Long id,

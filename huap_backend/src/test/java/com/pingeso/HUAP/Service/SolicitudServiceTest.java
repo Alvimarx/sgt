@@ -96,7 +96,12 @@ class SolicitudServiceTest {
         when(seguridadServicio.idServicioActual()).thenReturn(servicioSesionId);
     }
 
-    private static final LocalDate LUNES = LocalDate.of(2026, 6, 8);
+    /**
+     * Un lunes futuro: crear una solicitud sobre un turno que ya empezó responde 409 (§5.1), así
+     * que las pruebas de calendario al crear necesitan turnos que todavía no empiezan.
+     */
+    private static final LocalDate LUNES = LocalDate.now()
+            .with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY)).plusWeeks(1);
 
     /** Turno con horario real, de la duración indicada, para activar las validaciones de calendario. */
     private static TurnoEntity turnoConHorario(long id, LocalDate dia, LocalTime horaInicio, int duracionHoras) {
@@ -414,7 +419,7 @@ class SolicitudServiceTest {
     @Test
     void crear_turnoIntercambioInexistente_quedaNullSinLanzar() {
         mockFuncionarioYTipo(4);
-        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turnoDe(70L, 2L))); // del receptor
         when(turnoRepository.findById(999L)).thenReturn(Optional.empty());
         when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
         saveAsignaId();
@@ -1489,6 +1494,141 @@ class SolicitudServiceTest {
 
         assertEquals(0, service.rechazarPendientesPorCambioManual(30L, 9L, "Rechazo automático: El turno fue liberado manualmente."));
         assertEquals("Cancelada por el solicitante", yaCancelada.getMotivo());
+        verify(solicitudRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService);
+    }
+
+    // ============================ P-01: al crear, el turno pedido es del receptor y ninguno empezó ============================
+
+    /** Turno de 12 horas desde las 08:00 del día indicado, asignado a esa persona (o libre, con null). */
+    private static TurnoEntity turnoDelDia(long id, LocalDate dia, Long idDueno) {
+        TurnoEntity t = turnoConHorario(id, dia, LocalTime.of(8, 0), 12);
+        t.setFuncionario(idDueno != null ? funcionario(idDueno) : null);
+        return t;
+    }
+
+    @Test
+    void crear_intercambio_pidiendoUnTurnoQueNoEsDelReceptor_409YNoGuarda() {
+        mockFuncionarioYTipo(4);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turnoDe(70L, 3L))); // es de un tercero
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turnoDe(71L, ID_FUNCIONARIO)));
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+        dto.setIdTurnoIntercambio(71L);
+        dto.setIdFuncionarioReceptor(2L);
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> service.crearSolicitud(dto));
+        assertEquals(409, ex.getStatusCode().value());
+        assertEquals("El turno que pides no es de la persona con quien quieres intercambiar", ex.getReason());
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_intercambio_sinReceptorOSinElTurnoQuePide_400() {
+        mockFuncionarioYTipo(4);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turnoDe(70L, 2L)));
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turnoDe(71L, ID_FUNCIONARIO)));
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
+
+        CrearSolicitudDTO sinReceptor = dtoBase();
+        sinReceptor.setIdTurno(70L);
+        sinReceptor.setIdTurnoIntercambio(71L);
+        CrearSolicitudDTO sinTurnoPedido = dtoBase();
+        sinTurnoPedido.setIdTurnoIntercambio(71L);
+        sinTurnoPedido.setIdFuncionarioReceptor(2L);
+
+        for (CrearSolicitudDTO dto : List.of(sinReceptor, sinTurnoPedido)) {
+            org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                    org.springframework.web.server.ResponseStatusException.class, () -> service.crearSolicitud(dto));
+            assertEquals(400, ex.getStatusCode().value());
+            assertEquals("Para un intercambio, indica a la persona y el turno suyo que quieres", ex.getReason());
+        }
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_botarCoberturaIntercambioUOfertaParticular_sobreUnTurnoQueYaEmpezo_409() {
+        LocalDate ayer = LocalDate.now().minusDays(1);
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turnoDelDia(71L, LUNES, ID_FUNCIONARIO)));
+        for (int tipo : new int[]{2, 3, 4, 5}) {
+            mockFuncionarioYTipo(tipo);
+            // Botar y ceder: un turno propio; cobertura: un cupo libre; intercambio: uno del receptor.
+            Long dueno = tipo == 3 ? null : (tipo == 4 ? 2L : ID_FUNCIONARIO);
+            when(turnoRepository.findById(50L)).thenReturn(Optional.of(turnoDelDia(50L, ayer, dueno)));
+            CrearSolicitudDTO dto = dtoBase();
+            dto.setIdTurno(50L);
+            if (tipo == 4) dto.setIdTurnoIntercambio(71L);
+            if (tipo == 4 || tipo == 5) dto.setIdFuncionarioReceptor(2L);
+
+            org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                    org.springframework.web.server.ResponseStatusException.class, () -> service.crearSolicitud(dto),
+                    "tipo " + tipo);
+            assertEquals(409, ex.getStatusCode().value());
+            assertEquals("Ese turno ya empezó", ex.getReason());
+        }
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_intercambio_entregandoUnTurnoQueYaEmpezo_409() {
+        mockFuncionarioYTipo(4);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turnoDelDia(70L, LUNES, 2L)));
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turnoDelDia(71L, LocalDate.now().minusDays(2), ID_FUNCIONARIO)));
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+        dto.setIdTurnoIntercambio(71L);
+        dto.setIdFuncionarioReceptor(2L);
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> service.crearSolicitud(dto));
+        assertEquals(409, ex.getStatusCode().value());
+        assertEquals("El turno que ofreces entregar ya empezó", ex.getReason());
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_permiso_conUnTurnoPropioQueYaEmpezo_noSeLimita() {
+        mockFuncionarioYTipo(1);
+        when(turnoRepository.findById(50L)).thenReturn(Optional.of(turnoDelDia(50L, LocalDate.now().minusDays(1), ID_FUNCIONARIO)));
+        saveAsignaId();
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(50L);
+
+        assertEquals(PENDIENTE, service.crearSolicitud(dto).getEstado());
+    }
+
+    // ============================ HU-SOL-08: el receptor responde una sola vez ============================
+
+    @Test
+    void responder_unaVezDada_laRespuestaNoCambia_409() {
+        for (Boolean previa : new Boolean[]{true, false}) {
+            SolicitudEntity solicitud = SolicitudEntity.builder()
+                    .idSolicitud(1L).funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                    .aceptadoReceptor(previa).estado(PENDIENTE).build(); // aún espera a la jefatura
+            when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+            actorAutenticado(6L);
+            for (boolean respuesta : new boolean[]{true, false}) {
+                for (org.junit.jupiter.api.function.Executable responder : List.<org.junit.jupiter.api.function.Executable>of(
+                        () -> service.responderOfertaIntercambio(1L, respuesta),
+                        () -> service.responderOfertaParticular(1L, respuesta))) {
+                    org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                            org.springframework.web.server.ResponseStatusException.class, responder);
+                    assertEquals(409, ex.getStatusCode().value());
+                    assertEquals("Ya respondiste esta solicitud", ex.getReason());
+                }
+            }
+            assertEquals(previa, solicitud.getAceptadoReceptor());
+
+            // Quien no es el receptor sigue recibiendo el aviso de antes (HU-SOL-08, criterio 4).
+            actorAutenticado(7L);
+            RuntimeException ajeno = assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, true));
+            assertEquals("No eres el receptor de esta solicitud", ajeno.getMessage());
+        }
         verify(solicitudRepository, never()).save(any());
         verifyNoInteractions(bitacoraService);
     }

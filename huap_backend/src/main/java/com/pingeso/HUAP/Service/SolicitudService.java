@@ -157,6 +157,8 @@ public class SolicitudService {
                 .build();
 
         exigirTurnoPropioAlCrear(tipoSolicitud.getTipo(), turno, turnoIntercambio, idFuncionarioEmisor);
+        exigirTurnoPedidoDelReceptor(tipoSolicitud.getTipo(), turno, receptor);
+        exigirTurnosQueNoHanEmpezado(tipoSolicitud.getTipo(), turno, turnoIntercambio);
 
         // Un turno solo puede estar comprometido en UNA solicitud pendiente del mismo funcionario,
         // cuente como turno pedido o como turno entregado. Sin esto se podían apilar solicitudes
@@ -205,6 +207,45 @@ public class SolicitudService {
             throw new org.springframework.security.access.AccessDeniedException(
                     "El turno que ofreces entregar no es tuyo");
         }
+    }
+
+    /**
+     * P-01 (HU-SOL-06): en un intercambio, el turno que se pide tiene que ser hoy del receptor.
+     * Antes se aceptaba cualquier turno, y la solicitud quedaba sobre un turno de un tercero que
+     * no participaba en ella.
+     */
+    private void exigirTurnoPedidoDelReceptor(Integer tipo, TurnoEntity turnoPedido, FuncionarioEntity receptor) {
+        if (!Integer.valueOf(4).equals(tipo)) return;
+        if (turnoPedido == null || receptor == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Para un intercambio, indica a la persona y el turno suyo que quieres");
+        }
+        if (!esDe(turnoPedido, receptor.getIdFuncionario())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El turno que pides no es de la persona con quien quieres intercambiar");
+        }
+    }
+
+    /**
+     * §5.1 (P-01, HU-SOL-05): no se bota, se cubre, se intercambia ni se cede un turno que ya
+     * empezó (tipos 2 a 5). Antes se aceptaba, por ejemplo, la cobertura de un cupo de la semana
+     * pasada. El permiso (tipo 1) es un registro de fechas y no se limita aquí.
+     */
+    private void exigirTurnosQueNoHanEmpezado(Integer tipo, TurnoEntity turno, TurnoEntity turnoIntercambio) {
+        if (tipo == null || tipo < 2 || tipo > 5) return;
+        LocalDateTime ahora = LocalDateTime.now();
+        if (yaEmpezo(turno, ahora)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ese turno ya empezó");
+        }
+        if (tipo == 4 && yaEmpezo(turnoIntercambio, ahora)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "El turno que ofreces entregar ya empezó");
+        }
+    }
+
+    /** ¿El turno empezó a esta hora o antes? Sin fecha u hora de inicio no hay base para decirlo. */
+    private static boolean yaEmpezo(TurnoEntity turno, LocalDateTime ahora) {
+        if (turno == null || turno.getDiaInicioTurno() == null || turno.getHoraInicio() == null) return false;
+        return !turno.getDiaInicioTurno().atTime(turno.getHoraInicio()).isAfter(ahora);
     }
 
     /** ¿El turno está asignado a ese funcionario? */
@@ -358,6 +399,7 @@ public class SolicitudService {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
         exigirPendienteParaResponder(solicitud);
+        exigirSinRespuestaPrevia(solicitud);
 
         FuncionarioEntity receptor = funcionarioRepository.findById(idReceptor).orElseThrow();
 
@@ -390,6 +432,7 @@ public class SolicitudService {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
         exigirPendienteParaResponder(solicitud);
+        exigirSinRespuestaPrevia(solicitud);
 
         FuncionarioEntity receptor = funcionarioRepository.findById(idReceptor).orElseThrow();
 
@@ -417,6 +460,17 @@ public class SolicitudService {
         if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Esta solicitud ya fue resuelta: no se puede responder");
+        }
+    }
+
+    /**
+     * HU-SOL-08 (P-01): el receptor responde una sola vez. Antes podía aceptar y, mientras la
+     * jefatura no decidía, rechazar (o aceptar de nuevo) por API. Se revisa después del estado: una
+     * solicitud ya resuelta sigue respondiendo «Esta solicitud ya fue resuelta…».
+     */
+    private void exigirSinRespuestaPrevia(SolicitudEntity solicitud) {
+        if (solicitud.getAceptadoReceptor() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Ya respondiste esta solicitud");
         }
     }
 
