@@ -259,4 +259,17 @@ class FuncionarioServiceTest {
         assertEquals("SUBROGANTE", funcionarioService.nombreRolServicio("subrogante"));
         assertNull(funcionarioService.nombreRolServicio(null));
     }
+
+    @Test
+    void rolEnServicio_leeElRolDeLaRelacionConEseServicio_oNullSiNoPertenece() {
+        FuncionarioEntity f = conRelacion(50L, URGENCIAS, rol(1L, "JEFATURA"));
+        f.getServiciosFuncionario().add(new ServiciosFuncionarioEntity(f, CIRUGIA, rol(3L, "MEDICO")));
+        when(funcionarioRepository.findById(50L)).thenReturn(Optional.of(f));
+        when(funcionarioRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertEquals("JEFATURA", funcionarioService.rolEnServicio(50L, 4L));
+        assertEquals("MEDICO", funcionarioService.rolEnServicio(50L, 3L));
+        assertNull(funcionarioService.rolEnServicio(50L, 2L));
+        assertNull(funcionarioService.rolEnServicio(99L, 4L));
+    }
 }

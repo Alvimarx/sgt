@@ -478,6 +478,22 @@ public class FuncionarioService {
     }
 
     /**
+     * Nombre del rol que tiene hoy el funcionario en ese servicio (JEFATURA, SUBROGANTE o MEDICO),
+     * o {@code null} si no pertenece a él. Lo usa {@code FuncionarioController.update} para que
+     * solo el ADMINISTRADOR cambie una jefatura (C-07). Se lee en BD, nunca del cliente.
+     */
+    public String rolEnServicio(Long idFuncionario, Long idServicio) {
+        if (idFuncionario == null || idServicio == null) return null;
+        FuncionarioEntity f = funcionarioRepository.findById(idFuncionario).orElse(null);
+        if (f == null || f.getServiciosFuncionario() == null) return null;
+        return f.getServiciosFuncionario().stream()
+                .filter(sf -> sf.getServicio() != null && idServicio.equals(sf.getServicio().getIdServicio()))
+                .map(sf -> sf.getRolServicio() != null ? sf.getRolServicio().getNombreRol() : null)
+                .filter(Objects::nonNull)
+                .findFirst().orElse(null);
+    }
+
+    /**
      * Servicios que el funcionario puede elegir al iniciar sesión.
      *
      * <p>Un {@code ADMINISTRADOR} ve <b>todos</b> los servicios vigentes aunque no sea miembro

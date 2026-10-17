@@ -160,14 +160,26 @@ class FuncionarioControllerTest {
     }
 
     @Test
-    void subrogante_editaElEstadoDeAlguienDeSuServicio_sigueSiendoPosible() {
+    void subrogante_noCambiaElEstadoNiElNombreDeAlguienDeSuServicio_403() {
+        // C-03 (17 oct): antes podía; ahora el subrogante no edita a otras personas.
         autenticar(9L, "SUBROGANTE", "USUARIO", SERVICIO_A);
         when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(true);
-        when(funcionarioService.updateUser(eq(50L), anyMap())).thenReturn(new FuncionarioSummaryDTO());
 
-        ResponseEntity<?> resp = controller.update(50L, Map.of("estado", "activo"));
+        for (Map<String, Object> payload : List.<Map<String, Object>>of(
+                Map.of("estado", "inactivo"), Map.of("nombre", "Otro"), Map.of("apellidoPaterno", "Otro"))) {
+            ResponseEntity<?> resp = controller.update(50L, payload);
+            assertEquals(HttpStatus.FORBIDDEN, resp.getStatusCode(), payload.toString());
+            assertEquals(Map.of("error", "El subrogante no puede cambiar los datos ni el estado de otro funcionario"), resp.getBody());
+        }
+        verify(funcionarioService, never()).updateUser(any(), any());
+    }
 
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
+    @Test
+    void subrogante_editaSusPropiosDatos_sigueSiendoPosible() {
+        autenticar(9L, "SUBROGANTE", "USUARIO", SERVICIO_A);
+        when(funcionarioService.updateUser(eq(9L), anyMap())).thenReturn(new FuncionarioSummaryDTO());
+
+        assertEquals(HttpStatus.OK, controller.update(9L, Map.of("nombre", "Nuevo")).getStatusCode());
     }
 
     @Test
@@ -357,6 +369,45 @@ class FuncionarioControllerTest {
 
         assertEquals(HttpStatus.OK, controller.update(50L, Map.of("servicioId", SERVICIO_B, "rol", 1)).getStatusCode());
         verify(funcionarioService, never()).nombreRolServicio(any());
+    }
+
+    @Test
+    void jefatura_noCambiaElRolDeOtraJefatura_niElPropio_403() {
+        autenticar(9L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(true);
+        when(funcionarioService.nombreRolServicio(2)).thenReturn("SUBROGANTE");
+        when(funcionarioService.rolEnServicio(50L, SERVICIO_A)).thenReturn("JEFATURA");
+        when(funcionarioService.rolEnServicio(9L, SERVICIO_A)).thenReturn("JEFATURA");
+
+        for (long persona : new long[]{50L, 9L}) {
+            ResponseEntity<?> resp = controller.update(persona, Map.of("servicioId", SERVICIO_A, "rol", 2));
+            assertEquals(HttpStatus.FORBIDDEN, resp.getStatusCode(), "persona " + persona);
+            assertEquals(Map.of("error", "Solo un administrador puede cambiar una jefatura"), resp.getBody());
+        }
+        verify(funcionarioService, never()).updateUser(any(), any());
+    }
+
+    @Test
+    void jefatura_pideMedicoParaOtraJefatura_llegaAl409DeC19SinCambiarSuRol() {
+        // Sumar como Médico a quien ya pertenece no cambia el rol (C-19): no es un cambio de jefatura.
+        autenticar(9L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.perteneceAServicio(50L, SERVICIO_A)).thenReturn(true);
+        when(funcionarioService.nombreRolServicio(3)).thenReturn("MEDICO");
+        when(funcionarioService.updateUser(eq(50L), anyMap())).thenThrow(new org.springframework.web.server.ResponseStatusException(
+                HttpStatus.CONFLICT, "La persona ya pertenece a este servicio; no se cambió su rol"));
+
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> controller.update(50L, Map.of("servicioId", SERVICIO_A, "rol", 3)));
+        verify(funcionarioService, never()).rolEnServicio(any(), any());
+    }
+
+    @Test
+    void administrador_cambiaUnaJefatura_permitido() {
+        autenticar(1L, "JEFATURA", "ADMINISTRADOR", SERVICIO_A);
+        when(funcionarioService.updateUser(eq(50L), anyMap())).thenReturn(new FuncionarioSummaryDTO());
+
+        assertEquals(HttpStatus.OK, controller.update(50L, Map.of("servicioId", SERVICIO_A, "rol", 2)).getStatusCode());
+        verify(funcionarioService, never()).rolEnServicio(any(), any());
     }
 
     // ============================ C-23 y C-19: la jefatura suma a su servicio como Médico ============================

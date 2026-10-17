@@ -332,6 +332,12 @@ public class FuncionarioController {
                         .body(Map.of("error", "No tienes permiso para modificar a un funcionario de otro servicio"));
             }
         }
+        // SEC (C-03): el subrogante tampoco cambia el nombre ni el estado (activo/inactivo) de
+        // otra persona, aunque sea de su servicio; sus propios datos, sí, como cualquiera.
+        if (!isAdmin && esSubrogante && !currentUserId.equals(id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "El subrogante no puede cambiar los datos ni el estado de otro funcionario"));
+        }
         // Escalada de privilegios: solo JEFATURA/SUBROGANTE puede cambiar el rol o el estado.
         if (!isGestionServicio && (payload.containsKey("rol") || payload.containsKey("estado"))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -369,6 +375,16 @@ public class FuncionarioController {
                 && ROL_JEFATURA.equals(funcionarioService.nombreRolServicio(payload.get("rol")))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "Solo un administrador puede designar una jefatura"));
+        }
+        // SEC (C-07): una jefatura que no es administradora tampoco cambia el rol de quien ya es
+        // jefatura en el servicio (tampoco el propio): eso queda para el ADMINISTRADOR. Pedir Médico
+        // para quien ya pertenece no cambia el rol (C-19 responde 409), así que no cuenta aquí.
+        if (!isAdmin && payload.containsKey("rol") && payload.containsKey("servicioId")
+                && !ROL_MEDICO.equals(funcionarioService.nombreRolServicio(payload.get("rol")))
+                && ROL_JEFATURA.equals(funcionarioService.rolEnServicio(id,
+                        Long.valueOf(payload.get("servicioId").toString())))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Solo un administrador puede cambiar una jefatura"));
         }
 
         FuncionarioSummaryDTO updated = funcionarioService.updateUser(id, payload);
