@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
-import { ofertaVisible, participaEnSolicitud, turnosComprometidos } from '../../utils/reglasSolicitud';
+import { esCoberturaDeTurnoCubierto, ofertaVisible, participaEnSolicitud, turnosComprometidos } from '../../utils/reglasSolicitud';
 import { puedeTomarCupo, yaEmpezo } from '../../utils/reglasTurno';
 import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { mensajeDeError } from '../../utils/errores';
@@ -115,11 +115,15 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
   const receptorAcepto    = esBifasico && solicitud.aceptadoReceptor === true;
   const receptorRechazo   = esBifasico && solicitud.aceptadoReceptor === false;
 
+  // R18-15: una cobertura sobre un turno que ya tiene dueño quedó obsoleta (el
+  // backend rechazaría aprobarla): «Turno ya cubierto», sin Aprobar ni Rechazar,
+  // como en el Centro de operaciones. Quien la emitió puede cancelarla.
+  const turnoCubierto = esCoberturaDeTurnoCubierto(solicitud);
+  const decisionPosible = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo && !turnoCubierto;
   // Segregación de funciones: quien participa en la solicitud (emisor, receptor o
   // dueño de alguno de sus turnos) no la decide; el backend lo rechazaría
   // (SolicitudService.participantesDirectos). En vez de ofrecer Aprobar y
   // Rechazar, la vista lo explica. Igual en móvil y desktop.
-  const decisionPosible = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
   const participa = canDecide && participaEnSolicitud(solicitud, userId);
   const canDecideThis = decisionPosible && !participa;
   const bloqueadaPorParticipar = decisionPosible && participa;
@@ -138,6 +142,10 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
   // Badge contextual para tipos bifásicos (4 y 5)
   let badgeLabel = esCancelada ? 'CANCELADA' : estado;
   let badgeTone  = esCancelada ? 'neutral' : (ESTADO_TONE[estado] || 'neutral');
+  if (turnoCubierto) {
+    badgeLabel = 'Turno ya cubierto';
+    badgeTone  = 'neutral';
+  }
   if (esBifasico && estado === 'PENDIENTE') {
     if (esMiReceptor && esperandoReceptor) {
       badgeLabel = 'Requiere tu respuesta';
@@ -153,7 +161,7 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
 
   return {
     tipo, estado, esBifasico, esperandoReceptor, receptorAcepto, receptorRechazo,
-    canDecideThis, bloqueadaPorParticipar, canRespond, canEditMotivo, canCancelar, esCancelada, badgeLabel, badgeTone,
+    canDecideThis, bloqueadaPorParticipar, turnoCubierto, canRespond, canEditMotivo, canCancelar, esCancelada, badgeLabel, badgeTone,
   };
 }
 
@@ -222,6 +230,8 @@ function evaluarOferta(oferta, userId, canDecide) {
 // (rechazarSolicitudesCompetitivas), así que aquí no hay lógica extra de limpieza.
 const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar, userId }) => {
   const { turno, nombreTipoTurno, posicion, ordenadas } = datosGrupoPostulacion(grupo);
+  // R18-15: si el turno ya tiene dueño, las postulaciones quedaron obsoletas.
+  const cubierto = esCoberturaDeTurnoCubierto(grupo[0]);
 
   return (
     <div className="sgt-list-row" style={{ background: '#fff', border: `1px solid ${PA.line}`, borderLeft: `4px solid ${TIPO_COLOR[3]}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
@@ -234,7 +244,7 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar, userId }) => {
           <div style={{ fontSize: 14, fontWeight: 800, color: PA.ink }}>Postulaciones al mismo turno</div>
           <div style={{ fontSize: 11, color: PA.ink3, fontWeight: 600 }}>Cobertura · elige a una persona</div>
         </div>
-        <SGTBadge tone="warn" size="xs">{grupo.length} postulantes</SGTBadge>
+        <SGTBadge tone={cubierto ? 'neutral' : 'warn'} size="xs">{cubierto ? 'Turno ya cubierto' : `${grupo.length} postulantes`}</SGTBadge>
       </div>
 
       {/* Turno en disputa */}
@@ -255,7 +265,7 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar, userId }) => {
                 </div>
                 <div style={{ fontSize: 10.5, color: PA.ink3, fontWeight: 600 }}>Postuló el {fmtFecha(sol.fechaCreacion)}</div>
               </div>
-              {participaEnSolicitud(sol, userId) ? (
+              {cubierto ? null : participaEnSolicitud(sol, userId) ? (
                 // Su propia postulación: la decide otra jefatura (segregación de funciones).
                 <SGTBadge tone="neutral" size="xs">Tu postulación</SGTBadge>
               ) : (
@@ -279,7 +289,9 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar, userId }) => {
       </div>
 
       <div style={{ marginTop: 10, fontSize: 11, color: PA.ink3, fontWeight: 600 }}>
-        Al elegir a una persona, las demás postulaciones de este turno se rechazan automáticamente.
+        {cubierto
+          ? 'El turno ya tiene a una persona asignada: estas postulaciones ya no se pueden elegir.'
+          : 'Al elegir a una persona, las demás postulaciones de este turno se rechazan automáticamente.'}
       </div>
     </div>
   );
@@ -1162,72 +1174,59 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     return () => el.removeEventListener('scroll', check);
   }, [isMedico]);
 
-  const handleAprobar = async (id) => {
-    try {
-      await solicitudesService.updateEstado(id, 'APROBADA', user.id);
-      load();
-    } catch (e) { setError(mensajeDeError(e, 'Error al aprobar la solicitud.')); }
+  // R18-15: mientras una acción está en vuelo (y hasta que la lista se recarga),
+  // los demás clics que cambian datos se ignoran: evita dobles envíos y avisos
+  // contradictorios, como en el Centro de operaciones. Móvil y desktop.
+  const enVuelo = useRef(false);
+  const mutar = async (accion) => {
+    if (enVuelo.current) return;
+    enVuelo.current = true;
+    try { await accion(); } finally { enVuelo.current = false; }
   };
+  const ejecutar = (accion, porDefecto) => mutar(async () => {
+    try {
+      await accion();
+      await load();
+    } catch (e) { setError(mensajeDeError(e, porDefecto)); }
+  });
 
-  const handleRechazar = async (id) => {
-    try {
-      await solicitudesService.updateEstado(id, 'RECHAZADA', user.id);
-      load();
-    } catch (e) { setError(mensajeDeError(e, 'Error al rechazar la solicitud.')); }
-  };
+  const handleAprobar = (id) => ejecutar(
+    () => solicitudesService.updateEstado(id, 'APROBADA', user.id), 'Error al aprobar la solicitud.');
+
+  const handleRechazar = (id) => ejecutar(
+    () => solicitudesService.updateEstado(id, 'RECHAZADA', user.id), 'Error al rechazar la solicitud.');
 
   const handleCancelar = async (solicitud) => {
     setCancelando(solicitud);
   };
 
-  const confirmarCancelacion = async () => {
+  const confirmarCancelacion = () => {
     const solicitud = cancelando;
     setCancelando(null);
     if (!solicitud) return;
-    try {
-      await solicitudesService.cancelar(solicitud.idSolicitud);
-      load();
-    } catch (e) { setError(mensajeDeError(e, 'No se pudo cancelar la solicitud.')); }
+    ejecutar(() => solicitudesService.cancelar(solicitud.idSolicitud), 'No se pudo cancelar la solicitud.');
   };
 
-  const handleResponder = async (id, acepta) => {
-    try {
-      await solicitudesService.responderIntercambio(id, user.id, acepta);
-      load();
-    } catch (e) { setError(mensajeDeError(e, 'Error al responder el intercambio.')); }
-  };
+  const handleResponder = (id, acepta) => ejecutar(
+    () => solicitudesService.responderIntercambio(id, user.id, acepta), 'Error al responder el intercambio.');
 
-  const handleResponderOfertaParticular = async (id, acepta) => {
-    try {
-      await solicitudesService.responderOfertaParticular(id, user.id, acepta);
-      load();
-    } catch (e) { setError(mensajeDeError(e, 'Error al responder la oferta.')); }
-  };
+  const handleResponderOfertaParticular = (id, acepta) => ejecutar(
+    () => solicitudesService.responderOfertaParticular(id, user.id, acepta), 'Error al responder la oferta.');
 
-  const handleOfertaAprobar = async (id) => {
-    try { await ofertasGeneralesService.aprobar(id, user.id); load(); }
-    catch (e) { setError(mensajeDeError(e, 'Error al aprobar la oferta.')); }
-  };
+  const handleOfertaAprobar = (id) => ejecutar(
+    () => ofertasGeneralesService.aprobar(id, user.id), 'Error al aprobar la oferta.');
 
-  const handleOfertaRechazar = async (id) => {
-    try { await ofertasGeneralesService.rechazar(id, user.id); load(); }
-    catch (e) { setError(mensajeDeError(e, 'Error al rechazar la oferta.')); }
-  };
+  const handleOfertaRechazar = (id) => ejecutar(
+    () => ofertasGeneralesService.rechazar(id, user.id), 'Error al rechazar la oferta.');
 
-  const handlePostular = async (idOferta) => {
-    try { await ofertasGeneralesService.postular(idOferta, user.id); load(); }
-    catch (e) { setError(mensajeDeError(e, 'Error al postular.')); }
-  };
+  const handlePostular = (idOferta) => ejecutar(
+    () => ofertasGeneralesService.postular(idOferta, user.id), 'Error al postular.');
 
-  const handleRetirar = async (idOferta, idPostulacion) => {
-    try { await ofertasGeneralesService.retirarPostulacion(idOferta, idPostulacion, user.id); load(); }
-    catch (e) { setError(mensajeDeError(e, 'Error al retirar la postulación.')); }
-  };
+  const handleRetirar = (idOferta, idPostulacion) => ejecutar(
+    () => ofertasGeneralesService.retirarPostulacion(idOferta, idPostulacion, user.id), 'Error al retirar la postulación.');
 
-  const handleSeleccionar = async (idOferta, idPostulacion) => {
-    try { await ofertasGeneralesService.seleccionar(idOferta, idPostulacion, user.id); load(); }
-    catch (e) { setError(mensajeDeError(e, 'Error al seleccionar postulante.')); }
-  };
+  const handleSeleccionar = (idOferta, idPostulacion) => ejecutar(
+    () => ofertasGeneralesService.seleccionar(idOferta, idPostulacion, user.id), 'Error al seleccionar postulante.');
 
   const SORT_OPTIONS = [
     { id: 'reciente', label: 'Más reciente', desc: 'De la más nueva a la más antigua' },
@@ -1364,6 +1363,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
 
     const itemGrupo = (grupo) => {
       const { turno, nombreTipoTurno, posicion, ordenadas } = datosGrupoPostulacion(grupo);
+      const cubierto = esCoberturaDeTurnoCubierto(grupo[0]);
       return {
         key: `grupo-turno-${turno.idTurno}`,
         color: TIPO_COLOR[3],
@@ -1372,7 +1372,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         icono: 'users',
         titulo: 'Postulaciones al mismo turno',
         subtitulo: 'Cobertura · elige a una persona',
-        chip: { texto: `${grupo.length} postulantes`, tono: 'aviso' },
+        chip: cubierto ? { texto: 'Turno ya cubierto', tono: 'neutral' } : { texto: `${grupo.length} postulantes`, tono: 'aviso' },
         linea1: ordenadas.map((sol) => nombreFuncionario(sol.funcionario)).join(', '),
         linea2: `${turnoTexto(turno)}${posicion ? ` · ${posicion}` : ''}`,
         filas: [
@@ -1389,14 +1389,16 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             nombre,
             detalle: `Postuló el ${fmtFecha(sol.fechaCreacion)}`,
             motivo: sol.motivo,
-            chip: propia ? { texto: 'Tu postulación', tono: 'neutral' } : undefined,
-            acciones: propia ? [] : [
+            chip: propia && !cubierto ? { texto: 'Tu postulación', tono: 'neutral' } : undefined,
+            acciones: propia || cubierto ? [] : [
               { clave: 'rechazar', etiqueta: 'Rechazar', variante: 'peligro', tamano: 'sm', icono: 'close', ariaLabel: `Rechazar a ${nombre}`, onClick: () => handleRechazar(sol.idSolicitud) },
               { clave: 'elegir', etiqueta: 'Elegir', variante: 'exito', tamano: 'sm', icono: 'check', ariaLabel: `Elegir a ${nombre}`, onClick: () => handleAprobar(sol.idSolicitud) },
             ],
           };
         }),
-        pie: 'Al elegir a una persona, las demás postulaciones de este turno se rechazan automáticamente.',
+        pie: cubierto
+          ? 'El turno ya tiene a una persona asignada: estas postulaciones ya no se pueden elegir.'
+          : 'Al elegir a una persona, las demás postulaciones de este turno se rechazan automáticamente.',
       };
     };
 
