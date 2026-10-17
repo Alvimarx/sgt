@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
-import { esCoberturaDeTurnoCubierto, ofertaVisible, participaEnOferta, participaEnSolicitud, turnosComprometidos } from '../../utils/reglasSolicitud';
+import { ESTADO_OFERTA, esCoberturaDeTurnoCubierto, ofertaVisible, participaEnOferta, participaEnSolicitud, puedeRetirarOferta, turnosComprometidos } from '../../utils/reglasSolicitud';
 import { puedeTomarCupo, yaEmpezo } from '../../utils/reglasTurno';
 import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { mensajeDeError } from '../../utils/errores';
@@ -106,6 +106,8 @@ function btnStyle(tone) {
 const NOTA_PARTICIPAS = 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.';
 // Lo mismo en una oferta general que la gestión publicó o a la que postuló.
 const NOTA_PARTICIPAS_OFERTA = 'Participas en esta oferta: por segregación de funciones, la decisión corresponde a otra jefatura.';
+// Confirmación de «Retirar oferta» (C-16), la misma en móvil y desktop.
+const TEXTO_RETIRAR_OFERTA = 'Se retirará tu oferta general: ya no esperará apertura, nadie podrá postular y el turno sigue siendo tuyo.';
 
 // Estado de una solicitud para quien la mira: badge y qué puede hacer con ella.
 function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo, puedeCancelar, userId }) {
@@ -211,6 +213,7 @@ function evaluarOferta(oferta, userId, canDecide) {
   // H-07 también en las ofertas (§5.1): quien la publicó o postuló no la abre,
   // no la rechaza ni elige al postulante; ve la nota en vez de los botones.
   const participa = canDecide && participaEnOferta(oferta, userId);
+  const rotulo = ESTADO_OFERTA[estado] || { etiqueta: estado || 'Oferta', tono: 'neutral' };
   return {
     estado,
     esOfertor,
@@ -218,13 +221,15 @@ function evaluarOferta(oferta, userId, canDecide) {
     yaPostulado: !!miPostulacion,
     postulaciones,
     seleccionado: postulaciones.find(p => p.seleccionado),
-    badgeTone: estado === 'ABIERTA' ? 'success' : estado === 'PENDIENTE_APROBACION' ? 'warn' : estado === 'CERRADA' ? 'neutral' : 'accent',
-    badgeLabel: estado === 'PENDIENTE_APROBACION' ? 'Pend. apertura' : estado === 'ABIERTA' ? 'Abierta' : estado === 'CERRADA' ? 'Cerrada' : 'Rechazada',
+    badgeTone: rotulo.tono,
+    badgeLabel: rotulo.etiqueta,
     puedeDecidirApertura: canDecide && !participa && estado === 'PENDIENTE_APROBACION',
     puedeSeleccionar: canDecide && !participa && estado === 'ABIERTA',
     bloqueadaPorParticipar: participa && (estado === 'PENDIENTE_APROBACION' || estado === 'ABIERTA'),
     puedePostularORetirar: !canDecide && !esOfertor && estado === 'ABIERTA',
     esMiOfertaAbierta: !canDecide && esOfertor && estado === 'ABIERTA',
+    // C-16: quien la publicó la retira mientras espera apertura, sea cual sea su rol.
+    puedeRetirar: puedeRetirarOferta(oferta, userId),
   };
 }
 
@@ -411,10 +416,12 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
 const COLOR_OFERTA = '#E0A040';
 const COLOR_OFERTA_SOFT = '#FDF3E3';
 
-const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, onPostular, onRetirar, onSeleccionar }) => {
+// onRetirarOferta(oferta): quien la publicó la retira (C-16); la vista pide
+// confirmación. onRetirar(idOferta, idPostulacion): retirar la postulación.
+const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, onPostular, onRetirar, onSeleccionar, onRetirarOferta }) => {
   const {
     estado, miPostulacion, yaPostulado, postulaciones, seleccionado, badgeTone, badgeLabel,
-    puedeDecidirApertura, puedeSeleccionar, puedePostularORetirar, esMiOfertaAbierta, bloqueadaPorParticipar,
+    puedeDecidirApertura, puedeSeleccionar, puedePostularORetirar, esMiOfertaAbierta, bloqueadaPorParticipar, puedeRetirar,
   } = evaluarOferta(oferta, userId, canDecide);
 
   const [confirmando, setConfirmando] = useState(null); // { idPostulacion, nombrePostulante }
@@ -512,6 +519,13 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
         <div style={{ marginTop: 8, padding: '6px 10px', background: COLOR_OFERTA_SOFT, borderRadius: 8, fontSize: 12, color: COLOR_OFERTA, fontWeight: 700 }}>
           Tu oferta está abierta · {postulaciones.length} postulante{postulaciones.length !== 1 ? 's' : ''}
         </div>
+      )}
+
+      {/* Quien la publicó: retirarla mientras espera apertura (C-16) */}
+      {puedeRetirar && onRetirarOferta && (
+        <button onClick={() => onRetirarOferta(oferta)} style={{ ...btnStyle('danger'), marginTop: 12, width: '100%' }}>
+          <SGTIcon name="close" size={13} color="#fff" /> Retirar oferta
+        </button>
       )}
 
       {/* Diálogo de confirmación selección */}
@@ -1125,6 +1139,8 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const [busquedaDesktop, setBusquedaDesktop] = useState('');
   const [tipoDesktop, setTipoDesktop] = useState('todos');
   const [ofertaPorConfirmar, setOfertaPorConfirmar] = useState(null);
+  // Oferta propia que se está por retirar (C-16): la confirmación, en móvil y desktop.
+  const [ofertaPorRetirar, setOfertaPorRetirar] = useState(null);
 
   useEffect(() => {
     if (!initialCreatePreset) return;
@@ -1239,6 +1255,15 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
 
   const handleSeleccionar = (idOferta, idPostulacion) => ejecutar(
     () => ofertasGeneralesService.seleccionar(idOferta, idPostulacion, user.id), 'Error al seleccionar postulante.');
+
+  // C-16: retirar la oferta propia que espera apertura. Queda RETIRADA y la
+  // lista la oculta, como a las rechazadas (ofertaVisible).
+  const confirmarRetiroOferta = () => {
+    const oferta = ofertaPorRetirar;
+    setOfertaPorRetirar(null);
+    if (!oferta) return;
+    ejecutar(() => ofertasGeneralesService.retirar(oferta.idOfertaGeneral), 'No se pudo retirar la oferta.');
+  };
 
   const SORT_OPTIONS = [
     { id: 'reciente', label: 'Más reciente', desc: 'De la más nueva a la más antigua' },
@@ -1427,6 +1452,9 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
       if (ev.puedePostularORetirar && ev.yaPostulado) {
         acciones.push({ clave: 'retirar', etiqueta: 'Retirar', variante: 'peligro', icono: 'close', onClick: () => handleRetirar(oferta.idOfertaGeneral, ev.miPostulacion.idPostulacion) });
       }
+      if (ev.puedeRetirar) {
+        acciones.push({ clave: 'retirar-oferta', etiqueta: 'Retirar oferta', variante: 'peligro', icono: 'close', izquierda: true, onClick: () => setOfertaPorRetirar(oferta) });
+      }
       const notas = [];
       if (ev.bloqueadaPorParticipar) notas.push({ clave: 'segregacion', texto: NOTA_PARTICIPAS_OFERTA });
       if (ev.puedePostularORetirar && ev.yaPostulado) notas.push({ clave: 'postulado', tono: 'exito', texto: 'Postulado' });
@@ -1574,6 +1602,25 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             )}
           </ConfirmacionDesktop>
         )}
+
+        {ofertaPorRetirar && (
+          <ConfirmacionDesktop
+            titulo="Retirar oferta"
+            tono="peligro"
+            etiquetaCancelar="Volver"
+            etiquetaConfirmar="Retirar oferta"
+            onCancelar={() => setOfertaPorRetirar(null)}
+            onConfirmar={confirmarRetiroOferta}
+          >
+            {TEXTO_RETIRAR_OFERTA}
+            {ofertaPorRetirar.turno && (
+              <div className="sgt-dt-motivo" style={{ marginTop: 10 }}>
+                <div className="sgt-d-seccion-titulo" style={{ margin: '0 0 2px' }}>Turno</div>
+                <div className="sgt-dt-motivo__texto">{turnoTexto(ofertaPorRetirar.turno)}</div>
+              </div>
+            )}
+          </ConfirmacionDesktop>
+        )}
       </>
     );
   }
@@ -1684,6 +1731,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
                 onPostular={handlePostular}
                 onRetirar={handleRetirar}
                 onSeleccionar={handleSeleccionar}
+                onRetirarOferta={setOfertaPorRetirar}
               />
             ))}
           </>
@@ -1750,6 +1798,27 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             <button onClick={() => setCancelando(null)} style={{ ...btnStyle('ghost'), flex: 1 }}>Volver</button>
             <button onClick={confirmarCancelacion} style={{ ...btnStyle('danger'), flex: 1 }}>
               <SGTIcon name="close" size={13} color="#fff" /> Cancelar solicitud
+            </button>
+          </div>
+        </div>
+      </Sheet>
+
+      <Sheet open={!!ofertaPorRetirar} onClose={() => setOfertaPorRetirar(null)} title="Retirar oferta">
+        <div style={{ padding: '8px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <p style={{ fontSize: 14, color: PA.ink, fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
+            {TEXTO_RETIRAR_OFERTA}
+          </p>
+          {ofertaPorRetirar?.turno && (
+            <div style={{ background: PA.surface2, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: PA.ink2, fontWeight: 600 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>Turno</div>
+              <div>{fmtFecha(ofertaPorRetirar.turno.diaInicioTurno)}</div>
+              <div style={{ color: PA.ink3 }}>{fmtHora(ofertaPorRetirar.turno.horaInicio)} – {fmtHora(ofertaPorRetirar.turno.horaFin)}</div>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setOfertaPorRetirar(null)} style={{ ...btnStyle('ghost'), flex: 1 }}>Volver</button>
+            <button onClick={confirmarRetiroOferta} style={{ ...btnStyle('danger'), flex: 1 }}>
+              <SGTIcon name="close" size={13} color="#fff" /> Retirar oferta
             </button>
           </div>
         </div>

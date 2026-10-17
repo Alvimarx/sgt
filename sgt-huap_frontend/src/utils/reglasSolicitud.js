@@ -68,9 +68,30 @@ export const ofertaVigente = (oferta, hoy) =>
   String(oferta?.turno?.diaFinalTurno || oferta?.turno?.diaInicioTurno || '9999-12-31') >= hoy;
 
 /**
+ * Etiqueta y tono del badge del estado de una oferta general, los mismos en
+ * Solicitudes y en el Centro de operaciones. RETIRADA: la retiró quien la
+ * publicó, antes de que se abriera (C-16).
+ */
+export const ESTADO_OFERTA = {
+  PENDIENTE_APROBACION: { etiqueta: 'Pend. apertura', tono: 'warn' },
+  ABIERTA:              { etiqueta: 'Abierta',        tono: 'success' },
+  CERRADA:              { etiqueta: 'Cerrada',        tono: 'neutral' },
+  RECHAZADA:            { etiqueta: 'Rechazada',      tono: 'accent' },
+  RETIRADA:             { etiqueta: 'Retirada',       tono: 'neutral' },
+};
+
+/**
+ * ¿`userId` puede retirar la oferta? Solo quien la publicó y solo mientras
+ * espera apertura: PUT /ofertas-generales/{id}/retirar (C-16, 17 oct 2026).
+ */
+export const puedeRetirarOferta = (oferta, userId) =>
+  oferta?.estado === 'PENDIENTE_APROBACION' && mismoId(oferta?.ofertor?.idFuncionario, userId);
+
+/**
  * ¿Se muestra la oferta? (R17 y C-16, el mismo filtro en el Centro y en
  * Solicitudes):
- *  - nunca las de turnos que ya terminaron ni las rechazadas;
+ *  - nunca las de turnos que ya terminaron, las rechazadas ni las retiradas
+ *    por quien las publicó;
  *  - la gestión (y quien la publicó) ve las abiertas, las que esperan apertura
  *    y las cerradas con un postulante elegido;
  *  - el resto ve solo las abiertas, que son a las que puede postular.
@@ -78,6 +99,7 @@ export const ofertaVigente = (oferta, hoy) =>
 export function ofertaVisible(oferta, { hoy, puedeDecidir = false, userId = null } = {}) {
   if (!oferta || !ofertaVigente(oferta, hoy)) return false;
   const estado = oferta.estado;
+  if (estado === 'RECHAZADA' || estado === 'RETIRADA') return false;
   if (estado === 'ABIERTA') return true;
   const propia = mismoId(oferta.ofertor?.idFuncionario, userId);
   if (!puedeDecidir && !propia) return false;

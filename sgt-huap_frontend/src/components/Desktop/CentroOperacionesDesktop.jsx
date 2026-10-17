@@ -4,7 +4,7 @@ import { solicitudesService, ofertasGeneralesService } from '../../services/admi
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { mensajeDeError } from '../../utils/errores';
 import { esAdministrador } from '../../utils/roles';
-import { ofertaVisible, participaEnOferta, participaEnSolicitud } from '../../utils/reglasSolicitud';
+import { ESTADO_OFERTA, ofertaVisible, participaEnOferta, participaEnSolicitud, puedeRetirarOferta } from '../../utils/reglasSolicitud';
 import { formatShiftLabel } from '../Comun/turnoPresentacion';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
 // lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
@@ -325,6 +325,12 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
       recargar();
     } catch (e) { toast(mensajeDeError(e, 'No se pudo seleccionar al postulante.')); }
   });
+  // C-16: quien publicó la oferta la retira mientras espera apertura, como en Solicitudes.
+  const ofRetirar = (idOferta) => mutar(async () => {
+    setConfirm(null);
+    try { await ofertasGeneralesService.retirar(idOferta); toast('Oferta retirada.'); recargar(); }
+    catch (e) { toast(mensajeDeError(e, 'No se pudo retirar la oferta.')); }
+  });
 
   // ── VM del panel expandido de un turno (día o noche) ──────────────────────
   const shiftVM = useCallback((fechaISO, tipo) => {
@@ -568,15 +574,11 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
 
   // ── VM de ofertas generales ───────────────────────────────────────────────
   const ofertasVM = useMemo(() => {
-    const map = {
-      ABIERTA: ['Abierta', 'success'],
-      PENDIENTE_APROBACION: ['Pend. apertura', 'warn'],
-      CERRADA: ['Cerrada', 'neutral'],
-    };
     return ofertasVisibles
       .map((o) => {
-        const [badge, tone] = map[o.estado] || ['—', 'neutral'];
-        const [badgeBg, badgeInk] = BADGE[tone];
+        // La misma etiqueta y el mismo tono que en Solicitudes (utils/reglasSolicitud.js).
+        const { etiqueta: badge, tono } = ESTADO_OFERTA[o.estado] || { etiqueta: '—', tono: 'neutral' };
+        const [badgeBg, badgeInk] = BADGE[tono] || BADGE.neutral;
         const op = personaVM(nombreCompletoDe(o.ofertor), {});
         const postul = o.postulaciones || [];
         const seleccionado = postul.find((p) => p.seleccionado);
@@ -608,6 +610,13 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
           }),
           onAprobar: () => ofAprobar(o.idOfertaGeneral),
           onRechazar: () => ofRechazar(o.idOfertaGeneral),
+          // Retirar la oferta propia que espera apertura (C-16), con la
+          // confirmación en la misma tarjeta, como la selección.
+          canRetirar: puedeRetirarOferta(o, myUserId),
+          retirando: confirm?.t === 'retirar' && confirm.id === o.idOfertaGeneral,
+          onRetirar: () => setConfirm({ t: 'retirar', id: o.idOfertaGeneral }),
+          onRetirarSi: () => ofRetirar(o.idOfertaGeneral),
+          onRetirarNo: () => setConfirm(null),
         };
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -869,6 +878,20 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
                     <div style={{ display: 'flex', gap: 5, marginTop: 7 }}>
                       <button onClick={o.onRechazar} style={{ background: '#fff', border: '1px solid #F3D2D5', color: '#B85A60', borderRadius: 8, padding: '5px 9px', fontSize: '10px', fontWeight: 800, cursor: 'pointer' }}>Rechazar</button>
                       <button onClick={o.onAprobar} style={{ flex: 1, background: '#2E7D57', border: 'none', color: '#fff', borderRadius: 8, padding: '5px 9px', fontSize: '10px', fontWeight: 800, cursor: 'pointer' }}>Aprobar apertura</button>
+                    </div>
+                  )}
+                  {o.canRetirar && !o.retirando && (
+                    <div style={{ display: 'flex', marginTop: 7 }}>
+                      <button onClick={o.onRetirar} style={{ background: '#fff', border: '1px solid #F3D2D5', color: '#B85A60', borderRadius: 8, padding: '5px 9px', fontSize: '10px', fontWeight: 800, cursor: 'pointer' }}>Retirar oferta</button>
+                    </div>
+                  )}
+                  {o.retirando && (
+                    <div style={{ background: '#F7F9FC', borderRadius: 8, padding: '5px 7px', marginTop: 7 }}>
+                      <div style={{ fontSize: '10px', fontWeight: 700, marginBottom: 5, lineHeight: 1.35 }}>¿Retirar tu oferta? Nadie podrá postular y el turno sigue siendo tuyo.</div>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        <button onClick={o.onRetirarNo} style={{ flex: 1, background: '#fff', border: '1px solid #E5EAF1', borderRadius: 6, padding: '4px 0', fontSize: '10px', fontWeight: 800, color: '#3B4A5F', cursor: 'pointer' }}>Volver</button>
+                        <button onClick={o.onRetirarSi} style={{ flex: 1, background: '#B85A60', border: 'none', borderRadius: 6, padding: '4px 0', fontSize: '10px', fontWeight: 800, color: '#fff', cursor: 'pointer' }}>Retirar oferta</button>
+                      </div>
                     </div>
                   )}
                   {o.showPost && (

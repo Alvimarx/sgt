@@ -411,6 +411,13 @@ export const ofertasGeneralesService = {
         return response.data;
     },
 
+    // PUT /ofertas-generales/{id}/retirar — C-16: solo quien la publicó, y solo
+    // mientras espera apertura (PENDIENTE_APROBACION). La oferta queda RETIRADA.
+    retirar: async (idOferta) => {
+        const response = await axiosInstance.put(`/ofertas-generales/${idOferta}/retirar`);
+        return response.data;
+    },
+
     // POST /ofertas-generales/{id}/postular?idFuncionario=
     postular: async (idOferta, idFuncionario) => {
         const response = await axiosInstance.post(`/ofertas-generales/${idOferta}/postular?idFuncionario=${idFuncionario}`);
