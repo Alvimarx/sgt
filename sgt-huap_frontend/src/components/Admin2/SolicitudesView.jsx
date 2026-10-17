@@ -775,7 +775,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
         {/* PASO 1 — elegir tipo */}
         {step === 1 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <p style={{ fontSize: 13, color: PA.ink2, fontWeight: 600, margin: '0 0 4px' }}>¿Qué tipo de solicitud necesitás?</p>
+            <p style={{ fontSize: 13, color: PA.ink2, fontWeight: 600, margin: '0 0 4px' }}>¿Qué tipo de solicitud necesitas?</p>
             {tipos.map(t => (
               <button key={t.id} onClick={() => { setTipoSel(t.id); setStep(2); }} style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 14, padding: 14, cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: PA.primarySoft, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
@@ -841,7 +841,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
 
             <div>
               <label style={lbl}>Motivo</label>
-              <textarea rows={3} value={form.motivo || ''} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Describí el motivo..." style={{ ...inp, resize: 'vertical' }} />
+              <textarea rows={3} value={form.motivo || ''} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Describe el motivo..." style={{ ...inp, resize: 'vertical' }} />
             </div>
             {error && <div style={{ background: PA.accentSoft, color: '#B85A60', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>{error}</div>}
             <button onClick={handleSubmit} disabled={!canSubmit} style={{ background: canSubmit ? PA.primary : PA.line, color: canSubmit ? '#fff' : PA.ink3, border: 'none', borderRadius: 12, padding: 14, fontSize: 15, fontWeight: 800, cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
@@ -980,7 +980,7 @@ const EditMotivoSheet = ({ solicitud, onClose, onSaved }) => {
       await solicitudesService.modificarMotivo(solicitud.idSolicitud, motivo);
       onSaved?.();
       onClose();
-    } catch { setError('No se pudo guardar. Intentá de nuevo.'); }
+    } catch { setError('No se pudo guardar. Intenta de nuevo.'); }
     finally { setSaving(false); }
   };
 

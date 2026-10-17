@@ -141,7 +141,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       items.push({
         id: "notificaciones-sin-leer",
         tipo: "notificacion",
-        titulo: `${unreadCount} notificacion${unreadCount > 1 ? "es" : ""} sin leer`,
+        titulo: `${unreadCount} ${unreadCount === 1 ? "notificación" : "notificaciones"} sin leer`,
         sub: "Revisa tu bandeja",
         urgencia: "info",
       });
