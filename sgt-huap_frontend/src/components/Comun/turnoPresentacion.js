@@ -40,6 +40,24 @@ export const getAgendaTeam = (shift) => {
     return null;
 };
 
+const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+// "2026-10-19" → "lun 19 oct 2026", el formato de las fechas de turno en
+// Solicitudes (desktop). Sin Intl, para que no dependa del navegador.
+export const fechaLegible = (fecha) => {
+    const m = String(fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return fecha ? String(fecha) : "";
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return `${DIAS_CORTOS[d.getDay()]} ${d.getDate()} ${MESES_CORTOS[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const hora = (valor) => String(valor || "").slice(0, 5);
+
+// Etiqueta de un turno: «Día · lun 19 oct 2026 · 08:00–20:00». La usan las
+// confirmaciones de asignación, el encabezado de «Gestión de asignación», los
+// avisos del intercambio y las etiquetas que el inicio y el calendario le pasan
+// al asistente de solicitudes. Antes mostraba la fecha en ISO.
 export const formatShiftLabel = (shift) => {
     if (!shift) return "";
 
@@ -49,9 +67,10 @@ export const formatShiftLabel = (shift) => {
         shift.nombre ||
         (shift.tipo === "dia" ? "Turno día" : "Turno noche");
 
-    const fecha = shift.fecha || shift.raw?.diaInicioTurno || "";
-    const inicio = shift.inicio || shift.horaInicio || shift.raw?.horaInicio || "";
-    const fin = shift.fin || shift.horaFin || shift.raw?.horaFin || "";
+    const fecha = fechaLegible(shift.fecha || shift.raw?.diaInicioTurno || "");
+    const inicio = hora(shift.inicio || shift.horaInicio || shift.raw?.horaInicio);
+    const fin = hora(shift.fin || shift.horaFin || shift.raw?.horaFin);
+    const horario = inicio || fin ? `${inicio}–${fin}` : "";
 
-    return `${tipoLabel} · ${fecha} ${inicio}–${fin}`.trim();
+    return [tipoLabel, fecha, horario].filter(Boolean).join(" · ");
 };

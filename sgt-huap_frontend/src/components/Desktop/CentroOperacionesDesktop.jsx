@@ -3,6 +3,7 @@ import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { ofertaVisible, participaEnSolicitud } from '../../utils/reglasSolicitud';
+import { formatShiftLabel } from '../Comun/turnoPresentacion';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
 // lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
 // En desktop el Sheet se presenta como panel lateral (R18).
@@ -355,7 +356,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
           ? () => setTurnoGestion(t)
           : yaSolicitada
             ? undefined
-            : () => onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: t.id, turnoLabel: `${fechaISO} ${fmtHora(t.inicio)}–${fmtHora(t.fin)}` }),
+            : () => onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: t.id, turnoLabel: formatShiftLabel(t) }),
       };
     });
 
