@@ -1,19 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { SGT_DATA } from '../Admin2/data';
 import { IconBadge3D, SGTIcon } from './UIPrimitives';
 
 const P = () => SGT_DATA.PALETTE;
-
-// Paginación client-side: reemplaza el ITEMS_PER_PAGE + slice() manual
-// duplicado en varios listados (Servicios, Puestos, Personal del Sistema).
-// No cambia qué datos se muestran, solo cómo se trocean/recorren.
-export const usePagination = (items, perPage = 6) => {
-  const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(items.length / perPage));
-  const safePage = Math.min(page, totalPages);
-  const pageItems = items.slice((safePage - 1) * perPage, safePage * perPage);
-  return { page: safePage, setPage, totalPages, pageItems };
-};
 
 export const PaginationControls = ({ page, totalPages, onChange }) => {
   if (totalPages <= 1) return null;

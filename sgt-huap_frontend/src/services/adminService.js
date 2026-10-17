@@ -352,7 +352,9 @@ export const solicitudesService = {
             window.dispatchEvent(new CustomEvent('solicitud:updated', {
                 detail: { id: solicitudId, estado: nuevoEstado, response: response.data }
             }));
-        } catch (_) {}
+        } catch {
+            // El evento solo avisa a otras vistas: si no se puede emitir, no pasa nada.
+        }
         return response.data;
     },
 

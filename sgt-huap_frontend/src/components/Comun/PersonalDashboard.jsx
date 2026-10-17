@@ -4,7 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { turnosService } from '../../services/adminService';
 import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data';
 import { SGTBadge, SGTIcon, IconBadge3D } from '../Style/UIPrimitives';
-import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
+import PeriodoSelector from '../Style/PeriodoSelector';
+import { buildSemanasDelMes, rangoPeriodo } from '../Style/periodo';
 import { useLayout } from '../../layout/layout';
 import {
   EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, KpiDesktop,
@@ -141,8 +142,9 @@ const PersonalDashboard = ({ onBack }) => {
     setLoading(true);
     setError(null);
 
+    const mesPedido = dayjs().subtract(mesOffset, 'month');
     Promise.all([
-      turnosService.getByMedico(user.id, mesActual.year(), mesActual.month() + 1),
+      turnosService.getByMedico(user.id, mesPedido.year(), mesPedido.month() + 1),
       turnosService.getFuturos(user.id),
     ])
       .then(([mes, fut]) => {

@@ -5,12 +5,8 @@ import './App.css';
 import Prop4 from "./components/Admin2/Prop4.jsx";
 
 
-import { useAuth, Roles } from './context/AuthContext';
-
+// <AuthProvider> envuelve a <App> en main.jsx.
 function App() {
-    // Asegúrate de que <AuthProvider> esté envolviendo <App> en tu main.jsx
-    const auth = useAuth(); 
-
     return (
         <Router>
             <div className="app-container">

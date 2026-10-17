@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Pencil, Trash2, X, Check, AlertCircle, Plus, PowerOff } from 'lucide-react';
 import { SGT_DATA } from './data';
 import { SGTIcon, TopHeader, IconBadge3D, StatusBadge, ConfirmDialog } from '../Style/UIPrimitives';
-import { usePagination, PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
+import { PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
+import { usePagination } from '../Style/usePagination';
 import {
     getServicios, 
     getServiciosInactivos,

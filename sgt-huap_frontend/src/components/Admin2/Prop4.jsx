@@ -1,5 +1,5 @@
 // Prop4.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 //Importaciones Style
 import "../Style/style.css";
@@ -141,9 +141,9 @@ function leerNavGuardada(user) {
 
 const Prop4 = ({ tweaks = {} }) => {
   const auth = useAuth();
-  // Navegación inicial: la última vista guardada si hay sesión, o login.
-  // useMemo con [] = solo al montar; auth.user ya está rehidratado en ese punto.
-  const navInicial = useMemo(() => leerNavGuardada(auth?.user), []);
+  // Navegación inicial: la última vista guardada si hay sesión, o login. Se
+  // calcula una sola vez, al montar; auth.user ya está rehidratado en ese punto.
+  const [navInicial] = useState(() => leerNavGuardada(auth?.user));
 
   const [currentView, setCurrentView] = useState(navInicial.view);
   const [activeTab, setActiveTab] = useState(navInicial.tab);

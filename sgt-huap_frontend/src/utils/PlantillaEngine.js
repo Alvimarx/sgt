@@ -28,7 +28,9 @@ export const calcularMatrizPlantilla = (lineas) => {
           if (patron.matriz && patron.matriz.length > maxSemanas) {
             maxSemanas = patron.matriz.length;
           }
-        } catch (e) {}
+        } catch {
+          // Patrón ilegible: no cuenta para el máximo de semanas.
+        }
       }
     });
   });
@@ -93,7 +95,9 @@ export const calcularMatrizPlantilla = (lineas) => {
             }
           });
         }
-      } catch (e) { }
+      } catch {
+        // Patrón ilegible: esa línea queda sin turnos.
+      }
     });
   });
   

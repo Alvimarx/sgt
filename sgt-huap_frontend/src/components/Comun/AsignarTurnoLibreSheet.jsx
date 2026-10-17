@@ -3,7 +3,7 @@ import { SGT_DATA } from '../Admin2/data';
 import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { asignarTurnoLibre, reasignarTurno, desasignarTurno } from '../../services/turnosService';
-import { formatShiftLabel } from './ShiftDetail';
+import { formatShiftLabel } from './turnoPresentacion';
 import { useLayout } from '../../layout/layout';
 import AsignacionTurnoDesktop from '../Desktop/turnos/AsignacionTurnoDesktop';
 import ConfirmacionDesktop from '../Desktop/turnos/ConfirmacionDesktop';

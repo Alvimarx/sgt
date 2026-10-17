@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
 import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon, TopHeader, IconBadge3D, ConfirmDialog } from '../Style/UIPrimitives';
-import { usePagination, PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
+import { PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
+import { usePagination } from '../Style/usePagination';
 import { useAuth } from '../../context/AuthContext';
 import {
     getPuestosPorServicio,

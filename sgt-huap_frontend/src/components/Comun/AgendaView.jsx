@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { SGT_DATA } from "../Admin2/data";
 import { getTurnosServicio } from "../../services/funcionarioService";
-import ShiftDetail, { getTipoTurnoColor, getAgendaTeam, formatShiftLabel } from "../Comun/ShiftDetail";
+import ShiftDetail from "../Comun/ShiftDetail";
+import { getTipoTurnoColor, getAgendaTeam, formatShiftLabel } from "../Comun/turnoPresentacion";
 import AsignarTurnoLibreSheet from "./AsignarTurnoLibreSheet";
 
 import {
@@ -75,8 +76,8 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   const toastTimerRef = useRef(null);
 
   const PA = SGT_DATA.PALETTE;
-  const agendaDays = agendaData.weekDays || [];
-  const shiftsByDay = agendaData.shiftsByDay || {};
+  const agendaDays = useMemo(() => agendaData.weekDays || [], [agendaData.weekDays]);
+  const shiftsByDay = useMemo(() => agendaData.shiftsByDay || {}, [agendaData.shiftsByDay]);
   const todayKey = agendaData.todayKey || "";
   const { unreadCount } = useNotifications();
 
@@ -263,7 +264,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     };
     load();
     return () => { mounted = false; };
-  }, [user?.id, user?.userId, user?.servicioId, refreshTick]);
+  }, [myUserId, user?.servicioId, refreshTick]);
 
   // Limpieza del timer al desmontar
   useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
@@ -272,7 +273,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   // CONTADORES DE FILTROS
   // ---------------------------------------------------------------------------
   const countMisTurnos = useMemo(
-    () => agendaDays.filter((day) => getShifts(day.key).some((s) => s.miTurno)).length,
+    () => agendaDays.filter((day) => (shiftsByDay[day.key] || []).some((s) => s.miTurno)).length,
     [agendaDays, shiftsByDay]
   );
   // solicitudPendiente llega del backend desde R11: los listados de turnos marcan
@@ -280,7 +281,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   // batch en TurnoService).
   const countSolicitudes = useMemo(
     () => agendaDays.reduce(
-      (acc, day) => acc + getShifts(day.key).filter((s) => s.solicitudPendiente).length, 0
+      (acc, day) => acc + (shiftsByDay[day.key] || []).filter((s) => s.solicitudPendiente).length, 0
     ),
     [agendaDays, shiftsByDay]
   );

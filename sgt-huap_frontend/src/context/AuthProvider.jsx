@@ -1,14 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import AuthContext, { Roles } from './AuthContext'
 import { isAuthenticated, getCurrentUser, logout as authLogout } from '../services/authService'
-
-// Roles usados en la aplicación (mapeo del backend)
-export const Roles = {
-    JEFATURA: 'JEFATURA',
-    JEFATURA_SUB: 'SUBROGANTE',
-    MEDICO: 'MEDICO'
-}
-
-const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
@@ -112,9 +104,3 @@ export function AuthProvider({ children }) {
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-
-export function useAuth() {
-    return useContext(AuthContext)
-}
-
-export default AuthContext

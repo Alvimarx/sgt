@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SGT_DATA, DASHBOARD_ICON_THEMES } from './data'; // Ajusta la ruta según tu estructura
 import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
-import { usePagination, PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
+import { PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
+import { usePagination } from '../Style/usePagination';
 import { getServicios } from '../../services/servicioService';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { useLayout } from '../../layout/layout';

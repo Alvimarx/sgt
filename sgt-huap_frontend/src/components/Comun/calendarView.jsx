@@ -4,7 +4,8 @@ import { SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { LoadingState } from '../Style/ListControls';
 import { useAuth } from '../../context/AuthContext';
 import { getTurnosCalendario } from '../../services/turnosService';
-import ShiftDetail, { getTipoTurnoColor, formatShiftLabel } from '../Comun/ShiftDetail';
+import ShiftDetail from '../Comun/ShiftDetail';
+import { getTipoTurnoColor, formatShiftLabel } from '../Comun/turnoPresentacion';
 import AsignarTurnoLibreSheet from './AsignarTurnoLibreSheet';
 import { exportarTurnosCsv } from '../../services/exportacionService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
@@ -394,7 +395,7 @@ const CalendarView = ({
     const goToNextMonth = () => { if (viewMonth === 12) { setViewYear(y => y + 1); setViewMonth(1); } else setViewMonth(m => m + 1); };
 
     const selectedKey = selectedDay ? dateKey(viewYear, viewMonth, selectedDay) : null;
-    const selectedShifts = selectedKey ? (shiftsByDay[selectedKey] || []) : [];
+    const selectedShifts = useMemo(() => (selectedKey ? (shiftsByDay[selectedKey] || []) : []), [selectedKey, shiftsByDay]);
     const selectedStats = useMemo(() => getCoverageStats(selectedShifts), [selectedShifts]);
     const sheetTitle = selectedDay
         ? `${DAY_LABELS[(new Date(viewYear, viewMonth - 1, selectedDay).getDay() + 6) % 7]} ${selectedDay} ${MONTH_NAMES[viewMonth - 1].slice(0, 3)}`

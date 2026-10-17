@@ -1,5 +1,4 @@
 // src/services/funcionarioService.js
-import axios from 'axios';
 import axiosInstance from '../utils/axiosConfig';
 import { getUserId as getUserIdFromToken ,
     getServicioId as getUserServiceIdFromToken
@@ -19,13 +18,6 @@ const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 // ---------------------------------------------------------------------------
 // HELPERS DE PARSEO Y CÁLCULO
 // ---------------------------------------------------------------------------
-
-const parseDateKey = (value) => {
-    if (!value) return null;
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toISOString().slice(0, 10);
-};
 
 const formatTime = (value) => {
     if (!value) return null;
@@ -434,7 +426,7 @@ export const asignarServicio = async (idServicio, rut) => {
 
         return { success: true, data: responseAsignacion.data };
 
-    } catch (error) {
+    } catch {
         // 4. Catch global: Atrapa errores de asignación, de servidor caído, o de credenciales (401)
         return { success: false, error: 'No se pudo completar la asignación. Intenta de nuevo.' };
     }

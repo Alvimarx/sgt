@@ -10,7 +10,7 @@ import React from 'react';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import { SGTIcon } from '../../Style/UIPrimitives';
-import { buildSemanasDelMes, MAX_MESES_ATRAS } from '../../Style/PeriodoSelector';
+import { buildSemanasDelMes, MAX_MESES_ATRAS } from '../../Style/periodo';
 import { SegmentosDesktop } from '../ui';
 import './gestion.css';
 

@@ -1,4 +1,5 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
+import NotificationContext from "./NotificationContext";
 import { useAuth } from "./AuthContext";
 import {
   eliminarNotificacion,
@@ -6,16 +7,6 @@ import {
   getNotificacionesUsuario,
   marcarNotificacionLeida,
 } from "../services/notificationService";
-
-/**
- * NOTIFICATION CONTEXT
- * 
- * Este contexto SOLO utiliza datos proporcionados por el backend.
- * NO utiliza datos mock, datos de prueba, ni datos por defecto.
- * Todas las notificaciones y contadores se obtienen de la API del servidor.
- */
-
-const NotificationContext = createContext(null);
 
 export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
@@ -137,6 +128,3 @@ export function NotificationProvider({ children }) {
     </NotificationContext.Provider>
   );
 }
-
-// Hook para usar el context
-export const useNotifications = () => useContext(NotificationContext);
