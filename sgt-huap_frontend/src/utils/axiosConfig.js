@@ -6,6 +6,13 @@
 import axios from 'axios';
 import { getToken, clearAuth, isTokenValid } from './tokenManager';
 
+/**
+ * Evento de window que se emite cuando el backend responde 403 a una petición
+ * fuera del login: la acción no está permitida, pero la sesión sigue abierta.
+ * detail: { url, mensaje }.
+ */
+export const EVENTO_SIN_PERMISO = 'sgt:sin-permiso';
+
 // Configuración base de Axios
 const axiosInstance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v2',
@@ -73,7 +80,8 @@ axiosInstance.interceptors.response.use(
         if (error.response) {
             const { status, data } = error.response;
 
-            // 401: Token inválido o expirado — ignorar en endpoints de login (credenciales wrongas, no sesión expirada)
+            // 401: token inválido o expirado: se cierra la sesión — salvo en los endpoints
+            // de login (credenciales erradas, no una sesión vencida).
             const isLoginEndpoint = error.config?.url?.includes('/login');
             if (status === 401 && !isLoginEndpoint) {
                 console.warn('[Axios] Token inválido o expirado. Limpiando autenticación...');
@@ -83,10 +91,19 @@ axiosInstance.interceptors.response.use(
                 }
             }
 
-            // 403: Sin permisos
-            if (status === 403) {
-                console.error('[Axios] Acceso denegado. Sin permisos suficientes.');
-                // Podrías mostrar un mensaje o redirigir a una página de error
+            // 403: falta el permiso, pero la sesión sigue siendo válida (C-20). No
+            // se cierra la sesión: se avisa (AvisoSinPermiso, montado en Prop4) y la
+            // vista muestra su propio error. En el login (elegir un servicio ajeno)
+            // el error lo muestra la propia pantalla.
+            if (status === 403 && !isLoginEndpoint) {
+                console.warn('[Axios] Acceso denegado. Sin permisos suficientes.');
+                try {
+                    window.dispatchEvent(new CustomEvent(EVENTO_SIN_PERMISO, {
+                        detail: { url: error.config?.url || null, mensaje: data?.error || data?.message || null },
+                    }));
+                } catch {
+                    // Sin window o sin CustomEvent: no hay a quién avisar.
+                }
             }
 
             // Agregar el mensaje de error al objeto error para fácil acceso

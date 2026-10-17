@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 //Importaciones Style
 import "../Style/style.css";
 import { PhoneShell, TabBar } from "../Style/UIPrimitives";
+import AvisoSinPermiso from "../Style/AvisoSinPermiso";
 
 import { useAuth } from "../../context/AuthContext";
 import { selectService } from "../../services/authService";
@@ -522,6 +523,7 @@ const Prop4 = ({ tweaks = {} }) => {
         conteoSolicitudes={conteoSolicitudes}
       >
         {animaciones}
+        <AvisoSinPermiso />
         {currentView === "agenda" ? (
           <CentroOperacionesDesktop
             user={auth?.user}
@@ -537,6 +539,7 @@ const Prop4 = ({ tweaks = {} }) => {
     <PhoneShell>
       {animaciones}
       {vistas}
+      <AvisoSinPermiso />
 
       {[
         "agenda",
