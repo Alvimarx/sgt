@@ -8,6 +8,7 @@ import { SGT_DATA } from './data';
 import { useLayout } from '../../layout/layout';
 import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, CampoDesktop, BotonDesktop, ChipDesktop, AvisoDesktop } from '../Desktop/ui';
 import { AvisoMantenedorDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
+import { mensajeDeError } from '../../utils/errores';
 
 // ─── Paleta de colores compartida con el resto de la app ───────────────────
 const PA = SGT_DATA.PALETTE;
@@ -382,7 +383,7 @@ export default function TiposTurnoView({ onBack }) {
             const data = await tiposTurnoService.getByServicio(user?.servicioId);
             setTipos(Array.isArray(data) ? data : []);
         } catch (e) {
-            setError(e?.response?.data || e.message || 'Error al cargar los tipos de turno.');
+            setError(mensajeDeError(e, 'Error al cargar los tipos de turno.'));
         } finally {
             setLoading(false);
         }
@@ -402,7 +403,7 @@ export default function TiposTurnoView({ onBack }) {
             setEditing(null);
             await load();
         } catch (e) {
-            setError(e?.response?.data || e.message || 'Error al guardar.');
+            setError(mensajeDeError(e, 'Error al guardar.'));
         } finally {
             setSaving(false);
         }
@@ -431,7 +432,7 @@ export default function TiposTurnoView({ onBack }) {
             setConfirmDel(null);
             await load();
         } catch (e) {
-            setError(e?.response?.data || e.message || 'Error al eliminar.');
+            setError(mensajeDeError(e, 'Error al eliminar.'));
             setConfirmDel(null);
         } finally {
             setDeleting(false);

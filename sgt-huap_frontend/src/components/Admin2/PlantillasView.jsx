@@ -14,6 +14,7 @@ import { AvisoDesktop, BotonDesktop, CampoDesktop, EncabezadoDesktop, PaginaDesk
 import RotativasDesktop from '../Desktop/planificacion/RotativasDesktop';
 import { AvisoCerrable, BloqueTipo, ConfirmacionPlan, FormularioPanel, GrillaSemanas } from '../Desktop/planificacion/piezas';
 import { DIAS_LARGOS, crearTonoTipo, textoError } from '../Desktop/planificacion/formato';
+import { mensajeDeError } from '../../utils/errores';
 
 // ─── Paleta compartida con el resto de la app ──────────────────────────────
 const PA = SGT_DATA.PALETTE;
@@ -433,6 +434,13 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
 
     const [nombre, setNombre]   = useState(plantilla?.nombre ?? '');
     const [semanas, setSemanas] = useState(plantilla?.semanas ?? 2);
+    // Texto del campo «Semanas», aparte del número: se puede borrar para escribir
+    // otro sin que la rotativa cambie mientras el campo está vacío.
+    const [semanasTexto, setSemanasTexto] = useState(String(plantilla?.semanas ?? 2));
+    // Guarda todos los días pintados, aunque se bajen las semanas: la rotativa
+    // usa los primeros semanas × 7 (diasDeLaRotativa) y el resto se descarta al
+    // guardar. Así, borrar o bajar las semanas y volver a subirlas no pierde la
+    // secuencia.
     const [diasMatrix, setDiasMatrix] = useState(() => {
         if (plantilla?.secuenciaDias?.length > 0)
             return parseSecuenciaFromBackend(plantilla.secuenciaDias, plantilla?.semanas ?? 2);
@@ -443,17 +451,22 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
     const [gridError, setGridError] = useState('');
     const [brush, setBrush]   = useState(null);   // null | 'libre' | idTipoTurno
 
+    const diasDeLaRotativa = diasMatrix.slice(0, semanas * 7);
+
     const handleSemanasChange = (val) => {
-        const n = Math.max(1, Math.min(12, Number(val) || 1));
+        setSemanasTexto(val);
+        const n = Number(val);
+        if (!Number.isInteger(n) || n < 1 || n > 12) return;
         setSemanas(n);
-        setDiasMatrix(prev => {
-            const next = matrizVacia(n);
-            for (let i = 0; i < Math.min(prev.length, next.length); i++) next[i] = prev[i];
-            return next;
-        });
+        setDiasMatrix(prev => (prev.length >= n * 7
+            ? prev
+            : [...prev, ...Array.from({ length: n * 7 - prev.length }, () => [])]));
     };
+    // Al salir del campo con un valor que no sirve, vuelve el número vigente.
+    const completarSemanas = () => setSemanasTexto(String(semanas));
 
     const handleSave = async () => {
+        completarSemanas();
         if (!nombre.trim()) return setErr('El nombre es obligatorio.');
         if (semanas < 1)    return setErr('Las semanas deben ser ≥ 1.');
         setErr('');
@@ -466,18 +479,18 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
                     semanas: Number(semanas),
                     idServicio: servicioId,
                 });
-                await plantillasService.setSecuencia(creada.idRotativa, diasMatrix);
+                await plantillasService.setSecuencia(creada.idRotativa, diasDeLaRotativa);
                 result = creada;
             } else {
                 await plantillasService.update(plantilla.idRotativa, {
                     nombre: nombre.trim(),
                     semanas: Number(semanas),
                 });
-                result = await plantillasService.setSecuencia(plantilla.idRotativa, diasMatrix);
+                result = await plantillasService.setSecuencia(plantilla.idRotativa, diasDeLaRotativa);
             }
             onSaved(result);
         } catch (e) {
-            setErr(e?.response?.data || e.message || 'Error al guardar la plantilla.');
+            setErr(mensajeDeError(e, 'Error al guardar la rotativa.'));
         } finally {
             setSaving(false);
         }
@@ -489,8 +502,9 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
         boxSizing: 'border-box',
     };
 
-    // Horas totales del patrón y promedio semanal que haría la persona.
-    const totalMin = diasMatrix.reduce((acc, dia) => acc + dia.reduce((a, id) => {
+    // Horas totales del patrón y promedio semanal que haría la persona. Sobre
+    // 44 horas solo se avisa: no impide guardar (C-13).
+    const totalMin = diasDeLaRotativa.reduce((acc, dia) => acc + dia.reduce((a, id) => {
         const t = tipos.find(tt => tt.idTipoTurno === id);
         return a + (t ? duracionMin(t) : 0);
     }, 0), 0);
@@ -503,7 +517,7 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
     // el encabezado.
     if (esDesktop) {
         const tono = crearTonoTipo(tipos);
-        const diasConTurno = diasMatrix.filter((d) => d.length > 0).length;
+        const diasConTurno = diasDeLaRotativa.filter((d) => d.length > 0).length;
         return (
             <>
                 <EncabezadoDesktop
@@ -548,8 +562,9 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
                                             id="sgt-dp-rotativa-semanas"
                                             type="number" min={1} max={12}
                                             className="sgt-d-input sgt-dp-input-num"
-                                            value={semanas}
+                                            value={semanasTexto}
                                             onChange={e => handleSemanasChange(e.target.value)}
+                                            onBlur={completarSemanas}
                                         />
                                     </CampoDesktop>
                                 </div>
@@ -667,8 +682,9 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
                         </label>
                         <input
                             type="number" min={1} max={12}
-                            value={semanas}
+                            value={semanasTexto}
                             onChange={e => handleSemanasChange(e.target.value)}
+                            onBlur={completarSemanas}
                             style={{ ...inputStyle, width: 72, textAlign: 'center' }}
                         />
                     </div>
@@ -940,7 +956,7 @@ export default function PlantillasView({ onBack }) {
             setPlantillas(Array.isArray(pList) ? pList : []);
             setTipos(Array.isArray(tList) ? tList : []);
         } catch (e) {
-            setError(e?.response?.data || e.message || 'Error al cargar datos.');
+            setError(mensajeDeError(e, 'Error al cargar datos.'));
         } finally {
             setLoading(false);
         }
@@ -961,7 +977,7 @@ export default function PlantillasView({ onBack }) {
             setConfirmDel(null);
             await load();
         } catch (e) {
-            setError(e?.response?.data || e.message || 'Error al eliminar.');
+            setError(mensajeDeError(e, 'Error al eliminar.'));
             setConfirmDel(null);
         } finally {
             setDeleting(false);
