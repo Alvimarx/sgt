@@ -5,7 +5,9 @@ import { useLayout } from '../../layout/layout';
 import { EncabezadoDesktop, PaginaDesktop, BotonDesktop } from '../Desktop/ui';
 import { GrillaModulosDesktop } from '../Desktop/gestion/ModulosDesktop';
 
-const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServicioJefatura ,onGoFuncionariosJefatura, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion,onGoAsignacionTurnos}) => {
+// C-01 (17 oct 2026): tipos de turno, rotativas y planificación son solo del
+// administrador (Panel de Administración); este panel no los ofrece.
+const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServicioJefatura ,onGoFuncionariosJefatura, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoAsignacionTurnos}) => {
   const PA = SGT_DATA.PALETTE;
   const { esDesktop } = useLayout();
 
@@ -17,9 +19,6 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
       onGoAsignacionJefatura && { icono: 'users', titulo: 'Asignación de Funcionarios', descripcion: 'Asigna funcionarios a servicios y rotativas.', onClick: onGoAsignacionJefatura },
       onGoFuncionariosServicioJefatura && { icono: 'briefcase', titulo: 'Personal del Servicio', descripcion: 'Visualiza y gestiona el personal asociado a tu servicio.', onClick: onGoFuncionariosServicioJefatura },
       onGoFuncionariosJefatura && { icono: 'org-chart', titulo: 'Jerarquía de Funcionarios', descripcion: 'Designa nuevos subrogantes al sistema.', onClick: onGoFuncionariosJefatura },
-      onGoTiposTurno && { icono: 'calendar', titulo: 'Crear tipo de Turno', descripcion: 'Diseña un nuevo tipo de turno.', onClick: onGoTiposTurno },
-      onGoPlantillas && { icono: 'rotate', titulo: 'Crear Rotativa', descripcion: 'Diseña una nueva rotativa.', onClick: onGoPlantillas },
-      onGoPlanificacion && { icono: 'calendar', titulo: 'Crear Planificación Mensual', descripcion: 'Diseña una nueva planificación mensual.', onClick: onGoPlanificacion },
       onGoSolitudes && { icono: 'alert', titulo: 'Evaluar Solicitudes', descripcion: 'Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos.', onClick: onGoSolitudes },
       onGoPuestos && { icono: 'home', titulo: 'Gestionar Puestos', descripcion: 'Crea, edita y elimina puestos del sistema.', onClick: onGoPuestos },
       onGoStats && { icono: 'sliders', titulo: 'Estadísticas del Servicio', descripcion: 'Cobertura, turnos vacantes y horas cubiertas.', onClick: onGoStats },
@@ -55,9 +54,7 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
 
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', flex: 1 }}>
 
-        {/* Cada tarjeta se muestra solo si su acción está habilitada (handler provisto).
-            Las acciones globales (servicios, tipos de turno, rotativas, planificación) son
-            exclusivas de ADMINISTRADOR y no se cablean aquí, por lo que quedan ocultas. */}
+        {/* Cada tarjeta se muestra solo si su acción está habilitada (handler provisto). */}
         {onGoSolitudes && (
           <DashboardCard
             icon="users"
@@ -92,33 +89,6 @@ const JefaturaDashboard = ({ onBack,onGoAsignacionJefatura, onGoFuncionariosServ
             desc="Designa nuevos subrogantes al sistema."
             onClick={onGoFuncionariosJefatura}
             delay={0.09}
-          />
-        )}
-        {onGoTiposTurno && (
-          <DashboardCard
-            icon="calendar"
-            title="Crear tipo de Turno"
-            desc="Diseña un nuevo tipo de turno."
-            onClick={onGoTiposTurno}
-            delay={0.12}
-          />
-        )}
-        {onGoPlantillas && (
-          <DashboardCard
-            icon="rotate"
-            title="Crear Rotativa"
-            desc="Diseña una nueva rotativa."
-            onClick={onGoPlantillas}
-            delay={0.15}
-          />
-        )}
-        {onGoPlanificacion && (
-          <DashboardCard
-            icon="calendar"
-            title="Crear Planificación Mensual"
-            desc="Diseña una nueva planificación mensual."
-            onClick={onGoPlanificacion}
-            delay={0.18}
           />
         )}
         {onGoSolitudes && (

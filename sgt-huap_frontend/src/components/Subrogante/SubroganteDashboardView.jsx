@@ -28,7 +28,10 @@ const SubroganteCard = ({ icon, title, desc, onClick }) => {
   );
 };
 
-const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoAsignacionTurnos}) => {
+// C-01 (17 oct 2026): tipos de turno, rotativas y planificación son solo del
+// administrador; C-03: el subrogante tampoco designa jerarquía ni suma personal.
+// Este panel no ofrece ninguno de esos módulos.
+const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoAsignacionTurnos}) => {
   const PA = SGT_DATA.PALETTE;
   const { esDesktop } = useLayout();
 
@@ -37,9 +40,6 @@ const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, on
   if (esDesktop) {
     const modulos = [
       onGoSolitudes && { icono: 'users', titulo: 'Asignación de turnos', descripcion: 'Asigna o quita funcionarios de turnos', onClick: onGoAsignacionTurnos },
-      onGoTiposTurno && { icono: 'calendar', titulo: 'Crear tipo de Turno', descripcion: 'Diseña un nuevo tipo de turno.', onClick: onGoTiposTurno },
-      onGoPlantillas && { icono: 'calendar', titulo: 'Crear Rotativa', descripcion: 'Diseña una nueva rotativa.', onClick: onGoPlantillas },
-      onGoPlanificacion && { icono: 'calendar', titulo: 'Crear Planificación Mensual', descripcion: 'Diseña una nueva planificación mensual.', onClick: onGoPlanificacion },
       onGoSolitudes && { icono: 'alert', titulo: 'Evaluar Solicitudes', descripcion: 'Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos.', onClick: onGoSolitudes },
       onGoPuestos && { icono: 'home', titulo: 'Gestionar Puestos', descripcion: 'Crea, edita y elimina puestos del sistema.', onClick: onGoPuestos },
       onGoStats && { icono: 'sliders', titulo: 'Estadísticas del Servicio', descripcion: 'Cobertura, turnos vacantes y horas cubiertas.', onClick: onGoStats },
@@ -73,9 +73,7 @@ const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, on
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', flex: 1 }}>
         <p style={{ margin: '0 0 10px', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>Selecciona un módulo de tu servicio.</p>
 
-        {/* Solo se muestran las acciones habilitadas (handler provisto). Las acciones
-            globales (tipos de turno, rotativas, planificación) son exclusivas de
-            ADMINISTRADOR y no se cablean aquí, por lo que quedan ocultas. */}
+        {/* Solo se muestran las acciones habilitadas (handler provisto). */}
         {onGoSolitudes && (
           <SubroganteCard
             icon="users"
@@ -83,33 +81,6 @@ const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, on
             desc="Asigna o quita funcionarios de turnos"
             tone="accent"
             onClick={onGoAsignacionTurnos}
-          />
-        )}
-        {onGoTiposTurno && (
-          <SubroganteCard
-            icon="calendar"
-            title="Crear tipo de Turno"
-            desc="Diseña un nuevo tipo de turno."
-            tone="accent"
-            onClick={onGoTiposTurno}
-          />
-        )}
-        {onGoPlantillas && (
-          <SubroganteCard
-            icon="calendar"
-            title="Crear Rotativa"
-            desc="Diseña una nueva rotativa."
-            tone="accent"
-            onClick={onGoPlantillas}
-          />
-        )}
-        {onGoPlanificacion && (
-          <SubroganteCard
-            icon="calendar"
-            title="Crear Planificación Mensual"
-            desc="Diseña una nueva planificación mensual."
-            tone="accent"
-            onClick={onGoPlanificacion}
           />
         )}
         {onGoSolitudes && (
