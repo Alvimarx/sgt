@@ -41,8 +41,11 @@ public class ExportacionController {
                 .body(archivo);
     }
 
+    // SEC (C-08, HU-CAL-07): el médico también exporta, pero el backend fuerza que salgan solo
+    // sus turnos del servicio de la sesión, sea cual sea el idFuncionario que pida. La gestión
+    // exporta su servicio completo o los turnos de una persona; el ADMINISTRADOR, lo que pida.
     @GetMapping("/turnos/csv")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE','MEDICO')")
     public ResponseEntity<byte[]> exportarTurnosCsv(
             @RequestParam Integer anio,
             @RequestParam Integer mes,
@@ -52,25 +55,29 @@ public class ExportacionController {
         // Sin idServicio, antes se exportaban los turnos de TODO el hospital. Ahora, quien
         // no es ADMINISTRADOR debe acotar a su propio servicio (por defecto, el de su sesión).
         Long idServicioAlcance = idServicio;
+        Long idFuncionarioAlcance = idFuncionario;
         if (!seguridadServicio.esAdministrador()) {
             idServicioAlcance = (idServicio != null) ? idServicio : seguridadServicio.idServicioActual();
             seguridadServicio.exigirMismoServicio(idServicioAlcance);
+            if (!seguridadServicio.esGestionDelServicio()) {
+                idFuncionarioAlcance = seguridadServicio.idUsuarioActual();
+            }
         }
         byte[] archivo = exportacionService.exportarTurnosCsv(
                 anio,
                 mes,
-                idFuncionario,
+                idFuncionarioAlcance,
                 idServicioAlcance
         );
 
         String nombreArchivo = "turnos_" + anio + "_" + mes;
 
-        if (idServicio != null) {
-            nombreArchivo += "_servicio_" + idServicio;
+        if (idServicioAlcance != null) {
+            nombreArchivo += "_servicio_" + idServicioAlcance;
         }
 
-        if (idFuncionario != null) {
-            nombreArchivo += "_funcionario_" + idFuncionario;
+        if (idFuncionarioAlcance != null) {
+            nombreArchivo += "_funcionario_" + idFuncionarioAlcance;
         }
 
         nombreArchivo += ".csv";
