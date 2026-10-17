@@ -39,18 +39,20 @@ public class SecurityConfig {
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     // Administración GLOBAL del sistema: solo ADMINISTRADOR (super-admin).
-    private static final String[] GLOBAL_ADMIN_PATHS = {
+    // C-10: las reglas de horario quedan en el administrador, igual que los tipos de turno (C-01);
+    // antes estaban en SERVICE_ADMIN_PATHS y la jefatura o el subrogante las escribían por API.
+    static final String[] GLOBAL_ADMIN_PATHS = {
             "/api/v2/servicios/**",
             "/api/v2/tipos-turno/**",
             "/api/v2/rotativas/**",
-            "/api/v2/planificaciones/**"
+            "/api/v2/planificaciones/**",
+            "/api/v2/reglas-servicio/**"
     };
 
     // Administración a nivel de SERVICIO: JEFATURA/SUBROGANTE (y ADMINISTRADOR como super-admin).
-    private static final String[] SERVICE_ADMIN_PATHS = {
+    static final String[] SERVICE_ADMIN_PATHS = {
             "/api/v2/puestos/**",
             "/api/v2/turnos/**",
-            "/api/v2/reglas-servicio/**",
             "/api/v2/Personal/**"
     };
 
