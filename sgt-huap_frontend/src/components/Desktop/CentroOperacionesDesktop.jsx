@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { esAdministrador } from '../../utils/roles';
 import { ofertaVisible, participaEnOferta, participaEnSolicitud } from '../../utils/reglasSolicitud';
 import { formatShiftLabel } from '../Comun/turnoPresentacion';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
@@ -172,7 +173,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
     return Number.isFinite(raw) && raw > 0 ? raw : null;
   })();
   const canDecide = user?.rol === 'JEFATURA' || user?.rol === 'SUBROGANTE';
-  const canAssign = canDecide || ['ADMIN', 'ADMINISTRADOR'].includes(String(user?.rolSistema || '').toUpperCase());
+  const canAssign = canDecide || esAdministrador(user);
   const servicioNombre = localStorage.getItem('sgt_servicio_activo_nombre') || 'Servicio';
 
   const hoy = hoyISOEnZonaHospital();

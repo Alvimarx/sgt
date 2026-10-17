@@ -9,6 +9,7 @@ import AvisoSinPermiso from "../Style/AvisoSinPermiso";
 import { useAuth } from "../../context/AuthContext";
 import { selectService } from "../../services/authService";
 import { useLayout } from "../../layout/layout";
+import { esAdministrador } from "../../utils/roles";
 import { useSolicitudesPendientes } from "../../hooks/useSolicitudesPendientes";
 
 //Importaciones de Comun
@@ -92,7 +93,7 @@ const VISTAS_GESTION = ["admin_stats", "puestos", "auditoria", "reglas"];
 // pestaña se cambió a un servicio donde el rol es MEDICO, aquí no se restaura
 // un panel de jefatura con el token nuevo.
 function vistaPermitida(view, user) {
-  const esAdmin = ["ADMIN", "ADMINISTRADOR"].includes(String(user?.rolSistema || "").toUpperCase());
+  const esAdmin = esAdministrador(user);
   const esJefatura = user?.rol === "JEFATURA";
   const esSubrogante = user?.rol === "SUBROGANTE";
   if (VISTAS_COMUNES.includes(view)) return true;

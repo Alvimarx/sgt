@@ -6,10 +6,10 @@
 // Administración / Centro de gestión / Subrogancia): el menú no habilita
 // nada que el móvil no ofrezca.
 
-const esAdminSistema = (user) => ['ADMIN', 'ADMINISTRADOR'].includes(String(user?.rolSistema || '').toUpperCase());
+import { esAdministrador } from '../../utils/roles';
 
 export const permisosDe = (user) => {
-  const admin = esAdminSistema(user);
+  const admin = esAdministrador(user);
   const jefatura = user?.rol === 'JEFATURA';
   const subrogante = user?.rol === 'SUBROGANTE';
   return { admin, jefatura, subrogante, gestion: admin || jefatura || subrogante };

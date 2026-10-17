@@ -9,6 +9,7 @@ import { getTipoTurnoColor, formatShiftLabel } from '../Comun/turnoPresentacion'
 import AsignarTurnoLibreSheet from './AsignarTurnoLibreSheet';
 import { exportarTurnosCsv } from '../../services/exportacionService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { esAdministrador } from '../../utils/roles';
 import { useLayout } from '../../layout/layout';
 import CalendarioDesktop from '../Desktop/turnos/CalendarioDesktop';
 import ExportarTurnosDesktop from '../Desktop/turnos/ExportarTurnosDesktop';
@@ -128,26 +129,12 @@ const CalendarView = ({
 
     const rol = String(user?.rol || user?.role || '').toUpperCase();
 
-    const rolSistema = String(
-        user?.rolSistema ||
-        user?.roleSistema ||
-        user?.rol_sistema ||
-        ''
-    ).toUpperCase();
-
-    const esAdmin =
-        rolSistema === 'ADMIN' ||
-        rolSistema === 'ADMINISTRADOR' ||
-        rol === 'ADMIN' ||
-        rol === 'ADMINISTRADOR';
-
-    const esJefatura =
-        rol === 'JEFATURA' ||
-        rolSistema === 'JEFATURA';
-
-    const esSubrogante =
-        rol === 'SUBROGANTE' ||
-        rolSistema === 'SUBROGANTE';
+    // C-18: el administrador se reconoce solo por el rol de sistema
+    // ADMINISTRADOR (utils/roles.js); JEFATURA y SUBROGANTE son roles del
+    // servicio activo, nunca de sistema.
+    const esAdmin = esAdministrador(user);
+    const esJefatura = rol === 'JEFATURA';
+    const esSubrogante = rol === 'SUBROGANTE';
 
     const puedeEditarAsignacionTurnos =
         esAdmin ||

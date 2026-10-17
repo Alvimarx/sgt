@@ -16,6 +16,7 @@ import {
 } from "../Style/UIPrimitives";
 import { useNotifications } from "../../context/NotificationContext";
 import { puedeTomarCupo } from "../../utils/reglasTurno";
+import { esAdministrador } from "../../utils/roles";
 
 // ---------------------------------------------------------------------------
 // ESTADO INICIAL
@@ -91,7 +92,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
   const canAssignFreeTurns =
     user?.rol === "JEFATURA" ||
     user?.rol === "SUBROGANTE" ||
-    ["ADMIN", "ADMINISTRADOR"].includes(String(user?.rolSistema || "").toUpperCase());
+    esAdministrador(user);
 
   // Cupos libres de los días que muestra la agenda (de hoy en adelante, más la
   // noche de ayer que termina hoy): antes contaba todos los del servicio,
