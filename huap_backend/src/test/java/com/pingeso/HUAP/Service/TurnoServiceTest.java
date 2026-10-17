@@ -322,4 +322,28 @@ class TurnoServiceTest {
 
         assertEquals(4L, turnoService.getTurnosByPuesto(3L).get(0).get("idServicio"));
     }
+
+    // ============================ §5.1: el selector de Cobertura, sin cupos que ya empezaron ============================
+
+    @Test
+    void cuposSinAsignar_soloLosQueTodaviaNoEmpiezan() {
+        java.time.LocalDateTime ahora = java.time.LocalDateTime.now();
+        TurnoEntity pasado = cupo(1L, ahora.minusDays(7));
+        TurnoEntity enCurso = cupo(2L, ahora.minusHours(1));
+        TurnoEntity futuro = cupo(3L, ahora.plusHours(2));
+        when(turnoRepository.findUnassignedTurnosByServicio(4L)).thenReturn(List.of(pasado, enCurso, futuro));
+
+        List<Map<String, Object>> cupos = turnoService.getUnassignedTurnosByServicio(4L);
+
+        assertEquals(List.of(3L), cupos.stream().map(c -> c.get("id")).toList());
+    }
+
+    /** Cupo libre de Urgencias, de 12 horas, que parte en el instante indicado. */
+    private static TurnoEntity cupo(long id, java.time.LocalDateTime inicio) {
+        java.time.LocalDateTime fin = inicio.plusHours(12);
+        return TurnoEntity.builder().idTurno(id).servicio(servicio(4L))
+                .diaInicioTurno(inicio.toLocalDate()).horaInicio(inicio.toLocalTime())
+                .diaFinalTurno(fin.toLocalDate()).horaFin(fin.toLocalTime())
+                .build();
+    }
 }

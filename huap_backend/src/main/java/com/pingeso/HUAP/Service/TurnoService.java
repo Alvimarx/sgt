@@ -304,14 +304,15 @@ public class TurnoService {
     }
 
     /**
-     * Obtiene todos los turnos sin asignar (vacantes) de un Servicio específico.
+     * Turnos sin asignar (vacantes) de un servicio que todavía no empiezan. Alimentan el selector
+     * «Turno a cubrir» de Cobertura. §5.1 (P-01, HU-SOL-05): antes traía también los cupos que ya
+     * pasaron, que el backend no deja pedir (409 «Ese turno ya empezó»).
      */
     public List<Map<String, Object>> getUnassignedTurnosByServicio(Long servicioId) {
-        // 1. Llamamos al método que ya tienes en tu nuevo Repository
-        List<TurnoEntity> turnosVacantes = turnoRepository.findUnassignedTurnosByServicio(servicioId);
-
-        // 2. Lo convertimos al formato limpio para el Frontend usando nuestro mapeador
-        return turnosVacantes.stream()
+        LocalDateTime ahora = LocalDateTime.now();
+        return turnoRepository.findUnassignedTurnosByServicio(servicioId).stream()
+                .filter(t -> t.getDiaInicioTurno() == null || t.getHoraInicio() == null
+                        || t.getDiaInicioTurno().atTime(t.getHoraInicio()).isAfter(ahora))
                 .map(this::convertirTurnoAMap)
                 .collect(Collectors.toList());
     }
