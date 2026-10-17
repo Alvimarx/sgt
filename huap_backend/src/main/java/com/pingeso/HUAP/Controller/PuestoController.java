@@ -2,6 +2,7 @@ package com.pingeso.HUAP.Controller;
 
 import com.pingeso.HUAP.DTO.PuestoRequestDTO;
 import com.pingeso.HUAP.Entity.PuestoEntity;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import com.pingeso.HUAP.Service.PuestoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Controlador REST de puestos.
@@ -31,6 +33,20 @@ public class PuestoController {
     @Autowired
     private PuestoService puestoService;
 
+    // SEC (C-17, HU-PUE-01): las escrituras y lecturas de puestos exigen el servicio de la
+    // sesión (salvo ADMINISTRADOR). Antes una jefatura o un subrogante podía crear, renombrar o
+    // eliminar puestos de otro servicio por API, y cualquier sesión los leía.
+    @Autowired
+    private SeguridadServicio seguridadServicio;
+
+    /** El puesto (400 si no existe, como antes) debe ser del servicio de la sesión (403). */
+    private PuestoEntity puestoDelServicio(Long idPuesto) {
+        PuestoEntity puesto = puestoService.obtenerPuesto(idPuesto);
+        seguridadServicio.exigirMismoServicio(
+                puesto.getServicio() != null ? puesto.getServicio().getIdServicio() : null);
+        return puesto;
+    }
+
     /**
      * Crea un puesto en un servicio.
      * @param request idServicio y nombre del puesto.
@@ -40,6 +56,7 @@ public class PuestoController {
             description = "Crea un puesto en un servicio. Falla si el servicio no existe o el nombre está vacío.")
     @PostMapping
     public ResponseEntity<PuestoEntity> crearPuesto(@RequestBody PuestoRequestDTO request) {
+        seguridadServicio.exigirMismoServicio(request.getIdServicio());
         PuestoEntity puesto = puestoService.crearPuesto(
                 request.getIdServicio(),
                 request.getNombre()
@@ -60,18 +77,23 @@ public class PuestoController {
     ) {
 
         return ResponseEntity.ok(
-                puestoService.obtenerPuesto(id)
+                puestoDelServicio(id)
         );
     }
 
-    /** Lista todos los puestos vigentes (no eliminados). */
+    /** Lista los puestos vigentes (no eliminados): todos para el ADMINISTRADOR, los del servicio de la sesión para el resto. */
     @Operation(summary = "Listar todos los puestos (vigentes)")
     @GetMapping
     public ResponseEntity<List<PuestoEntity>> obtenerTodosPuestos() {
-
-        return ResponseEntity.ok(
-                puestoService.obtenerTodosPuestos()
-        );
+        List<PuestoEntity> puestos = puestoService.obtenerTodosPuestos();
+        if (!seguridadServicio.esAdministrador()) {
+            Long servicioSesion = seguridadServicio.idServicioActual();
+            puestos = puestos.stream()
+                    .filter(p -> p.getServicio() != null && servicioSesion != null
+                            && Objects.equals(servicioSesion, p.getServicio().getIdServicio()))
+                    .toList();
+        }
+        return ResponseEntity.ok(puestos);
     }
 
     /** Lista los puestos vigentes de un servicio. */
@@ -80,7 +102,7 @@ public class PuestoController {
     public ResponseEntity<List<PuestoEntity>> obtenerPorServicio(
             @PathVariable Long idServicio
     ) {
-
+        seguridadServicio.exigirMismoServicio(idServicio);
         return ResponseEntity.ok(
                 puestoService.obtenerPuestosPorServicio(idServicio)
         );
@@ -93,10 +115,10 @@ public class PuestoController {
     public ResponseEntity<PuestoEntity> obtenerPorNombre(
             @PathVariable String nombre
     ) {
-
-        return ResponseEntity.ok(
-                puestoService.obtenerPuestosPorNombre(nombre)
-        );
+        PuestoEntity puesto = puestoService.obtenerPuestosPorNombre(nombre);
+        seguridadServicio.exigirMismoServicio(
+                puesto.getServicio() != null ? puesto.getServicio().getIdServicio() : null);
+        return ResponseEntity.ok(puesto);
     }
 
     /**
@@ -110,7 +132,7 @@ public class PuestoController {
             @PathVariable Long id,
             @RequestParam String nombre
     ) {
-
+        puestoDelServicio(id);
         return ResponseEntity.ok(
                 puestoService.actualizarPuesto(id, nombre)
         );
@@ -127,7 +149,7 @@ public class PuestoController {
     public ResponseEntity<Long> contarTurnosAsociados(
             @PathVariable Long id
     ) {
-
+        puestoDelServicio(id);
         return ResponseEntity.ok(
                 puestoService.contarTurnosAsociados(id)
         );
@@ -146,7 +168,7 @@ public class PuestoController {
     public ResponseEntity<Void> eliminarPuesto(
             @PathVariable Long id
     ) {
-
+        puestoDelServicio(id);
         puestoService.eliminarPuesto(id);
 
         return ResponseEntity.noContent().build();

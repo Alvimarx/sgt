@@ -8,6 +8,7 @@ import com.pingeso.HUAP.Entity.PlanificacionAsignacionEntity;
 import com.pingeso.HUAP.Entity.PlanificacionEjecucionEntity;
 import com.pingeso.HUAP.Entity.PlanificacionEntity;
 import com.pingeso.HUAP.Repository.PlanificacionEjecucionRepository;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import com.pingeso.HUAP.Service.PlanificacionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,17 +19,25 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Planificaciones (moldes) y sus ejecuciones. Las escrituras son solo del ADMINISTRADOR
+ * ({@code SecurityConfig.GLOBAL_ADMIN_PATHS}, C-01). SEC (C-17): las lecturas exigen además el
+ * servicio de la sesión, porque el molde trae los nombres del personal del servicio.
+ */
 @RestController
 @RequestMapping("/api/v2/planificaciones")
 public class PlanificacionController {
 
     private final PlanificacionService planificacionService;
     private final PlanificacionEjecucionRepository ejecucionRepository;
+    private final SeguridadServicio seguridadServicio;
 
     public PlanificacionController(PlanificacionService planificacionService,
-                                    PlanificacionEjecucionRepository ejecucionRepository) {
+                                    PlanificacionEjecucionRepository ejecucionRepository,
+                                    SeguridadServicio seguridadServicio) {
         this.planificacionService = planificacionService;
         this.ejecucionRepository = ejecucionRepository;
+        this.seguridadServicio = seguridadServicio;
     }
 
     @PostMapping
@@ -43,11 +52,14 @@ public class PlanificacionController {
 
     @GetMapping("/{id}")
     public ResponseEntity<PlanificacionDTO> obtener(@PathVariable Long id) {
-        return ResponseEntity.ok(convertToDTO(planificacionService.obtenerPlanificacion(id)));
+        PlanificacionEntity planificacion = planificacionService.obtenerPlanificacion(id);
+        exigirMismoServicio(planificacion);
+        return ResponseEntity.ok(convertToDTO(planificacion));
     }
 
     @GetMapping("/servicio/{idServicio}")
     public ResponseEntity<List<PlanificacionDTO>> obtenerPorServicio(@PathVariable Long idServicio) {
+        seguridadServicio.exigirMismoServicio(idServicio);
         List<PlanificacionDTO> respuesta = planificacionService.obtenerPlanificacionesPorServicio(idServicio).stream()
                 .map(this::convertToDTO)
                 .toList();
@@ -127,6 +139,7 @@ public class PlanificacionController {
     // Lista las ejecuciones (vigencias/versiones) de esta planificación, más recientes primero.
     @GetMapping("/{id}/ejecuciones")
     public ResponseEntity<List<PlanificacionEjecucionDTO>> ejecuciones(@PathVariable Long id) {
+        exigirMismoServicio(planificacionService.obtenerPlanificacion(id));
         List<PlanificacionEjecucionDTO> respuesta = ejecucionRepository.findByPlanificacion_IdPlanificacion(id).stream()
                 .sorted((a, b) -> b.getFechaInicioEfectiva().compareTo(a.getFechaInicioEfectiva()))
                 .map(this::convertEjecucionToDTO)
@@ -138,6 +151,7 @@ public class PlanificacionController {
     // cualquier planificación vigente sin depender de tener cargado el molde que la generó.
     @GetMapping("/servicio/{idServicio}/ejecuciones")
     public ResponseEntity<List<PlanificacionEjecucionDTO>> ejecucionesPorServicio(@PathVariable Long idServicio) {
+        seguridadServicio.exigirMismoServicio(idServicio);
         List<PlanificacionEjecucionDTO> respuesta = planificacionService.obtenerEjecucionesPorServicio(idServicio).stream()
                 .map(this::convertEjecucionToDTO)
                 .toList();
@@ -184,6 +198,12 @@ public class PlanificacionController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /** SEC (C-17): la planificación debe ser del servicio de la sesión (salvo ADMINISTRADOR). */
+    private void exigirMismoServicio(PlanificacionEntity planificacion) {
+        seguridadServicio.exigirMismoServicio(
+                planificacion.getServicio() != null ? planificacion.getServicio().getIdServicio() : null);
     }
 
     private Long actorIdActual() {

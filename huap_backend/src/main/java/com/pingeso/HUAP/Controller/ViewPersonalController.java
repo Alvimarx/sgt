@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,8 +41,13 @@ public class ViewPersonalController {
      *
      * @return lista de resúmenes de personal disponibles para el sistema de turnos.
      */
-    @Operation(summary = "Listar personal", description = "Devuelve un resumen de todo el personal disponible en la vista hospitalaria")
+    @Operation(summary = "Listar personal", description = "Devuelve un resumen de todo el personal disponible "
+            + "en la vista hospitalaria. Requiere rol JEFATURA o ADMINISTRADOR.")
     @GetMapping("/summary")
+    // SEC (C-17): es el padrón del hospital, con RUT; antes lo leía cualquier sesión. Solo lo
+    // usa la asignación de funcionarios (jefatura y administrador). El subrogante no suma
+    // personal (C-03).
+    @PreAuthorize("hasAnyRole('JEFATURA','ADMINISTRADOR')")
     public ResponseEntity<List<ViewPersonalSummaryDTO>> getAllPersonal() {
         return ResponseEntity.ok(viewPersonalService.getAllPersonal());
     }

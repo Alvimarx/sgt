@@ -55,4 +55,13 @@ public class SeguridadServicio {
     public boolean esAdministrador() {
         return actual().esAdministrador();
     }
+
+    /**
+     * ¿El rol de la sesión en su servicio es de gestión (JEFATURA o SUBROGANTE)? El
+     * ADMINISTRADOR se consulta aparte, con {@link #esAdministrador()}.
+     */
+    public boolean esGestionDelServicio() {
+        String rol = actual().rol();
+        return "JEFATURA".equals(rol) || "SUBROGANTE".equals(rol);
+    }
 }

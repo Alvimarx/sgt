@@ -6,6 +6,7 @@ import com.pingeso.HUAP.Repository.BitacoraRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -20,6 +21,9 @@ import static org.mockito.Mockito.*;
  * Foco en {@code convertToDTO} (la lógica más frágil: enriquecimiento condicional desde
  * "idOferta=X" en el motivo) y en el contrato de {@code registrarEvento}/{@code registrarEventoOferta}
  * de nunca propagar una excepción hacia la transacción que los llama.
+ *
+ * <p>Por defecto el actor es ADMINISTRADOR, que ve toda la bitácora; el alcance por servicio
+ * (C-17) se prueba en {@code BitacoraAlcanceServicioTest}.
  */
 class BitacoraServiceTest {
 
@@ -27,9 +31,15 @@ class BitacoraServiceTest {
     private final SolicitudRepository solicitudRepository = mock(SolicitudRepository.class);
     private final FuncionarioRepository funcionarioRepository = mock(FuncionarioRepository.class);
     private final OfertaGeneralRepository ofertaGeneralRepository = mock(OfertaGeneralRepository.class);
+    private final SeguridadServicio seguridadServicio = mock(SeguridadServicio.class);
 
     private final BitacoraService service = new BitacoraService(
-            bitacoraRepository, solicitudRepository, funcionarioRepository, ofertaGeneralRepository);
+            bitacoraRepository, solicitudRepository, funcionarioRepository, ofertaGeneralRepository,
+            seguridadServicio);
+
+    {
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+    }
 
     private static FuncionarioEntity funcionario(long id, String nombre, String apelPat) {
         return FuncionarioEntity.builder().idFuncionario(id).nombre(nombre).apelPat(apelPat).build();

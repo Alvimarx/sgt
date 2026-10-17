@@ -299,4 +299,57 @@ class FuncionarioControllerTest {
         assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());
         verify(funcionarioService, never()).updateUser(any(), any());
     }
+
+    // ============================ C-17: lecturas de funcionarios ============================
+
+    @Test
+    void summaryPorId_propio_ydeAlguienDelServicio_200() {
+        autenticar(50L, "MEDICO", "USUARIO", SERVICIO_A);
+        lenient().when(seguridadServicio.idUsuarioActual()).thenReturn(50L);
+        when(funcionarioService.getUserSummary(50L)).thenReturn(new FuncionarioSummaryDTO());
+        when(funcionarioService.getUserSummary(51L)).thenReturn(new FuncionarioSummaryDTO());
+        when(funcionarioService.perteneceAServicio(51L, SERVICIO_A)).thenReturn(true);
+
+        assertEquals(HttpStatus.OK, controller.getSummary(50L).getStatusCode());
+        assertEquals(HttpStatus.OK, controller.getSummary(51L).getStatusCode());
+    }
+
+    @Test
+    void summaryPorId_personaDeOtroServicio_403() {
+        autenticar(101L, "SUBROGANTE", "USUARIO", SERVICIO_B);
+        lenient().when(seguridadServicio.idUsuarioActual()).thenReturn(101L);
+        when(funcionarioService.getUserSummary(369L)).thenReturn(new FuncionarioSummaryDTO());
+        when(funcionarioService.perteneceAServicio(369L, SERVICIO_B)).thenReturn(false);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> controller.getSummary(369L));
+        assertEquals("No tienes acceso a datos de otro servicio", ex.getMessage());
+    }
+
+    @Test
+    void summaryPorId_administrador_cualquiera_200() {
+        autenticar(1L, null, "ADMINISTRADOR", null);
+        lenient().when(seguridadServicio.idUsuarioActual()).thenReturn(1L);
+        when(funcionarioService.getUserSummary(369L)).thenReturn(new FuncionarioSummaryDTO());
+
+        assertEquals(HttpStatus.OK, controller.getSummary(369L).getStatusCode());
+        verify(funcionarioService, never()).perteneceAServicio(any(), any());
+    }
+
+    @Test
+    void statusPorRut_exigeJefaturaOAdministrador() throws NoSuchMethodException {
+        org.springframework.security.access.prepost.PreAuthorize regla = FuncionarioController.class
+                .getMethod("checkFuncionario", String.class)
+                .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(regla, "GET /funcionarios/status/{rut} debe declarar @PreAuthorize");
+        assertEquals("hasAnyRole('JEFATURA','ADMINISTRADOR')", regla.value());
+    }
+
+    @Test
+    void padronDelHospital_exigeJefaturaOAdministrador() throws NoSuchMethodException {
+        org.springframework.security.access.prepost.PreAuthorize regla = ViewPersonalController.class
+                .getMethod("getAllPersonal")
+                .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+        assertNotNull(regla, "GET /Personal/summary debe declarar @PreAuthorize");
+        assertEquals("hasAnyRole('JEFATURA','ADMINISTRADOR')", regla.value());
+    }
 }

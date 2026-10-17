@@ -6,6 +6,7 @@ import com.pingeso.HUAP.DTO.TipoTurnoDTO;
 import com.pingeso.HUAP.Entity.RotativaDiaEntity;
 import com.pingeso.HUAP.Entity.RotativaEntity;
 import com.pingeso.HUAP.Entity.TipoTurnoEntity;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import com.pingeso.HUAP.Service.RotativaService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Controlador REST de rotativas.
@@ -33,9 +35,21 @@ import java.util.List;
 public class RotativaController {
 
     private final RotativaService rotativaService;
+    // Las escrituras son solo del ADMINISTRADOR (SecurityConfig.GLOBAL_ADMIN_PATHS, C-01).
+    // SEC (C-17): las lecturas exigen el servicio de la sesión (el ADMINISTRADOR queda exento).
+    private final SeguridadServicio seguridadServicio;
 
-    public RotativaController(RotativaService rotativaService) {
+    public RotativaController(RotativaService rotativaService, SeguridadServicio seguridadServicio) {
         this.rotativaService = rotativaService;
+        this.seguridadServicio = seguridadServicio;
+    }
+
+    /** La rotativa debe ser del servicio de la sesión (403, salvo ADMINISTRADOR). */
+    private RotativaEntity rotativaDelServicio(Long id) {
+        RotativaEntity rotativa = rotativaService.obtenerRotativa(id);
+        seguridadServicio.exigirMismoServicio(
+                rotativa.getServicio() != null ? rotativa.getServicio().getIdServicio() : null);
+        return rotativa;
     }
 
     /**
@@ -64,14 +78,18 @@ public class RotativaController {
     @Operation(summary = "Obtener una rotativa por id")
     @GetMapping("/{id}")
     public ResponseEntity<RotativaDTO> obtenerRotativa(@PathVariable Long id) {
-        return ResponseEntity.ok(convertToDTO(rotativaService.obtenerRotativa(id)));
+        return ResponseEntity.ok(convertToDTO(rotativaDelServicio(id)));
     }
 
-    /** Lista todas las rotativas vigentes. */
+    /** Lista las rotativas vigentes: todas para el ADMINISTRADOR, las del servicio de la sesión para el resto. */
     @Operation(summary = "Listar rotativas vigentes")
     @GetMapping
     public ResponseEntity<List<RotativaDTO>> obtenerRotativas() {
+        boolean todas = seguridadServicio.esAdministrador();
+        Long servicioSesion = todas ? null : seguridadServicio.idServicioActual();
         List<RotativaDTO> respuesta = rotativaService.obtenerRotativas().stream()
+                .filter(r -> todas || (servicioSesion != null && r.getServicio() != null
+                        && Objects.equals(servicioSesion, r.getServicio().getIdServicio())))
                 .map(this::convertToDTO)
                 .toList();
         return ResponseEntity.ok(respuesta);
@@ -81,6 +99,7 @@ public class RotativaController {
     @Operation(summary = "Rotativas de un servicio")
     @GetMapping("/servicio/{idServicio}")
     public ResponseEntity<List<RotativaDTO>> obtenerPorServicio(@PathVariable Long idServicio) {
+        seguridadServicio.exigirMismoServicio(idServicio);
         List<RotativaDTO> respuesta = rotativaService.obtenerRotativasPorServicio(idServicio).stream()
                 .map(this::convertToDTO)
                 .toList();
@@ -123,6 +142,7 @@ public class RotativaController {
                     + "lanza error con el detalle si no cuadra.")
     @GetMapping("/{id}/validar")
     public ResponseEntity<String> validarRotativa(@PathVariable Long id) {
+        rotativaDelServicio(id);
         rotativaService.validarRotativa(id);
         return ResponseEntity.ok("Rotativa válida");
     }
@@ -147,6 +167,7 @@ public class RotativaController {
     @Operation(summary = "Obtener la secuencia de días de una rotativa")
     @GetMapping("/{id}/secuencia")
     public ResponseEntity<List<RotativaDiaDTO>> obtenerSecuencia(@PathVariable Long id) {
+        rotativaDelServicio(id);
         List<RotativaDiaEntity> entidades = rotativaService.obtenerSecuencia(id);
         List<RotativaDiaDTO> respuesta = entidades.stream()
                 .map(this::convertDiaToDTO)

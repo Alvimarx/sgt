@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -56,6 +57,18 @@ public class GlobalExceptionHandler {
         logger.warn("Acceso denegado: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("error", ex.getMessage() != null ? ex.getMessage() : "No tienes permiso para esta operación"));
+    }
+
+    /**
+     * Rechazos con un código explícito (404 no existe, 409 conflicto de estado): se lanzan como
+     * {@link ResponseStatusException} y salen con su código y el mismo cuerpo {"error": ...}.
+     * Sin este handler, el catch-all de RuntimeException los convertiría en 400.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException ex) {
+        logger.warn("Solicitud rechazada ({}): {}", ex.getStatusCode().value(), ex.getReason());
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(Map.of("error", ex.getReason() != null ? ex.getReason() : "Solicitud inválida"));
     }
 
     /** Bean Validation (@Valid) sobre el body de la petición. */

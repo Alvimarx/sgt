@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.core.Authentication;
@@ -170,8 +171,12 @@ public class FuncionarioController {
      * @return ResponseEntity sin cuerpo con el estado de la verificación.
      */
     @Operation(summary = "Verificar si un funcionario está registrado",
-            description = "Devuelve el ID del funcionario si existe (200), 404 si no, o 401 ante un error controlado.")
+            description = "Devuelve el ID del funcionario si existe (200), 404 si no, o 401 ante un error controlado. "
+                    + "Requiere rol JEFATURA o ADMINISTRADOR.")
     @GetMapping("/status/{rut}")
+    // SEC (C-17): antes cualquier sesión averiguaba si un RUT está en el SGT y con qué id. Solo
+    // lo usa la asignación de funcionarios (jefatura y administrador), igual que /register.
+    @PreAuthorize("hasAnyRole('JEFATURA','ADMINISTRADOR')")
     public ResponseEntity<Long> checkFuncionario(@PathVariable String rut){
         try {
             Long funcionarioId = funcionarioService.isPresent(rut);
@@ -212,11 +217,19 @@ public class FuncionarioController {
     /**
      * Obtiene el resumen de un funcionario específico por su identificador.
      */
-    @Operation(summary = "Resumen de un funcionario por ID")
+    @Operation(summary = "Resumen de un funcionario por ID",
+            description = "El propio, siempre. El de otra persona, solo si es del servicio de la sesión "
+                    + "(403 si no), salvo ADMINISTRADOR.")
     @GetMapping("/{id}/summary")
     public ResponseEntity<FuncionarioSummaryDTO> getSummary(@PathVariable Long id) {
         FuncionarioSummaryDTO dto = funcionarioService.getUserSummary(id);
         if (dto == null) return ResponseEntity.notFound().build();
+        // SEC (C-17): antes cualquier autenticado leía el resumen (con RUT) de cualquier persona.
+        if (!seguridadServicio.esAdministrador()
+                && !id.equals(seguridadServicio.idUsuarioActual())
+                && !funcionarioService.perteneceAServicio(id, seguridadServicio.idServicioActual())) {
+            throw new AccessDeniedException("No tienes acceso a datos de otro servicio");
+        }
         return ResponseEntity.ok(dto);
     }
 

@@ -252,4 +252,74 @@ class TurnoServiceTest {
         verify(turnoRepository).findByFuncionarioIdAndDateRange(1L, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30));
         verify(turnoRepository).findByFuncionarioIdAndDateRange(1L, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31));
     }
+
+    // ============================ C-17: alcance de los turnos de una persona ============================
+
+    private static FuncionarioEntity funcDeServicio(long id, long idServicio) {
+        FuncionarioEntity f = func(id);
+        f.setServiciosFuncionario(new java.util.ArrayList<>(List.of(
+                new com.pingeso.HUAP.Entity.ServiciosFuncionarioEntity(f, servicio(idServicio), null))));
+        return f;
+    }
+
+    @Test
+    void alcance_propiosYAdministrador_sinAcotar() {
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(5L);
+        assertNull(turnoService.servicioAlcanceTurnosDe(5L));
+
+        when(seguridadServicio.esAdministrador()).thenReturn(true);
+        assertNull(turnoService.servicioAlcanceTurnosDe(77L));
+        verifyNoInteractions(funcionarioRepository);
+    }
+
+    @Test
+    void alcance_personaDelMismoServicio_seAcotaAEseServicio() {
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(5L);
+        when(seguridadServicio.idServicioActual()).thenReturn(4L);
+        when(funcionarioRepository.findById(6L)).thenReturn(java.util.Optional.of(funcDeServicio(6L, 4L)));
+
+        assertEquals(4L, turnoService.servicioAlcanceTurnosDe(6L));
+    }
+
+    @Test
+    void alcance_personaDeOtroServicio_403() {
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(101L);
+        when(seguridadServicio.idServicioActual()).thenReturn(2L);
+        when(funcionarioRepository.findById(6L)).thenReturn(java.util.Optional.of(funcDeServicio(6L, 4L)));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.servicioAlcanceTurnosDe(6L));
+    }
+
+    @Test
+    void alcance_personaInexistente_404() {
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(5L);
+        when(funcionarioRepository.findById(999L)).thenReturn(java.util.Optional.empty());
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> turnoService.servicioAlcanceTurnosDe(999L));
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void soloDelServicio_filtraPorElServicioDelTurno_yConNullDevuelveTodo() {
+        List<Map<String, Object>> turnos = List.of(
+                Map.of("id", 1L, "idServicio", 4L), Map.of("id", 2L, "idServicio", 2L));
+
+        assertEquals(List.of(turnos.get(0)), TurnoService.soloDelServicio(turnos, 4L));
+        assertSame(turnos, TurnoService.soloDelServicio(turnos, null));
+    }
+
+    @Test
+    void elMapaDelTurnoIncluyeSuServicio() {
+        TurnoEntity t = TurnoEntity.builder().idTurno(1L).servicio(servicio(4L)).build();
+        when(turnoRepository.findByPuesto_IdPuesto(3L)).thenReturn(List.of(t));
+
+        assertEquals(4L, turnoService.getTurnosByPuesto(3L).get(0).get("idServicio"));
+    }
 }

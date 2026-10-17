@@ -10,7 +10,10 @@ import com.pingeso.HUAP.Repository.BitacoraRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
+import com.pingeso.HUAP.Security.AlcanceServicio;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,33 +37,104 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BitacoraService {
 
+    private static final String OTRO_SERVICIO = "No tienes acceso a datos de otro servicio";
+
     private final BitacoraRepository bitacoraRepository;
     private final SolicitudRepository solicitudRepository;
     private final FuncionarioRepository funcionarioRepository;
     private final OfertaGeneralRepository ofertaGeneralRepository;
+    private final SeguridadServicio seguridadServicio;
 
+    // SEC (C-17, BUG-007): las lecturas de la bitácora exigían rol de gestión, pero entregaban
+    // los eventos de todo el hospital. Ahora los listados traen solo los del servicio de la
+    // sesión y las consultas por id, turno, solicitud o persona de otro servicio responden 403.
+    // El ADMINISTRADOR sigue viendo todo. Ver esDelServicio para la regla.
+
+    @Transactional(readOnly = true)
     public List<BitacoraEntity> findAll() {
-        return bitacoraRepository.findAll();
+        return acotarAlServicio(bitacoraRepository.findAll());
     }
 
+    @Transactional(readOnly = true)
     public Optional<BitacoraEntity> findById(Long id) {
-        return bitacoraRepository.findById(id);
+        Optional<BitacoraEntity> evento = bitacoraRepository.findById(id);
+        evento.ifPresent(this::exigirEventoDelServicio);
+        return evento;
     }
 
+    @Transactional(readOnly = true)
     public List<BitacoraEntity> findByTipoEvento(String tipoEvento) {
-        return bitacoraRepository.findByTipoEvento(tipoEvento);
+        return acotarAlServicio(bitacoraRepository.findByTipoEvento(tipoEvento));
     }
 
+    /** Eventos de un actor: la persona debe ser del servicio de la sesión y se ven solo los de ese servicio. */
+    @Transactional(readOnly = true)
     public List<BitacoraEntity> findByFuncionario(Long idFuncionario) {
-        return bitacoraRepository.findByFuncionario_IdFuncionario(idFuncionario);
+        if (!seguridadServicio.esAdministrador()) {
+            FuncionarioEntity actor = funcionarioRepository.findById(idFuncionario).orElse(null);
+            if (actor != null && !AlcanceServicio.perteneceAServicio(actor, seguridadServicio.idServicioActual())) {
+                throw new AccessDeniedException(OTRO_SERVICIO);
+            }
+        }
+        return acotarAlServicio(bitacoraRepository.findByFuncionario_IdFuncionario(idFuncionario));
     }
 
+    @Transactional(readOnly = true)
     public List<BitacoraEntity> findByTurno(Long idTurno) {
-        return bitacoraRepository.findByTurno_IdTurno(idTurno);
+        List<BitacoraEntity> eventos = bitacoraRepository.findByTurno_IdTurno(idTurno);
+        if (!eventos.isEmpty()) {
+            seguridadServicio.exigirMismoServicio(AlcanceServicio.servicioDe(eventos.get(0).getTurno()));
+        }
+        return eventos;
     }
 
+    @Transactional(readOnly = true)
     public List<BitacoraEntity> findBySolicitud(Long idSolicitud) {
-        return bitacoraRepository.findBySolicitud_IdSolicitud(idSolicitud);
+        List<BitacoraEntity> eventos = bitacoraRepository.findBySolicitud_IdSolicitud(idSolicitud);
+        if (!eventos.isEmpty() && !seguridadServicio.esAdministrador()
+                && !AlcanceServicio.solicitudEsDelServicio(eventos.get(0).getSolicitud(), seguridadServicio.idServicioActual())) {
+            throw new AccessDeniedException(OTRO_SERVICIO);
+        }
+        return eventos;
+    }
+
+    /** Deja solo los eventos del servicio de la sesión (el ADMINISTRADOR los ve todos). */
+    private List<BitacoraEntity> acotarAlServicio(List<BitacoraEntity> eventos) {
+        if (seguridadServicio.esAdministrador()) return eventos;
+        Long servicioSesion = seguridadServicio.idServicioActual();
+        return eventos.stream().filter(e -> esDelServicio(e, servicioSesion)).toList();
+    }
+
+    private void exigirEventoDelServicio(BitacoraEntity evento) {
+        if (!seguridadServicio.esAdministrador() && !esDelServicio(evento, seguridadServicio.idServicioActual())) {
+            throw new AccessDeniedException(OTRO_SERVICIO);
+        }
+    }
+
+    /**
+     * Un evento es del servicio de su turno, de su solicitud (la regla de
+     * {@link AlcanceServicio#solicitudEsDelServicio}) o del turno de su oferta general
+     * ({@code "idOferta=X"} en el motivo). Los que no se pueden atribuir a un servicio, como los
+     * resúmenes de planificación, solo los ve el ADMINISTRADOR.
+     */
+    private boolean esDelServicio(BitacoraEntity evento, Long idServicio) {
+        if (idServicio == null) return false;
+        if (evento.getTurno() != null) return idServicio.equals(AlcanceServicio.servicioDe(evento.getTurno()));
+        if (evento.getSolicitud() != null) return AlcanceServicio.solicitudEsDelServicio(evento.getSolicitud(), idServicio);
+        Long idOferta = idOfertaDelMotivo(evento.getMotivo());
+        if (idOferta == null) return false;
+        return ofertaGeneralRepository.findById(idOferta)
+                .map(oferta -> idServicio.equals(AlcanceServicio.servicioDe(oferta.getTurno())))
+                .orElse(false);
+    }
+
+    private static Long idOfertaDelMotivo(String motivo) {
+        if (motivo == null || !motivo.startsWith("idOferta=")) return null;
+        try {
+            return Long.parseLong(motivo.substring("idOferta=".length()));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     public List<BitacoraEntity> findActivos() {
@@ -89,14 +163,14 @@ public class BitacoraService {
     /** Igual que {@link #findAll} pero mapeado a {@link BitacoraResponseDTO} (ver {@link #convertToDTO}). */
     @Transactional(readOnly = true)
     public List<BitacoraResponseDTO> findAllDTO() {
-        return bitacoraRepository.findAll().stream()
+        return acotarAlServicio(bitacoraRepository.findAll()).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public Optional<BitacoraResponseDTO> findByIdDTO(Long id) {
-        return bitacoraRepository.findById(id).map(this::convertToDTO);
+        return findById(id).map(this::convertToDTO);
     }
 
     /**

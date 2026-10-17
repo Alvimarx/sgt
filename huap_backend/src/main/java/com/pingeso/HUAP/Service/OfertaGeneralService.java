@@ -3,6 +3,7 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.DTO.CrearOfertaGeneralDTO;
 import com.pingeso.HUAP.Entity.*;
 import com.pingeso.HUAP.Repository.*;
+import com.pingeso.HUAP.Security.AlcanceServicio;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Ofertas generales de turno: un funcionario ofrece un turno propio para que cualquiera del
@@ -242,14 +244,28 @@ public class OfertaGeneralService {
         validadorAsignacion.validarAsignacion(nombre, nuevoInicio, nuevoFin, turno.getIdTurno(), vigentes);
     }
 
+    /** SEC (C-17): las ofertas de un servicio solo las lee ese servicio (o el ADMINISTRADOR). */
     @Transactional
     public List<OfertaGeneralEntity> findByServicio(Long idServicio) {
+        seguridadServicio.exigirMismoServicio(idServicio);
         return ofertaGeneralRepository.findByTurno_Servicio_IdServicio(idServicio);
     }
 
+    /**
+     * SEC (C-17): las ofertas propias se ven completas; las de otra persona, solo las del
+     * servicio de la sesión (el ADMINISTRADOR ve todas).
+     */
     @Transactional
     public List<OfertaGeneralEntity> findByOfertor(Long idFuncionario) {
-        return ofertaGeneralRepository.findByOfertor_IdFuncionario(idFuncionario);
+        List<OfertaGeneralEntity> ofertas = ofertaGeneralRepository.findByOfertor_IdFuncionario(idFuncionario);
+        if (seguridadServicio.esAdministrador()
+                || Objects.equals(idFuncionario, seguridadServicio.idUsuarioActual())) {
+            return ofertas;
+        }
+        Long servicioSesion = seguridadServicio.idServicioActual();
+        return ofertas.stream()
+                .filter(o -> servicioSesion != null && servicioSesion.equals(AlcanceServicio.servicioDe(o.getTurno())))
+                .toList();
     }
 
     private void agendarBitacora(String evento, Long idOferta, Long idFuncionario) {

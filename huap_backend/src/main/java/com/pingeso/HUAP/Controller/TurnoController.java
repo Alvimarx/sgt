@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -25,12 +26,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import com.pingeso.HUAP.DTO.AlterarTurnoRequest;
+import com.pingeso.HUAP.Entity.PuestoEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.RotativaRepository;
 import com.pingeso.HUAP.Repository.TipoTurnoRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.ServicioRepository;
+import com.pingeso.HUAP.Security.AlcanceServicio;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import com.pingeso.HUAP.Service.GestionTurnoService;
 import com.pingeso.HUAP.Service.TurnoService;
 
@@ -70,13 +74,23 @@ public class TurnoController {
     @Autowired
     private GestionTurnoService gestionTurnoService;
 
+    // SEC (C-17, BUG-004): las lecturas por servicio, por turno y por puesto exigen el servicio
+    // de la sesión (el ADMINISTRADOR queda exento). Antes cualquier autenticado leía los turnos,
+    // con el nombre y el RUT de quien los tiene, de cualquier servicio con solo cambiar un id.
+    @Autowired
+    private SeguridadServicio seguridadServicio;
+
     // ====================================================================
     // CRUD BASE
     // ====================================================================
 
-    /** Lista todos los turnos. */
-    @Operation(summary = "Listar todos los turnos")
+    /**
+     * Lista todos los turnos del hospital. SEC (C-17): solo ADMINISTRADOR; ninguna pantalla de
+     * otro rol lo usa (el resto lee por servicio).
+     */
+    @Operation(summary = "Listar todos los turnos", description = "Requiere rol ADMINISTRADOR.")
     @GetMapping
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<List<TurnoEntity>> getAllTurnos() {
         return ResponseEntity.ok(turnoService.getAllTurnos());
     }
@@ -84,18 +98,20 @@ public class TurnoController {
     /**
      * Obtiene un turno por su id.
      * @param id identificador del turno.
-     * @return el turno, o 404 si no existe.
+     * @return el turno, 404 si no existe o 403 si es de otro servicio.
      */
     @Operation(summary = "Obtener un turno por id")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Turno encontrado"),
+            @ApiResponse(responseCode = "403", description = "El turno es de otro servicio"),
             @ApiResponse(responseCode = "404", description = "Turno no encontrado")
     })
     @GetMapping("/{id}")
     public ResponseEntity<?> getTurnoById(@PathVariable Long id) {
-        return turnoService.getTurnoById(id)
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        TurnoEntity turno = turnoService.getTurnoById(id).orElse(null);
+        if (turno == null) return ResponseEntity.notFound().build();
+        seguridadServicio.exigirMismoServicio(AlcanceServicio.servicioDe(turno));
+        return ResponseEntity.ok(turno);
     }
 
     /**
@@ -199,6 +215,7 @@ public class TurnoController {
     @Operation(summary = "Turnos de un servicio (con detalles)")
     @GetMapping("/servicio/{servicioId}")
     public ResponseEntity<List<Map<String, Object>>> getTurnosByServicio(@PathVariable Long servicioId) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         return ResponseEntity.ok(turnoService.getTurnosByServicioConDetalles(servicioId));
     }
 
@@ -215,6 +232,7 @@ public class TurnoController {
             @PathVariable Long servicioId,
             @PathVariable int year,
             @PathVariable int month) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         if (month < 1 || month > 12) return ResponseEntity.badRequest().build();
         LocalDate inicio = LocalDate.of(year, month, 1);
         LocalDate fin = inicio.withDayOfMonth(inicio.lengthOfMonth());
@@ -231,6 +249,8 @@ public class TurnoController {
     public ResponseEntity<?> getTurnosByServicioAndDia(
             @PathVariable Long servicioId,
             @PathVariable String fecha) {
+        // Fuera del try: su catch convierte cualquier excepción en 400 y taparía el 403.
+        seguridadServicio.exigirMismoServicio(servicioId);
         try {
             LocalDate fechaDia = LocalDate.parse(fecha);
             return ResponseEntity.ok(turnoService.getTurnosCalendario(servicioId, fechaDia, fechaDia));
@@ -245,6 +265,7 @@ public class TurnoController {
     public ResponseEntity<?> getTurnosSinAsignarByDia(
             @PathVariable Long servicioId,
             @PathVariable String fecha) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         try {
             LocalDate fechaDia = LocalDate.parse(fecha);
             return ResponseEntity.ok(turnoService.getTurnosSinAsignarByDia(servicioId, fechaDia));
@@ -257,6 +278,7 @@ public class TurnoController {
     @Operation(summary = "Turnos sin asignar de un servicio")
     @GetMapping("/servicio/{servicioId}/sin-asignar")
     public ResponseEntity<List<Map<String, Object>>> getUnassignedTurnosByServicio(@PathVariable Long servicioId) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         return ResponseEntity.ok(turnoService.getUnassignedTurnosByServicio(servicioId));
     }
 
@@ -267,6 +289,7 @@ public class TurnoController {
             @PathVariable Long servicioId,
             @RequestParam(required = false) String fechaInicio,
             @RequestParam(required = false) String fechaFin) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         Rango r = resolverRango(fechaInicio, fechaFin);
         return ResponseEntity.ok(turnoService.getUnassignedTurnosByServicioAndPeriodo(servicioId, r.inicio(), r.fin()));
     }
@@ -284,6 +307,7 @@ public class TurnoController {
             @PathVariable Long servicioId,
             @RequestParam(required = false) String fechaInicio,
             @RequestParam(required = false) String fechaFin) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         Rango r = resolverRango(fechaInicio, fechaFin);
         return ResponseEntity.ok(turnoService.getTurnosStatsByServicio(servicioId, r.inicio(), r.fin()));
     }
@@ -295,6 +319,7 @@ public class TurnoController {
             @PathVariable Long servicioId,
             @RequestParam(required = false) String fechaInicio,
             @RequestParam(required = false) String fechaFin) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         Rango r = resolverRango(fechaInicio, fechaFin);
         return ResponseEntity.ok(turnoService.getTurnosDetalleServicio(servicioId, r.inicio(), r.fin()));
     }
@@ -306,6 +331,7 @@ public class TurnoController {
             @PathVariable Long servicioId,
             @RequestParam(required = false) String fechaInicio,
             @RequestParam(required = false) String fechaFin) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         Rango r = resolverRango(fechaInicio, fechaFin);
         return ResponseEntity.ok(turnoService.getFuncionariosConTurnosServicio(servicioId, r.inicio(), r.fin()));
     }
@@ -323,6 +349,7 @@ public class TurnoController {
             @PathVariable Long servicioId,
             @RequestParam(required = false) String fechaInicio,
             @RequestParam(required = false) String fechaFin) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         Rango r = resolverRango(fechaInicio, fechaFin);
         return ResponseEntity.ok(turnoService.getFuncionariosStatsServicio(servicioId, r.inicio(), r.fin()));
     }
@@ -334,6 +361,7 @@ public class TurnoController {
             @PathVariable Long servicioId,
             @RequestParam(required = false) String fechaInicio,
             @RequestParam(required = false) String fechaFin) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         Rango r = resolverRango(fechaInicio, fechaFin);
         return ResponseEntity.ok(turnoService.getCoberturaRealByServicio(servicioId, r.inicio(), r.fin()));
     }
@@ -344,18 +372,23 @@ public class TurnoController {
 
     /**
      * Turnos de un funcionario. Si se indican {@code year} y {@code month}, filtra por ese mes;
-     * si no, devuelve todos sus turnos.
+     * si no, devuelve todos sus turnos. Los propios se ven completos; los de otra persona, solo
+     * si es del servicio de la sesión y solo sus turnos de ese servicio
+     * ({@link TurnoService#servicioAlcanceTurnosDe}).
      */
-    @Operation(summary = "Turnos de un funcionario (opcionalmente por mes/año)")
+    @Operation(summary = "Turnos de un funcionario (opcionalmente por mes/año)",
+            description = "Los propios, completos. Los de otra persona del servicio de la sesión, solo "
+                    + "los de ese servicio; de otro servicio, 403 (salvo ADMINISTRADOR).")
     @GetMapping("/funcionario/{idFuncionario}")
     public ResponseEntity<List<Map<String, Object>>> getTurnosByFuncionario(
             @PathVariable Long idFuncionario,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month) {
-        if (year != null && month != null) {
-            return ResponseEntity.ok(turnoService.getTurnosByMedicoAndMonthAndYear(idFuncionario, month, year));
-        }
-        return ResponseEntity.ok(turnoService.getTurnosByMedico(idFuncionario));
+        Long alcance = turnoService.servicioAlcanceTurnosDe(idFuncionario);
+        List<Map<String, Object>> turnos = (year != null && month != null)
+                ? turnoService.getTurnosByMedicoAndMonthAndYear(idFuncionario, month, year)
+                : turnoService.getTurnosByMedico(idFuncionario);
+        return ResponseEntity.ok(TurnoService.soloDelServicio(turnos, alcance));
     }
 
     /**
@@ -371,21 +404,27 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.getTurnosIntercambiables(idTurnoPropio, idFuncionarioReceptor));
     }
 
-    /** Próximos turnos (futuros) de un funcionario. */
+    /**
+     * Próximos turnos (futuros) de un funcionario, con el mismo alcance que
+     * {@link #getTurnosByFuncionario}: el asistente de intercambio del médico lee los del receptor.
+     */
     @Operation(summary = "Turnos futuros de un funcionario")
     @GetMapping("/funcionario/{idFuncionario}/futuros")
     public ResponseEntity<List<Map<String, Object>>> getTurnosFuturos(@PathVariable Long idFuncionario) {
-        return ResponseEntity.ok(turnoService.getTurnosFuturosFuncionario(idFuncionario));
+        Long alcance = turnoService.servicioAlcanceTurnosDe(idFuncionario);
+        return ResponseEntity.ok(TurnoService.soloDelServicio(
+                turnoService.getTurnosFuturosFuncionario(idFuncionario), alcance));
     }
 
     // ====================================================================
     // CONSULTAS POR PUESTO
     // ====================================================================
 
-    /** Turnos asociados a un puesto. */
+    /** Turnos asociados a un puesto (404 si el puesto no existe, 403 si es de otro servicio). */
     @Operation(summary = "Turnos de un puesto")
     @GetMapping("/puesto/{puestoId}")
     public ResponseEntity<List<Map<String, Object>>> getTurnosByPuesto(@PathVariable Long puestoId) {
+        exigirMismoServicioDelPuesto(puestoId);
         return ResponseEntity.ok(turnoService.getTurnosByPuesto(puestoId));
     }
 
@@ -409,6 +448,8 @@ public class TurnoController {
             @RequestParam Long puestoId,
             @RequestParam String fechaInicio,
             @RequestParam String fechaFin) {
+        // Fuera del try: su catch convierte cualquier excepción en 400 y taparía el 403/404.
+        exigirMismoServicioDelPuesto(puestoId);
         try {
             LocalDate inicio = LocalDate.parse(fechaInicio);
             LocalDate fin = LocalDate.parse(fechaFin);
@@ -424,6 +465,14 @@ public class TurnoController {
 
     /** Rango de fechas resuelto (inicio y fin). */
     private record Rango(LocalDate inicio, LocalDate fin) {}
+
+    /** SEC (C-17): el puesto debe existir (404) y ser del servicio de la sesión (403, salvo ADMINISTRADOR). */
+    private void exigirMismoServicioDelPuesto(Long puestoId) {
+        PuestoEntity puesto = puestoRepository.findById(puestoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El puesto no existe"));
+        seguridadServicio.exigirMismoServicio(
+                puesto.getServicio() != null ? puesto.getServicio().getIdServicio() : null);
+    }
 
     /**
      * Resuelve un rango de fechas a partir de parámetros opcionales.

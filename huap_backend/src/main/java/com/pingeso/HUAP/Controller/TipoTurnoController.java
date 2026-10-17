@@ -2,6 +2,7 @@ package com.pingeso.HUAP.Controller;
 
 import com.pingeso.HUAP.DTO.TipoTurnoDTO;
 import com.pingeso.HUAP.Entity.TipoTurnoEntity;
+import com.pingeso.HUAP.Security.SeguridadServicio;
 import com.pingeso.HUAP.Service.TipoTurnoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * API REST del catálogo de tipos de turno (horarios nombrados de un servicio).
@@ -28,9 +30,21 @@ import java.util.List;
 public class TipoTurnoController {
 
     private final TipoTurnoService tipoTurnoService;
+    // Las escrituras son solo del ADMINISTRADOR (SecurityConfig.GLOBAL_ADMIN_PATHS, C-01).
+    // SEC (C-17): las lecturas exigen el servicio de la sesión (el ADMINISTRADOR queda exento).
+    private final SeguridadServicio seguridadServicio;
 
-    public TipoTurnoController(TipoTurnoService tipoTurnoService) {
+    public TipoTurnoController(TipoTurnoService tipoTurnoService, SeguridadServicio seguridadServicio) {
         this.tipoTurnoService = tipoTurnoService;
+        this.seguridadServicio = seguridadServicio;
+    }
+
+    /** El tipo de turno debe ser del servicio de la sesión (403, salvo ADMINISTRADOR). */
+    private TipoTurnoEntity tipoDelServicio(Long id) {
+        TipoTurnoEntity tipo = tipoTurnoService.obtenerTipoDeTurno(id);
+        seguridadServicio.exigirMismoServicio(
+                tipo.getServicio() != null ? tipo.getServicio().getIdServicio() : null);
+        return tipo;
     }
 
     /**
@@ -67,6 +81,7 @@ public class TipoTurnoController {
     @ApiResponse(responseCode = "200", description = "Listado obtenido")
     @GetMapping("/servicio/{servicioId}")
     public ResponseEntity<List<TipoTurnoDTO>> obtenerTiposDeTurnoPorServicio(@PathVariable Long servicioId) {
+        seguridadServicio.exigirMismoServicio(servicioId);
         List<TipoTurnoEntity> entidades = tipoTurnoService.obtenerTiposDeTurnoPorServicio(servicioId);
         List<TipoTurnoDTO> respuesta = entidades.stream()
                 .map(this::convertToDTO)
@@ -80,12 +95,17 @@ public class TipoTurnoController {
      * @return tipos de turno no eliminados de todos los servicios.
      */
     @Operation(summary = "Listar catálogo completo",
-            description = "Devuelve todos los tipos de turno vigentes (no eliminados) de todos los servicios.")
+            description = "Devuelve los tipos de turno vigentes (no eliminados) de todos los servicios al "
+                    + "ADMINISTRADOR, y los del servicio de la sesión al resto.")
     @ApiResponse(responseCode = "200", description = "Catálogo obtenido")
     @GetMapping
     public ResponseEntity<List<TipoTurnoDTO>> obtenerCatalogo() {
+        boolean todos = seguridadServicio.esAdministrador();
+        Long servicioSesion = todos ? null : seguridadServicio.idServicioActual();
         List<TipoTurnoEntity> entidades = tipoTurnoService.obtenerCatalogo();
         List<TipoTurnoDTO> respuesta = entidades.stream()
+                .filter(t -> todos || (servicioSesion != null && t.getServicio() != null
+                        && Objects.equals(servicioSesion, t.getServicio().getIdServicio())))
                 .map(this::convertToDTO)
                 .toList();
         return ResponseEntity.ok(respuesta);
@@ -104,8 +124,7 @@ public class TipoTurnoController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<TipoTurnoDTO> obtenerTipoDeTurno(@PathVariable Long id) {
-        TipoTurnoEntity entidad = tipoTurnoService.obtenerTipoDeTurno(id);
-        return ResponseEntity.ok(convertToDTO(entidad));
+        return ResponseEntity.ok(convertToDTO(tipoDelServicio(id)));
     }
 
     /**
@@ -147,6 +166,7 @@ public class TipoTurnoController {
     @ApiResponse(responseCode = "200", description = "Consulta realizada")
     @GetMapping("/{id}/rotativas-afectadas")
     public ResponseEntity<List<String>> obtenerRotativasAfectadas(@PathVariable Long id) {
+        tipoDelServicio(id);
         return ResponseEntity.ok(tipoTurnoService.obtenerRotativasAfectadas(id));
     }
 

@@ -101,4 +101,25 @@ class SeguridadServicioTest {
         assertThat(seguridadServicio.idServicioActual()).isNull();
         assertThat(seguridadServicio.esAdministrador()).isTrue();
     }
+
+    // ============================ C-17: rol de gestión del servicio ============================
+
+    @Test
+    void esGestionDelServicio_jefaturaYSubrogante_si_medicoNo() {
+        autenticarComo(1L, "JEFATURA", "USUARIO", 100L);
+        assertThat(seguridadServicio.esGestionDelServicio()).isTrue();
+
+        autenticarComo(1L, "SUBROGANTE", "USUARIO", 100L);
+        assertThat(seguridadServicio.esGestionDelServicio()).isTrue();
+
+        autenticarComo(1L, "MEDICO", "USUARIO", 100L);
+        assertThat(seguridadServicio.esGestionDelServicio()).isFalse();
+    }
+
+    @Test
+    void esGestionDelServicio_administradorSinRolDeServicio_no() {
+        // El ADMINISTRADOR se reconoce con esAdministrador(); su rol de servicio puede ser nulo.
+        autenticarComo(1L, null, "ADMINISTRADOR", null);
+        assertThat(seguridadServicio.esGestionDelServicio()).isFalse();
+    }
 }

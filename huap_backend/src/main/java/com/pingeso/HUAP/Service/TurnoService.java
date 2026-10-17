@@ -6,11 +6,15 @@ import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
+import com.pingeso.HUAP.Security.AlcanceServicio;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,6 +181,8 @@ public class TurnoService {
 
         // --- 1. Identificadores y Datos Básicos ---
         m.put("id", t.getIdTurno());
+        // Servicio del turno: permite acotar al servicio de la sesión los turnos de otra persona (C-17).
+        m.put("idServicio", AlcanceServicio.servicioDe(t));
 
         if (t.getTipoTurno() != null) {
             m.put("idTipoTurno", t.getTipoTurno().getIdTipoTurno());
@@ -401,6 +407,36 @@ public class TurnoService {
         return marcarSolicitudesPendientesDelUsuario(turnos.stream()
                      .map(this::convertirTurnoAMap)
                      .collect(Collectors.toList()));
+    }
+
+    /**
+     * SEC (C-17, BUG-004): servicio al que se acota la lectura de los turnos de una persona, o
+     * {@code null} si no se acota. Los propios y el ADMINISTRADOR ven todo. Otra persona solo se
+     * consulta si pertenece al servicio de la sesión (404 si no existe, 403 si es de otro
+     * servicio), y entonces solo sus turnos de ese servicio: el asistente de intercambio del
+     * médico lee los turnos futuros del receptor.
+     */
+    @Transactional
+    public Long servicioAlcanceTurnosDe(Long idFuncionario) {
+        if (seguridadServicio.esAdministrador()
+                || Objects.equals(idFuncionario, seguridadServicio.idUsuarioActual())) {
+            return null;
+        }
+        FuncionarioEntity funcionario = funcionarioRepository.findById(idFuncionario)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El funcionario no existe"));
+        Long servicioSesion = seguridadServicio.idServicioActual();
+        if (!AlcanceServicio.perteneceAServicio(funcionario, servicioSesion)) {
+            throw new AccessDeniedException("No tienes acceso a datos de otro servicio");
+        }
+        return servicioSesion;
+    }
+
+    /** Deja solo los turnos (ya mapeados) del servicio indicado; con {@code null}, la lista completa. */
+    public static List<Map<String, Object>> soloDelServicio(List<Map<String, Object>> turnos, Long idServicio) {
+        if (idServicio == null) return turnos;
+        return turnos.stream()
+                .filter(t -> idServicio.equals(t.get("idServicio")))
+                .collect(Collectors.toList());
     }
 
     /**

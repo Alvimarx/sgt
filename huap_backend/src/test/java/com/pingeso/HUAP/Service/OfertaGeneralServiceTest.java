@@ -424,4 +424,36 @@ class OfertaGeneralServiceTest {
 
         assertEquals(List.of(o), service.findByOfertor(1L));
     }
+
+    // ============================ C-17: lecturas acotadas por servicio ============================
+
+    private static TurnoEntity turnoDeServicio(long id, long idServicio) {
+        return TurnoEntity.builder().idTurno(id)
+                .servicio(com.pingeso.HUAP.Entity.ServicioEntity.builder().idServicio(idServicio).build()).build();
+    }
+
+    @Test
+    void findByServicio_otroServicio_403SinConsultar() {
+        doThrow(new org.springframework.security.access.AccessDeniedException("No tienes acceso a datos de otro servicio"))
+                .when(seguridadServicio).exigirMismoServicio(4L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.findByServicio(4L));
+        verify(ofertaGeneralRepository, never()).findByTurno_Servicio_IdServicio(any());
+    }
+
+    @Test
+    void findByOfertor_deOtraPersona_traeSoloLasDelServicioDeLaSesion() {
+        OfertaGeneralEntity deUrgencias = oferta(1L, funcionario(5L), turnoDeServicio(10L, 4L), ABIERTA);
+        OfertaGeneralEntity deEnfermeria = oferta(2L, funcionario(5L), turnoDeServicio(20L, 2L), ABIERTA);
+        when(ofertaGeneralRepository.findByOfertor_IdFuncionario(5L)).thenReturn(List.of(deUrgencias, deEnfermeria));
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.idServicioActual()).thenReturn(2L);
+        actorAutenticado(9L);
+
+        assertEquals(List.of(deEnfermeria), service.findByOfertor(5L));
+
+        // Las propias se ven completas, de cualquier servicio.
+        actorAutenticado(5L);
+        assertEquals(List.of(deUrgencias, deEnfermeria), service.findByOfertor(5L));
+    }
 }

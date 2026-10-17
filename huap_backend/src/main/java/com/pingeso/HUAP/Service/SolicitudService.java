@@ -3,6 +3,7 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.DTO.CrearSolicitudDTO;
 import com.pingeso.HUAP.Entity.*;
 import com.pingeso.HUAP.Repository.*;
+import com.pingeso.HUAP.Security.AlcanceServicio;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -44,33 +45,70 @@ public class SolicitudService {
     private final ValidadorAsignacionTurnoService validadorAsignacion;
     private final SeguridadServicio seguridadServicio;
 
+    /** Solicitudes visibles para la sesión (ver {@link #acotarLectura}). */
     @Transactional
     public List<SolicitudEntity> findAllSolicitudes() {
-        return solicitudRepository.findAll();
+        return acotarLectura(solicitudRepository.findAll());
     }
 
     /** Solicitudes emitidas por el funcionario (el que las crea, no el receptor). */
     @Transactional
     public List<SolicitudEntity> findByFuncionario(Long idFuncionario) {
-        return solicitudRepository.findByFuncionario_IdFuncionario(idFuncionario);
+        return acotarLecturaDe(idFuncionario, solicitudRepository.findByFuncionario_IdFuncionario(idFuncionario));
     }
 
     /** Solicitudes donde el funcionario es el receptor (intercambio u oferta particular). */
     @Transactional
     public List<SolicitudEntity> findByFuncionarioReceptor(Long idFuncionario) {
-        return solicitudRepository.findByFuncionarioReceptor_IdFuncionario(idFuncionario);
+        return acotarLecturaDe(idFuncionario, solicitudRepository.findByFuncionarioReceptor_IdFuncionario(idFuncionario));
     }
 
     /** Solicitudes de un tipo (Tipo_Solicitud.tipo: 1=Permiso, 2=Botar turno, 3=Cobertura, 4=Intercambio, 5=Oferta particular). */
     @Transactional
     public List<SolicitudEntity> findByTipoSolicitud(Long idTipoSolicitud) {
-        return solicitudRepository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud);
+        return acotarLectura(solicitudRepository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud));
     }
 
     /** Solicitudes asociadas a un turno (como turno solicitado o como turno propio en un intercambio). */
     @Transactional
     public List<SolicitudEntity> findByTurno(Long idTurno) {
-        return solicitudRepository.findByTurno_IdTurno(idTurno);
+        return acotarLectura(solicitudRepository.findByTurno_IdTurno(idTurno));
+    }
+
+    /**
+     * SEC (C-17, BUG-002): alcance de lectura de las solicitudes. Antes cualquier autenticado
+     * recibía las de todo el hospital. El ADMINISTRADOR ve todas; la gestión (JEFATURA,
+     * SUBROGANTE), las de su servicio ({@link AlcanceServicio#solicitudEsDelServicio}); cualquier
+     * otro rol, solo aquellas en las que participa como emisor o receptor.
+     */
+    private List<SolicitudEntity> acotarLectura(List<SolicitudEntity> solicitudes) {
+        if (seguridadServicio.esAdministrador()) return solicitudes;
+        if (seguridadServicio.esGestionDelServicio()) {
+            Long servicioSesion = seguridadServicio.idServicioActual();
+            return solicitudes.stream()
+                    .filter(s -> AlcanceServicio.solicitudEsDelServicio(s, servicioSesion))
+                    .toList();
+        }
+        Long idUsuario = seguridadServicio.idUsuarioActual();
+        return solicitudes.stream()
+                .filter(s -> AlcanceServicio.participaEnSolicitud(s, idUsuario))
+                .toList();
+    }
+
+    /**
+     * Igual que {@link #acotarLectura}, para los listados de una persona: las propias se ven
+     * completas; las de otra persona, solo la gestión (y las de su servicio) o el ADMINISTRADOR.
+     */
+    private List<SolicitudEntity> acotarLecturaDe(Long idFuncionario, List<SolicitudEntity> solicitudes) {
+        if (seguridadServicio.esAdministrador()
+                || Objects.equals(idFuncionario, seguridadServicio.idUsuarioActual())) {
+            return solicitudes;
+        }
+        if (!seguridadServicio.esGestionDelServicio()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "No puedes consultar las solicitudes de otro funcionario");
+        }
+        return acotarLectura(solicitudes);
     }
 
     /*
