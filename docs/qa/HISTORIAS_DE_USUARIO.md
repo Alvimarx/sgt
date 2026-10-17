@@ -482,10 +482,10 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   2. Las fechas van desde hoy hasta el 31 de diciembre del año siguiente, y el término no puede ser anterior al inicio. En móvil se eligen año, mes y día; en desktop, con campos de fecha.
   3. Si falta una fecha, «Enviar solicitud» muestra «Rellena todos los campos requeridos.».
   4. Al enviar, la solicitud aparece PENDIENTE en «Mis solicitudes» y en la bandeja de la jefatura.
-  5. Al aprobarla no cambia ningún turno, porque el permiso no lleva turno (ver §5, C-15).
+  5. Al aprobarla no cambia ningún turno: el permiso queda como registro y la jefatura libera a mano los turnos que correspondan (§5, C-15, decidido el 17 oct).
 - **Trazabilidad:** FUN-SGT-026; MF-007; TC-025, TC-027; RN-SGT-017.
 - **Estado:** **Implementada.** Evidencia: `CrearSolicitudSheet` (`buildDTO`, `handleSubmit`); `SolicitudService.crearSolicitud`. El backend no valida el orden de las fechas (TC-027); solo lo hace la interfaz.
-- **Prueba E2E:** `medico`; muta; ambos. Ya existe: foto del asistente en `interacciones-turnos.spec.js`.
+- **Prueba E2E:** `medico`; muta; ambos. Ya existe: foto del asistente en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/crear-solicitudes.spec.js` y, el criterio 5, `aprobaciones.spec.js`.
 
 #### HU-SOL-04 · Botar (liberar) un turno propio
 
@@ -499,7 +499,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Si ese turno ya está en otra solicitud mía pendiente, no se crea nada. Si la otra solicitud lo pide (por ejemplo, otro «Botar turno»), veo «Ud. ya solicitó este turno. Cancele la solicitud pendiente desde Solicitudes si desea cambiarla.» (R12). Si es el turno que entrego en un intercambio pendiente, veo «Ese turno ya está comprometido en otra solicitud pendiente suya. Cancélela desde Solicitudes para pedir otra cosa sobre él.» (R15). El backend revisa en ese orden (`SolicitudService.java:124-133`).
 - **Trazabilidad:** MF-008; FUN-SGT-026; R14, R15; RN-SGT-017.
 - **Estado:** **Implementada.** Evidencia: `TurnoService.getTurnosFuturosFuncionario`; `SolicitudService.crearSolicitud` y `cambiarEstado`. El backend no comprueba que el turno sea del solicitante: solo la interfaz lo limita.
-- **Prueba E2E:** `medico`, y `jefatura` para aprobar; muta; ambos.
+- **Prueba E2E:** `medico`, y `jefatura` para aprobar; muta; ambos. Automatizada: `e2e/hu-muta/crear-solicitudes.spec.js` y, «al aprobarse», `aprobaciones.spec.js`.
 
 #### HU-SOL-05 · Ofrecerme para cubrir un cupo (Cobertura)
 
@@ -513,7 +513,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Al crear se aplican R12 y R13 (HU-SOL-13 y HU-SOL-14).
 - **Trazabilidad:** MF-009; FUN-SGT-026; R4, R12, R13.
 - **Estado:** **Parcial.** El criterio 1 falla. El selector trae todos los cupos sin funcionario, incluidos los que ya pasaron (`TurnoRepository.findUnassignedTurnosByServicio` no filtra por fecha), y no aplica la elegibilidad de «Disponibles» (R9). El backend acepta pedir un cupo ya pasado (`crearSolicitud` no valida la fecha). El selector también ofrece la noche que termina la mañana de un turno de día propio, que R9 tampoco excluye (HU-CAL-02) y que el backend rechaza al crear (R13).
-- **Prueba E2E:** `medico`; datos: los cupos de la semana pasada del seed (turnos 97, 99, 102 y 106) y los cupos futuros generados; muta; ambos.
+- **Prueba E2E:** `medico`; datos: los cupos de la semana pasada del seed (turnos 97, 99, 102 y 106) y los cupos futuros generados; muta; ambos. Automatizada: `e2e/hu-muta/crear-solicitudes.spec.js` y, «al aprobarse», `aprobaciones.spec.js`.
 
 #### HU-SOL-06 · Proponer un intercambio (R14)
 
@@ -530,7 +530,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   6. Al aprobarse, los turnos se cruzan entre los dos.
 - **Trazabilidad:** MF-010; FUN-SGT-026; R13, R14, R15; RN-SGT-019, RN-SGT-041.
 - **Estado:** **Parcial.** Evidencia: `TurnoService.getTurnosIntercambiables`; `CrearSolicitudSheet` (efecto del selector del receptor y purgas); `SolicitudService.crearSolicitud` y `validarConflictoSegunTipo`. El criterio 5 falla por la interfaz. Con mi turno comprometido, `/turnos/intercambiables` devuelve una lista vacía (`TurnoService.java:474-477`) y el asistente muestra solo la nota genérica del criterio 2 (`SolicitudesView.jsx:717` en desktop y `:824` en móvil). Al enviar sin turno del receptor, dice «Rellena todos los campos requeridos.» (`:607`). El mensaje de R15 (`SolicitudService.java:134-138`) solo se ve por API. Lo encontró la E2E de la fase 3 (HU-SOL-13, criterio 2).
-- **Prueba E2E:** `medico` y el receptor 30000069-9; muta; ambos.
+- **Prueba E2E:** `medico` y el receptor 30000069-9; muta; ambos. Automatizada: `e2e/hu-muta/propuestas.spec.js`; el criterio 5, `reglas-solicitud.spec.js`.
 
 #### HU-SOL-07 · Ceder un turno a una persona (Oferta particular)
 
@@ -544,7 +544,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Si el receptor quedaría con un solape o con una noche seguida de día, aceptar o aprobar muestra el mensaje de la regla.
 - **Trazabilidad:** MF-011; FUN-SGT-026, FUN-SGT-027; RN-SGT-017, RN-SGT-019, RN-SGT-039.
 - **Estado:** **Implementada.** Evidencia: `CrearSolicitudSheet`; `SolicitudService.crearSolicitud`, `responderOfertaParticular` y `cambiarEstado`. El backend no comprueba que el turno ofrecido sea del solicitante.
-- **Prueba E2E:** `medico`, el receptor 30000069-9 y `jefatura`; muta; ambos.
+- **Prueba E2E:** `medico`, el receptor 30000069-9 y `jefatura`; muta; ambos. Automatizada: `e2e/hu-muta/propuestas.spec.js`.
 
 #### HU-SOL-08 · Responder una propuesta recibida
 
@@ -559,7 +559,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   4. Negativo (API): si responde otro usuario, recibe 400 «No eres el receptor de esta solicitud».
 - **Trazabilidad:** FUN-SGT-027; MF-010, MF-011; RN-SGT-019.
 - **Estado:** **Implementada.** Evidencia: `evaluarSolicitud` (`canRespond`); `SolicitudService.responderOfertaIntercambio` y `responderOfertaParticular`. Observación: la condición del criterio 1 la aplica solo la interfaz. El backend no exige que la solicitud siga PENDIENTE ni que el receptor no haya respondido, así que por API el receptor puede rechazar una solicitud ya aprobada (queda RECHAZADA con los turnos ya cruzados) o cambiar su respuesta (§5.1).
-- **Prueba E2E:** 30000069-9 como receptor de una propuesta creada por `medico`. No usar la solicitud 12 del seed, aunque el administrador sea su receptor: es de Medicina Interna y su emisor está en el bloque de RUT por revisar (§7). Muta; ambos.
+- **Prueba E2E:** 30000069-9 como receptor de una propuesta creada por `medico`. No usar la solicitud 12 del seed, aunque el administrador sea su receptor: es de Medicina Interna y su emisor está en el bloque de RUT por revisar (§7). Muta; ambos. Automatizada: `e2e/hu-muta/propuestas.spec.js`; el criterio 4, `e2e/hu/permisos.spec.js`.
 
 #### HU-SOL-09 · Aprobar o rechazar solicitudes
 
@@ -575,10 +575,10 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   5. Si el cupo ya tiene otra persona, veo «Este turno ya fue asignado a otra persona». Si en un intercambio alguno de los turnos cambió de dueño, veo «El turno solicitado ya cambió de dueño: el intercambio quedó obsoleto» (o «El turno ofrecido…»).
   6. Si participo en la solicitud (como solicitante, receptor o dueño de alguno de los turnos), en desktop no veo los botones y leo «Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.». En móvil sí veo los botones y el backend responde «No puedes aprobar ni rechazar una solicitud en la que participas directamente».
   7. Si dos jefaturas aprueban a la vez, la segunda ve «Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)».
-  8. Negativos: el médico no ve los botones, y por API `PUT /estado` con su token lo niega el filtro de seguridad (BUG-005, corregido). Una solicitud de otro servicio responde 403 «No tienes acceso a solicitudes de otro servicio».
+  8. Negativos: el médico no ve los botones, y por API `PUT /estado` con su token lo niega el filtro de seguridad (BUG-005, corregido). Una solicitud de otro servicio responde 403 «No tienes acceso a solicitudes de otro servicio»; si es un intercambio con un turno de otro servicio, 403 «El intercambio involucra un turno de otro servicio» (`SolicitudService.java:372-385`).
 - **Trazabilidad:** FUN-SGT-028; MF-027; R10, R12, R13, R15; RN-SGT-017, 018, 019 y 040; TC-028, TC-029; BUG-005.
-- **Estado:** **Implementada.** Evidencia: `SolicitudesView` (`handleAprobar`, `handleRechazar`, `evaluarSolicitud`, `participa`); `SolicitudService.cambiarEstado` (`participantesDirectos`, `lockTurnosInvolucrados`, `rechazarSolicitudesCompetitivas`); `SecurityConfig` (comentario «SEC (H-07)»). Observaciones: la regla del criterio 1 la aplica solo la interfaz, porque el backend aprueba aunque el receptor no haya aceptado (§5, C-11); el backend deja pasar a RECHAZADA una solicitud que ya estaba resuelta; y la revisión de dueño del criterio 5 existe solo para Cobertura e Intercambio: aprobar un «Botar turno» o una «Oferta particular» cuyo turno cambió de dueño entre medio libera o entrega el turno de un tercero (§5.1).
-- **Prueba E2E:** `jefatura`, con solicitudes creadas por `medico`; muta; ambos. Ya existe: fotos en `interacciones-turnos.spec.js`.
+- **Estado:** **Parcial.** El criterio 6 falla en desktop cuando la jefatura es dueña de uno de los turnos sin ser solicitante ni receptora: la vista le ofrece «Aprobar» y «Rechazar» y no le muestra la nota, porque `participa` (`SolicitudesView.jsx:1257`) no mira a los dueños de los turnos, y el backend responde 403 al aprobar (E2E de la fase 4, §5.1). Evidencia: `SolicitudesView` (`handleAprobar`, `handleRechazar`, `evaluarSolicitud`, `participa`); `SolicitudService.cambiarEstado` (`participantesDirectos`, `lockTurnosInvolucrados`, `rechazarSolicitudesCompetitivas`); `SecurityConfig` (comentario «SEC (H-07)»). Observaciones: la regla del criterio 1 la aplica solo la interfaz, porque el backend aprueba aunque el receptor no haya aceptado (§5, C-11); el backend deja pasar a RECHAZADA una solicitud que ya estaba resuelta; y la revisión de dueño del criterio 5 existe solo para Cobertura e Intercambio: aprobar un «Botar turno» o una «Oferta particular» cuyo turno cambió de dueño entre medio libera o entrega el turno de un tercero (§5.1).
+- **Prueba E2E:** `jefatura`, con solicitudes creadas por `medico`; muta; ambos. Ya existe: fotos en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/aprobaciones.spec.js`; el criterio 8, `e2e/hu/permisos.spec.js`.
 
 #### HU-SOL-10 · Elegir entre varios postulantes al mismo turno (R10)
 
@@ -593,7 +593,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   4. En desktop la decisión se toma en el detalle, persona por persona.
 - **Trazabilidad:** R10, R16, R18; MF-027.
 - **Estado:** **Implementada.** Evidencia: `SolicitudesView` (`gruposPostulacion`, `PostulacionesGrupoCard`, `datosGrupoPostulacion`); `CentroOperacionesDesktop` (`solsVM`); `SolicitudService.rechazarSolicitudesCompetitivas`.
-- **Prueba E2E:** `jefatura`, con coberturas de `medico` y de 30000069-9 sobre el mismo cupo futuro; muta; ambos. Ya existe: foto con datos simulados en `interacciones-turnos.spec.js`.
+- **Prueba E2E:** `jefatura`, con coberturas de `medico` y de 30000069-9 sobre el mismo cupo futuro; muta; ambos. Ya existe: foto con datos simulados en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/aprobaciones.spec.js`.
 
 #### HU-SOL-11 · Cancelar mi solicitud pendiente (R15)
 
@@ -610,7 +610,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   6. Negativos (API): cancelar una solicitud ajena responde 403 «Solo puedes cancelar tus propias solicitudes»; una propia ya resuelta, 400 «Esta solicitud ya fue resuelta: no se puede cancelar». El backend revisa primero quién la emitió (`SolicitudService.java:241-248`): una ajena ya resuelta responde 403.
 - **Trazabilidad:** R15.
 - **Estado:** **Implementada.** Evidencia: `SolicitudesView` (`handleCancelar`, `confirmarCancelacion`; `canCancelar` y `esCancelada` en `evaluarSolicitud`); `SolicitudService.cancelarSolicitud`; `BitacoraView` (evento `SOLICITUD_CANCELADA`).
-- **Prueba E2E:** `medico` y `jefatura`; muta; ambos. Ya existe: foto con datos simulados en `interacciones-turnos.spec.js`.
+- **Prueba E2E:** `medico` y `jefatura`; muta; ambos. Ya existe: foto con datos simulados en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/cancelar-modificar.spec.js` y, el criterio 5 en móvil, `aprobaciones.spec.js`; el criterio 6 con una solicitud ajena, `e2e/hu/permisos.spec.js`.
 
 #### HU-SOL-12 · Modificar el motivo de mi solicitud
 
@@ -625,7 +625,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   4. Negativos (API): el motivo de una solicitud ajena responde 403 «Solo quien emitió la solicitud puede modificar su motivo» (el administrador queda exento); el de una que ya no está pendiente, 400 «Solo se puede modificar el motivo si la solicitud está en estado PENDIENTE».
 - **Trazabilidad:** FUN-SGT-029; RN-SGT-020.
 - **Estado:** **Implementada.** Evidencia: `EditMotivoSheet`; `SolicitudService.modificarMotivo`. Observaciones: la jefatura y el subrogante no tienen el botón para sus propias solicitudes; el error no muestra el mensaje del backend y el texto usa voseo.
-- **Prueba E2E:** `medico`; muta; ambos.
+- **Prueba E2E:** `medico`; muta; ambos. Automatizada: `e2e/hu-muta/cancelar-modificar.spec.js`; el criterio 4, `e2e/hu/permisos.spec.js`.
 
 #### HU-SOL-13 · No pedir dos veces el mismo turno ni comprometerlo en dos solicitudes (R12, R15)
 
@@ -640,7 +640,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   4. Con dos pestañas abiertas, la segunda solicitud igual se rechaza: la garantía está en el backend.
 - **Trazabilidad:** R12, R15.
 - **Estado:** **Parcial.** Evidencia: `SolicitudService.crearSolicitud` (`existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado`, `contarPendientesQueInvolucranTurno`). El criterio 2 falla por la interfaz cuando se intenta otro intercambio: el asistente no deja elegir el turno del receptor y su nota no menciona cancelar (ver HU-SOL-06, criterio 5). Al botar u ofrecer el turno, y por API, el mensaje sí aparece. Las ofertas generales no participan de este bloqueo: un turno en oferta general se puede además botar o intercambiar.
-- **Prueba E2E:** `medico`; muta (la primera solicitud); ambos.
+- **Prueba E2E:** `medico`; muta (la primera solicitud); ambos. Automatizada: `e2e/hu-muta/reglas-solicitud.spec.js` y, el criterio 3, `aprobaciones.spec.js`.
 
 #### HU-SOL-14 · Respetar el descanso post nocturno (R13)
 
@@ -656,7 +656,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   5. La jefatura no puede asignar a mano a esa persona en ese día (R13 dice que el validador es compartido con la asignación manual).
 - **Trazabilidad:** R13, que reemplaza la regla de 12 horas de RN-SGT-039 y FUN-SGT-052; R9 (el filtro «Disponibles» es coherente).
 - **Estado:** **Parcial.** Los criterios 1 a 4 se cumplen: `ValidadorAsignacionTurnoService.esDescansoPostNocturnoViolado` lo usan `SolicitudService`, `OfertaGeneralService` y `TurnoService.getTurnosIntercambiables`. El criterio 5 no: `GestionTurnoService.validarConflictoFuncionario` solo revisa el solape, así que la asignación manual acepta la noche seguida de día. Ver §5, C-04.
-- **Prueba E2E:** `medico` y `jefatura`. Datos: la jefatura libera (HU-ASG-03) un turno de día del día siguiente a una noche del médico 369, y después el médico lo pide. Muta; ambos.
+- **Prueba E2E:** `medico` y `jefatura`. Datos: la jefatura libera (HU-ASG-03) un turno de día del día siguiente a una noche del médico 369, y después el médico lo pide. Muta; ambos. Automatizada: `e2e/hu-muta/reglas-solicitud.spec.js` (criterios 1 a 3), `propuestas.spec.js` (4) y `asignacion.spec.js` (5).
 
 ### 3.5 Ofertas y postulaciones (HU-OFE)
 
@@ -671,7 +671,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   2. Como ofertor no veo «Postular» en mi oferta. Cuando la abren, veo «Tu oferta está abierta · N postulantes».
 - **Trazabilidad:** FUN-SGT-031; MF-012; TC-030.
 - **Estado:** **Implementada.** Evidencia: `CrearSolicitudSheet` (tipo 6); `OfertaGeneralService.crearOferta`. Observaciones: el backend no comprueba que el turno sea del ofertor ni que esté libre de otras solicitudes, y los errores se muestran genéricos. El ofertor no puede retirar su oferta: `OfertaGeneralController` no tiene una ruta para eso.
-- **Prueba E2E:** `medico`; muta; ambos.
+- **Prueba E2E:** `medico`; muta; ambos. Automatizada: `e2e/hu-muta/crear-solicitudes.spec.js` y, la apertura real, `ofertas-generales.spec.js`.
 
 #### HU-OFE-02 · Abrir o rechazar una oferta (gestión)
 
@@ -685,7 +685,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Negativos: el médico no ve los botones y por API recibe 403; una oferta de otro servicio también responde 403, salvo al administrador (`SeguridadServicio.exigirMismoServicio`).
 - **Trazabilidad:** FUN-SGT-031; MF-012.
 - **Estado:** **Implementada.** Evidencia: `OfertaGeneralCard` y `evaluarOferta` (`puedeDecidirApertura`); `OfertaGeneralController` (`@PreAuthorize`); `OfertaGeneralService.aprobarOferta`, `rechazarOferta` y `exigirMismoServicioQueOferta`. Observación: las ofertas no tienen la segregación de funciones de las solicitudes (H-07): una jefatura puede abrir su propia oferta, y ni la interfaz ni el backend lo impiden (§5.1).
-- **Prueba E2E:** `jefatura`, con una oferta creada por `medico`; muta; ambos.
+- **Prueba E2E:** `jefatura`, con una oferta creada por `medico`; muta; ambos. Automatizada: `e2e/hu-muta/ofertas-generales.spec.js`; los criterios 2 y 3, `e2e/hu/permisos.spec.js`.
 
 #### HU-OFE-03 · Postular y retirar mi postulación
 
@@ -699,7 +699,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. No puedo postular a mi propia oferta ni dos veces a la misma.
 - **Trazabilidad:** FUN-SGT-032; MF-012; RN-SGT-021; TC-031.
 - **Estado:** **Implementada.** Evidencia: `evaluarOferta` (`puedePostularORetirar`); `OfertaGeneralService.postular` y `retirarPostulacion`. Observaciones: la jefatura no puede postular desde la interfaz; ante un error del backend la interfaz muestra «Error al postular.», sin el motivo; no se puede postular desde el Centro.
-- **Prueba E2E:** `medico`. La oferta 1 del seed está abierta, pero su turno es de la semana pasada (ver HU-OFE-05): mejor crear una oferta futura con 30000042-2. Muta; ambos.
+- **Prueba E2E:** `medico`. La oferta 1 del seed está abierta, pero su turno es de la semana pasada (ver HU-OFE-05): mejor crear una oferta futura con 30000042-2. Muta; ambos. Automatizada: `e2e/hu-muta/ofertas-generales.spec.js`.
 
 #### HU-OFE-04 · Seleccionar al postulante
 
@@ -713,8 +713,8 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Si el postulante quedaría con un solape o con una noche seguida de día, veo el mensaje de la regla y la oferta sigue abierta.
   4. Una oferta abierta sin postulantes muestra «Sin postulantes aún.».
 - **Trazabilidad:** FUN-SGT-033; MF-012; RN-SGT-022; TC-032.
-- **Estado:** **Implementada.** Evidencia: `OfertaGeneralCard` (confirmación); `OfertaGeneralService.seleccionarPostulante`. Observaciones: no se revisa que el turno siga siendo del ofertor (si cambió de dueño entre medio, se le quita a un tercero), y una jefatura puede elegir al postulante de su propia oferta (§5.1).
-- **Prueba E2E:** `jefatura`; datos: una oferta futura con postulante; muta; ambos. Ya existe: foto de la confirmación en `interacciones-turnos.spec.js`.
+- **Estado:** **Parcial.** El criterio 3 falla en pantalla: cuando el backend rechaza la selección por la regla, se ve «Error al seleccionar postulante.» y no su mensaje (`handleSeleccionar`, `SolicitudesView.jsx:1170-1173`; E2E de la fase 4, §5.1). Evidencia: `OfertaGeneralCard` (confirmación); `OfertaGeneralService.seleccionarPostulante`. Observaciones: no se revisa que el turno siga siendo del ofertor (si cambió de dueño entre medio, se le quita a un tercero), y una jefatura puede elegir al postulante de su propia oferta (§5.1).
+- **Prueba E2E:** `jefatura`; datos: una oferta futura con postulante; muta; ambos. Ya existe: foto de la confirmación en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/ofertas-generales.spec.js`.
 
 #### HU-OFE-05 · Ver solo las ofertas vigentes
 
@@ -758,7 +758,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   2. «Eliminar» la quita de la lista. Queda con estado ELIMINADO y no vuelve al refrescar.
 - **Trazabilidad:** FUN-SGT-034; MF-014; BUG-006.
 - **Estado:** **Implementada.** Evidencia: `NotificationContext.markAsRead` y `deleteNotification`; `NotificacionService.marcarLeido` y `marcarComoEliminado`. El backend no comprueba que la notificación sea del usuario: BUG-006 sigue abierto en estas dos rutas y en `GET /notificaciones/{id}`.
-- **Prueba E2E:** 30000013-3; muta; ambos.
+- **Prueba E2E:** 30000013-3, con una notificación creada en la prueba (`POST /notificaciones`) y no con la 16 del seed, que usan las fases 1 y 2a; muta; ambos. Automatizada: `e2e/hu-muta/notificaciones.spec.js`.
 
 #### HU-NOT-03 · Recibir avisos de mis solicitudes y de mis turnos
 
@@ -846,7 +846,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   5. Negativo (API): un turno de otro servicio se rechaza con «No tienes acceso a datos de otro servicio», salvo al administrador. Hoy responde 400, no 403: `TurnoController.alterarTurno` captura toda `RuntimeException`, y la `AccessDeniedException` de `SeguridadServicio` lo es.
 - **Trazabilidad:** FUN-SGT-024; MF-022; R4, R17, R18; RN-SGT-009, RN-SGT-010; TC-024.
 - **Estado:** **Implementada.** Evidencia: `AsignarTurnoLibreSheet.jsx` (`handleSubmitAsignacion`, `textosConfirmacion`); `GestionTurnoService.alterarTurno` y `accionAsignar`; `TurnoController.alterarTurno`. Observaciones: el aviso a la persona asignada no llega (HU-NOT-03); aquí no se aplica R13 (HU-SOL-14); el cruce de horario responde 500 en vez de 400, y la negación por servicio, 400 en vez de 403; asignar a mano no toca las solicitudes pendientes sobre ese turno.
-- **Prueba E2E:** `jefatura`, con los cupos futuros generados de Urgencias, y `subrogante`, con los cupos del seed de Enfermería (turnos 26 y 66, que con las fechas relativas caen la semana siguiente y tres semanas después); muta; ambos. Ya existe: fotos hasta la confirmación en `interacciones-turnos.spec.js`.
+- **Prueba E2E:** `jefatura`, con los cupos futuros generados de Urgencias, y `subrogante`, con los cupos del seed de Enfermería (turnos 26 y 66, que con las fechas relativas caen la semana siguiente y tres semanas después); muta; ambos. Ya existe: fotos hasta la confirmación en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/asignacion.spec.js`; el criterio 5, `e2e/hu/permisos.spec.js`.
 
 #### HU-ASG-03 · Reasignar o liberar un turno asignado
 
@@ -861,7 +861,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   4. Tras confirmar, la vista se recarga y la bitácora registra la reasignación o la liberación.
 - **Trazabilidad:** FUN-SGT-024; MF-022; R17.
 - **Estado:** **Implementada.** Evidencia: `AsignarTurnoLibreSheet` (`handleSubmitDesasignar`, `abrirConfirmacionDesasignar`); `GestionTurnoService.accionReasignar` y `accionDesasignar`.
-- **Prueba E2E:** `jefatura`; muta; ambos.
+- **Prueba E2E:** `jefatura`; muta; ambos. Automatizada: `e2e/hu-muta/asignacion.spec.js`.
 
 #### HU-ASG-04 · Cambiar el horario de un turno
 
@@ -1318,7 +1318,7 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | SOL-06 | Intercambio (R14) | Sí | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
 | SOL-07 | Oferta particular | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-08 | Responder como receptor | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
-| SOL-09 | Aprobar o rechazar | Neg. | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
+| SOL-09 | Aprobar o rechazar | Neg. | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
 | SOL-10 | Postulaciones agrupadas (R10) | — | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-11 | Cancelar solicitud (R15) | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-12 | Modificar motivo | Sí | — | — | — | Implementada | Sí | Sí | M+D |
@@ -1327,7 +1327,7 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | OFE-01 | Publicar oferta general | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | OFE-02 | Abrir o rechazar oferta | Neg. | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | OFE-03 | Postular y retirar | Sí | — | — | — | Implementada | Sí | Sí | M+D |
-| OFE-04 | Seleccionar postulante | — | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
+| OFE-04 | Seleccionar postulante | — | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
 | OFE-05 | Solo ofertas vigentes | Sí | Sí | Sí | Sí | Parcial | Sí | No | M+D |
 | NOT-01 | Ver bandeja | Sí | Sí | Sí | Sí | Implementada | Sí (con 30000013-3 o con el seed corregido) | No | M+D |
 | NOT-02 | Marcar leída y eliminar | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
@@ -1374,8 +1374,8 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | AUT Autenticación y servicio | 7 | 6 | 1 | 0 | 0 |
 | CAL Calendario y turnos propios | 9 | 6 | 0 | 2 | 1 |
 | DET Detalle de turno | 4 | 1 | 2 | 0 | 1 |
-| SOL Solicitudes | 14 | 9 | 5 | 0 | 0 |
-| OFE Ofertas y postulaciones | 5 | 4 | 1 | 0 | 0 |
+| SOL Solicitudes | 14 | 8 | 6 | 0 | 0 |
+| OFE Ofertas y postulaciones | 5 | 3 | 2 | 0 | 0 |
 | NOT Notificaciones | 3 | 2 | 0 | 1 | 0 |
 | PAN Paneles de jefatura y subrogante | 3 | 3 | 0 | 0 | 0 |
 | ASG Asignación de turnos | 5 | 4 | 0 | 1 | 0 |
@@ -1390,13 +1390,13 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | PRF Perfil | 1 | 1 | 0 | 0 | 0 |
 | DSH Dashboard personal | 1 | 1 | 0 | 0 | 0 |
 | PEN Registro pendiente | 1 | 1 | 0 | 0 | 0 |
-| **Total** | **76** | **47** | **18** | **6** | **5** |
+| **Total** | **76** | **45** | **20** | **6** | **5** |
 
 ---
 
 ## 5. Contradicciones y preguntas para Álvaro
 
-Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el código y una pregunta con recomendación. No están resueltas.
+Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el código, una pregunta con recomendación y, al final, la decisión de Álvaro (17 oct 2026). La implementación partió ese día: el «Código hoy» y el estado de cada HU describen el código al 17 oct hasta que se integre cada corrección.
 
 ### C-01 · Quién crea tipos de turno, rotativas y planificaciones
 
@@ -1405,6 +1405,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `SecurityConfig.GLOBAL_ADMIN_PATHS` (`/tipos-turno/**`, `/rotativas/**`, `/planificaciones/**`) exige ADMINISTRADOR para POST, PUT y DELETE. `Prop4` solo pasa `onGoTiposTurno`, `onGoPlantillas` y `onGoPlanificacion` al panel de administración. Los paneles de jefatura y subrogante tienen esas tarjetas en el código, ocultas porque nunca reciben el handler.
 - **Pregunta:** ¿Para la entrega, solo el administrador crea tipos de turno, rotativas y planificaciones?
 - **Recomendación:** sí. Dejarlo en el administrador, que es coherente en la interfaz y en el backend y reduce el riesgo entre servicios; corregir el manual y retirar las tarjetas ocultas de los paneles. Si se quiere dárselo a la jefatura, hacerlo con control por servicio (riesgo de IDOR señalado en `QA_REMEDIATION_PLAN.md`).
+- **Decisión (17 oct):** como se recomienda: solo el administrador. Corregir el manual y retirar las tarjetas ocultas de los paneles.
 
 ### C-02 · ¿Un médico aprueba solicitudes?
 
@@ -1414,6 +1415,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `SecurityConfig` dice «SEC (H-07): aprobar/rechazar es una función de gestión — antes incluía MEDICO, lo que permitía auto-aprobación (cerrado además en el service con la verificación de que el aprobador no sea el propio emisor).», y `PUT /api/v2/solicitudes/*/estado` exige ADMINISTRADOR, JEFATURA o SUBROGANTE. `SolicitudService.cambiarEstado` impide además decidir a quien participa en la solicitud. Pero la descripción OpenAPI de `SolicitudController.cambiarEstado` todavía dice «Requiere rol JEFATURA, SUBROGANTE o MEDICO.».
 - **Pregunta:** ¿Se confirma que ningún médico aprueba, tampoco un «jefe de turno» sin rol de jefatura?
 - **Recomendación:** confirmar; cerrar BUG-005 como corregido y actualizar el Archivo (§6.11, RN-SGT-019, RN-SGT-029, FUN-SGT-028, flujo 19.6) y la descripción OpenAPI.
+- **Decisión (17 oct):** confirmado: ningún médico aprueba. Cerrar BUG-005 y actualizar el Archivo y la descripción OpenAPI.
 
 ### C-03 · Qué puede hacer el subrogante
 
@@ -1422,6 +1424,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** el panel de subrogante tiene 6 módulos, sin jerarquía, personal ni asignación de funcionarios (`SubroganteDashboardView`, `navegacion.js`). En cambio, `FuncionarioController.update` dice «SEC (item 5): SUBROGANTE se equipara a JEFATURA para esta operación»: por API puede cambiar el rol de cualquier persona de su servicio, es decir, designar jerarquía. `registerPersonal` exige JEFATURA o ADMINISTRADOR, así que no registra personal nuevo, al revés de RN-SGT-007. Puestos, turnos y reglas sí los puede tocar (`SERVICE_ADMIN_PATHS`), aunque reglas no tiene menú (C-10).
 - **Pregunta:** Mientras subroga, ¿el subrogante tiene todas las facultades de la jefatura o un subconjunto? ¿Cuál?
 - **Recomendación:** para la entrega, un subconjunto explícito: decide solicitudes y ofertas, asigna turnos y gestiona puestos; no designa jerarquía ni suma personal. Alinear el backend para que `PUT /funcionarios/{id}` no le deje cambiar el `rol`.
+- **Decisión (17 oct):** el subconjunto recomendado: decide solicitudes y ofertas, asigna turnos y gestiona puestos; no designa jerarquía ni suma personal, y el backend se lo niega.
 
 ### C-04 · Regla de 12 horas frente a R13
 
@@ -1430,6 +1433,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `ValidadorAsignacionTurnoService.esDescansoPostNocturnoViolado` lo usan `SolicitudService`, `OfertaGeneralService.seleccionarPostulante` y `TurnoService.getTurnosIntercambiables`. `GestionTurnoService.validarConflictoFuncionario` (asignar y reasignar a mano) solo revisa el solape con `solapan`. La generación de la planificación tampoco aplica R13.
 - **Pregunta:** ¿La jefatura puede asignar a mano un turno de día a quien sale de una noche (por ejemplo, en una emergencia)? ¿Y la planificación?
 - **Recomendación:** aplicar el validador también en `accionAsignar` y `accionReasignar` (cambio acotado, alcanzable antes del congelamiento). Si se quiere permitir la excepción, que pida confirmación explícita y quede en la bitácora. Reemplazar la regla de 12 horas en el Archivo.
+- **Decisión (17 oct):** aplicar R13 también al asignar y reasignar a mano. La planificación queda como limitación conocida. La excepción de emergencia no se implementa.
 
 ### C-05 · Chips del inicio y aviso de cambio aprobado
 
@@ -1439,6 +1443,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `AgendaView.FILTERS` tiene Todos, Mis turnos, Solicitudes y Disponibles. El filtro inicial es «Mis turnos» (`useState("miTurno")`), algo que ningún documento menciona. El backend no envía `cambioAprobado` ni `solicitudCon`, así que la marca y el aviso de aprobado nunca aparecen.
 - **Preguntas:** (a) ¿El inicio debe abrir en «Mis turnos» o en «Todos»? (b) ¿Se implementa el aviso de cambio aprobado o se retira ese código?
 - **Recomendación:** (a) dejar «Mis turnos» y documentarlo; (b) retirar el código del aviso para la entrega (implementarlo exige que el backend lo calcule desde la bitácora) y actualizar MF-005 en el manual.
+- **Decisión (17 oct):** dejar «Mis turnos», documentarlo y retirar el código del aviso.
 
 ### C-06 · Bitácora del médico («Ver historial»)
 
@@ -1448,6 +1453,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `ShiftDetail.accionesDelTurno` agrega «Ver historial» para todos y abre `bitacora`, general, sin filtrar por el turno. `BitacoraController` exige rol de gestión, así que el médico ve «No se pudo cargar la bitácora.». `Prop4` tiene `bitacora` en `VISTAS_COMUNES`.
 - **Pregunta:** ¿El médico debe ver el historial de sus turnos?
 - **Recomendación:** si la respuesta es sí, que «Ver historial» use `GET /bitacoras/turno/{id}` y que el backend lo permita solo para turnos propios. Si es no, ocultar «Ver historial» al médico y sacar `bitacora` de las vistas comunes. En ambos casos, que la gestión vea el historial del turno y no toda la bitácora.
+- **Decisión (17 oct):** sí, el de sus turnos: «Ver historial» usa `GET /bitacoras/turno/{id}`, el médico ve solo el de sus turnos y la gestión ve el historial del turno, no toda la bitácora.
 
 ### C-07 · ¿Puede haber varias jefaturas por servicio?
 
@@ -1457,6 +1463,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `FuncionarioService.updateUser` cambia el rol sin mirar si ya hay una jefatura. El seed tiene seis jefaturas en Urgencias (ids 300 a 305; cinco son además administradores). `JerarquiaJefaturaView` parte con `selectedRole = 'jefe'` y solo ofrece el botón «Subrogante». El panel de jefatura promete «Designa nuevos subrogantes al sistema.».
 - **Pregunta:** ¿Una sola jefatura por servicio, o varias (por ejemplo, coordinadores por turno)? ¿La jefatura puede nombrar a otra jefatura?
 - **Recomendación:** para la entrega, que la jefatura solo designe subrogantes: selección inicial «Subrogante» y rechazo en el backend del rol JEFATURA cuando quien designa no es administrador. Que la cantidad de jefaturas la decida TIC con el servicio y, si es una, que la valide el backend.
+- **Decisión (17 oct):** la jefatura solo designa subrogantes: selección inicial «Subrogante», y el backend rechaza JEFATURA salvo que lo pida un administrador. Cuántas jefaturas tiene un servicio lo decide TIC con el servicio.
 
 ### C-08 · El médico que exporta sus turnos
 
@@ -1466,6 +1473,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `ExportacionController.exportarTurnosCsv` tiene `@PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE')")` y el comentario «SEC (H-01, High): antes cualquier autenticado (incl. MEDICO) podía exportar…». `calendarView` le muestra el botón al médico, con «Se exportarán solo tus turnos del servicio actual.», y termina en «No se pudo exportar. Intenta de nuevo.».
 - **Pregunta:** ¿El médico exporta sus propios turnos?
 - **Recomendación:** sí, con el alcance forzado en el backend: si el rol es MEDICO, `idFuncionario` es el de la sesión, ignorando el parámetro. Si no, quitarle el botón al médico antes de la entrega.
+- **Decisión (17 oct):** sí, sus turnos: el backend fuerza que salgan solo los del médico.
 
 ### C-09 · Notificaciones de solicitudes y de turnos
 
@@ -1474,6 +1482,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** ningún service de solicitudes ni de ofertas crea notificaciones; solo existen el `POST /notificaciones` manual y las llamadas de `GestionTurnoService`. `NotificacionService.crearNotificacionSistema` recibe al destinatario pero no lo guarda (la entidad no tiene ese campo) y deja la solicitud nula. La bandeja solo muestra notificaciones ligadas a una solicitud donde el usuario es emisor o receptor. Lo único que hoy hay en las bandejas son los datos del seed.
 - **Pregunta:** ¿La bandeja tiene que funcionar para la entrega? ¿Con qué eventos?
 - **Recomendación:** agregar el destinatario a `Notificacion` (migración chica) y crear la notificación en `SolicitudService` (crear, responder, cambiar estado, cancelar), en `OfertaGeneralService` y en `GestionTurnoService`. Si no alcanza antes del 30 de octubre, decirlo en el manual y ocultar la bandeja.
+- **Decisión (17 oct):** implementarlas: destinatario en `Notificacion` y avisos al crear, responder, aprobar, rechazar y cancelar solicitudes, en las ofertas y en las asignaciones. Si no alcanzan al 28 oct, se oculta la bandeja y se dice en el manual.
 
 ### C-10 · Reglas de horario para jefatura y subrogante
 
@@ -1483,6 +1492,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `SecurityConfig.SERVICE_ADMIN_PATHS` incluye `/reglas-servicio/**`; `Prop4.VISTAS_GESTION` incluye `reglas`; `navegacion.js` pone «Reglas de horario» con permiso `admin`; los paneles de jefatura y subrogante no tienen la tarjeta.
 - **Pregunta:** ¿La jefatura y el subrogante configuran las reglas de su servicio?
 - **Recomendación:** si es sí, agregar el módulo y el ítem del menú (cambio solo de frontend). Si es no, sacar `/reglas-servicio/**` de las escrituras de `SERVICE_ADMIN_PATHS` y `reglas` de `VISTAS_GESTION`.
+- **Decisión (17 oct):** solo el administrador: cerrar en el backend las escrituras de `/reglas-servicio/**`.
 
 ### C-11 · El receptor debe aceptar antes de que la jefatura apruebe
 
@@ -1491,6 +1501,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** la interfaz lo cumple (en `evaluarSolicitud`, `canDecideThis` exige que no se esté esperando al receptor). El backend no: `SolicitudService.cambiarEstado` no mira `aceptadoReceptor`, así que por API se puede aprobar un intercambio que el receptor nunca aceptó.
 - **Pregunta:** ninguna de negocio; la regla está clara.
 - **Recomendación:** agregar la verificación en `cambiarEstado` para los tipos 4 y 5.
+- **Decisión (17 oct):** revisarlo en el backend al aprobar intercambios y ofertas particulares.
 
 ### C-12 · Eliminar un tipo de turno que usan rotativas
 
@@ -1499,6 +1510,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `TipoTurnoService.eliminarTipoDeTurno` lo elimina y deja libres esos días en las rotativas (`liberarReferenciasAlTipoTurno`); la interfaz lista las rotativas afectadas.
 - **Pregunta:** ¿Se bloquea o se permite con aviso?
 - **Recomendación:** mantener el código (permitir con aviso) y corregir el manual.
+- **Decisión (17 oct):** permitir con aviso, como hoy, y corregir el manual.
 
 ### C-13 · Tope de horas de una rotativa
 
@@ -1507,6 +1519,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `PlantillasView` (`HORAS_SEMANALES_REF = 44`) solo avisa; el backend no tiene tope (`RotativaService`).
 - **Pregunta:** ¿Cuál es el tope (24 horas, 44 u otro) y debe bloquear?
 - **Recomendación:** confirmarlo con la jefatura de Urgencias; si se mantiene el aviso de 44 horas, corregir el manual.
+- **Decisión (17 oct):** que no bloquee y solo avise sobre las 44 horas («puede alguien sin problema hacer 60hrs en una semana»). Corregir el manual.
 
 ### C-14 · Auditoría con el encargado de cada asignación
 
@@ -1514,6 +1527,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `AuditoriaView` muestra el funcionario o «Vacante» y los totales, pero no quién hizo la asignación.
 - **Pregunta:** ¿Es necesario mostrar al encargado?
 - **Recomendación:** si se necesita, cruzar con la bitácora; si no, corregir el manual.
+- **Decisión (17 oct):** corregir el manual.
 
 ### C-15 · ¿Aprobar un permiso libera los turnos del período?
 
@@ -1522,6 +1536,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** el asistente de Permiso envía solo las fechas, sin turno. `cambiarEstado` libera el turno solo si la solicitud trae uno, así que aprobar un permiso creado desde la interfaz no cambia ningún turno (los permisos del seed sí traen turno).
 - **Pregunta:** al aprobar un permiso, ¿deben quedar libres los turnos del funcionario en esas fechas?
 - **Recomendación:** decidirlo con las jefaturas. Para la entrega, documentar que el permiso es un registro y que la jefatura libera a mano los turnos si corresponde.
+- **Decisión (17 oct):** el permiso queda como registro: la jefatura libera a mano los turnos que correspondan, y se documenta así.
 
 ### C-16 · Ofertas pasadas y pendientes de apertura a la vista del médico
 
@@ -1529,6 +1544,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** el Centro filtra por vigencia y oculta las rechazadas. La pestaña «Ofertas generales» de Solicitudes muestra todas a todos; la oferta 1 del seed, abierta y de la semana pasada, sigue recibiendo postulaciones. Quien publica una oferta no puede retirarla: `OfertaGeneralController` no tiene una ruta para eso (E2E de la fase 3).
 - **Pregunta:** ¿El médico ve las ofertas pendientes de apertura? ¿Se ocultan las pasadas en todas partes? ¿Puede el ofertor retirar su oferta?
 - **Recomendación:** usar en Solicitudes el mismo filtro de vigencia y mostrarle al médico solo las abiertas. Dejar que el ofertor retire su oferta mientras nadie la haya abierto.
+- **Decisión (17 oct):** como se recomienda: el mismo filtro de vigencia en Solicitudes y en Cobertura, al médico solo las ofertas abiertas, y el ofertor puede retirar su oferta mientras nadie la haya abierto.
 
 ### C-17 · Lecturas sin control por servicio o por dueño
 
@@ -1545,12 +1561,14 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
   - `GET /funcionarios/status/{rut}`, que a cualquier sesión le dice si un RUT está registrado y con qué id.
 - **Pregunta:** ¿Se corrige antes de entregar a TIC o se entrega como riesgo conocido?
 - **Recomendación:** con datos reales de personal, corregir antes: `GET /solicitudes` filtrado por rol y servicio, `exigirMismoServicio` en los GET por servicio y por id de recurso, y control de dueño en las notificaciones. `GET /turnos` (todos los turnos) se restringe al administrador, o se quita si la interfaz no lo usa. Es el mayor riesgo de seguridad que queda.
+- **Decisión (17 oct):** corregir antes de entregar, como se recomienda.
 
 ### C-18 · Cómo se reconoce al administrador
 
 - **R18 (decisión pendiente):** «El administrador se reconoce distinto en Mi Perfil (solo `ADMINISTRADOR`) y en el menú desktop (`ADMIN` o `ADMINISTRADOR`).».
 - **Código hoy:** `Perfil.jsx` usa `rolSistema === 'ADMINISTRADOR'`; `navegacion.esAdminSistema`, `Prop4.vistaPermitida` y `calendarView` aceptan también `ADMIN`; el backend solo envía `ADMINISTRADOR` o `USUARIO`.
 - **Recomendación:** unificar en `ADMINISTRADOR`. Con los datos actuales no cambia nada.
+- **Decisión (17 oct):** unificar en `ADMINISTRADOR`.
 
 ### C-19 · Sumar al servicio a alguien que ya pertenece
 
@@ -1559,6 +1577,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `funcionarioService.asignarServicio` envía `rol: 3`, y `FuncionarioService.updateUser` reemplaza el rol de la relación existente.
 - **Pregunta:** ¿Qué debe pasar en ese caso?
 - **Recomendación:** si la persona ya pertenece al servicio, no tocar el rol y avisar que ya pertenece.
+- **Decisión (17 oct):** se resuelve con C-23: si la persona ya pertenece al servicio, se avisa y no se cambia su rol.
 
 ### C-20 · 401 o 403 cuando falta permiso
 
@@ -1566,12 +1585,14 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Código hoy:** `SecurityConfig` sigue sin `accessDeniedHandler`. `GlobalExceptionHandler.handleAccessDenied` responde 403 solo en las negaciones dentro de los controllers (`@PreAuthorize`, `SeguridadServicio`). `axiosConfig` cierra la sesión ante cualquier 401 y ante un 403 solo escribe en la consola. No verificado en ejecución en esta revisión.
 - **Pregunta:** ninguna de negocio.
 - **Recomendación:** registrar un `AccessDeniedHandler` que responda 403 y permitir `/error`; en el frontend, mostrar un aviso ante un 403. Es requisito para que las pruebas negativas de permisos no cierren la sesión.
+- **Decisión (17 oct):** responder 403 y mostrar un aviso, sin cerrar la sesión.
 
 ### C-21 · Exportar la nómina del servicio
 
 - **Archivo:** §6.15 «Botón de exportación en el calendario (`calendarView.jsx`) y en la vista de funcionarios de un servicio.».
 - **Código hoy:** ninguna vista llama a `/exportaciones/servicios/{id}/funcionarios/csv`.
 - **Recomendación:** agregar el botón en Personal del servicio o corregir el Archivo.
+- **Decisión (17 oct):** agregar el botón en Personal del servicio.
 
 ### C-22 · Eliminar turnos generados: lo que promete la pantalla y lo que hace el backend
 
@@ -1579,6 +1600,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Archivo:** RN-SGT-013 «Eliminar los turnos generados de una planificación en un rango de fechas puede afectar turnos de otra planificación que comparta la misma rotativa en ese rango (riesgo reconocido en el propio código)».
 - **Código hoy:** `PlanificacionService.eliminarTurnosGenerados` borra por las rotativas del molde dentro del rango (`softDeleteByRotativasAndRango`): incluye turnos de otros moldes y turnos manuales o del seed con esas rotativas, y no anula la vigencia activa.
 - **Recomendación:** corregir el texto de la pantalla, o limitar el borrado a los turnos sin ejecución (los legados), como sugiere el propio Archivo.
+- **Decisión (17 oct):** corregir el texto de la pantalla y anotarlo como limitación. Limitar el borrado queda para TIC.
 
 ### C-23 · ¿La jefatura suma funcionarios a su servicio?
 
@@ -1590,6 +1612,8 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 
 ### 5.1 Otras brechas del código que ningún documento contradice
 
+Decisión P-01 (Álvaro, 17 oct): todas se corrigen antes del congelamiento, en móvil y desktop.
+
 - `SolicitudService.crearSolicitud` no comprueba que el turno a botar, ofrecer o entregar sea del solicitante, ni que el turno no haya pasado (tipos 2 a 5).
 - `OfertaGeneralService.crearOferta` no comprueba que el turno sea del ofertor ni que esté libre de otras solicitudes.
 - Aprobar un «Botar turno» o una «Oferta particular», o seleccionar al postulante de una oferta general, no revisa que el turno siga siendo de quien lo comprometió: si cambió de dueño entre medio (por una asignación manual u otra aprobación), se libera o se entrega el turno de un tercero. Cobertura e Intercambio sí lo revisan (`SolicitudService.cambiarEstado`, `OfertaGeneralService.seleccionarPostulante`). La asignación manual tampoco cierra las solicitudes pendientes sobre ese turno (`GestionTurnoService`).
@@ -1599,7 +1623,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - `TurnoController.alterarTurno` responde 500 al cruce de horario (`GestionTurnoService.validarConflictoFuncionario` lanza `Exception`) y 400 a la negación por servicio (captura toda `RuntimeException`, también la `AccessDeniedException`).
 - Crear un tipo de turno con el nombre de uno eliminado del mismo servicio choca con la clave única de la base, que incluye los eliminados (HU-ADM-06; no verificado en ejecución).
 - El aviso «N turnos libres en agenda» cuenta también los cupos que ya pasaron (HU-CAL-01).
-- Los errores de ofertas y del motivo se muestran genéricos, sin el mensaje del backend (`SolicitudesView`: `handlePostular`, `handleOfertaAprobar`, `EditMotivoSheet`).
+- Los errores de ofertas y del motivo se muestran genéricos, sin el mensaje del backend (`SolicitudesView`: `handlePostular`, `handleOfertaAprobar`, `handleSeleccionar`, `EditMotivoSheet`).
 - Hay textos con errores: voseo («¿Qué tipo de solicitud necesitás?», «Describí el motivo...», «No se pudo guardar. Intentá de nuevo.») y «1 notificacion sin leer», sin tilde en singular (`AgendaView`, aviso superior).
 - Mi dashboard llama «horas» a la suma de todos los turnos del período, incluidos los futuros y los de otros servicios.
 - El seed de notificaciones de Medicina Interna usa estados que el código no reconoce (HU-NOT-01).
@@ -1619,6 +1643,12 @@ Encontradas por la E2E de la fase 3 (17 oct 2026), confirmadas en el código:
 - El mensaje de R13 muestra las fechas en formato ISO, como «2026-10-20T20:00»: `ValidadorAsignacionTurnoService.java:82-84` concatena los `LocalDateTime`.
 - En móvil, el paso 2 de «Oferta general» muestra el botón de volver sin el nombre del tipo: `TIPO_LABEL` (`SolicitudesView.jsx:15`) no tiene el tipo 6 (`:798`).
 - «Cupo libre — falta cubrir» es una rama que nunca se usa (HU-DET-02, criterio 3).
+
+Encontradas por la E2E de la fase 4 (17 oct 2026), confirmadas en el código:
+
+- En desktop, a la jefatura dueña de uno de los turnos de una solicitud, sin ser solicitante ni receptora, la vista le ofrece «Aprobar» y «Rechazar» y no le muestra «Participas en esta solicitud…» (HU-SOL-09, criterio 6). `participa` (`SolicitudesView.jsx:1257`) mira solo al solicitante y al receptor; el backend cuenta además a los dueños de los turnos (`SolicitudService.participantesDirectos`, `:509-520`) y responde 403 al aprobar.
+- Cuando el backend rechaza la selección de un postulante por la regla (solape o R13), la pantalla muestra «Error al seleccionar postulante.» y no el mensaje (`handleSeleccionar`, `SolicitudesView.jsx:1170-1173`; HU-OFE-04, criterio 3).
+- Las confirmaciones de la asignación de turnos muestran la fecha en ISO, como «Día · 2026-10-19 08:00–20:00» (`formatShiftLabel`).
 
 ---
 
@@ -1662,7 +1692,7 @@ La barra final importa: Playwright toma el filtro como expresión regular, y `e2
 SGT_MUTA=1 TMPDIR=~/.cache/sgt-pw-tmp npx playwright test e2e/hu-muta/ --project=movil --project=desktop --reporter=line
 ```
 
-Quedan para la fase 4:
+Quedaron para la fase 4, que los automatizó:
 
 - SOL-03 (criterio 5).
 - La mitad «al aprobarse» de SOL-04 y SOL-05 (criterio 2).
@@ -1673,33 +1703,43 @@ Quedan para la fase 4:
 
 No se automatizan DET-02 (criterio 3), porque el estado no se produce, ni la regla de 12 horas, que R13 reemplazó (C-04).
 
+**Fase 4 (17 oct 2026):** cinco specs más en `e2e/hu-muta/`, con flujos de dos o tres usuarios: `aprobaciones.spec.js` (SOL-09, SOL-10 y lo que dejó la fase 3), `propuestas.spec.js` (SOL-06 a SOL-08 y SOL-14, criterio 4), `ofertas-generales.spec.js` (la apertura real de OFE-01, y OFE-02 a OFE-04), `asignacion.spec.js` (ASG-02, ASG-03 y SOL-14, criterio 5) y `notificaciones.spec.js` (NOT-02). Sin mutar, `e2e/hu/permisos.spec.js` suma la mitad «otro servicio» de SOL-09 (criterio 8) y OFE-02 (criterio 2). Los turnos que una prueba mueve vuelven a su dueño con la asignación directa de la jefatura. La red de seguridad rechaza las ofertas propias que queden pendientes, devuelve los turnos y elimina las notificaciones creadas, y si tiene que actuar, la prueba falla. Lo que no se deshace queda como filas nuevas: ninguna fila previa cambia y `Turnos` queda igual. Dos corridas seguidas dejaron 266 solicitudes (234 RECHAZADAS y 32 APROBADAS, ninguna pendiente), 48 ofertas (40 cerradas, 4 rechazadas y las 4 pendientes de la fase 3), 44 postulaciones, 276 notificaciones (268 del sistema, por las asignaciones directas, y 8 eliminadas) y 1.018 eventos de bitácora.
+
+Con la fase 3, `e2e/hu-muta/` tiene 104 pruebas por proyecto. En `movil` pasan 88 y se omiten 16; en `desktop` pasan 94 y se omiten 10. Entre las que pasan hay fallas esperadas: las 4 de la fase 3 por proyecto; SOL-14 (criterio 5, C-04) y OFE-04 (criterio 3, en pantalla) en los dos proyectos, y SOL-09 (criterio 6) en desktop. Las omitidas son entradas que solo remiten a otras pruebas, lo que corre solo por API (una vez, en `desktop`) y lo propio de un solo layout. Dos corridas seguidas, sin restaurar entre ellas, quedan en verde: 182 pasan y 26 se omiten, en unos 22 minutos cada una. Si el equipo se suspende a mitad de una corrida, Vite recarga la página y la prueba en curso falla: es del ambiente, no de la app. Sin automatizar:
+
+- SOL-09 (criterio 8, la negativa del médico por API): es de la fase 2b.
+- SOL-06 (criterio 2) con una lista vacía real: se simula, porque el caso real ya lo cubre la fase 3.
+- ASG-02 (criterio 4, «no pertenece al servicio») por la interfaz, porque el panel lista solo al personal del servicio: se prueba por API.
+
 ### 6.3 HU que no se pueden probar de punta a punta sin arreglar algo antes
 
 | HU | Qué lo impide | Qué arreglar |
 |---|---|---|
 | NOT-03 | El backend no crea notificaciones, y las de asignación manual quedan sin destinatario | Agregar el destinatario a `Notificacion` y crear las notificaciones en `SolicitudService`, `OfertaGeneralService` y `GestionTurnoService` |
 | NOT-01 (criterio 3), NOT-02 con los datos del administrador | Seed con estados `NO_LEIDA`/`LEIDA`: contador en 0 y la lista dice «Nueva» | Corregir `02_datos.sql` (`NO_LEIDO`/`LEIDO`) o probar con 30000013-3 |
-| CAL-04 | El backend no envía `cambioAprobado` | Implementarlo o retirar el código (C-05) |
-| CAL-07 | El backend niega la exportación al médico | Decidir C-08: ajustar `ExportacionController` o quitar el botón |
-| DET-04 | «Ver historial» no filtra por turno y el backend se lo niega al médico | Decidir C-06 |
+| CAL-04 | El backend no envía `cambioAprobado` | Retirar el código del aviso (C-05, decidido) |
+| CAL-07 | El backend niega la exportación al médico | Permitirla con el alcance forzado a sus turnos en `ExportacionController` (C-08, decidido) |
+| DET-04 | «Ver historial» no filtra por turno y el backend se lo niega al médico | Usar `GET /bitacoras/turno/{id}`, solo con turnos propios para el médico (C-06, decidido) |
 | ADM-06 y ADM-07 (casos de error) | La pantalla queda en blanco cuando el backend rechaza | Mostrar `e?.response?.data?.error` (un `mensajeDeError` común) en `TiposTurnoView` y `PlantillasView`; en rotativas, además, no recortar la secuencia al editar las semanas |
 | JER-01 | Parte en «Jefatura», la jerarquía actual no reconoce `JEFATURA` y no recarga | Selección inicial «Subrogante», comparar con `JEFATURA` y recargar después de designar |
 | ADM-05 | No recarga después de designar | Recargar los funcionarios después de designar |
-| PER-02 (jefatura que no es administradora, como 305) | El backend niega la relación a quien todavía no es del servicio, y la persona queda registrada sin servicio | Decidir C-23 y, si la jefatura puede, permitirle crear la relación con su servicio sin tocar otros roles |
+| PER-02 (jefatura que no es administradora, como 305) | El backend niega la relación a quien todavía no es del servicio, y la persona queda registrada sin servicio | Permitirle crear la relación con su servicio, como Médico, sin tocar otros roles (C-23, decidido) |
 | PER-02 y ADM-04 (criterio de quien ya pertenece) | Se sobrescribe el rol con MEDICO | No tocar el rol si ya pertenece (C-19) |
 | ASG-02 (criterio 5) | `POST /turnos/alterar` responde 400, no 403, a la negación por servicio | Dejar pasar la `AccessDeniedException` al `GlobalExceptionHandler` y lanzar `RuntimeException` en el cruce de horario |
 | ADM-06 (nombre de un tipo eliminado) | La clave única de la base incluye los eliminados (no verificado en ejecución) | Validar contra todos los tipos del servicio, o reactivar el eliminado |
 | SOL-14 (criterio 5) | La asignación manual no aplica R13 | Usar `ValidadorAsignacionTurnoService` en `GestionTurnoService` (C-04) |
 | JER-02 | El backend deja al subrogante cambiar roles | Negarlo en `FuncionarioController.update` (C-03) |
-| REG-02 | No hay menú ni módulo | Decidir C-10 |
+| REG-02 | No hay menú ni módulo | No se implementa: las reglas quedan para el administrador y se cierra el backend (C-10, decidido) |
 | SOL-02 (criterio 3), BIT-01 (criterio 3) | Sin filtro por servicio | Filtrar por servicio en el backend (C-17) |
 | DET-01 (criterio 2) y DET-02 (criterio 2) desde el calendario | `mapTurnoCalendario` no copia `horas` ni `solicitudPendiente` | Copiarlos como en `funcionarioService.js` (§5.1) |
 | SOL-06 (criterio 5) y SOL-13 (criterio 2) por la interfaz | `/turnos/intercambiables` devuelve una lista vacía sin el motivo | Devolver el mensaje de R15 y mostrarlo en el asistente (§5.1) |
+| SOL-09 (criterio 6) en desktop | `participa` no mira a los dueños de los turnos | Usar la misma regla que `participantesDirectos` (§5.1) |
+| OFE-04 (criterio 3) en pantalla | `handleSeleccionar` muestra un error genérico | Mostrar el mensaje del backend (§5.1) |
 | DET-02 (criterio 3) | El estado no se produce | Quitar la rama y el criterio, o definir cuándo un cupo se conoce solo por su conteo |
 | OFE-05, SOL-05 | Ofertas y cupos pasados visibles | Filtrar por vigencia en Solicitudes y en el selector de Cobertura |
-| AUD-01 (criterio 4) | No muestra al encargado | Cruzar con la bitácora o corregir el manual (C-14) |
+| AUD-01 (criterio 4) | No muestra al encargado | Corregir el manual (C-14, decidido) |
 | ADM-09 (eliminar molde en móvil) | Borra sin confirmación | Agregar la confirmación que ya tiene desktop |
-| ADM-13 (criterio 3) | El texto promete algo que el backend no cumple | C-22 |
+| ADM-13 (criterio 3) | El texto promete algo que el backend no cumple | Corregir el texto de la pantalla (C-22, decidido) |
 | AUT-07 y todos los negativos por API que pasan por el filtro | BUG-001: 401 y cierre de sesión | `AccessDeniedHandler` 403 y `/error` permitido (C-20) |
 | Todas las que dependen de «hoy» (futuros, R14, vigencias desde hoy, Generar) | Backend en UTC: de 21:00 a 24:00 se corre un día | `TZ=America/Santiago` en el backend |
 | ADM-10 y ADM-11 | La vigencia demo ocupa 7 semanas | No es un arreglo: elegir un rango posterior o anularla antes, y restaurar después |
@@ -1712,3 +1752,5 @@ No se automatizan DET-02 (criterio 3), porque el estado no se produce, ni la reg
 - Los demás RUT del mismo bloque de Medicina Interna (`gestionturnos` ids 5 a 20; `innhosp` id_personal 15 a 30) tienen el mismo patrón: no son secuencias de prueba evidentes, como las de Urgencias. No se verificó si corresponden a personas reales; conviene revisarlos en la misma limpieza. Por eso las pruebas de este catálogo usan datos de Urgencias o datos creados en la prueba.
 - Los RUT de Urgencias siguen una regla de prueba (3000xxxx, con el dígito verificador igual al último dígito), pero en 9 de los 80 esa regla coincide por azar con un RUT válido: 30000008-8, 30000017-7, 30000026-6, 30000035-5, 30000044-4, 30000053-3, 30000062-2, 30000071-1 y 30000080-0. Ninguno se usa para entrar en este catálogo. Conviene cambiarles el dígito en la misma limpieza. Todos los RUT de entrada de §2.1 tienen un dígito verificador inválido, salvo 11111111-1, el RUT de prueba de uso común.
 - Los nombres del bloque de Urgencias (ids 300 a 379) parecen nombres de personas reales, no nombres de prueba. No se verificó si son personal del HUAP. Los RUT de ese bloque sí son ficticios. Si los nombres son reales, reemplazarlos antes de entregar el repositorio. Por eso este catálogo nombra a las personas solo por su id.
+- **Decisión (17 oct):** sí: la jefatura suma a su servicio, como Médico, a quien no está en él, sin tocar otros roles. Si ya pertenece, se avisa y no se cambia su rol (C-19).
+
