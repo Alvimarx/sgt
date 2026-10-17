@@ -162,7 +162,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Endpoints:** `POST /funcionarios/login/select-service`.
 - **Criterios de aceptación:**
   1. Dado un usuario con dos o más servicios, después del login veo «Selecciona un servicio», con cada servicio y mi rol en él.
-  2. Cuando elijo uno, entonces veo «¡Listo!», entro al inicio y el nombre del servicio queda en el encabezado (móvil) o en el menú lateral (desktop).
+  2. Cuando elijo uno, entonces veo «¡Listo!», entro al inicio y el nombre del servicio queda en Mi Perfil (móvil; el encabezado del inicio móvil no lo muestra, `AgendaView.jsx:348-349`) o en el menú lateral (desktop).
   3. Cuando presiono «Salir», vuelvo al login.
   4. Dado el administrador, veo todos los servicios vigentes; en los que no es miembro, su rol es JEFATURA.
   5. Dado que pasaron más de 5 minutos desde el login, cuando elijo un servicio, entonces veo «Token de pre-autorización inválido o expirado» en la misma pantalla.
@@ -206,12 +206,12 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Pantallas:** en móvil, la flecha «Volver a selección de servicio» del encabezado del inicio lleva a `select_service`; en desktop, «Cambiar servicio» en la tarjeta de usuario del menú y en Mi Perfil.
 - **Endpoints:** `POST /funcionarios/switch-service`.
 - **Criterios de aceptación:**
-  1. Dado multiservicio en Cirugía, cuando cambio a Medicina Interna, entonces el inicio muestra los turnos de Medicina Interna y cambia el nombre del servicio.
+  1. Dado multiservicio en Cirugía, cuando cambio a Medicina Interna, entonces el inicio muestra los turnos de Medicina Interna y cambia el nombre del servicio (en móvil se ve en Mi Perfil; en desktop, en el menú lateral).
   2. Dado el administrador en Urgencias, cuando cambio a Medicina Interna, entonces su rol sigue siendo JEFATURA y conserva el Panel de Administración.
   3. Dado que refresqué la página, el botón sigue funcionando (la lista de servicios sale de `user_data`).
   4. Dado un usuario con un solo servicio, el botón se ve y muestra solo ese servicio.
 - **Trazabilidad:** FUN-SGT-003; R5, R8.
-- **Estado:** **Implementada.** Evidencia: `Prop4.handleBackToServiceSelection`; `SelectServiceView` (`switchService`); `FuncionarioController.switchService`.
+- **Estado:** **Implementada.** Evidencia: `Prop4.handleBackToServiceSelection`; `SelectServiceView` (`switchService`); `FuncionarioController.switchService`. Detalle (E2E, 17 oct): después de refrescar, la lista de servicios sale sin el rol, porque `Prop4.jsx:272` lee `s.rol` y `user_data.servicios` trae `rolServicioNombre` (§5.1).
 - **Prueba E2E:** `multiservicio` y `admin`; no muta; ambos.
 
 #### HU-AUT-06 · Cerrar sesión
@@ -221,7 +221,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Pantallas:** en móvil, «Salir» en el encabezado del inicio (Mi Perfil no tiene botón para salir); en desktop, «Cerrar sesión» en el menú lateral.
 - **Endpoints:** ninguno. El JWT se borra en el navegador; el backend no tiene logout.
 - **Criterios de aceptación:**
-  1. Cuando cierro sesión, vuelvo al login y se borran `jwt_token`, `user_data`, `sgt_nav_state` y el nombre del servicio activo.
+  1. Cuando cierro sesión, vuelvo al login y se borran `jwt_token`, `user_data` y el nombre del servicio activo; `sgt_nav_state` se borra y el login lo vuelve a escribir enseguida con la vista «login», así que la pantalla anterior no se restaura.
   2. Cuando refresco después, sigo en el login.
 - **Trazabilidad:** Archivo §6.1 («Cierre de sesión»).
 - **Estado:** **Implementada.** Evidencia: `Prop4.handleLogout`; `authService.logout`.
@@ -387,13 +387,13 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Pantallas:** «Detalle del turno» (sheet en móvil, panel lateral en desktop), dentro de `agenda` (tarjeta de bloque del día) o de `calendar_view` (persona o cupo del día).
 - **Endpoints:** ninguno nuevo; usa los datos ya cargados.
 - **Criterios de aceptación:**
-  1. El encabezado dice «{TIPO}: {ROTATIVA}» (en desktop, «{tipo} · {rotativa}»), con el horario, la fecha y la cobertura «Equipo completo · a/t» o «a/t asignados · faltan n» (R7).
+  1. El encabezado dice «{TIPO}: {ROTATIVA}» (en desktop, «{tipo} · {rotativa}»), con el horario, la fecha y la cobertura «Equipo completo · a/t» o «a/t asignados · faltan n» (en desktop, «a/t · faltan n», `DetalleTurnoDesktop.jsx:96`) (R7).
   2. «Información del turno» muestra el Estado («Tu turno», «Asignado», «Cupo libre» o «Solicitud pendiente»), el Funcionario, el Puesto y la Duración.
   3. «Integrantes del equipo por puesto» lista a cada persona, con «(tú)» si soy yo, y las vacantes con «Falta cubrir» (y «×n» cuando faltan varias en el mismo puesto).
   4. Siempre está la acción «Ver historial» (HU-DET-04).
 - **Trazabilidad:** MF-006, MF-015; R3 (reemplazado por R7), R7, R18.
-- **Estado:** **Implementada.** Evidencia: `ShiftDetail.jsx` (`estadoDelTurno`, `equipoPorPuesto`, `accionesDelTurno`); `DetalleTurnoDesktop.jsx`.
-- **Prueba E2E:** `medico`; no muta; ambos. Ya existe: fotos en `interacciones-turnos.spec.js`.
+- **Estado:** **Parcial.** Evidencia: `ShiftDetail.jsx` (`estadoDelTurno`, `equipoPorPuesto`, `accionesDelTurno`); `DetalleTurnoDesktop.jsx`. Abierto desde la agenda móvil cumple todo. Abierto desde el calendario, móvil o desktop, el criterio 2 falla: no aparece la Duración y un turno con solicitud pendiente dice «Tu turno». `mapTurnoCalendario` (`turnosService.js:135`) no copia `horas` ni `solicitudPendiente`, aunque el backend marca la solicitud en el calendario (`TurnoService.java:242-259`); el mapeo de la agenda sí los copia (`funcionarioService.js:130` y `:144`). Encontrado por la E2E de la fase 1 (17 oct). Ver §5.1.
+- **Prueba E2E:** `medico`; no muta; ambos. Ya existe: fotos en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu/calendario-detalle.spec.js`.
 
 #### HU-DET-02 · Pedir un cupo libre tocándolo (R4)
 
@@ -407,7 +407,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Un cupo del que solo se conoce el conteo («Cupo libre — falta cubrir», en cursiva) no se puede tocar.
   4. Dada la jefatura, la misma tarjeta dice «Asignar funcionario a este cupo» y abre la asignación directa (HU-ASG-02).
 - **Trazabilidad:** R4, R11, R12; MF-009, MF-015.
-- **Estado:** **Implementada.** Evidencia: `ShiftDetail.jsx` (`alTocarVacante`, `handleRequestVacancy`); acción `solicitar-turno` en `AgendaView` y `calendarView`.
+- **Estado:** **Implementada.** Evidencia: `ShiftDetail.jsx` (`alTocarVacante`, `handleRequestVacancy`); acción `solicitar-turno` en `AgendaView` y `calendarView`. Desde el calendario, el criterio 2 probablemente falla por la misma causa que HU-DET-01, y tampoco aparecería la marca «Solicitado» del calendario desktop (`CalendarioDesktop.jsx:91` y `:215`). No probado: muta (fase 3).
 - **Prueba E2E:** `medico` (y `jefatura` para el criterio 4); muta: crea la solicitud, y cancelarla al final no borra la fila; ambos.
 
 #### HU-DET-03 · Elegir receptor y su turno para pedir un intercambio
@@ -784,7 +784,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Criterios de aceptación:**
   1. Veo 9 módulos: «Asignación de turnos», «Asignación de Funcionarios», «Personal del Servicio», «Jerarquía de Funcionarios», «Evaluar Solicitudes», «Gestionar Puestos», «Estadísticas del Servicio», «Bitácora de Cambios» y «Auditoría de Asistencia».
   2. No veo «Crear tipo de Turno», «Crear Rotativa», «Crear Planificación Mensual» ni «Reglas de Horario del Servicio».
-  3. Cada módulo abre su vista y el volver regresa al panel. El volver del panel regresa a Mi Perfil.
+  3. Cada módulo abre su vista y el volver regresa al panel. El volver del panel regresa a Mi Perfil. Aplica a móvil: en desktop las vistas de gestión no tienen volver; se navega por el menú lateral (`docs/desktop/GUIA-DESKTOP.md`, §Volver).
 - **Trazabilidad:** Archivo §6.16; MF-018 (equivalente); BUG-003.
 - **Estado:** **Implementada.** Evidencia: `JefaturaDashboardView.jsx` (cada tarjeta depende de su handler); `Prop4` no le pasa `onGoTiposTurno`, `onGoPlantillas`, `onGoPlanificacion` ni `onGoReglas`.
 - **Prueba E2E:** `jefatura`; no muta; ambos. Ya existe: foto de `jefatura` en `pantallas.spec.js`.
@@ -826,8 +826,8 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Endpoints:** `GET /turnos/servicio/{id}/calendario/{año}/{mes}`.
 - **Criterios de aceptación:**
   1. El título dice «Asignación de turnos · {Mes} {Año}» y, en desktop, la ayuda dice «Elige un día para ver su equipo, asignar cupos libres o editar asignaciones».
-  2. El resumen del mes muestra asignados, total y vacantes, sin «mis turnos».
-  3. El volver regresa al panel del rol. En desktop, entrando desde el menú, no hay volver.
+  2. En desktop, el resumen del mes muestra asignados, total y vacantes, sin «mis turnos». El móvil no tiene resumen del mes (`calendarView.jsx:451`).
+  3. En móvil, el volver regresa al panel del rol. En desktop no hay volver, se entre desde el menú o desde el panel (`docs/desktop/GUIA-DESKTOP.md`, §Volver).
 - **Trazabilidad:** MF-022; FUN-SGT-024.
 - **Estado:** **Implementada.** Evidencia: `Prop4` (`modoAsignacionAdmin`, `navegarDesktop('asignacion_turnos')`); `calendarView`. La jefatura también puede asignar desde el calendario normal, porque los permisos salen de su rol.
 - **Prueba E2E:** `jefatura`, `subrogante` y `admin`; no muta; ambos. Ya existe: fotos en `interacciones-turnos.spec.js`.
@@ -998,7 +998,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   1. Puedo elegir mes y semana, y los eventos se ordenan del más reciente al más antiguo.
   2. Filtro por categoría (Solicitudes o Turnos), tipo de solicitud, estado y encargado. En desktop la tabla pagina de a 50 y el detalle se abre en un panel lateral.
   3. Veo solo los eventos de mi servicio.
-  4. Las cancelaciones aparecen como «Cancelada por el solicitante».
+  4. Las cancelaciones se listan como «{tipo de solicitud} · RECHAZADA» (`BitacoraView.jsx:121`) y, al abrir el evento, el motivo dice «Cancelada por el solicitante».
 - **Trazabilidad:** FUN-SGT-035; MF-031; R15, R18; TC-036, TC-037; BUG-007.
 - **Estado:** **Parcial.** El criterio 1 no está garantizado: la vista invierte el orden de llegada, no ordena por fecha (R18). El criterio 3 falla: ni el backend (`BitacoraController.getAllDTO` restringe por rol, no por servicio) ni la vista filtran por servicio, y el backend no pagina (BUG-007 parcial).
 - **Prueba E2E:** `jefatura`; no muta; ambos. Ya existe: `interacciones-gestion.spec.js`.
@@ -1306,7 +1306,7 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | CAL-07 | Exportar mis turnos | Sí | — | — | — | Contradicción | Tras decidir C-08 | No | M+D |
 | CAL-08 | Exportar todo el servicio | — | Sí | Sí | Sí | Implementada | Sí | No | M+D |
 | CAL-09 | Exportar nómina | — | Sí | Sí | Sí | No implementada | Solo API | No | — |
-| DET-01 | Ver detalle de turno | Sí | Sí | Sí | Sí | Implementada | Sí | No | M+D |
+| DET-01 | Ver detalle de turno | Sí | Sí | Sí | Sí | Parcial | Sí | No | M+D |
 | DET-02 | Pedir un cupo tocándolo (R4) | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | DET-03 | Elegir receptor desde el detalle | Sí | Sí | Sí | Sí | Implementada | Sí | No | M+D |
 | DET-04 | «Ver historial» | Sí | Sí | Sí | Sí | Contradicción | Tras decidir C-06 | No | M+D |
@@ -1373,7 +1373,7 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 |---|---|---|---|---|---|
 | AUT Autenticación y servicio | 7 | 6 | 1 | 0 | 0 |
 | CAL Calendario y turnos propios | 9 | 6 | 0 | 2 | 1 |
-| DET Detalle de turno | 4 | 3 | 0 | 0 | 1 |
+| DET Detalle de turno | 4 | 2 | 1 | 0 | 1 |
 | SOL Solicitudes | 14 | 11 | 3 | 0 | 0 |
 | OFE Ofertas y postulaciones | 5 | 4 | 1 | 0 | 0 |
 | NOT Notificaciones | 3 | 2 | 0 | 1 | 0 |
@@ -1390,7 +1390,7 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | PRF Perfil | 1 | 1 | 0 | 0 | 0 |
 | DSH Dashboard personal | 1 | 1 | 0 | 0 | 0 |
 | PEN Registro pendiente | 1 | 1 | 0 | 0 | 0 |
-| **Total** | **76** | **51** | **14** | **6** | **5** |
+| **Total** | **76** | **50** | **15** | **6** | **5** |
 
 ---
 
@@ -1596,6 +1596,13 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - Mi dashboard llama «horas» a la suma de todos los turnos del período, incluidos los futuros y los de otros servicios.
 - El seed de notificaciones de Medicina Interna usa estados que el código no reconoce (HU-NOT-01).
 
+Encontradas por la E2E de la fase 1 (17 oct 2026), confirmadas en el código:
+
+- `mapTurnoCalendario` (`turnosService.js:135`) no copia `horas` ni `solicitudPendiente`. Abierto desde el calendario, el detalle del turno no muestra la Duración y un turno con solicitud pendiente dice «Tu turno» (HU-DET-01, criterio 2). Por la misma causa, probablemente fallan «Ya solicitaste este turno» desde el calendario (HU-DET-02, criterio 2) y la marca «Solicitado» del calendario desktop. Arreglo: copiar ambos campos como lo hace el mapeo de la agenda (`funcionarioService.js:130` y `:144`).
+- Después de refrescar, «Cambiar servicio» lista los servicios sin el rol: `Prop4.jsx:272` lee `s.rol` y `user_data.servicios` trae `rolServicioNombre` (HU-AUT-05, criterio 3).
+- La bandeja móvil de notificaciones dice «1 recibidas» (`NotificationView.jsx:199`).
+- La bitácora lista una cancelación como «{tipo} · RECHAZADA»; solo el motivo dice que la canceló el solicitante (HU-BIT-01, criterio 4).
+
 ---
 
 ## 6. Orden sugerido para automatizar las pruebas
@@ -1622,6 +1629,14 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 | — | Solo por API hasta que tengan pantalla | CAL-09, ASG-04, ADM-08, ADM-12 | Según el caso |
 | — | Pendientes de implementación | CAL-04, NOT-03 | — |
 
+**Avance (17 oct 2026):** la fase 1 está automatizada en `sgt-huap_frontend/e2e/hu/` (7 specs; base común en `e2e/helpers/hu.js` y `e2e/helpers/datos.js`). Son 155 pruebas por proyecto, en `movil` y `desktop`, todas en verde. Las fallas conocidas se marcan con `fallaConocida('C-xx: …')` y las nuevas con `fallaNueva(…)`: la suite queda verde y avisa cuando una se corrige, porque la prueba pasa a «unexpected pass». Con `SGT_VER_FALLAS=1` corren como pruebas normales. Una guarda corta en el navegador toda escritura a la API. Se corre de día. Si `/tmp` es un tmpfs chico, `TMPDIR` debe apuntar a disco, porque Chromium guarda ahí su memoria compartida:
+
+```bash
+TMPDIR=~/.cache/sgt-pw-tmp npx playwright test e2e/hu --project=movil --project=desktop --reporter=line
+```
+
+Quedaron sin automatizar AUT-01 (criterio 6: el seed no tiene un funcionario sin servicios) y AUT-02 (criterio 5: exige esperar 5 minutos reales). Los estados que el seed no tiene se prueban con respuestas GET simuladas en el navegador.
+
 ### 6.3 HU que no se pueden probar de punta a punta sin arreglar algo antes
 
 | HU | Qué lo impide | Qué arreglar |
@@ -1642,6 +1657,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 | JER-02 | El backend deja al subrogante cambiar roles | Negarlo en `FuncionarioController.update` (C-03) |
 | REG-02 | No hay menú ni módulo | Decidir C-10 |
 | SOL-02 (criterio 3), BIT-01 (criterio 3) | Sin filtro por servicio | Filtrar por servicio en el backend (C-17) |
+| DET-01 (criterio 2) y DET-02 (criterio 2) desde el calendario | `mapTurnoCalendario` no copia `horas` ni `solicitudPendiente` | Copiarlos como en `funcionarioService.js` (§5.1) |
 | OFE-05, SOL-05 | Ofertas y cupos pasados visibles | Filtrar por vigencia en Solicitudes y en el selector de Cobertura |
 | AUD-01 (criterio 4) | No muestra al encargado | Cruzar con la bitácora o corregir el manual (C-14) |
 | ADM-09 (eliminar molde en móvil) | Borra sin confirmación | Agregar la confirmación que ya tiene desktop |
