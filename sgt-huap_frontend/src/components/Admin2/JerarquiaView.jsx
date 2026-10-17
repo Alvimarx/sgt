@@ -448,7 +448,7 @@ const JerarquiaView = ({ onBack }) => {
           <div style={{ position: 'relative' }}>
             <select 
               id="select-servicio"
-              style={inputStyle} 
+              style={{ ...inputStyle, paddingRight: 40 }} 
               value={selectedServicioId} 
               onChange={e => setSelectedServicioId(e.target.value)}
               disabled={loadingDatos || servicios.length === 0}

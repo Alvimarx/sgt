@@ -5,10 +5,14 @@ import { useLayout } from '../../layout/layout';
 
 const P = () => SGT_DATA.PALETTE;
 
-export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth = 2 }) => {
+// `style` va al <svg>: varias vistas lo usan para ubicar el ícono dentro de un
+// campo (la lupa de los buscadores, la flecha de los select). Antes se
+// ignoraba y la lupa quedaba encima del campo en vez de adentro.
+export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth = 2, style }) => {
   const common = {
     width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
     stroke: color, strokeWidth, strokeLinecap: 'round', strokeLinejoin: 'round',
+    style,
   };
   switch (name) {
     case 'home':          return <svg {...common}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
@@ -50,6 +54,7 @@ export const SGTIcon = ({ name, size = 18, color = 'currentColor', strokeWidth =
     case 'rotate':        return <svg {...common}><path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/></svg>;
     case 'shield-search': return <svg {...common}><path d="M12 21c-3.6-1.3-7-4-7-9V6l7-3 7 3v6c0 1-.14 1.9-.4 2.7"/><circle cx="15.5" cy="15.5" r="3"/><path d="M19 19l2 2"/></svg>;
     case 'download':      return <svg {...common}><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg>;
+    case 'trash':         return <svg {...common}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>;
     default: return null;
   }
 };

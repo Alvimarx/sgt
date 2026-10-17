@@ -96,6 +96,9 @@ const AsignacionJerarquiaView = ({ onBack }) => {
     return () => { mounted = false; };
   }, [servicioActivoId]);
   
+  // Cierra la lista al tocar fuera del buscador, en móvil y en desktop. En
+  // móvil había además una capa fija transparente que tapaba también el campo:
+  // el segundo toque en el buscador caía en la capa y cerraba la lista.
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)){
@@ -103,7 +106,11 @@ const AsignacionJerarquiaView = ({ onBack }) => {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   useEffect(() => {
@@ -207,9 +214,8 @@ const AsignacionJerarquiaView = ({ onBack }) => {
   };
 
   // Desktop (R18): vista raíz del menú (sin volver). El mismo formulario
-  // (búsqueda, selección, confirmación y mensajes) en una página angosta. Sin la
-  // capa fija transparente del móvil para cerrar la lista: taparía el menú
-  // lateral; la cierra el mismo listener de clic afuera (searchWrapperRef).
+  // (búsqueda, selección, confirmación y mensajes) en una página angosta. La
+  // lista la cierra el mismo listener de clic afuera (searchWrapperRef).
   if (esDesktop) {
     const conMensaje = Boolean(mensaje.texto);
     return (
@@ -454,9 +460,6 @@ const AsignacionJerarquiaView = ({ onBack }) => {
         ¿Deseas asignar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> al servicio{' '}
         <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
       </ConfirmDialog>
-      {showDropdown && (
-        <div onClick={() => setShowDropdown(false)} style={{ position: 'fixed', inset: 0, zIndex: 5 }} />
-      )}
     </div>
   );
 };

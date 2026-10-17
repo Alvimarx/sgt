@@ -56,7 +56,7 @@ const ToolCard = ({ icon, theme, title, sub, onClick }) => (
 
 
 
-// Iniciales para el avatar desktop (el móvil usa SGTAvatar con person.iniciales).
+// Iniciales del avatar, en móvil (SGTAvatar) y en desktop.
 const inicialesDe = (nombre) => {
   const partes = String(nombre || '').trim().split(/\s+/);
   return ((partes[0]?.[0] || '') + (partes[1]?.[0] || '')).toUpperCase() || '·';
@@ -174,7 +174,8 @@ const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPerso
       {/* Contenedor con scroll propio: evita que el contenido comprima el TabBar inferior */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <SGTAvatar person={me} size={88} style={{ fontSize: 34, boxShadow: '0 8px 18px rgba(15,23,42,0.18)' }} />
+        {/* El usuario de la sesión no trae `iniciales` (SGTAvatar las espera): sin esto el avatar salía vacío. */}
+        <SGTAvatar person={{ ...me, iniciales: me.iniciales || inicialesDe(me.nombre) }} size={88} style={{ fontSize: 34, boxShadow: '0 8px 18px rgba(15,23,42,0.18)' }} />
         <div style={{ textAlign: 'center' }}>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: PA.ink }}>{me.nombre}</h2>
           <p style={{ margin: '4px 0 0 0', fontSize: 14, color: PA.ink3, fontWeight: 600 }}>{nombreServicioActivo}</p>
