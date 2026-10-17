@@ -1,0 +1,843 @@
+/* ==============================================================
+   MODO DESKTOP (R18) — Gestión del servicio, Mi cuenta y Entrada
+   --------------------------------------------------------------
+   Clases propias de este grupo de pantallas, todas con prefijo
+   sgt-dg-. Complementan el kit (desktop.css, prefijo sgt-d-) con
+   el mismo lenguaje visual de la "Propuesta C". El layout móvil no
+   usa ninguna de estas clases.
+   ============================================================== */
+
+/* La página y el panel que ocupan todo el alto, y el contenido alineado bajo
+   el título, son del kit (PaginaDesktop/PanelDesktop `llena`, desktop.css). */
+
+/* Paneles con desplegables que no deben recortarse. Doble clase para ganarle
+   a .sgt-d-panel sin depender del orden de carga del CSS. */
+.sgt-d-panel.sgt-dg-panel-abierto { overflow: visible; }
+
+/* Columnas con un panel lateral fijo de ancho razonable */
+.sgt-dg-columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 12px;
+  align-items: start;
+  min-height: 0;
+}
+.sgt-dg-columnas--llena {
+  flex: 0 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.sgt-dg-columnas--llena > .sgt-d-panel { min-height: 0; max-height: 100%; }
+
+/* Texto secundario en celdas y listas */
+.sgt-dg-sec { font-size: 10.5px; font-weight: 600; color: var(--ink3); }
+.sgt-dg-num { font-variant-numeric: tabular-nums; }
+.sgt-dg-nowrap { white-space: nowrap; }
+.sgt-dg-mayus-cap::first-letter { text-transform: uppercase; }
+
+/* ---------- Pantallas de entrada (login, servicio, registro) ---------- */
+.sgt-dg-entrada {
+  flex: 1;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(440px, 44%) minmax(0, 1fr);
+  background: var(--d-fondo);
+  font-family: 'Raleway', system-ui, sans-serif;
+  color: var(--ink);
+}
+.sgt-dg-entrada__marca {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px clamp(48px, 5vw, 96px) 32px;
+  color: #fff;
+}
+.sgt-dg-entrada__marca-arriba {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+.sgt-dg-entrada__sello {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.16);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+.sgt-dg-entrada__marca-centro {
+  position: relative;
+  max-width: 460px;
+}
+.sgt-dg-entrada__logo {
+  width: 92px;
+  height: 92px;
+  border-radius: 22px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.28);
+  margin-bottom: 26px;
+}
+.sgt-dg-entrada__logo img { width: 70px; height: auto; display: block; }
+.sgt-dg-entrada__titulo {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+.sgt-dg-entrada__hospital {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.86);
+}
+.sgt-dg-entrada__rasgos {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sgt-dg-entrada__rasgo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+.sgt-dg-entrada__rasgo-icono {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.sgt-dg-entrada__pie {
+  position: relative;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+}
+.sgt-dg-entrada__zona {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  min-width: 0;
+}
+.sgt-dg-entrada__tarjeta {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 18px 44px rgba(23, 65, 108, 0.12), 0 1px 2px rgba(15, 27, 45, 0.04);
+  padding: 28px 28px 26px;
+}
+.sgt-dg-entrada__tarjeta--ancha { max-width: 620px; }
+.sgt-dg-entrada__encabezado {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.sgt-dg-entrada__h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+}
+.sgt-dg-entrada__sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink3);
+  line-height: 1.45;
+}
+.sgt-dg-entrada__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.sgt-dg-entrada__etiqueta {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink2);
+  margin-bottom: 6px;
+}
+.sgt-dg-con-icono { position: relative; }
+.sgt-dg-con-icono__icono {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink3);
+  display: grid;
+  pointer-events: none;
+}
+.sgt-dg-input-entrada {
+  width: 100%;
+  height: 42px;
+  box-sizing: border-box;
+  padding: 0 12px 0 38px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.sgt-dg-input-entrada:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(23, 65, 108, 0.14);
+}
+.sgt-dg-input-entrada:disabled { opacity: 0.6; }
+.sgt-dg-btn-entrada {
+  margin-top: 6px;
+  height: 42px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(23, 65, 108, 0.22);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+.sgt-dg-btn-entrada:hover:not(:disabled) { background: #12355a; }
+.sgt-dg-btn-entrada:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-dg-btn-entrada:disabled { cursor: not-allowed; }
+.sgt-dg-btn-entrada--cargando { background: var(--ink3); box-shadow: none; }
+.sgt-dg-btn-entrada--exito { background: var(--success); box-shadow: 0 6px 16px rgba(46, 125, 87, 0.3); }
+.sgt-dg-btn-entrada .login-spinner { width: 16px; height: 16px; }
+
+/* Elegir servicio: tarjetas en grilla */
+.sgt-dg-servicios {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+.sgt-dg-servicio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+.sgt-dg-servicio:hover:not(:disabled) {
+  border-color: var(--primary);
+  box-shadow: 0 8px 20px rgba(15, 27, 45, 0.1);
+}
+.sgt-dg-servicio:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-dg-servicio:disabled { cursor: not-allowed; }
+.sgt-dg-servicio--atenuado { opacity: 0.5; }
+.sgt-dg-servicio--exito { background: var(--success-soft); border-color: var(--success); }
+.sgt-dg-servicio__icono {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+.sgt-dg-servicio--exito .sgt-dg-servicio__icono { background: var(--success); }
+.sgt-dg-servicio__nombre {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sgt-dg-servicio__fin {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink3);
+}
+.sgt-dg-servicio__listo { font-size: 11.5px; font-weight: 800; color: var(--success); }
+
+/* Registro pendiente */
+.sgt-dg-aviso-icono {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: #FEF3C7;
+  color: #B45309;
+  flex-shrink: 0;
+}
+.sgt-dg-nota {
+  margin-top: 16px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  color: var(--ink3);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* ---------- Paneles de gestión (Jefatura / Subrogante) ---------- */
+.sgt-dg-modulos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.sgt-dg-modulo {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 14px 14px 15px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--d-radio);
+  box-shadow: var(--d-sombra-panel);
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.sgt-dg-modulo:hover {
+  border-color: var(--primary);
+  box-shadow: 0 10px 24px rgba(15, 27, 45, 0.1);
+}
+.sgt-dg-modulo:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-dg-modulo__texto { flex: 1; min-width: 0; }
+.sgt-dg-modulo__titulo { display: block; font-size: 13px; font-weight: 800; color: var(--ink); }
+.sgt-dg-modulo__desc {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink3);
+}
+.sgt-dg-modulo__flecha {
+  align-self: center;
+  color: var(--ink3);
+  display: grid;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.sgt-dg-modulo:hover .sgt-dg-modulo__flecha { color: var(--primary); transform: translateX(2px); }
+
+/* ---------- Selector de período compacto ---------- */
+.sgt-dg-periodo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sgt-dg-mes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sgt-dg-mes__boton {
+  width: 29px;
+  height: 29px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink3);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sgt-dg-mes__boton:hover:not(:disabled) { background: var(--primary-soft); color: var(--primary); }
+.sgt-dg-mes__boton:disabled { opacity: 0.35; cursor: default; }
+.sgt-dg-mes__boton:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-dg-mes__nombre {
+  min-width: 112px;
+  height: 29px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--primary);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.sgt-dg-semana { display: inline-flex; align-items: baseline; gap: 5px; }
+.sgt-dg-semana__dias { font-size: 9.5px; font-weight: 700; color: var(--ink3); }
+.sgt-d-segmento[aria-selected='true'] .sgt-dg-semana__dias { color: var(--primary); opacity: 0.75; }
+.sgt-dg-capitalizar,
+.sgt-dg-capitalizar .sgt-d-segmento { text-transform: capitalize; }
+
+/* ---------- Buscador de funcionario con resultados ---------- */
+.sgt-dg-busqueda { position: relative; }
+.sgt-dg-resultados {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 264px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--d-sombra-flotante);
+  padding: 4px;
+}
+.sgt-dg-resultado {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sgt-dg-resultado:hover,
+.sgt-dg-resultado--activo { background: var(--surface2); }
+.sgt-dg-resultado[aria-selected='true'] { background: var(--primary-soft); }
+.sgt-dg-resultado__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  background: var(--primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.sgt-dg-resultado__nombre {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sgt-dg-resultados__vacio {
+  padding: 14px 10px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+
+/* Campo de solo lectura (servicio activo) */
+.sgt-dg-solo-lectura {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--d-radio-sm);
+  background: var(--surface2);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* Persona elegida en un formulario */
+.sgt-dg-elegido {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid #CFDCEA;
+}
+
+/* Pie de formulario: acciones a la derecha */
+.sgt-dg-pie-form {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line2);
+}
+.sgt-dg-pie-form__nota { margin-right: auto; font-size: 11px; font-weight: 600; color: var(--ink3); }
+
+/* Opción tipo interruptor (nivel de jerarquía) */
+.sgt-dg-opcion {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--d-radio-sm);
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.sgt-dg-opcion:hover { border-color: var(--primary); }
+.sgt-dg-opcion:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-dg-opcion[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.sgt-dg-opcion__marca {
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  border: 2px solid var(--line);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.sgt-dg-opcion[aria-pressed='true'] .sgt-dg-opcion__marca { border-color: var(--primary); background: var(--primary); }
+
+/* Jerarquía actual */
+.sgt-dg-jerarquia { display: flex; flex-direction: column; }
+.sgt-dg-jerarquia__fila {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 0;
+}
+.sgt-dg-jerarquia__linea {
+  margin-left: 15px;
+  width: 1.5px;
+  height: 14px;
+  background: var(--line);
+}
+.sgt-dg-jerarquia__nivel {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+.sgt-dg-jerarquia__nombre {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ---------- Estadísticas y dashboards ---------- */
+.sgt-dg-indicador {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.sgt-dg-indicador__valor {
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.4px;
+  font-variant-numeric: tabular-nums;
+}
+.sgt-dg-indicador__texto { font-size: 11.5px; font-weight: 600; color: var(--ink2); }
+.sgt-dg-indicador__pie {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.sgt-dg-kpi-texto {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.sgt-dg-barra {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line2);
+  overflow: hidden;
+  position: relative;
+}
+.sgt-dg-barra__relleno {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Filtros en fila (selects con etiqueta) */
+.sgt-dg-filtros {
+  display: grid;
+  grid-template-columns: repeat(var(--dg-filtros, 4), minmax(0, 1fr));
+  gap: 8px 10px;
+  align-items: end;
+}
+.sgt-dg-filtros .sgt-d-campo__etiqueta { font-size: 9.5px; }
+.sgt-dg-filtros .sgt-d-select { height: 32px; padding: 0 8px; font-size: 12px; }
+
+/* Contenido del panel lateral */
+.sgt-dg-lateral {
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sgt-dg-lateral__sub {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink3);
+  margin-top: -4px;
+}
+.sgt-dg-lateral .sgt-d-tabla th { top: 0; }
+
+/* Lista expandible de funcionarios (detalle de estadísticas) */
+.sgt-dg-acordeon { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.sgt-dg-acordeon__item + .sgt-dg-acordeon__item { border-top: 1px solid var(--line2); }
+.sgt-dg-acordeon__boton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: none;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.sgt-dg-acordeon__boton:hover { background: var(--surface2); }
+.sgt-dg-acordeon__boton:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.sgt-dg-acordeon__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.sgt-dg-acordeon__nombre { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; }
+.sgt-dg-acordeon__cuerpo { background: var(--surface2); padding: 2px 12px 8px 50px; }
+.sgt-dg-acordeon__turno {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.sgt-dg-acordeon__turno:first-child { border-top: none; }
+
+/* ---------- Bitácora ---------- */
+.sgt-dg-evento-chips { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.sgt-dg-paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line2);
+  background: #fff;
+}
+.sgt-dg-paginacion__texto { font-size: 11px; font-weight: 700; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.sgt-dg-paginacion__botones { display: inline-flex; align-items: center; gap: 6px; }
+.sgt-dg-ficha {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sgt-dg-datos {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 7px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.sgt-dg-datos dt {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+  padding-top: 2px;
+}
+.sgt-dg-datos dd { margin: 0; font-weight: 700; color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- Perfil ---------- */
+.sgt-dg-perfil {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line2);
+}
+.sgt-dg-perfil__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 99px;
+  background: var(--primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  font-weight: 800;
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(23, 65, 108, 0.22);
+}
+.sgt-dg-perfil__nombre { font-size: 16px; font-weight: 800; color: var(--ink); }
+.sgt-dg-herramientas { display: flex; flex-direction: column; gap: 8px; }
+.sgt-dg-herramienta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sgt-dg-herramienta:hover { border-color: var(--primary); box-shadow: 0 8px 20px rgba(15, 27, 45, 0.08); }
+.sgt-dg-herramienta:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-dg-herramienta__titulo { display: block; font-size: 12.5px; font-weight: 800; }
+.sgt-dg-herramienta__sub { display: block; font-size: 11px; font-weight: 600; color: var(--ink3); margin-top: 1px; }
+
+/* Lista de próximos turnos (Mi dashboard) */
+.sgt-dg-proximos { display: flex; flex-direction: column; gap: 6px; }
+.sgt-dg-proximo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: 10px;
+}
+.sgt-dg-proximo--hoy { border-color: var(--primary); border-left-color: var(--primary); background: var(--primary-soft); }
+.sgt-dg-proximo__fecha { width: 38px; text-align: center; flex-shrink: 0; }
+.sgt-dg-proximo__dow { font-size: 9.5px; font-weight: 800; text-transform: uppercase; color: var(--ink3); }
+.sgt-dg-proximo__dia { font-size: 18px; font-weight: 900; line-height: 1.1; color: var(--ink); }
+.sgt-dg-proximo--hoy .sgt-dg-proximo__dia { color: var(--primary); }
+
+/* Mensaje que se puede cerrar */
+.sgt-dg-aviso-cerrable { display: flex; align-items: flex-start; gap: 8px; }
+.sgt-dg-aviso-cerrable > span { flex: 1; }
+.sgt-dg-aviso-cerrable__cerrar {
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  opacity: 0.8;
+}
+.sgt-dg-aviso-cerrable__cerrar:hover { opacity: 1; }
+
+/* Edición en línea dentro de una tabla */
+.sgt-dg-edicion { display: flex; align-items: center; gap: 6px; }
+.sgt-dg-edicion .sgt-d-input { height: 28px; max-width: 360px; }
+
+/* Texto solo para lectores de pantalla */
+.sgt-dg-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Panel lateral que ocupa todo el alto con una tabla de scroll propio */
+.sgt-dg-lateral--llena {
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+}
+.sgt-dg-lateral__tabla {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.sgt-dg-lateral__tabla .sgt-d-tabla-envoltura {
+  flex: 0 1 auto;
+  min-height: 0;
+}

@@ -4,6 +4,9 @@ import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon, TopHeader, IconBadge3D, ConfirmDialog } from '../Style/UIPrimitives';
 import { getFuncionariosSummary, asignarRolJerarquia } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop, AvisoDesktop } from '../Desktop/ui';
+import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS (Importados de AsignacionView)
@@ -26,7 +29,7 @@ const sanitizeQuery = (raw) =>
     raw.replace(/[<>"'`;]/g, '').slice(0, MAX_SEARCH_LENGTH);
 
 const maskRut = (rut = '') => {
-    const clean = rut.replace(/[^0-9kK\-]/g, '');
+    const clean = rut.replace(/[^0-9kK-]/g, '');
     if (clean.length < 5) return '***';
     return `***${clean.slice(-5)}`;
 };
@@ -86,6 +89,7 @@ const JerarquiaPreview = ({ jefe, subrogantes, totalFuncionarios, PA }) => (
 const JerarquiaJefaturaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const auth = useAuth();
+  const { esDesktop } = useLayout();
 
   // 1. OBTENER DATOS DE SESIÓN
   const storedUserData = localStorage.getItem('userData') || localStorage.getItem('user');
@@ -243,6 +247,148 @@ const JerarquiaJefaturaView = ({ onBack }) => {
     background: '#fff', fontSize: 15, color: PA.ink, fontWeight: 600, marginTop: 6,
     appearance: 'none', outline: 'none', boxSizing: 'border-box'
   };
+
+  // Desktop (R18): vista raíz del menú (sin volver). El mismo formulario a la
+  // izquierda y la vista previa de la jerarquía actual (los mismos datos y el
+  // mismo criterio) a la derecha.
+  if (esDesktop) {
+    const filaJerarquia = (icono, tema, nivel, texto) => (
+      <div className="sgt-dg-jerarquia__fila">
+        <IconBadge3D icon={icono} theme={tema} size={30} iconSize={15} radius={9} />
+        <div style={{ minWidth: 0 }}>
+          <div className="sgt-dg-jerarquia__nivel">{nivel}</div>
+          <div className="sgt-dg-jerarquia__nombre">{texto}</div>
+        </div>
+      </div>
+    );
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Jerarquía de Funcionarios"
+          subtitulo="Designa quién es la jefatura oficial de tu servicio actual o nombra a un subrogante temporal."
+        />
+        <PaginaDesktop ancho="medio">
+          {errorCarga && (
+            <AvisoDesktop tono="alerta">
+              <span role="alert" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <SGTIcon name="exclamation-circle" size={14} color="currentColor" />{errorCarga}
+              </span>
+            </AvisoDesktop>
+          )}
+          {mensaje.texto && (
+            <AvisoDesktop tono={mensaje.tipo === 'success' ? 'exito' : 'alerta'}>
+              <span role="alert" aria-live="polite" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <SGTIcon name={mensaje.tipo === 'success' ? 'check-circle' : 'exclamation-circle'} size={14} color="currentColor" />
+                {mensaje.texto}
+              </span>
+            </AvisoDesktop>
+          )}
+          <div className="sgt-dg-columnas">
+            <PanelDesktop titulo="Designar autoridad" icono="org-chart" iconoColor="#6D28D9" iconoFondo="#EFEAFB" className="sgt-dg-panel-abierto">
+              <div className="sgt-d-formulario">
+                <CampoDesktop etiqueta="1. Servicio Activo">
+                  <div className="sgt-dg-solo-lectura">
+                    <SGTIcon name="briefcase" size={15} color={PA.ink3} />
+                    {servicioActivoNombre}
+                  </div>
+                </CampoDesktop>
+                <BusquedaFuncionarioDesktop
+                  id="buscar-funcionario"
+                  listaId="lista-funcionarios"
+                  etiqueta={<>2. Buscar Funcionario {loadingDatos && <span style={{ textTransform: 'none', fontWeight: 600, color: 'var(--ink3)' }}>(Cargando…)</span>}</>}
+                  placeholder="Nombre o RUT del funcionario"
+                  maxLength={MAX_SEARCH_LENGTH}
+                  valor={searchQuery}
+                  onChange={handleSearchChange}
+                  onFocus={() => setShowDropdown(true)}
+                  onCerrar={() => setShowDropdown(false)}
+                  disabled={loadingDatos || !servicioActivoId}
+                  abierto={dropdownVisible}
+                  wrapperRef={searchWrapperRef}
+                  vacio="No se encontraron funcionarios en este servicio"
+                  ayuda={searchQuery.length > 0 && searchQuery.length < 2 && (
+                    <div className="sgt-d-campo__ayuda">Escribe al menos 2 caracteres para buscar</div>
+                  )}
+                  resultados={resultados.map((u, i) => {
+                    const uId = getUserId(u);
+                    return {
+                      clave: `${uId ?? 'sin-id'}-${i}`,
+                      nombre: getNombreCompleto(u),
+                      detalle: `RUT ${maskRut(u.rutCompleto || u.rut)}`,
+                      iniciales: getInitials(u.nombre, u.apellidoPaterno),
+                      seleccionado: Boolean(selectedUser && getUserId(selectedUser) === uId),
+                      onElegir: () => handleSelectUser(u),
+                    };
+                  })}
+                />
+                <CampoDesktop etiqueta="3. Nivel de Jerarquía" anchoCompleto>
+                  <div>
+                    <button
+                      type="button"
+                      className="sgt-dg-opcion"
+                      aria-pressed={selectedRole === 'subrogante'}
+                      onClick={() => setSelectedRole('subrogante')}
+                    >
+                      <span className="sgt-dg-opcion__marca" aria-hidden="true">
+                        {selectedRole === 'subrogante' && <SGTIcon name="check" size={9} color="#fff" strokeWidth={3.4} />}
+                      </span>
+                      Subrogante
+                    </button>
+                  </div>
+                </CampoDesktop>
+              </div>
+              <div className="sgt-dg-pie-form" style={{ marginTop: 14 }}>
+                <BotonDesktop
+                  variante="primario"
+                  icono="crown"
+                  disabled={!canSubmit}
+                  aria-disabled={!canSubmit}
+                  onClick={handleGuardarClick}
+                  title={!selectedUser ? 'Selecciona un funcionario primero' : !servicioActivoId ? 'Debes tener un servicio activo' : ''}
+                >
+                  {guardando ? 'Guardando...' : 'Designar Autoridad'}
+                </BotonDesktop>
+              </div>
+            </PanelDesktop>
+
+            <PanelDesktop titulo="Jerarquía actual del servicio" icono="crown" iconoColor="#B45309" iconoFondo="#FDF3E3">
+              {loadingDatos && (
+                <div className="sgt-dg-jerarquia" style={{ gap: 10 }}>
+                  {[0, 1, 2].map((i) => <div key={i} className="sgt-d-cargando" style={{ height: 30 }} />)}
+                </div>
+              )}
+              {!loadingDatos && !errorCarga && servicioActivoId && (
+                <div className="sgt-dg-jerarquia">
+                  {filaJerarquia('crown', 'amber', 'Jefatura', jefeActual ? getNombreCompleto(jefeActual) : 'Sin jefatura designada')}
+                  <div className="sgt-dg-jerarquia__linea" />
+                  {filaJerarquia('shield-check', 'blue', `Subrogante${subrogantesActuales.length !== 1 ? 's' : ''}`,
+                    subrogantesActuales.length > 0 ? subrogantesActuales.map(getNombreCompleto).join(', ') : 'Sin subrogante designado')}
+                  <div className="sgt-dg-jerarquia__linea" />
+                  {filaJerarquia('users', 'green', 'Funcionarios', `${funcionarios.length} en el servicio`)}
+                </div>
+              )}
+              {!loadingDatos && (errorCarga || !servicioActivoId) && (
+                <div className="sgt-dg-sec">No se pudo cargar la jerarquía del servicio.</div>
+              )}
+            </PanelDesktop>
+          </div>
+        </PaginaDesktop>
+        <ConfirmDialog
+          open={showConfirm && !!selectedUser}
+          icon="org-chart" tone="primary"
+          title="Confirmar jerarquía"
+          busy={guardando}
+          confirmLabel={guardando ? 'Guardando...' : 'Confirmar'}
+          onConfirm={handleConfirmar}
+          onCancel={() => setShowConfirm(false)}
+        >
+          ¿Deseas designar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> como{' '}
+          <strong style={{ color: PA.ink }}>{selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante'}</strong> de{' '}
+          <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
+        </ConfirmDialog>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease' }}>

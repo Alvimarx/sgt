@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { eventosService } from '../../services/adminService';
-import { SGT_DATA } from './data';
+import { SGT_DATA, STATUS_TONE_MAP } from './data';
 import { SGTBadge, SGTIcon, TopHeader, StatusBadge } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop, AvisoDesktop } from '../Desktop/ui';
+import { PeriodoDesktop } from '../Desktop/gestion/PeriodoDesktop';
+import { TablaBitacoraDesktop } from '../Desktop/gestion/BitacoraDesktop';
+
+// Tonos de SGTBadge → tonos de ChipDesktop (desktop, R18).
+const TONO_DESKTOP = { primary: 'primario', success: 'exito', accent: 'alerta', warn: 'aviso', neutral: 'neutral', libre: 'aviso' };
 
 // ──────────────────────────────────────────────
 // Mapeo de enums
@@ -427,6 +434,7 @@ const EventoItem = ({ evento }) => {
 
 const BitacoraView = ({ onBack }) => {
   const p = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
 
   const [eventos, setEventos]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -510,6 +518,96 @@ const BitacoraView = ({ onBack }) => {
   }, [eventos, rango, filtroCategoria, filtroTipoSolicitud, filtroEstado, filtroEncargado]);
 
   const filtrosActivos = [filtroCategoria, filtroTipoSolicitud, filtroEstado, filtroEncargado].filter(Boolean).length;
+
+  // Desktop (R18): vista raíz del menú (sin volver). Los mismos filtros, a la
+  // vista como selects; los mismos eventos filtrados en una tabla paginada y
+  // el mismo bloque de detalle en un panel lateral.
+  if (esDesktop) {
+    const filas = eventosFiltrados.map((ev) => {
+      const estado = estadoDesdeEvento(ev);
+      const generacion = esGeneracionTurno(ev);
+      return {
+        id: ev.idEvento,
+        fecha: fmtFechaHora(ev.fechaModificacion) || fmtFechaHora(ev.fechaInicioAfectada) || '—',
+        etiqueta: labelEvento(ev),
+        tono: TONO_DESKTOP[toneParaTipo(ev.tipoEvento || 'Evento')] || 'neutral',
+        extra: generacion
+          ? { texto: ev.nombreFuncionarioTurno || 'Libre', tono: ev.nombreFuncionarioTurno ? 'exito' : 'neutral' }
+          : null,
+        estado: estado ? { texto: estado, tono: TONO_DESKTOP[STATUS_TONE_MAP[estado]] || 'neutral' } : null,
+        solicitante: ev.nombreFuncionarioEmisor || ev.nombreOferente || null,
+        accionPor: ev.nombreFuncionario || null,
+        evento: ev,
+      };
+    });
+    const renderDetalle = (ev) => (esGeneracionTurno(ev) ? <BloqueGeneracionTurno ev={ev} /> : bloqueParaTipo(ev.tipoSolicitud, ev));
+    const claveFiltros = [mesOffset, semanaKey, filtroCategoria, filtroTipoSolicitud, filtroEstado, filtroEncargado].join('|');
+    const periodoTexto = semanaKey ? `${semanaKey} · ${mesActual.format('MMMM YYYY')}` : mesActual.format('MMMM YYYY');
+    const limpiarFiltros = () => {
+      setFiltroCategoria(null);
+      setFiltroTipoSolicitud(null);
+      setFiltroEstado(null);
+      setFiltroEncargado(null);
+    };
+    const selectFiltro = (id, etiqueta, opciones, valor, onSelect) => (
+      <CampoDesktop etiqueta={etiqueta} htmlFor={id}>
+        <select
+          id={id}
+          className="sgt-d-select"
+          value={valor ?? ''}
+          disabled={loading}
+          onChange={(e) => onSelect(e.target.value || null)}
+        >
+          <option value="">Todo</option>
+          {opciones.map((op) => <option key={op.value} value={op.value}>{op.label}</option>)}
+        </select>
+      </CampoDesktop>
+    );
+    const nRegistros = eventosFiltrados.length;
+
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Bitácora de Cambios"
+          subtitulo="Registro cronológico de todos los eventos del sistema."
+          acciones={<PeriodoDesktop mesOffset={mesOffset} setMesOffset={setMesOffset} semanaKey={semanaKey} setSemanaKey={setSemanaKey} />}
+        />
+        <PaginaDesktop llena>
+          {error && <AvisoDesktop tono="alerta">{error}</AvisoDesktop>}
+          {!error && (
+            <PanelDesktop
+              llena
+              titulo="Registros"
+              subtitulo={
+                <span className="sgt-dg-mayus-cap" style={{ display: 'inline-block' }}>
+                  {loading ? 'Cargando bitácora...' : `${nRegistros.toLocaleString('es-CL')} ${nRegistros === 1 ? 'registro' : 'registros'} · ${periodoTexto}`}
+                  {filtrosActivos > 0 && ` · ${filtrosActivos} ${filtrosActivos === 1 ? 'filtro activo' : 'filtros activos'}`}
+                </span>
+              }
+              icono="history"
+              iconoColor="#6D28D9"
+              iconoFondo="#EFEAFB"
+              acciones={filtrosActivos > 0 && (
+                <BotonDesktop tamano="sm" variante="fantasma" icono="close" onClick={limpiarFiltros}>Limpiar filtros</BotonDesktop>
+              )}
+              sinPadding
+            >
+              <div className="sgt-dg-filtros" style={{ padding: '10px 15px 12px', borderBottom: '1px solid var(--line2)' }}>
+                {selectFiltro('bitacora-categoria', 'Categoría', [
+                  { value: 'SOLICITUDES', label: 'Solicitudes' },
+                  { value: 'TURNOS', label: 'Turnos' },
+                ], filtroCategoria, setFiltroCategoria)}
+                {selectFiltro('bitacora-tipo', 'Tipo de solicitud', opcionesTipoSolicitud, filtroTipoSolicitud, setFiltroTipoSolicitud)}
+                {selectFiltro('bitacora-estado', 'Estado', opcionesEstado, filtroEstado, setFiltroEstado)}
+                {selectFiltro('bitacora-encargado', 'Encargado', opcionesEncargado, filtroEncargado, setFiltroEncargado)}
+              </div>
+              <TablaBitacoraDesktop key={claveFiltros} filas={filas} cargando={loading} renderDetalle={renderDetalle} />
+            </PanelDesktop>
+          )}
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>

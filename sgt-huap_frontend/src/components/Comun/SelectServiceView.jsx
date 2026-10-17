@@ -4,6 +4,9 @@ import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import { selectService } from '../../services/authService';
 import { switchService } from '../../services/authService';
+import { useLayout } from '../../layout/layout';
+import { MarcoEntradaDesktop } from '../Desktop/gestion/EntradaDesktop';
+import { BotonDesktop, ChipDesktop } from '../Desktop/ui';
 
 // Props:
 //   servicios     — Array<{ servicioId, nombre, rol }> que viene del Paso 1 (login)
@@ -11,6 +14,7 @@ import { switchService } from '../../services/authService';
 //   onServiceSelected(userData) — Prop4 lo recibe y actualiza el AuthContext
 const SelectServiceView = ({ servicios = [], preAuthToken, onServiceSelected, onLogout }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
   const [loadingId, setLoadingId] = useState(null);
   const [successId, setSuccessId] = useState(null);
   const [error, setError] = useState('');
@@ -58,6 +62,75 @@ const SelectServiceView = ({ servicios = [], preAuthToken, onServiceSelected, on
       onServiceSelected(result.userData);
     }, 450);
   };
+
+  // Desktop (R18): misma elección (mismo handleSelect, estados de carga y de
+  // éxito, mismo error) con los servicios como tarjetas en grilla.
+  if (esDesktop) {
+    return (
+      <MarcoEntradaDesktop>
+        <div className={`sgt-dg-entrada__tarjeta sgt-dg-entrada__tarjeta--ancha login-card-in ${shake ? 'login-shake' : ''}`}>
+          <div className="sgt-dg-entrada__encabezado">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 className="sgt-dg-entrada__h2">Selecciona un servicio</h2>
+              <p className="sgt-dg-entrada__sub">Elige el área de trabajo a la que deseas ingresar hoy.</p>
+            </div>
+            <BotonDesktop variante="secundario" icono="close" onClick={onLogout}>Salir</BotonDesktop>
+          </div>
+
+          {servicios.length > 0 && (
+            <div className="sgt-dg-servicios">
+              {servicios.map((srv) => {
+                const isLoading = loadingId === srv.servicioId;
+                const isSuccess = successId === srv.servicioId;
+                const disabled = !!loadingId || !!successId;
+                const clases = ['sgt-dg-servicio'];
+                if (isSuccess) clases.push('sgt-dg-servicio--exito');
+                if (disabled && !isLoading && !isSuccess) clases.push('sgt-dg-servicio--atenuado');
+                return (
+                  <button
+                    key={srv.servicioId}
+                    type="button"
+                    className={clases.join(' ')}
+                    onClick={() => handleSelect(srv)}
+                    disabled={disabled}
+                    aria-busy={isLoading || undefined}
+                  >
+                    <span className="sgt-dg-servicio__icono" aria-hidden="true">
+                      <SGTIcon name={isSuccess ? 'check-circle' : 'briefcase'} size={18} color={isSuccess ? '#fff' : PA.primary} />
+                    </span>
+                    <span style={{ minWidth: 0 }}>
+                      <span className="sgt-dg-servicio__nombre">{srv.nombre}</span>
+                      {srv.rol && <ChipDesktop tono="primario" mayus style={{ marginTop: 4 }}>{srv.rol}</ChipDesktop>}
+                    </span>
+                    <span className="sgt-dg-servicio__fin">
+                      {isSuccess ? (
+                        <span className="sgt-dg-servicio__listo">¡Listo!</span>
+                      ) : isLoading ? (
+                        <span className="login-spinner" style={{ borderColor: 'rgba(23,65,108,0.2)', borderTopColor: PA.primary }} aria-hidden="true" />
+                      ) : (
+                        <SGTIcon name="chevron-right" size={16} strokeWidth={2.5} />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {servicios.length === 0 && (
+            <div className="sgt-d-vacio">
+              <SGTIcon name="briefcase" size={26} color="var(--ink3)" />
+              <div className="sgt-d-vacio__texto">No hay servicios disponibles para este usuario.</div>
+            </div>
+          )}
+
+          {error && (
+            <div role="alert" className="sgt-d-aviso sgt-d-aviso--alerta" style={{ marginTop: 12 }}>{error}</div>
+          )}
+        </div>
+      </MarcoEntradaDesktop>
+    );
+  }
 
   return (
     <div

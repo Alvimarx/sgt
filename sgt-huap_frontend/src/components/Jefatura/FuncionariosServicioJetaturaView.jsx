@@ -6,10 +6,14 @@ import { ListEmptyState, LoadingState } from '../Style/ListControls';
 const AVATAR_THEME = DASHBOARD_ICON_THEMES.green;
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, AvisoDesktop } from '../Desktop/ui';
+import { PersonalServicioDesktop } from '../Desktop/gestion/PersonalServicioDesktop';
 
 const FuncionariosServicioJefaturaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const auth = useAuth();
+  const { esDesktop } = useLayout();
 
   // 1. Obtener datos del servicio activo de la sesión
   const storedUserData = localStorage.getItem('userData') || localStorage.getItem('user');
@@ -61,6 +65,49 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
     background: '#fff', fontSize: 15, color: PA.ink, fontWeight: 600, marginTop: 6,
     outline: 'none', boxSizing: 'border-box'
   };
+
+  // Desktop (R18): vista raíz del menú (sin volver). El mismo personal, la
+  // misma búsqueda y el mismo rol en el servicio, en una tabla densa.
+  if (esDesktop) {
+    // Roles presentes en el servicio (todo el personal, no solo lo buscado):
+    // las opciones del filtro por rol no cambian mientras se busca.
+    const rolesServicio = [...new Set(funcionarios.map((u) => {
+      const rel = u.servicios?.find(s => Number(s.idServicio) === Number(servicioActivoId));
+      return rel ? rel.rolServicioNombre : 'Sin rol asignado';
+    }))].sort();
+    const filas = personalFiltrado.map((u, i) => {
+      const relServicio = u.servicios?.find(s => Number(s.idServicio) === Number(servicioActivoId));
+      const nombreRolEnServicio = relServicio ? relServicio.rolServicioNombre : 'Sin rol asignado';
+      const esJefe = nombreRolEnServicio.toLowerCase().includes('jefe');
+      const esSubrogante = nombreRolEnServicio.toLowerCase().includes('subrogante');
+      return {
+        id: u.idFuncionario || `f_${i}`,
+        nombre: `${u.nombre || ''} ${u.apellidoPaterno || ''} ${u.apellidoMaterno || ''}`.trim(),
+        iniciales: `${(u.nombre || 'U').charAt(0)}${(u.apellidoPaterno || '').charAt(0)}`.toUpperCase(),
+        rut: u.rutCompleto || u.rut,
+        profesion: u.profesion || 'No especificada',
+        rol: nombreRolEnServicio,
+        tonoRol: esJefe ? 'aviso' : esSubrogante ? 'primario' : 'neutral',
+      };
+    });
+    return (
+      <>
+        <EncabezadoDesktop titulo="Personal del Servicio" subtitulo={`Visualizando: ${servicioActivoNombre}`} />
+        <PaginaDesktop ancho="amplio" llena>
+          {mensaje.texto && <AvisoDesktop tono="alerta">{mensaje.texto}</AvisoDesktop>}
+          <PersonalServicioDesktop
+            filas={filas}
+            roles={rolesServicio}
+            total={funcionarios.length}
+            cargando={loading}
+            busqueda={searchQuery}
+            onBusqueda={setSearchQuery}
+            deshabilitado={loading || !servicioActivoId}
+          />
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>

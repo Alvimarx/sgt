@@ -1,8 +1,11 @@
 // ProfileView.jsx
 import React from 'react';
 import { SGT_DATA } from '../Admin2/data';
-import { SGTAvatar, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
+import { SGTAvatar, SGTIcon, SGTBadge, IconBadge3D as IconBadge3DKit } from '../Style/UIPrimitives';
 import { useAuth } from '../../context/AuthContext';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, BotonDesktop, ChipDesktop } from '../Desktop/ui';
+import '../Desktop/gestion/gestion.css';
 
 // Exportamos el chip de roles por si lo necesitas en otras vistas
 export const SGTRoleChip = ({ role }) => {
@@ -53,8 +56,28 @@ const ToolCard = ({ icon, theme, title, sub, onClick }) => (
 
 
 
-const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPersonalDash }) => {
+// Iniciales para el avatar desktop (el móvil usa SGTAvatar con person.iniciales).
+const inicialesDe = (nombre) => {
+  const partes = String(nombre || '').trim().split(/\s+/);
+  return ((partes[0]?.[0] || '') + (partes[1]?.[0] || '')).toUpperCase() || '·';
+};
+
+// Fila de herramienta en desktop: mismo ícono, color, título y subtítulo que
+// la ToolCard móvil, compacta.
+const HerramientaDesktop = ({ icon, theme, title, sub, onClick }) => (
+  <button type="button" className="sgt-dg-herramienta" onClick={onClick}>
+    <IconBadge3DKit icon={icon} theme={theme} size={36} iconSize={18} radius={11} />
+    <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="sgt-dg-herramienta__titulo">{title}</span>
+      <span className="sgt-dg-herramienta__sub">{sub}</span>
+    </span>
+    <SGTIcon name="chevron-right" size={15} color="#7486A0" strokeWidth={2.5} />
+  </button>
+);
+
+const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPersonalDash, onChangeService }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
 
   const { user } = useAuth();
     
@@ -71,6 +94,69 @@ const ProfileView = ({ onGoAdmin,onGoJefatura, onGoSubrogante, onBack, onGoPerso
   const isAdmin = rolSistema === 'ADMINISTRADOR';   // Panel de Administración (global)
   const isJefatura = rol === 'JEFATURA';
   const isSubrogante = rol === 'SUBROGANTE';
+
+  // Desktop (R18): vista raíz del menú (sin volver). Página angosta en dos
+  // columnas: los datos de la sesión y los mismos accesos que en móvil, más
+  // "Cambiar servicio" (el mismo flujo del menú lateral).
+  if (esDesktop) {
+    const servicios = Array.isArray(user?.servicios) ? user.servicios : [];
+    return (
+      <>
+        <EncabezadoDesktop titulo="Mi Perfil" subtitulo={`${nombreServicioActivo} · ${me.rol || 'Sin rol'}`} />
+        <PaginaDesktop ancho="angosto">
+          <div className="sgt-d-columnas" style={{ '--d-columnas': 'minmax(0, 1fr) minmax(0, 1fr)' }}>
+            <PanelDesktop titulo="Mis datos" icono="user">
+              <div className="sgt-dg-perfil">
+                <div className="sgt-dg-perfil__avatar" aria-hidden="true">{inicialesDe(me.nombre)}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div className="sgt-dg-perfil__nombre">{me.nombre}</div>
+                  <div style={{ marginTop: 5 }}><SGTRoleChip role={me.rol} /></div>
+                </div>
+              </div>
+              <dl className="sgt-dg-datos">
+                {user?.rutCompleto && (<><dt>RUT</dt><dd className="sgt-dg-num">{user.rutCompleto}</dd></>)}
+                <dt>Servicio activo</dt><dd>{nombreServicioActivo}</dd>
+                <dt>Rol en el servicio</dt><dd>{me.rol || '—'}</dd>
+                {servicios.length > 1 && (
+                  <>
+                    <dt>Mis servicios</dt>
+                    <dd style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {servicios.map((s) => (
+                        <ChipDesktop key={s.idServicio ?? s.servicioId ?? s.nombreServicio} tono={s.nombreServicio === nombreServicioActivo ? 'primario' : 'neutral'}>
+                          {s.nombreServicio ?? s.nombre}
+                        </ChipDesktop>
+                      ))}
+                    </dd>
+                  </>
+                )}
+              </dl>
+            </PanelDesktop>
+
+            <PanelDesktop titulo="Herramientas especiales" icono="sliders">
+              <div className="sgt-dg-herramientas">
+                <HerramientaDesktop icon="sliders" theme={TOOL_THEMES.dashboard} title="Mi Dashboard" sub="Tus horas, turnos y estadísticas" onClick={onGoPersonalDash} />
+                {isAdmin && (
+                  <HerramientaDesktop icon="crown" theme={TOOL_THEMES.admin} title="Panel de Administración" sub="Configura servicios y rotativas" onClick={onGoAdmin} />
+                )}
+                {isJefatura && (
+                  <HerramientaDesktop icon="shield-check" theme={TOOL_THEMES.jefatura} title="Panel de Jefatura" sub="Gestiona turnos y personal" onClick={onGoJefatura} />
+                )}
+                {isSubrogante && (
+                  <HerramientaDesktop icon="user-gear" theme={TOOL_THEMES.subrogante} title="Panel de Subrogante" sub="Gestiona tus subrogancias" onClick={onGoSubrogante} />
+                )}
+              </div>
+              {onChangeService && (
+                <div className="sgt-dg-pie-form">
+                  <span className="sgt-dg-pie-form__nota">¿Trabajas en otro servicio?</span>
+                  <BotonDesktop variante="secundario" icono="swap" onClick={onChangeService}>Cambiar servicio</BotonDesktop>
+                </div>
+              )}
+            </PanelDesktop>
+          </div>
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtFade .3s ease' }}>

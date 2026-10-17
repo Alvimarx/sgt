@@ -4,6 +4,8 @@ import { SGT_DATA } from '../Admin2/data';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { login } from '../../services/authService';
 import huapLogo from "../../assets/huap_logo.png";
+import { useLayout } from '../../layout/layout';
+import { MarcoEntradaDesktop, IconoCandado } from '../Desktop/gestion/EntradaDesktop';
 
 // Deja solo dígitos y K mayúscula
 function cleanRut(value) {
@@ -32,6 +34,7 @@ function buildRutParam(clean) {
 // onLoginSuccess(response) — Prop4 decide si pasa a SelectServiceView o a la vista de aviso
 const LoginView = ({ onLoginSuccess }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
 
   const [rutDisplay, setRutDisplay] = useState('');
   const [rutClean, setRutClean] = useState('');
@@ -103,6 +106,87 @@ const LoginView = ({ onLoginSuccess }) => {
       onLoginSuccess(result);
     }, 550);
   };
+
+  // Desktop (R18): pantalla completa con el panel de marca a la izquierda y el
+  // mismo formulario (estado, validaciones, textos y animaciones) en una tarjeta.
+  if (esDesktop) {
+    const conError = Boolean(error && !success);
+    const claseBoton = success ? ' sgt-dg-btn-entrada--exito' : loading ? ' sgt-dg-btn-entrada--cargando' : '';
+    return (
+      <MarcoEntradaDesktop>
+        <div className={`sgt-dg-entrada__tarjeta login-card-in ${shake ? 'login-shake' : ''}`}>
+          <div className="sgt-dg-entrada__encabezado">
+            <div>
+              <h2 className="sgt-dg-entrada__h2">Iniciar sesión</h2>
+              <p className="sgt-dg-entrada__sub">Ingresa tus credenciales para continuar</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="sgt-dg-entrada__form" noValidate>
+            <div>
+              <label className="sgt-dg-entrada__etiqueta" htmlFor="login-rut">RUT</label>
+              <div className="sgt-dg-con-icono">
+                <span className="sgt-dg-con-icono__icono"><SGTIcon name="user" size={16} /></span>
+                <input
+                  id="login-rut"
+                  ref={rutRef}
+                  className="sgt-dg-input-entrada"
+                  type="text"
+                  inputMode="text"
+                  autoComplete="username"
+                  placeholder="Ej: 12.345.678-9"
+                  value={rutDisplay}
+                  onChange={handleRutChange}
+                  disabled={loading}
+                  aria-describedby={conError ? 'login-error' : undefined}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="sgt-dg-entrada__etiqueta" htmlFor="login-clave">Contraseña</label>
+              <div className="sgt-dg-con-icono">
+                <span className="sgt-dg-con-icono__icono"><IconoCandado size={16} /></span>
+                <input
+                  id="login-clave"
+                  className="sgt-dg-input-entrada"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  aria-describedby={conError ? 'login-error' : undefined}
+                />
+              </div>
+            </div>
+
+            {conError && (
+              <div id="login-error" role="alert" className="sgt-d-aviso sgt-d-aviso--alerta">{error}</div>
+            )}
+
+            <button type="submit" disabled={loading || success} className={`sgt-dg-btn-entrada${claseBoton}`}>
+              {success ? (
+                <>
+                  <span className="login-check-pop" style={{ display: 'inline-flex' }}>
+                    <SGTIcon name="check-circle" size={16} color="#fff" />
+                  </span>
+                  ¡Bienvenido!
+                </>
+              ) : loading ? (
+                <>
+                  <span className="login-spinner" aria-hidden="true" />
+                  Verificando...
+                </>
+              ) : (
+                'Iniciar Sesión'
+              )}
+            </button>
+          </form>
+        </div>
+      </MarcoEntradaDesktop>
+    );
+  }
 
   return (
     <div

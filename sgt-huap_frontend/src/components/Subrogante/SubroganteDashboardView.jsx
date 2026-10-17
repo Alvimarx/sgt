@@ -1,6 +1,9 @@
 import React from 'react';
 import { SGT_DATA, DASHBOARD_ICON_THEMES, DASHBOARD_CARD_THEME_BY_TITLE } from '../Admin2/data';
 import { SGTIcon } from '../Style/UIPrimitives';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, BotonDesktop } from '../Desktop/ui';
+import { GrillaModulosDesktop } from '../Desktop/gestion/ModulosDesktop';
 
 const SubroganteCard = ({ icon, title, desc, onClick }) => {
   const PA = SGT_DATA.PALETTE;
@@ -27,6 +30,36 @@ const SubroganteCard = ({ icon, title, desc, onClick }) => {
 
 const SubroganteDashboard = ({ onBack, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoAsignacionTurnos}) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
+
+  // Desktop (R18): los mismos módulos, con las mismas condiciones y acciones,
+  // en una grilla. Se llega desde Mi Perfil, así que conserva su "volver".
+  if (esDesktop) {
+    const modulos = [
+      onGoSolitudes && { icono: 'users', titulo: 'Asignación de turnos', descripcion: 'Asigna o quita funcionarios de turnos', onClick: onGoAsignacionTurnos },
+      onGoTiposTurno && { icono: 'calendar', titulo: 'Crear tipo de Turno', descripcion: 'Diseña un nuevo tipo de turno.', onClick: onGoTiposTurno },
+      onGoPlantillas && { icono: 'calendar', titulo: 'Crear Rotativa', descripcion: 'Diseña una nueva rotativa.', onClick: onGoPlantillas },
+      onGoPlanificacion && { icono: 'calendar', titulo: 'Crear Planificación Mensual', descripcion: 'Diseña una nueva planificación mensual.', onClick: onGoPlanificacion },
+      onGoSolitudes && { icono: 'alert', titulo: 'Evaluar Solicitudes', descripcion: 'Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos.', onClick: onGoSolitudes },
+      onGoPuestos && { icono: 'home', titulo: 'Gestionar Puestos', descripcion: 'Crea, edita y elimina puestos del sistema.', onClick: onGoPuestos },
+      onGoStats && { icono: 'sliders', titulo: 'Estadísticas del Servicio', descripcion: 'Cobertura, turnos vacantes y horas cubiertas.', onClick: onGoStats },
+      onGoBitacora && { icono: 'history', titulo: 'Bitácora de Cambios', descripcion: 'Registro cronológico de todos los eventos del sistema.', onClick: onGoBitacora },
+      onGoAuditoria && { icono: 'check-circle', titulo: 'Auditoría de Asistencia', descripcion: 'Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes.', onClick: onGoAuditoria },
+    ].filter(Boolean);
+    const servicio = localStorage.getItem('sgt_servicio_activo_nombre');
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Administración"
+          subtitulo={servicio ? `${servicio} · Selecciona un módulo de tu servicio.` : 'Selecciona un módulo de tu servicio.'}
+          izquierda={<BotonDesktop variante="secundario" icono="chevron-left" aria-label="Volver a Mi Perfil" title="Volver a Mi Perfil" onClick={onBack} />}
+        />
+        <PaginaDesktop ancho="amplio">
+          <GrillaModulosDesktop modulos={modulos} ariaLabel="Módulos de administración del servicio" />
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: PA.surface2, animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>

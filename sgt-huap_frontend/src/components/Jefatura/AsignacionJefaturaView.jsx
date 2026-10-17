@@ -4,6 +4,9 @@ import { SGTIcon, TopHeader, ConfirmDialog } from '../Style/UIPrimitives';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 import { useAuth } from '../../context/AuthContext';
 import { getCurrentUser } from '../../services/authService'
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop, AvisoDesktop, PersonaDesktop } from '../Desktop/ui';
+import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS (Homologados de AsignacionView)
@@ -25,7 +28,7 @@ const getInitials = (nombre = '', apellido = '') =>
     `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase() || 'U';
 
 const maskRut = (rut = '') => {
-    const clean = rut.replace(/[^0-9kK\-]/g, '');
+    const clean = rut.replace(/[^0-9kK-]/g, '');
     if (clean.length < 5) return '***';
     return `***${clean.slice(-5)}`;
 };
@@ -37,6 +40,7 @@ const maskRut = (rut = '') => {
 const AsignacionJerarquiaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const auth = useAuth();
+  const { esDesktop } = useLayout();
   const currentUserRut = getCurrentUser()?.rut;
 
   const storedUserData = localStorage.getItem('userData') || localStorage.getItem('user');
@@ -201,6 +205,101 @@ const AsignacionJerarquiaView = ({ onBack }) => {
     background: '#fff', fontSize: 15, color: PA.ink, fontWeight: 600, marginTop: 6,
     appearance: 'none', outline: 'none', boxSizing: 'border-box'
   };
+
+  // Desktop (R18): vista raíz del menú (sin volver). El mismo formulario
+  // (búsqueda, selección, confirmación y mensajes) en una página angosta. Sin la
+  // capa fija transparente del móvil para cerrar la lista: taparía el menú
+  // lateral; la cierra el mismo listener de clic afuera (searchWrapperRef).
+  if (esDesktop) {
+    const conMensaje = Boolean(mensaje.texto);
+    return (
+      <>
+        <EncabezadoDesktop titulo="Asignación de Funcionarios" subtitulo="Asocia a un nuevo funcionario para que forme parte de tu servicio." />
+        <PaginaDesktop ancho="angosto">
+          {conMensaje && (
+            <AvisoDesktop tono={mensaje.tipo === 'success' ? 'exito' : 'alerta'}>
+              <span role={mensaje.tipo === 'success' ? 'status' : 'alert'}>{mensaje.texto}</span>
+            </AvisoDesktop>
+          )}
+          <PanelDesktop titulo="Nueva asignación" icono="user-plus" iconoColor="#B45309" iconoFondo="#FDF3E3" className="sgt-dg-panel-abierto">
+            <div className="sgt-d-formulario">
+              <BusquedaFuncionarioDesktop
+                id="buscar-funcionario"
+                listaId="lista-funcionarios"
+                etiqueta={<>1. Buscar Funcionario {loadingDatos && <span style={{ textTransform: 'none', fontWeight: 600, color: 'var(--ink3)' }}>(Cargando...)</span>}</>}
+                placeholder="Nombre o RUT del funcionario..."
+                maxLength={MAX_SEARCH_LENGTH}
+                valor={searchQuery}
+                onChange={handleSearchChange}
+                onFocus={() => setShowDropdown(true)}
+                onCerrar={() => setShowDropdown(false)}
+                disabled={loadingDatos || !servicioActivoId}
+                abierto={dropdownVisible}
+                wrapperRef={searchWrapperRef}
+                vacio="No se encontraron funcionarios con ese nombre o RUT"
+                ayuda={searchQuery.length > 0 && searchQuery.length < 2 && (
+                  <div className="sgt-d-campo__ayuda">Escribe al menos 2 caracteres para buscar</div>
+                )}
+                resultados={resultados.map((u, idx) => {
+                  const uId = getUserId(u);
+                  return {
+                    clave: `${uId ?? 'sin-id'}-${idx}`,
+                    nombre: getNombreCompleto(u),
+                    detalle: `RUT ${maskRut(u.rutCompleto || u.rut)}`,
+                    iniciales: getInitials(u.nombre, u.apellidoPaterno),
+                    seleccionado: Boolean(selectedUser && getUserId(selectedUser) === uId),
+                    onElegir: () => handleSelectUser(u),
+                  };
+                })}
+              />
+              <CampoDesktop etiqueta="2. Asignar a Servicio">
+                <div className="sgt-dg-solo-lectura">
+                  <SGTIcon name="briefcase" size={15} color={PA.ink3} />
+                  {servicioActivoNombre}
+                </div>
+              </CampoDesktop>
+              {selectedUser && (
+                <div className="sgt-d-formulario__ancho-completo sgt-dg-elegido">
+                  <PersonaDesktop
+                    nombre={getNombreCompleto(selectedUser)}
+                    iniciales={getInitials(selectedUser.nombre, selectedUser.apellidoPaterno)}
+                    detalle={`RUT ${maskRut(selectedUser.rutCompleto || selectedUser.rut)}`}
+                    fondo="var(--primary)"
+                    tinta="#fff"
+                  />
+                  <span className="sgt-dg-sec" style={{ marginLeft: 'auto' }}>Se asignará a {servicioActivoNombre}</span>
+                </div>
+              )}
+            </div>
+            <div className="sgt-dg-pie-form" style={{ marginTop: 14 }}>
+              <BotonDesktop
+                variante="primario"
+                icono="check"
+                disabled={!canSubmit}
+                aria-disabled={!canSubmit}
+                onClick={handleGuardarClick}
+                title={!selectedUser ? 'Selecciona un funcionario primero' : ''}
+              >
+                {guardando ? 'Guardando...' : 'Guardar Asignación'}
+              </BotonDesktop>
+            </div>
+          </PanelDesktop>
+        </PaginaDesktop>
+        <ConfirmDialog
+          open={showConfirm && !!servicioActivoId}
+          icon="users" tone="primary"
+          title="Confirmar asignación"
+          busy={guardando}
+          confirmLabel={guardando ? 'Guardando...' : 'Confirmar'}
+          onConfirm={handleConfirmar}
+          onCancel={() => setShowConfirm(false)}
+        >
+          ¿Deseas asignar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> al servicio{' '}
+          <strong style={{ color: PA.ink }}>{servicioActivoNombre}</strong>?
+        </ConfirmDialog>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease' }}>

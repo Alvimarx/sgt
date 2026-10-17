@@ -5,6 +5,12 @@ import { turnosService } from '../../services/adminService';
 import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data';
 import { SGTBadge, SGTIcon, IconBadge3D } from '../Style/UIPrimitives';
 import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
+import { useLayout } from '../../layout/layout';
+import {
+  EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, KpiDesktop,
+  ChipDesktop, AvisoDesktop, EstadoVacioDesktop,
+} from '../Desktop/ui';
+import { PeriodoDesktop } from '../Desktop/gestion/PeriodoDesktop';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -117,6 +123,7 @@ const TurnoProximoItem = ({ turno, delay = 0 }) => {
 const PersonalDashboard = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const { user } = useAuth();
+  const { esDesktop } = useLayout();
 
   const [mesOffset, setMesOffset] = useState(0);
   const [semanaKey, setSemanaKey] = useState(null);
@@ -128,7 +135,6 @@ const PersonalDashboard = ({ onBack }) => {
   const mesActual = dayjs().subtract(mesOffset, 'month');
   const semanas   = buildSemanasDelMes(mesActual.year(), mesActual.month() + 1);
   const { inicio, fin } = rangoPeriodo(mesOffset, semanaKey, semanas);
-  const fmt = d => d.format('YYYY-MM-DD');
 
   useEffect(() => {
     if (!user?.id) return;
@@ -173,6 +179,129 @@ const PersonalDashboard = ({ onBack }) => {
   const sobreLimite = horasTrabajadas > limiteHoras;
   const pctCarga = Math.min(100, Math.round((horasTrabajadas / limiteHoras) * 100));
   const cargaTheme = sobreLimite ? DASHBOARD_ICON_THEMES.red : DASHBOARD_ICON_THEMES.violet;
+
+  // Desktop (R18): vista raíz del menú "Mi dashboard". Mismos datos y mismos
+  // cálculos; KPIs en una fila y paneles lado a lado. Suma la lista de los
+  // turnos del período (los mismos que cuentan los KPIs).
+  if (esDesktop) {
+    const periodoTexto = esSemana ? `Semana ${semanaKey} · ${mesActual.format('MMMM YYYY')}` : mesActual.format('MMMM YYYY');
+    const listo = !loading && !error;
+    const turnosDelPeriodo = [...turnosFiltrados].sort((a, b) =>
+      `${a.diaInicioTurno} ${a.horaInicio || ''}`.localeCompare(`${b.diaInicioTurno} ${b.horaInicio || ''}`));
+    const hora = (h) => (h ? String(h).slice(0, 5) : '?');
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Mi Dashboard"
+          subtitulo={<span className="sgt-dg-mayus-cap" style={{ display: 'inline-block' }}>{periodoTexto} · tus horas, turnos y estadísticas</span>}
+          acciones={<PeriodoDesktop mesOffset={mesOffset} setMesOffset={setMesOffset} semanaKey={semanaKey} setSemanaKey={setSemanaKey} />}
+        />
+        <PaginaDesktop>
+          {error && <AvisoDesktop tono="alerta">{error}</AvisoDesktop>}
+
+          <div className="sgt-d-kpis" aria-busy={loading || undefined}>
+            <KpiDesktop etiqueta="Turnos" valor={listo ? turnosFiltrados.length : '—'} detalle={esSemana ? `semana ${semanaKey}` : mesActual.format('MMMM')} />
+            <KpiDesktop
+              etiqueta="Horas trabajadas"
+              valor={listo ? `${horasTrabajadas}h` : '—'}
+              detalle={`límite ${limiteHoras}h`}
+              color={listo && sobreLimite ? 'var(--d-coral-ink)' : undefined}
+            />
+            <KpiDesktop etiqueta="Días sin turno" valor={listo ? diasLibres : '—'} detalle={`de ${diasPeriodo} días`} />
+            <KpiDesktop etiqueta="Días con turno" valor={listo ? diasConTurno : '—'} detalle={esSemana ? 'en la semana' : 'en el mes'} />
+          </div>
+
+          <div className="sgt-d-columnas" style={{ '--d-columnas': 'minmax(0, 1.3fr) minmax(0, 1fr)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+              <PanelDesktop
+                titulo={esSemana ? 'Carga horaria semanal' : 'Carga horaria mensual'}
+                icono="clock"
+                iconoColor={sobreLimite ? 'var(--d-coral-ink)' : '#6D28D9'}
+                iconoFondo={sobreLimite ? 'var(--accent-soft)' : '#EFEAFB'}
+                acciones={listo && (
+                  <span className="sgt-dg-num" style={{ fontSize: 13, fontWeight: 800, color: sobreLimite ? 'var(--d-coral-ink)' : 'var(--primary)' }}>
+                    {horasTrabajadas}h / {limiteHoras}h
+                  </span>
+                )}
+              >
+                {listo ? (
+                  <>
+                    <div className="sgt-dg-barra" style={{ height: 10 }} role="img" aria-label={`${pctCarga}% de ${limiteHoras} horas`}>
+                      <div className="sgt-dg-barra__relleno sgt-progress-fill" style={{ width: `${pctCarga}%`, background: cargaTheme.grad, boxShadow: `0 0 10px ${cargaTheme.glow}` }} />
+                    </div>
+                    <div className="sgt-dg-indicador__pie">
+                      <span style={{ fontSize: 12, fontWeight: 800, color: sobreLimite ? 'var(--d-coral-ink)' : 'var(--ink3)' }}>{pctCarga}%</span>
+                      {sobreLimite && (
+                        <ChipDesktop tono="alerta">Superaste el límite de {limiteHoras}h</ChipDesktop>
+                      )}
+                    </div>
+                  </>
+                ) : loading ? (
+                  <div className="sgt-d-cargando" style={{ height: 10 }} />
+                ) : (
+                  <div className="sgt-dg-sec">Sin datos para este período.</div>
+                )}
+              </PanelDesktop>
+
+              <PanelDesktop
+                titulo="Turnos del período"
+                subtitulo={<span className="sgt-dg-mayus-cap" style={{ display: 'inline-block' }}>{periodoTexto}</span>}
+                icono="calendar"
+                acciones={listo && <ChipDesktop tono="primario">{turnosDelPeriodo.length}</ChipDesktop>}
+                sinPadding
+              >
+                <TablaDesktop
+                  ariaLabel="Turnos del período"
+                  cargando={loading}
+                  filas={listo ? turnosDelPeriodo : []}
+                  claveFila={(t, i) => t.id ?? i}
+                  vacio={error ? 'No se pudieron cargar los turnos.' : 'No tienes turnos en este período.'}
+                  columnas={[
+                    { id: 'fecha', titulo: 'Fecha', ancho: 130, render: (t) => <span className="sgt-dg-mayus-cap" style={{ display: 'inline-block' }}>{t.diaInicioTurno ? dayjs(t.diaInicioTurno).format('ddd D MMM') : '—'}</span> },
+                    { id: 'horario', titulo: 'Horario', ancho: 130, render: (t) => <span className="sgt-dg-num">{hora(t.horaInicio)} – {hora(t.horaFin)}</span> },
+                    { id: 'puesto', titulo: 'Puesto', render: (t) => t.nombrePuesto || 'Sin puesto' },
+                    { id: 'horas', titulo: 'Horas', ancho: 70, alinear: 'derecha', render: (t) => `${Math.round(calcHoras(t))}h` },
+                  ]}
+                />
+              </PanelDesktop>
+            </div>
+
+            <PanelDesktop titulo="Próximos turnos" icono="calendar" iconoColor="var(--success)" iconoFondo="var(--success-soft)">
+              {loading && (
+                <div className="sgt-dg-proximos">
+                  {[0, 1, 2].map((i) => <div key={i} className="sgt-d-cargando" style={{ height: 40 }} />)}
+                </div>
+              )}
+              {listo && futuros.length > 0 && (
+                <ul className="sgt-dg-proximos" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {futuros.map((t) => {
+                    const esHoy = t.diaInicioTurno && dayjs(t.diaInicioTurno).isSame(dayjs(), 'day');
+                    return (
+                      <li key={t.id} className={`sgt-dg-proximo${esHoy ? ' sgt-dg-proximo--hoy' : ''}`}>
+                        <div className="sgt-dg-proximo__fecha">
+                          <div className="sgt-dg-proximo__dow">{t.diaInicioTurno ? dayjs(t.diaInicioTurno).format('ddd') : '—'}</div>
+                          <div className="sgt-dg-proximo__dia">{t.diaInicioTurno ? dayjs(t.diaInicioTurno).format('D') : '—'}</div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className="sgt-dg-num" style={{ fontSize: 12.5, fontWeight: 800 }}>{t.horaInicio || '?'} – {t.horaFin || '?'}</div>
+                          <div className="sgt-dg-sec">{t.nombrePuesto || 'Sin puesto'}</div>
+                        </div>
+                        {esHoy && <ChipDesktop tono="solido" mayus>Hoy</ChipDesktop>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {listo && futuros.length === 0 && (
+                <EstadoVacioDesktop icono="calendar" titulo="Sin turnos próximos" texto="Actualmente no tienes turnos programados." />
+              )}
+              {!loading && error && <div className="sgt-dg-sec">No se pudieron cargar los turnos.</div>}
+            </PanelDesktop>
+          </div>
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>

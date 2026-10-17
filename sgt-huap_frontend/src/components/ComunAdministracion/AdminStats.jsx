@@ -7,6 +7,10 @@ import { SGT_DATA, DASHBOARD_ICON_THEMES } from '../Admin2/data';
 import { SGTBadge, SGTIcon, TopHeader, IconBadge3D, CoverageBar } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import PeriodoSelector, { buildSemanasDelMes, rangoPeriodo } from '../Style/PeriodoSelector';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, KpiDesktop, BotonDesktop, ChipDesktop, AvisoDesktop } from '../Desktop/ui';
+import { PeriodoDesktop } from '../Desktop/gestion/PeriodoDesktop';
+import { CoberturaLateralDesktop, FuncionariosLateralDesktop } from '../Desktop/gestion/EstadisticasDesktop';
 
 dayjs.locale('es');
 
@@ -64,6 +68,7 @@ const TurnoLibreItem = ({ turno }) => {
 const AdminStats = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const { user } = useAuth();
+  const { esDesktop } = useLayout();
 
   const [mesOffset, setMesOffset]               = useState(0);
   const [semanaKey, setSemanaKey]               = useState(null);
@@ -218,6 +223,190 @@ const AdminStats = ({ onBack }) => {
     });
     return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [todosDetalle]);
+
+  // Desktop (R18): vista raíz del menú (sin volver). Fila de KPIs, los mismos
+  // gráficos CSS (CoverageBar) en paneles lado a lado y los dos detalles
+  // (cobertura y funcionarios) en panel lateral en vez de los overlays del
+  // teléfono. Mismos datos, mismos filtros, mismo estado.
+  if (esDesktop) {
+    const listo = !loading && !error && Boolean(stats);
+    const tonoPct = pct >= 80 ? 'success' : pct >= 50 ? 'warn' : 'danger';
+    const colorPct = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warn)' : 'var(--d-coral-ink)';
+    const servicio = localStorage.getItem('sgt_servicio_activo_nombre');
+    const fechaCorta = (f) => dayjs(f).format('ddd D MMM');
+    const funcsPct = funcsStats?.totalFuncionarios > 0
+      ? Math.round((funcsStats.funcionariosConTurno / funcsStats.totalFuncionarios) * 100)
+      : null;
+    const filtrosCobertura = [
+      { id: 'tipo', etiqueta: 'Tipo de turno', valor: filtroTipo, onChange: setFiltroTipo, opciones: opcionesTipo.map((o) => ({ value: o, label: o })) },
+      { id: 'puesto', etiqueta: 'Puesto', valor: filtroPuesto, onChange: setFiltroPuesto, opciones: opcionesPuesto.map((o) => ({ value: o, label: o })) },
+      { id: 'fecha', etiqueta: 'Fecha', valor: filtroFecha, onChange: setFiltroFecha, opciones: opcionesFecha.map((o) => ({ value: o, label: fechaCorta(o) })) },
+      { id: 'plantilla', etiqueta: 'Rotativa', valor: filtroPlantilla, onChange: setFiltroPlantilla, opciones: opcionesPlantilla.map((o) => ({ value: o, label: o })) },
+    ];
+    const alternarFuncionario = (id) => setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    const sinDato = (v) => (listo ? (v ?? '—') : '—');
+
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Estadísticas del Servicio"
+          subtitulo={<span className="sgt-dg-mayus-cap" style={{ display: 'inline-block' }}>{servicio ? `${servicio} · ` : ''}{periodoLabel}</span>}
+          acciones={<PeriodoDesktop mesOffset={mesOffset} setMesOffset={setMesOffset} semanaKey={semanaKey} setSemanaKey={setSemanaKey} />}
+        />
+        <PaginaDesktop>
+          {error && <AvisoDesktop tono="alerta">{error}</AvisoDesktop>}
+
+          <div className="sgt-d-kpis" aria-busy={loading || undefined}>
+            <KpiDesktop etiqueta="Cobertura" valor={listo ? `${pct}%` : '—'} color={listo ? colorPct : undefined} detalle={listo ? `${stats.turnosAsignados ?? '—'} de ${stats.totalTurnos ?? '—'} turnos` : 'del período'} />
+            <KpiDesktop etiqueta="Turnos totales" valor={sinDato(stats?.totalTurnos)} detalle="en el período" />
+            <KpiDesktop etiqueta="Asignados" valor={sinDato(stats?.turnosAsignados)} color={listo ? 'var(--success)' : undefined} detalle="con funcionario" />
+            <KpiDesktop etiqueta="Vacantes" valor={sinDato(stats?.turnosVacantes)} color={listo && stats?.turnosVacantes > 0 ? 'var(--d-coral-ink)' : undefined} detalle="sin funcionario" />
+            <KpiDesktop
+              etiqueta="Puesto con más vacantes"
+              valor={<span className="sgt-dg-kpi-texto" title={puestoMasCritico?.nombre}>{listo && puestoMasCritico ? puestoMasCritico.nombre : '—'}</span>}
+              detalle={!listo ? null : puestoMasCritico ? `${puestoMasCritico.vacantes} ${puestoMasCritico.vacantes === 1 ? 'vacante' : 'vacantes'}` : 'sin vacantes'}
+            />
+          </div>
+
+          <div className="sgt-d-columnas" style={{ '--d-columnas': 'minmax(0, 1fr) minmax(0, 1.15fr)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+              <PanelDesktop
+                titulo="Cobertura de turnos"
+                subtitulo="Turnos con funcionario asignado en el período"
+                icono="calendar"
+                iconoColor="var(--success)"
+                iconoFondo="var(--success-soft)"
+                acciones={listo && (
+                  <BotonDesktop tamano="sm" variante="secundario" onClick={handleAbrirCobertura} aria-label="Ver detalle de la cobertura">
+                    Ver detalle<SGTIcon name="arrow-right" size={12} strokeWidth={2.4} />
+                  </BotonDesktop>
+                )}
+              >
+                {listo ? (
+                  <>
+                    <div className="sgt-dg-indicador">
+                      <span className="sgt-dg-indicador__valor" style={{ color: colorPct }}>{pct}%</span>
+                      <span className="sgt-dg-indicador__texto">{stats.turnosAsignados ?? '—'} asignados de {stats.totalTurnos ?? '—'} totales</span>
+                    </div>
+                    <CoverageBar value={stats.turnosAsignados ?? 0} max={stats.totalTurnos ?? 0} tone={tonoPct} showPercent={false} />
+                  </>
+                ) : loading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div className="sgt-d-cargando" style={{ width: '30%', height: 22 }} />
+                    <div className="sgt-d-cargando" style={{ height: 8 }} />
+                  </div>
+                ) : (
+                  <div className="sgt-dg-sec">Sin datos para este período.</div>
+                )}
+              </PanelDesktop>
+
+              <PanelDesktop
+                titulo="Funcionarios con turno"
+                subtitulo="Personal del servicio con al menos un turno"
+                icono="users"
+                acciones={listo && funcsStats && (
+                  <BotonDesktop tamano="sm" variante="secundario" onClick={handleAbrirDetalle} aria-label="Ver detalle de funcionarios con turno">
+                    Ver detalle<SGTIcon name="arrow-right" size={12} strokeWidth={2.4} />
+                  </BotonDesktop>
+                )}
+              >
+                {listo && funcsStats ? (
+                  <>
+                    <div className="sgt-dg-indicador">
+                      <span className="sgt-dg-indicador__valor" style={{ color: 'var(--primary)' }}>
+                        {funcsStats.funcionariosConTurno ?? '—'} / {funcsStats.totalFuncionarios ?? '—'}
+                      </span>
+                      <span className="sgt-dg-indicador__texto">
+                        {funcsPct != null ? `${funcsPct}% del equipo activo en este período` : 'Sin datos de equipo'}
+                      </span>
+                    </div>
+                    <CoverageBar value={funcsStats.funcionariosConTurno ?? 0} max={funcsStats.totalFuncionarios ?? 0} tone="primary" showPercent={false} />
+                  </>
+                ) : loading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div className="sgt-d-cargando" style={{ width: '30%', height: 22 }} />
+                    <div className="sgt-d-cargando" style={{ height: 8 }} />
+                  </div>
+                ) : (
+                  <div className="sgt-dg-sec">Sin datos para este período.</div>
+                )}
+              </PanelDesktop>
+            </div>
+
+            <PanelDesktop
+              titulo="Turnos vacantes"
+              subtitulo={listo
+                ? (vacantes.length > 0 && (stats.turnosVacantes ?? 0) > vacantes.length
+                  ? `Mostrando ${vacantes.length} de ${stats.turnosVacantes}`
+                  : `${vacantes.length} en el período`)
+                : loading ? 'Cargando estadísticas...' : 'Sin datos'}
+              icono="alert"
+              iconoColor="var(--d-coral-ink)"
+              iconoFondo="var(--accent-soft)"
+              sinPadding
+            >
+              <TablaDesktop
+                ariaLabel="Turnos vacantes"
+                cargando={loading}
+                filas={listo ? vacantes : []}
+                claveFila={(t, i) => t.id ?? i}
+                vacio={error ? 'No se pudieron cargar las estadísticas.' : 'No hay turnos vacantes en este período.'}
+                columnas={[
+                  { id: 'fecha', titulo: 'Fecha', ancho: 120, render: (t) => <span className="sgt-dg-mayus-cap" style={{ display: 'inline-block', fontWeight: 800 }}>{t.diaInicioTurno ? dayjs(t.diaInicioTurno).format('ddd D MMM') : '—'}</span> },
+                  { id: 'horario', titulo: 'Horario', ancho: 130, render: (t) => <span className="sgt-dg-num">{t.horaInicio || '?'} – {t.horaFin || '?'}</span> },
+                  { id: 'puesto', titulo: 'Puesto', render: (t) => t.nombrePuesto || 'Sin puesto' },
+                  { id: 'estado', titulo: 'Estado', ancho: 96, render: () => <ChipDesktop tono="alerta" mayus>Vacante</ChipDesktop> },
+                ]}
+              />
+            </PanelDesktop>
+          </div>
+        </PaginaDesktop>
+
+        {showCobertura && (
+          <CoberturaLateralDesktop
+            periodo={periodoLabel}
+            cargando={loadingTodos}
+            hayDatos={!loadingTodos && Boolean(todosDetalle)}
+            resumen={{
+              asignados: turnosFiltrados.filter((t) => t.asignado).length,
+              vacantes: turnosFiltrados.filter((t) => !t.asignado).length,
+              total: turnosFiltrados.length,
+            }}
+            filtros={filtrosCobertura}
+            filtrosActivos={[filtroTipo, filtroPuesto, filtroFecha, filtroPlantilla].filter(Boolean).length}
+            onLimpiar={() => { setFiltroTipo(null); setFiltroPuesto(null); setFiltroFecha(null); setFiltroPlantilla(null); }}
+            filas={turnosFiltrados.map((t, idx) => ({
+              clave: t.idTurno ?? idx,
+              tipo: t.tipoTurno ?? '—',
+              puesto: t.nombrePuesto ?? '—',
+              fecha: t.fecha ? fechaCorta(t.fecha) : '—',
+              funcionario: t.asignado ? t.nombreFuncionario : null,
+              asignado: Boolean(t.asignado),
+            }))}
+            onClose={() => setShowCobertura(false)}
+          />
+        )}
+
+        {showDetalle && (
+          <FuncionariosLateralDesktop
+            periodo={periodoLabel}
+            cargando={loadingDetalle}
+            funcionarios={detalle}
+            expandidos={expandedIds}
+            onAlternar={alternarFuncionario}
+            colorDe={getAvatarColor}
+            inicialesDe={getInitials}
+            formatoFecha={fechaCorta}
+            onClose={() => setShowDetalle(false)}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden', position: 'relative' }}>

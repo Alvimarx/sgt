@@ -12,10 +12,14 @@ import {
     eliminarPuesto,
     getTurnosAsociados,
 } from '../../services/puestosService';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, CampoDesktop, BotonDesktop, ChipDesktop } from '../Desktop/ui';
+import '../Desktop/gestion/gestion.css';
 
 const PuestosView = ({ onBack }) => {
     const PA = SGT_DATA.PALETTE;
     const { user } = useAuth();
+    const { esDesktop } = useLayout();
     const servicioId = user?.servicioId;
 
     const [puestos, setPuestos] = useState([]);
@@ -136,6 +140,150 @@ const PuestosView = ({ onBack }) => {
         background: '#fff', fontSize: 15, color: PA.ink, fontWeight: 600,
         appearance: 'none', outline: 'none', boxSizing: 'border-box',
     };
+
+    // Desktop (R18): vista raíz del menú (sin volver). La lista completa en una
+    // tabla con edición en línea (mismo guardarEdicion, Enter guarda y Escape
+    // cancela), el alta en un panel al lado y las mismas confirmaciones.
+    if (esDesktop) {
+        const deshabilitadoCrear = !nuevoPuesto.trim() || creando;
+        return (
+            <>
+                <EncabezadoDesktop titulo="Puestos del Servicio" subtitulo="Administra los puestos o posiciones disponibles en este servicio." />
+                <PaginaDesktop ancho="medio" llena>
+                    {error && (
+                        <div className="sgt-d-aviso sgt-d-aviso--alerta sgt-dg-aviso-cerrable" role="alert">
+                            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                            <span>{error}</span>
+                            <button type="button" className="sgt-dg-aviso-cerrable__cerrar" onClick={() => setError('')} aria-label="Cerrar mensaje"><X size={15} /></button>
+                        </div>
+                    )}
+                    <div className="sgt-dg-columnas sgt-dg-columnas--llena">
+                        <PanelDesktop
+                            llena
+                            titulo="Puestos Registrados"
+                            subtitulo={loading ? 'Cargando datos…' : `${puestos.length} ${puestos.length === 1 ? 'puesto' : 'puestos'} en el servicio`}
+                            icono="home"
+                            iconoColor="#B45309"
+                            iconoFondo="#FDF3E3"
+                            acciones={!loading && <ChipDesktop tono="aviso">{puestos.length}</ChipDesktop>}
+                            sinPadding
+                        >
+                            <TablaDesktop
+                                ariaLabel="Puestos registrados"
+                                cargando={loading}
+                                filas={puestos}
+                                claveFila={(p) => puestoId(p)}
+                                filaSeleccionada={editId}
+                                vacio="No hay puestos registrados. Agrega el primero desde el panel de la derecha."
+                                columnas={[
+                                    {
+                                        id: 'nombre', titulo: 'Puesto',
+                                        render: (puesto) => (editId === puestoId(puesto) ? (
+                                            <div className="sgt-dg-edicion">
+                                                <input
+                                                    autoFocus
+                                                    className="sgt-d-input"
+                                                    aria-label="Nuevo nombre del puesto"
+                                                    value={editNombre}
+                                                    onChange={(e) => setEditNombre(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') guardarEdicion(); if (e.key === 'Escape') cancelarEdicion(); }}
+                                                    disabled={guardando}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <span style={{ fontWeight: 700 }}>{puestoNombre(puesto)}</span>
+                                        )),
+                                    },
+                                    {
+                                        id: 'acciones', titulo: 'Acciones', ancho: 210, alinear: 'derecha',
+                                        render: (puesto) => {
+                                            const nombre = puestoNombre(puesto);
+                                            return editId === puestoId(puesto) ? (
+                                                <span className="sgt-d-toolbar" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                                                    <BotonDesktop tamano="sm" variante="fantasma" onClick={cancelarEdicion} disabled={guardando}>Cancelar</BotonDesktop>
+                                                    <BotonDesktop tamano="sm" variante="primario" icono="check" onClick={guardarEdicion} disabled={!editNombre.trim() || guardando}>
+                                                        {guardando ? 'Guardando…' : 'Guardar'}
+                                                    </BotonDesktop>
+                                                </span>
+                                            ) : (
+                                                <span className="sgt-d-toolbar" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                                                    <BotonDesktop tamano="sm" variante="secundario" onClick={() => abrirEdicion(puesto)} aria-label={`Editar ${nombre}`}>
+                                                        <Pencil size={12} />Editar
+                                                    </BotonDesktop>
+                                                    <BotonDesktop tamano="sm" variante="peligro" onClick={() => abrirConfirmEliminar(puesto)} aria-label={`Eliminar ${nombre}`}>
+                                                        <Trash2 size={12} />Eliminar
+                                                    </BotonDesktop>
+                                                </span>
+                                            );
+                                        },
+                                    },
+                                ]}
+                            />
+                        </PanelDesktop>
+
+                        <PanelDesktop titulo="Nuevo Puesto" icono="plus" style={{ alignSelf: 'start' }}>
+                            <form onSubmit={handleCrear} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <CampoDesktop etiqueta="Nombre del puesto" htmlFor="puesto-nuevo">
+                                    <input
+                                        id="puesto-nuevo"
+                                        type="text"
+                                        className="sgt-d-input"
+                                        placeholder="Ej: Reanimación, Box 1, Triage…"
+                                        value={nuevoPuesto}
+                                        onChange={(e) => setNuevoPuesto(e.target.value)}
+                                        disabled={creando}
+                                    />
+                                </CampoDesktop>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    <BotonDesktop type="submit" variante="primario" disabled={deshabilitadoCrear}>
+                                        <Plus size={14} /> Agregar
+                                    </BotonDesktop>
+                                </div>
+                            </form>
+                        </PanelDesktop>
+                    </div>
+                </PaginaDesktop>
+
+                <ConfirmDialog
+                    open={!!confirmCrear}
+                    icon="home" tone="primary"
+                    title="¿Agregar nuevo puesto?"
+                    busy={creando}
+                    confirmLabel={creando ? 'Agregando…' : 'Sí, agregar'}
+                    onConfirm={ejecutarCrear}
+                    onCancel={() => setConfirmCrear(null)}
+                >
+                    Estás a punto de registrar el puesto <strong style={{ color: PA.ink }}>{confirmCrear}</strong>.
+                </ConfirmDialog>
+
+                <ConfirmDialog
+                    open={!!confirmDel}
+                    icon="alert" tone="danger"
+                    title="¿Eliminar puesto?"
+                    busy={eliminando || loadingImpacto}
+                    confirmLabel={eliminando ? 'Eliminando…' : 'Sí, eliminar'}
+                    onConfirm={handleEliminar}
+                    onCancel={() => setConfirmDel(null)}
+                >
+                    <div style={{ marginBottom: 8 }}>
+                        Estás a punto de eliminar <strong style={{ color: PA.ink }}>{confirmDel ? puestoNombre(confirmDel) : ''}</strong>.
+                    </div>
+                    {loadingImpacto ? (
+                        <div style={{ fontSize: 12.5, color: PA.ink3 }}>Verificando turnos asociados…</div>
+                    ) : turnosAsociados > 0 ? (
+                        <div style={{ background: PA.warnSoft, borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8, textAlign: 'left' }}>
+                            <AlertCircle size={16} color={PA.warn} style={{ flexShrink: 0, marginTop: 1 }} />
+                            <div style={{ fontSize: 12.5, color: PA.ink2, lineHeight: 1.5 }}>
+                                Este puesto está asociado a <strong style={{ color: PA.ink }}>{turnosAsociados} turno{turnosAsociados === 1 ? '' : 's'}</strong>. Se ocultará de la gestión, pero los turnos históricos se conservan.
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: 12.5, color: PA.ink3 }}>No tiene turnos asociados. Dejará de aparecer en la gestión.</div>
+                    )}
+                </ConfirmDialog>
+            </>
+        );
+    }
 
     return (
         <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>

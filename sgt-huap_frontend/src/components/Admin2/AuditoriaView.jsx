@@ -5,6 +5,9 @@ import { turnosService } from '../../services/adminService';
 import { SGT_DATA } from './data';
 import { SGTBadge, SGTIcon, TopHeader, IconBadge3D } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, SegmentosDesktop, KpiDesktop, AvisoDesktop } from '../Desktop/ui';
+import { TablaAuditoriaDesktop } from '../Desktop/gestion/AuditoriaDesktop';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -78,6 +81,7 @@ const TurnoAuditoriaItem = ({ turno }) => {
 const AuditoriaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const { user } = useAuth();
+  const { esDesktop } = useLayout();
 
   const opcionesMes = useMemo(() => meses(), []);
   const [mesSeleccionado, setMesSeleccionado] = useState(opcionesMes[0]);
@@ -105,6 +109,61 @@ const AuditoriaView = ({ onBack }) => {
 
   const totalAsignados = turnosFiltrados.filter(t => t.idFuncionario != null).length;
   const totalVacantes  = turnosFiltrados.filter(t => t.idFuncionario == null).length;
+
+  // Desktop (R18): vista raíz del menú (sin volver). Los mismos meses, los
+  // mismos turnos pasados y los mismos totales; la lista pasa a tabla densa.
+  if (esDesktop) {
+    const total = turnosFiltrados.length;
+    const listo = !loading && !error;
+    const filas = turnosFiltrados.map((t) => ({
+      id: t.id,
+      fecha: t.diaInicioTurno ? dayjs(t.diaInicioTurno).format('ddd D MMM') : '—',
+      turno: t.nombre || null,
+      horario: `${(t.horaInicio || '?').slice(0, 5)} – ${(t.horaFin || '?').slice(0, 5)}`,
+      puesto: t.nombrePuesto || 'Sin puesto',
+      asignado: t.idFuncionario != null,
+      funcionario: t.nombreFuncionario,
+    }));
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Auditoría de Asistencia"
+          subtitulo="Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes."
+          acciones={
+            <span className="sgt-dg-capitalizar">
+              <SegmentosDesktop
+                ariaLabel="Mes"
+                valor={mesSeleccionado.value}
+                onChange={(v) => setMesSeleccionado(opcionesMes.find((m) => m.value === v) || opcionesMes[0])}
+                opciones={opcionesMes.map((m) => ({ id: m.value, etiqueta: m.label }))}
+              />
+            </span>
+          }
+        />
+        <PaginaDesktop llena>
+          {error && <AvisoDesktop tono="alerta">{error}</AvisoDesktop>}
+          <div className="sgt-d-kpis">
+            <KpiDesktop
+              etiqueta="Asignados"
+              valor={listo ? totalAsignados : '—'}
+              color={listo ? 'var(--success)' : undefined}
+              detalle={listo && total > 0 ? `${Math.round((totalAsignados / total) * 100)}% del total` : 'turnos con funcionario'}
+            />
+            <KpiDesktop etiqueta="Vacantes" valor={listo ? totalVacantes : '—'} color={listo && totalVacantes > 0 ? 'var(--d-coral-ink)' : undefined} detalle="turnos sin funcionario" />
+            <KpiDesktop etiqueta="Total" valor={listo ? total : '—'} detalle={<span className="sgt-dg-mayus-cap" style={{ display: 'inline-block' }}>turnos pasados de {mesSeleccionado.label}</span>} />
+          </div>
+          {!error && (
+            <TablaAuditoriaDesktop
+              titulo="Turnos pasados del mes"
+              filas={filas}
+              cargando={loading}
+              vacio={`No se encontraron turnos en ${mesSeleccionado.label}.`}
+            />
+          )}
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
