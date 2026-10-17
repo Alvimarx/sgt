@@ -1,12 +1,19 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
     CalendarDays, Plus, Trash2, X, Check, AlertCircle, Clock, Brush,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { plantillasService, tiposTurnoService, formatHora } from '../../services/rotativasService';
-import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { PanelLateral, SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import { SGT_DATA } from './data';
+// Modo desktop (R18): presentación ancha. La lógica de esta vista es una sola;
+// cada componente bifurca solo el dibujo con `esDesktop`.
+import { useLayout } from '../../layout/layout';
+import { AvisoDesktop, BotonDesktop, CampoDesktop, EncabezadoDesktop, PaginaDesktop, PanelDesktop } from '../Desktop/ui';
+import RotativasDesktop from '../Desktop/planificacion/RotativasDesktop';
+import { AvisoCerrable, BloqueTipo, ConfirmacionPlan, FormularioPanel, GrillaSemanas } from '../Desktop/planificacion/piezas';
+import { DIAS_LARGOS, crearTonoTipo, textoError } from '../Desktop/planificacion/formato';
 
 // ─── Paleta compartida con el resto de la app ──────────────────────────────
 const PA = SGT_DATA.PALETTE;
@@ -81,7 +88,8 @@ const fmtHoras = (h) => {
 const HORAS_SEMANALES_REF = 44;
 
 // ─── Sub: celda de un día del calendario (puede mostrar varios turnos) ─────────
-function DayCell({ diaIndex, turnoIds, tipos, active, onClick }) {
+function DayCell({ diaIndex, turnoIds, tipos, active, onClick, tono, pincel }) {
+    const { esDesktop } = useLayout();
     const dayPos = diaIndex % 7;
     const items = turnoIds
         .map(id => {
@@ -89,6 +97,28 @@ function DayCell({ diaIndex, turnoIds, tipos, active, onClick }) {
             return idx >= 0 ? { tipo: tipos[idx], color: turnoColor(idx) } : null;
         })
         .filter(Boolean);
+
+    // Desktop (R18): celda con los turnos del día como bloques día/noche.
+    if (esDesktop) {
+        const semana = Math.floor(diaIndex / 7) + 1;
+        const resumen = items.length ? items.map(({ tipo }) => tipo.nombre).join(' y ') : 'libre';
+        return (
+            <button
+                type="button"
+                onClick={() => onClick(diaIndex)}
+                title={`Semana ${semana} — ${DIAS_LABEL[dayPos]}`}
+                aria-label={`Semana ${semana}, ${DIAS_LARGOS[dayPos]}: ${resumen}`}
+                aria-pressed={active}
+                className={`sgt-dp-diaeditor${items.length ? '' : ' sgt-dp-diaeditor--libre'}${pincel ? ' sgt-dp-diaeditor--pincel' : ''}`}
+            >
+                {items.length === 0 ? (
+                    <span className="sgt-dp-diaeditor__libre">Libre</span>
+                ) : items.map(({ tipo }, i) => (
+                    <BloqueTipo key={i} tono={tono ? tono(tipo) : undefined} nombre={tipo.nombre} detalle={rangoHoras(tipo)} />
+                ))}
+            </button>
+        );
+    }
 
     return (
         <button
@@ -133,10 +163,45 @@ function DayCell({ diaIndex, turnoIds, tipos, active, onClick }) {
 }
 
 // ─── Sub: bottom-sheet para editar los turnos de un día ───────────────────────
-function TurnoSheet({ diaIndex, tipos, turnoIds, onToggle, onLibre, onClose }) {
+function TurnoSheet({ diaIndex, tipos, turnoIds, onToggle, onLibre, onClose, error }) {
+    const { esDesktop } = useLayout();
     const semana = Math.floor(diaIndex / 7) + 1;
     const dia = DIAS_LABEL[diaIndex % 7];
     const esLibre = turnoIds.length === 0;
+
+    // Desktop (R18): las opciones del día en el panel lateral (Escape cierra).
+    if (esDesktop) {
+        const tono = crearTonoTipo(tipos);
+        return (
+            <PanelLateral onClose={onClose} title={`Semana ${semana} · ${dia}`} ancho={460}>
+                <FormularioPanel pie={<BotonDesktop variante="primario" icono="check" onClick={onClose}>Listo</BotonDesktop>}>
+                    <p className="sgt-dp-texto">
+                        <strong>{esLibre ? 'Día libre' : `${turnoIds.length} turno${turnoIds.length === 1 ? '' : 's'} en este día`}.</strong>{' '}
+                        Marca uno o más tipos de turno; dos que se superponen en horario no se pueden combinar.
+                    </p>
+                    {error && <AvisoDesktop tono="aviso"><span role="alert">{error}</span></AvisoDesktop>}
+                    <div className="sgt-dp-opciones" role="group" aria-label={`Turnos de la semana ${semana}, ${DIAS_LARGOS[diaIndex % 7]}`}>
+                        <button type="button" className="sgt-dp-opcion" aria-pressed={esLibre} onClick={onLibre}>
+                            <span className="sgt-dp-radio" aria-hidden="true">{esLibre && <Check size={10} color="#fff" strokeWidth={3.5} />}</span>
+                            <span className="sgt-dp-opcion__texto"><span className="sgt-dp-opcion__titulo">Día libre</span><span className="sgt-dp-opcion__detalle">Sin turnos este día</span></span>
+                            <span />
+                        </button>
+                        {tipos.map((t) => {
+                            const selected = turnoIds.includes(t.idTipoTurno);
+                            return (
+                                <button key={t.idTipoTurno} type="button" className="sgt-dp-opcion sgt-dp-opcion--casilla" aria-pressed={selected} onClick={() => onToggle(t.idTipoTurno)}>
+                                    <span className="sgt-dp-casilla" aria-hidden="true">{selected && <Check size={11} color="#fff" strokeWidth={3.5} />}</span>
+                                    <span className="sgt-dp-opcion__texto"><BloqueTipo tono={tono(t)} nombre={t.nombre} className="sgt-dp-bloque--ancho" /></span>
+                                    <span className="sgt-dp-opcion__meta">{rangoHoras(t)}</span>
+                                </button>
+                            );
+                        })}
+                        {tipos.length === 0 && <div className="sgt-dp-opciones__vacio">No hay tipos de turno en este servicio.</div>}
+                    </div>
+                </FormularioPanel>
+            </PanelLateral>
+        );
+    }
 
     return (
         <div
@@ -222,7 +287,8 @@ function TurnoSheet({ diaIndex, tipos, turnoIds, onToggle, onLibre, onClose }) {
 }
 
 // ─── Sub: grid interactivo de días ───────────────────────────────────────────
-function DayGrid({ semanas, diasMatrix, tipos, brush, onChange, onError }) {
+function DayGrid({ semanas, diasMatrix, tipos, brush, onChange, onError, error }) {
+    const { esDesktop } = useLayout();
     const [activeCell, setActiveCell] = useState(null);
     const totalDias = semanas * 7;
 
@@ -270,6 +336,42 @@ function DayGrid({ semanas, diasMatrix, tipos, brush, onChange, onError }) {
             aplicarTurno(idx, brush);
         }
     };
+
+    // Desktop (R18): la secuencia en una grilla semanas × 7 días a lo ancho; el
+    // día sin pincel abre sus opciones en el panel lateral.
+    if (esDesktop) {
+        const tono = crearTonoTipo(tipos);
+        return (
+            <>
+                <GrillaSemanas
+                    semanas={semanas}
+                    ariaLabel="Secuencia de la rotativa"
+                    renderDia={(globalIdx) => (globalIdx >= totalDias ? <span /> : (
+                        <DayCell
+                            diaIndex={globalIdx}
+                            turnoIds={diasMatrix[globalIdx] ?? []}
+                            tipos={tipos}
+                            active={activeCell === globalIdx}
+                            onClick={handleCellTap}
+                            tono={tono}
+                            pincel={brush != null}
+                        />
+                    ))}
+                />
+                {activeCell != null && (
+                    <TurnoSheet
+                        diaIndex={activeCell}
+                        tipos={tipos}
+                        turnoIds={diasMatrix[activeCell] ?? []}
+                        onToggle={(id) => aplicarTurno(activeCell, id)}
+                        onLibre={() => { marcarLibre(activeCell); setActiveCell(null); }}
+                        onClose={() => setActiveCell(null)}
+                        error={error}
+                    />
+                )}
+            </>
+        );
+    }
 
     return (
         <div>
@@ -326,6 +428,7 @@ function DayGrid({ semanas, diasMatrix, tipos, brush, onChange, onError }) {
 
 // ─── Sub: panel editor (crear o editar plantilla) ────────────────────────────
 function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
+    const { esDesktop } = useLayout();
     const isNew = !plantilla?.idRotativa;
 
     const [nombre, setNombre]   = useState(plantilla?.nombre ?? '');
@@ -394,6 +497,145 @@ function PlantillaEditor({ plantilla, tipos, servicioId, onSaved, onCancel }) {
     const horasTotales  = totalMin / 60;
     const horasSemana   = semanas > 0 ? horasTotales / semanas : 0;
     const excedeRef     = horasSemana > HORAS_SEMANALES_REF;
+
+    // Desktop (R18): sub-pantalla con su volver. Datos, horas y pincel a la
+    // izquierda; la secuencia a lo ancho a la derecha. Guardar y cancelar, en
+    // el encabezado.
+    if (esDesktop) {
+        const tono = crearTonoTipo(tipos);
+        const diasConTurno = diasMatrix.filter((d) => d.length > 0).length;
+        return (
+            <>
+                <EncabezadoDesktop
+                    izquierda={(
+                        <BotonDesktop variante="fantasma" className="sgt-d-btn--icono" onClick={onCancel} aria-label="Volver a Rotativas" title="Volver a Rotativas">
+                            <SGTIcon name="chevron-left" size={18} strokeWidth={2.4} />
+                        </BotonDesktop>
+                    )}
+                    titulo={isNew ? 'Nueva rotativa' : `Editar: ${plantilla.nombre}`}
+                    subtitulo={`${semanas} semana${semanas === 1 ? '' : 's'} · ${semanas * 7} días · ${diasConTurno} con turno · los cambios se aplican al guardar`}
+                    acciones={(
+                        <>
+                            <BotonDesktop variante="secundario" onClick={onCancel}>Cancelar</BotonDesktop>
+                            <BotonDesktop variante="primario" icono="check" onClick={handleSave} disabled={saving}>
+                                {saving ? 'Guardando…' : 'Guardar rotativa'}
+                            </BotonDesktop>
+                        </>
+                    )}
+                />
+                <PaginaDesktop>
+                    {tipos.length === 0 && (
+                        <AvisoDesktop tono="aviso">No hay tipos de turno en este servicio. Créalos primero en «Tipos de Turno».</AvisoDesktop>
+                    )}
+                    <div className="sgt-dp-editor">
+                        <div className="sgt-dp-editor__lateral">
+                            <PanelDesktop titulo={isNew ? 'Nueva rotativa' : 'Datos de la rotativa'} icono="rotate">
+                                {/* Sin <form>: como en el móvil, solo «Guardar rotativa» guarda
+                                    (Enter tras bajar las semanas no debe guardar la secuencia recortada). */}
+                                <div className="sgt-dp-editor__datos">
+                                    <CampoDesktop etiqueta="Nombre" htmlFor="sgt-dp-rotativa-nombre">
+                                        <input
+                                            id="sgt-dp-rotativa-nombre"
+                                            className="sgt-d-input"
+                                            value={nombre}
+                                            onChange={e => setNombre(e.target.value)}
+                                            placeholder="ej. Rotativa 4 semanas — Medicina"
+                                            autoComplete="off"
+                                        />
+                                    </CampoDesktop>
+                                    <CampoDesktop etiqueta="Semanas" htmlFor="sgt-dp-rotativa-semanas" ayuda="Entre 1 y 12">
+                                        <input
+                                            id="sgt-dp-rotativa-semanas"
+                                            type="number" min={1} max={12}
+                                            className="sgt-d-input sgt-dp-input-num"
+                                            value={semanas}
+                                            onChange={e => handleSemanasChange(e.target.value)}
+                                        />
+                                    </CampoDesktop>
+                                </div>
+                                {err && <AvisoDesktop tono="aviso" style={{ marginTop: 10 }}><span role="alert">{textoError(err)}</span></AvisoDesktop>}
+                            </PanelDesktop>
+
+                            <PanelDesktop titulo="Horas" subtitulo={`Promedio del patrón de ${semanas} semana${semanas === 1 ? '' : 's'}`} icono="clock">
+                                <div className="sgt-dp-minis sgt-dp-minis--2">
+                                    <div className={`sgt-dp-mini${excedeRef ? ' sgt-dp-mini--aviso' : ''}`}>
+                                        <div className="sgt-dp-mini__etiqueta">Horas por semana</div>
+                                        <div className="sgt-dp-mini__valor sgt-dp-mini__valor--grande">{fmtHoras(horasSemana)} h</div>
+                                    </div>
+                                    <div className="sgt-dp-mini">
+                                        <div className="sgt-dp-mini__etiqueta">Total · {semanas} sem.</div>
+                                        <div className="sgt-dp-mini__valor sgt-dp-mini__valor--grande">{fmtHoras(horasTotales)} h</div>
+                                    </div>
+                                </div>
+                                {excedeRef && (
+                                    <AvisoDesktop tono="aviso" style={{ marginTop: 8 }}>Supera las {HORAS_SEMANALES_REF} h semanales de referencia.</AvisoDesktop>
+                                )}
+                            </PanelDesktop>
+
+                            {tipos.length > 0 && (
+                                <PanelDesktop titulo="Pincel rápido" subtitulo="Elige un turno y haz clic en los días" icono="sliders">
+                                    <div className="sgt-dp-pincel" role="group" aria-label="Pincel rápido">
+                                        {tipos.map((t) => {
+                                            const activo = brush === t.idTipoTurno;
+                                            const tt = tono(t);
+                                            return (
+                                                <button
+                                                    key={t.idTipoTurno}
+                                                    type="button"
+                                                    className="sgt-dp-pincel__btn"
+                                                    aria-pressed={activo}
+                                                    aria-label={`Pincel ${t.nombre} (${rangoHoras(t)})`}
+                                                    onClick={() => setBrush(activo ? null : t.idTipoTurno)}
+                                                >
+                                                    <BloqueTipo tono={tt} nombre={t.nombre} className="sgt-dp-bloque--ancho" />
+                                                    <span className="sgt-dp-pincel__rango">{rangoHoras(t)}</span>
+                                                    <span className="sgt-dp-pincel__marca" aria-hidden="true">{activo && <Check size={13} strokeWidth={3} />}</span>
+                                                </button>
+                                            );
+                                        })}
+                                        <button
+                                            type="button"
+                                            className="sgt-dp-pincel__btn"
+                                            aria-pressed={brush === 'libre'}
+                                            aria-label="Pincel Libre"
+                                            onClick={() => setBrush(brush === 'libre' ? null : 'libre')}
+                                        >
+                                            <span className="sgt-dp-bloque sgt-dp-bloque--libre sgt-dp-bloque--ancho"><span className="sgt-dp-bloque__nombre">Libre</span></span>
+                                            <span className="sgt-dp-pincel__rango">sin turnos</span>
+                                            <span className="sgt-dp-pincel__marca" aria-hidden="true">{brush === 'libre' && <Check size={13} strokeWidth={3} />}</span>
+                                        </button>
+                                    </div>
+                                    <div className={`sgt-dp-ayuda sgt-dp-pincel__ayuda${brush != null ? ' sgt-dp-pincel__ayuda--activo' : ''}`} style={{ marginTop: 8 }}>
+                                        {brush != null ? (
+                                            <><Brush size={12} aria-hidden="true" /> Modo pincel: toca los días para aplicar. Tócalo de nuevo en un día para quitarlo. Sin pincel, toca un día para ver todas las opciones.</>
+                                        ) : 'Sin pincel, haz clic en un día para ver todas sus opciones.'}
+                                    </div>
+                                </PanelDesktop>
+                            )}
+                        </div>
+
+                        <PanelDesktop
+                            titulo={`Secuencia · ${semanas} semana${semanas === 1 ? '' : 's'}`}
+                            subtitulo={brush != null ? 'Pincel activo: cada clic aplica o quita el turno elegido' : 'Haz clic en un día para elegir sus turnos'}
+                            icono="calendar"
+                            className="sgt-dp-editor__grilla"
+                        >
+                            {gridError && <AvisoCerrable tono="aviso" onCerrar={() => setGridError('')}>{gridError}</AvisoCerrable>}
+                            <DayGrid
+                                semanas={semanas}
+                                diasMatrix={diasMatrix}
+                                tipos={tipos}
+                                brush={brush}
+                                onChange={setDiasMatrix}
+                                onError={setGridError}
+                                error={gridError}
+                            />
+                        </PanelDesktop>
+                    </div>
+                </PaginaDesktop>
+            </>
+        );
+    }
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -646,9 +888,31 @@ function PlantillaCard({ plantilla, onEdit, onDelete }) {
     );
 }
 
+// ─── Desktop (R18): resumen de una rotativa para la lista y su detalle ───────
+// Mismos cálculos que la tarjeta (días con turno) y el editor (horas).
+function resumenPlantilla(p, tipos) {
+    const semanas = Number(p.semanas) || 0;
+    const matriz = parseSecuenciaFromBackend(p.secuenciaDias, semanas);
+    const total = semanas * 7;
+    const diasConTurno = matriz.filter((d) => d.length > 0).length;
+    const turnos = matriz.reduce((a, d) => a + d.length, 0);
+    const min = matriz.reduce((acc, dia) => acc + dia.reduce((a, id) => {
+        const t = tipos.find((tt) => tt.idTipoTurno === id);
+        return a + (t ? duracionMin(t) : 0);
+    }, 0), 0);
+    const horasCiclo = min / 60;
+    const horasSemana = semanas > 0 ? horasCiclo / semanas : 0;
+    return {
+        id: p.idRotativa, nombre: p.nombre, semanas, total, matriz, turnos, diasConTurno,
+        libres: total - diasConTurno, pct: total > 0 ? Math.round((diasConTurno / total) * 100) : 0,
+        horasCiclo, horasSemana, excede: horasSemana > HORAS_SEMANALES_REF, plantilla: p,
+    };
+}
+
 // ─── Vista principal ─────────────────────────────────────────────────────────
 export default function PlantillasView({ onBack }) {
     const { user } = useAuth();
+    const { esDesktop } = useLayout();
 
     const [plantillas, setPlantillas] = useState([]);
     const [tipos,      setTipos]      = useState([]);
@@ -657,6 +921,13 @@ export default function PlantillasView({ onBack }) {
     const [editing,    setEditing]    = useState(null);   // plantilla o 'new'
     const [confirmDel, setConfirmDel] = useState(null);
     const [deleting,   setDeleting]   = useState(false);
+    // Desktop: rotativa elegida en la lista (maestro-detalle). Solo presentación.
+    const [seleccionDesktop, setSeleccionDesktop] = useState(null);
+    const resumenesDesktop = useMemo(
+        () => (esDesktop ? plantillas.map((p) => resumenPlantilla(p, tipos)) : []),
+        [esDesktop, plantillas, tipos],
+    );
+    const tonoTipo = useMemo(() => crearTonoTipo(tipos), [tipos]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -699,6 +970,19 @@ export default function PlantillasView({ onBack }) {
 
     // Modo editor abierto
     if (editing !== null) {
+        // Desktop (R18): el editor dibuja su propia página (con su volver).
+        if (esDesktop) {
+            return (
+                <PlantillaEditor
+                    key={editing === 'new' ? 'nueva' : editing.idRotativa}
+                    plantilla={editing === 'new' ? null : editing}
+                    tipos={tipos}
+                    servicioId={user?.servicioId}
+                    onSaved={(guardada) => { if (guardada?.idRotativa) setSeleccionDesktop(guardada.idRotativa); handleSaved(); }}
+                    onCancel={() => setEditing(null)}
+                />
+            );
+        }
         return (
             <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>
                 <TopHeader
@@ -728,6 +1012,48 @@ export default function PlantillasView({ onBack }) {
                     />
                 </div>
             </div>
+        );
+    }
+
+    // Desktop (R18): vista raíz del menú (sin volver). Lista a la izquierda y la
+    // secuencia de la rotativa elegida a la derecha; eliminar se confirma en un
+    // diálogo centrado.
+    if (esDesktop) {
+        return (
+            <>
+                <RotativasDesktop
+                    servicioNombre={localStorage.getItem('sgt_servicio_activo_nombre') || ''}
+                    items={resumenesDesktop}
+                    tipos={tipos}
+                    cargando={loading}
+                    error={textoError(error)}
+                    onCerrarError={() => setError('')}
+                    seleccion={seleccionDesktop}
+                    onSeleccionar={setSeleccionDesktop}
+                    onNueva={() => setEditing('new')}
+                    onEditar={(p) => { setSeleccionDesktop(p.idRotativa); setEditing(p); }}
+                    onEliminar={setConfirmDel}
+                    tonoTipo={tonoTipo}
+                    formatoHoras={fmtHoras}
+                    formatoRango={rangoHoras}
+                    horasReferencia={HORAS_SEMANALES_REF}
+                />
+                {confirmDel && (
+                    <ConfirmacionPlan
+                        titulo="¿Eliminar rotativa?"
+                        tono="peligro"
+                        icono={<Trash2 size={15} strokeWidth={2.2} />}
+                        etiquetaConfirmar="Sí, eliminar"
+                        etiquetaOcupado="Eliminando…"
+                        ocupado={deleting}
+                        onCancelar={() => setConfirmDel(null)}
+                        onConfirmar={handleDelete}
+                    >
+                        <p>Se eliminará <strong>{confirmDel.nombre}</strong> y toda su secuencia de días. Esta acción no se puede deshacer.</p>
+                        <p>También se quitará de los moldes de planificación que la usen.</p>
+                    </ConfirmacionPlan>
+                )}
+            </>
         );
     }
 

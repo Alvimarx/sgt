@@ -6,6 +6,15 @@ import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { planificacionService } from '../../services/planificacionService';
 import { feriadosService } from '../../services/feriadosService';
 import { reglasServicioService } from '../../services/reglasServicioService';
+// Modo desktop (R18): presentación ancha. La lógica de esta vista es una sola;
+// cada componente bifurca solo el dibujo con `esDesktop`.
+import { Trash2, ChevronLeft, ChevronRight, CalendarCheck2, FolderOpen } from 'lucide-react';
+import { useLayout } from '../../layout/layout';
+import { PanelLateral, SGTIcon as IconoKit } from '../Style/UIPrimitives';
+import { AvisoDesktop, BotonDesktop, BuscadorDesktop, CampoDesktop, ChipDesktop, EncabezadoDesktop, EstadoVacioDesktop, PaginaDesktop, PanelDesktop } from '../Desktop/ui';
+import MoldeDesktop, { MoldeCargandoDesktop } from '../Desktop/planificacion/MoldeDesktop';
+import { ConfirmacionPlan, FormularioPanel, GrillaSemanas } from '../Desktop/planificacion/piezas';
+import { DIAS_LARGOS, MESES_LARGOS, claseAvatar, crearTonoTipo, fechaCorta, fechaHora, formatoNumero, inicialesDeNombre, mayusculaInicial, normalizar } from '../Desktop/planificacion/formato';
 
 /* ─── Helpers de fecha ─────────────────────────────────────────────────────── */
 const MONTHS_LONG=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -127,8 +136,11 @@ function TopHeader({title,subtitle,rightSlot,leftSlot,dense}){
 }
 
 /* ─── Sheet ────────────────────────────────────────────────────────────────── */
-function Sheet({open,onClose,children,title,maxHeight='85%'}){
+function Sheet({open,onClose,children,title,maxHeight='85%',anchoDesktop='md'}){
+  const{esDesktop}=useLayout();
   if(!open)return null;
+  // Desktop (R18): panel lateral desde la derecha (Escape y clic afuera cierran).
+  if(esDesktop)return <PanelLateral onClose={onClose} title={title} ancho={anchoDesktop}>{children}</PanelLateral>;
   return(
     <div style={{position:'fixed',inset:0,zIndex:200,display:'flex',flexDirection:'column',justifyContent:'flex-end',alignItems:'center'}}>
       <div onClick={onClose} style={{position:'absolute',inset:0,background:'rgba(15,23,42,0.35)',animation:'sgtFade .2s ease'}}/>
@@ -277,6 +289,7 @@ function usePlanificacionState({plantillas,funcionarios,puestos}){
 
 /* ─── InyectarSheet ──────────────────────────────────────────────────────────── */
 function InyectarSheet({open,onClose,onInject,plantillas,puestos}){
+  const{esDesktop}=useLayout();
   const[idRotativa,setIdRotativa]=useState('');
   const[idPuesto,setIdPuesto]=useState('');
   const[err,setErr]=useState('');
@@ -284,6 +297,53 @@ function InyectarSheet({open,onClose,onInject,plantillas,puestos}){
 
   const handle=()=>{ if(!idRotativa)return setErr('Selecciona una rotativa.'); if(!idPuesto)return setErr('Selecciona el puesto.'); setErr(''); onInject({idRotativa:Number(idRotativa),idPuesto:Number(idPuesto)}); setIdRotativa(''); setIdPuesto(''); };
   const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
+
+  // Desktop (R18): mismo formulario en el panel lateral, acciones abajo.
+  if(esDesktop){
+    return(
+      <Sheet open={open} onClose={onClose} title="Agregar rotativa" anchoDesktop={560}>
+        <FormularioPanel pie={(
+          <>
+            <BotonDesktop variante="secundario" onClick={onClose}>Cancelar</BotonDesktop>
+            <BotonDesktop variante="primario" icono="plus" onClick={handle}>Agregar al molde</BotonDesktop>
+          </>
+        )}>
+          <p className="sgt-dp-texto">La rotativa quedará <strong>pendiente de asignación</strong> y asociada al puesto que elijas.</p>
+          {err&&<AvisoDesktop tono="aviso"><span role="alert">{err}</span></AvisoDesktop>}
+          <section className="sgt-dp-seccion" aria-label="Rotativa">
+            <div className="sgt-d-seccion-titulo">Rotativa</div>
+            {plantillas.length===0?(
+              <div className="sgt-dp-opciones__vacio">No hay rotativas en este servicio. Créalas en «Rotativas».</div>
+            ):(
+              <div className="sgt-dp-opciones">
+                {plantillas.map(p=>{ const sel=String(p.idRotativa)===idRotativa; const turnos=buildSecuencia(p).reduce((s,d)=>s+d.length,0); return(
+                  <button key={p.idRotativa} type="button" className="sgt-dp-opcion" aria-pressed={sel} onClick={()=>setIdRotativa(String(p.idRotativa))}>
+                    <span className="sgt-dp-radio" aria-hidden="true">{sel&&<SGTIcon name="check" size={10} color="#fff" strokeWidth={3.5}/>}</span>
+                    <span className="sgt-dp-opcion__texto"><span className="sgt-dp-opcion__titulo">{p.nombre}</span><span className="sgt-dp-opcion__detalle">{p.semanas} semanas · {turnos} turnos</span></span>
+                    <span/>
+                  </button>
+                );})}
+              </div>
+            )}
+          </section>
+          <section className="sgt-dp-seccion" aria-label="Puesto o unidad">
+            <div className="sgt-d-seccion-titulo">Asociar a puesto / unidad</div>
+            {puestos.length===0?(
+              <div className="sgt-dp-opciones__vacio">No hay puestos en este servicio.</div>
+            ):(
+              <div className="sgt-dp-pildoras">
+                {puestos.map(p=>{ const sel=String(p.idPuesto)===String(idPuesto); return(
+                  <button key={p.idPuesto} type="button" className="sgt-dp-pildora" aria-pressed={sel} onClick={()=>setIdPuesto(String(p.idPuesto))}>
+                    {sel&&<SGTIcon name="check" size={11} color="#fff" strokeWidth={3}/>}{p.nombre}
+                  </button>
+                );})}
+              </div>
+            )}
+          </section>
+        </FormularioPanel>
+      </Sheet>
+    );
+  }
 
   return(
     <Sheet open={open} onClose={onClose} title="Agregar rotativa" maxHeight="90%">
@@ -316,10 +376,14 @@ function InyectarSheet({open,onClose,onInject,plantillas,puestos}){
 
 /* ─── AsignarFuncionarioSheet ────────────────────────────────────────────────── */
 function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onRemove,instancias=[],funcionarios=[]}){
+  const{esDesktop}=useLayout();
   const[idFuncionario,setIdFuncionario]=useState(instancia?.idFuncionario?String(instancia.idFuncionario):'');
   const[err,setErr]=useState('');
+  // Desktop: filtro de la lista de funcionarios (solo presentación).
+  const[busqueda,setBusqueda]=useState('');
 
   useEffect(()=>{ setIdFuncionario(instancia?.idFuncionario?String(instancia.idFuncionario):''); setErr(''); },[instancia]);
+  useEffect(()=>{ setBusqueda(''); },[instancia?.id]);
 
   if(!open||!instancia)return null;
   const totalTurnos=(instancia.secuencia||[]).reduce((s,d)=>s+d.length,0);
@@ -331,6 +395,67 @@ function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onR
     setErr(''); onAssign(instancia.id,Number(idFuncionario));
   };
   const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
+
+  // Desktop (R18): resumen de la instancia, búsqueda y lista con RUT; acciones abajo.
+  if(esDesktop){
+    const q=normalizar(busqueda.trim());
+    const lista=q?funcionarios.filter(f=>normalizar(`${nombreFunc(f)} ${f.rutCompleto||''} ${f.profesion||''}`).includes(q)):funcionarios;
+    const actual=instancia.idFuncionario?funcionarios.find(f=>f.idFuncionario===Number(instancia.idFuncionario)):null;
+    const nombreActual=actual?nombreFunc(actual):instancia.nombreFuncionario;
+    return(
+      <Sheet open={open} onClose={onClose} title={`Asignar a ${instancia.label}`} anchoDesktop={560}>
+        <FormularioPanel className="sgt-dp-form--fijo" pie={(
+          <>
+            <BotonDesktop variante="peligro" className="sgt-dp-acciones__izq" onClick={()=>{ onRemove(instancia.id); onClose(); }} title="Quitar rotativa del molde">
+              <Trash2 size={13} strokeWidth={2.2} aria-hidden="true"/>Quitar del molde
+            </BotonDesktop>
+            {instancia.idFuncionario&&<BotonDesktop variante="secundario" onClick={()=>{ onUnassign(instancia.id); onClose(); }} title="Dejar esta rotativa sin funcionario">Vaciar</BotonDesktop>}
+            <BotonDesktop variante="secundario" onClick={onClose}>Cancelar</BotonDesktop>
+            <BotonDesktop variante="primario" icono="check" onClick={handle}>{instancia.idFuncionario?'Reasignar':'Asignar'}</BotonDesktop>
+          </>
+        )}>
+          <div className="sgt-dp-resumen">
+            <div className="sgt-dp-resumen__linea"><span className="sgt-dp-r">{instancia.label}</span><span className="sgt-dp-resumen__titulo">{instancia.nombreRotativa}</span></div>
+            <div className="sgt-dp-resumen__detalle">{instancia.semanas} semanas · {totalTurnos} turnos por ciclo{instancia.nombrePuesto?` · ${instancia.nombrePuesto}`:''}</div>
+            <div className="sgt-dp-resumen__actual">
+              {instancia.idFuncionario?(
+                <span className={`sgt-dp-avatar ${claseAvatar(instancia.nombrePuesto)}`} aria-hidden="true">{inicialesDeNombre(nombreActual)}</span>
+              ):(
+                <span className="sgt-dp-avatar sgt-dp-avatar--vacante" aria-hidden="true"><IconoKit name="plus" size={12} strokeWidth={2.8}/></span>
+              )}
+              <div style={{minWidth:0}}>
+                <div className="sgt-d-seccion-titulo" style={{margin:0}}>Funcionario actual</div>
+                <div className="sgt-dp-resumen__actual-nombre">{instancia.idFuncionario?nombreActual:'Vacante: sin funcionario'}</div>
+              </div>
+              {actual?.rutCompleto&&<span className="sgt-dp-opcion__meta" style={{marginLeft:'auto'}}>{actual.rutCompleto}</span>}
+            </div>
+          </div>
+          {err&&<AvisoDesktop tono="aviso"><span role="alert">{err}</span></AvisoDesktop>}
+          <BuscadorDesktop value={busqueda} onChange={setBusqueda} placeholder="Buscar por nombre, RUT o profesión…" ariaLabel="Buscar funcionario" autoComplete="off"/>
+          <section className="sgt-dp-seccion sgt-dp-seccion--llena" aria-label="Funcionarios del servicio">
+            <div className="sgt-dp-seccion__cabecera">
+              <span className="sgt-d-seccion-titulo">Funcionarios ({lista.length})</span>
+              {idFuncionario&&String(idFuncionario)!==String(instancia.idFuncionario||'')&&<ChipDesktop tono="primario">1 seleccionado</ChipDesktop>}
+            </div>
+            <div className="sgt-dp-opciones sgt-dp-opciones--lista">
+              {funcionarios.length===0?(
+                <div className="sgt-dp-opciones__vacio">No hay funcionarios en este servicio.</div>
+              ):lista.length===0?(
+                <div className="sgt-dp-opciones__vacio">Nadie coincide con «{busqueda.trim()}».</div>
+              ):lista.map(f=>{ const sel=String(f.idFuncionario)===idFuncionario; return(
+                <button key={f.idFuncionario} type="button" className="sgt-dp-opcion sgt-dp-opcion--persona" aria-pressed={sel} onClick={()=>setIdFuncionario(String(f.idFuncionario))}>
+                  <span className="sgt-dp-radio" aria-hidden="true">{sel&&<SGTIcon name="check" size={10} color="#fff" strokeWidth={3.5}/>}</span>
+                  <span className="sgt-dp-avatar" aria-hidden="true">{inicialesDe(f)}</span>
+                  <span className="sgt-dp-opcion__texto"><span className="sgt-dp-opcion__titulo">{nombreFunc(f)}</span>{f.profesion&&<span className="sgt-dp-opcion__detalle">{f.profesion}</span>}</span>
+                  <span className="sgt-dp-opcion__meta">{f.rutCompleto}</span>
+                </button>
+              );})}
+            </div>
+          </section>
+        </FormularioPanel>
+      </Sheet>
+    );
+  }
 
   return(
     <Sheet open={open} onClose={onClose} title={`Asignar a ${instancia.label}`} maxHeight="90%">
@@ -370,10 +495,14 @@ function AsignarFuncionarioSheet({open,onClose,onAssign,instancia,onUnassign,onR
 
 /* ─── MoldesSheet (guardar / cargar / eliminar contra el backend) ───────────── */
 function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,loading,nombreInicial,planActualId}){
+  const{esDesktop}=useLayout();
   const[tab,setTab]=useState('guardar');
   const[nombre,setNombre]=useState('');
   const[err,setErr]=useState('');
+  // Desktop: confirmación antes de eliminar un molde (patrón de la guía).
+  const[porEliminar,setPorEliminar]=useState(null);
   useEffect(()=>{ if(open){ setTab('guardar'); setNombre(nombreInicial||''); setErr(''); } },[open,nombreInicial]);
+  useEffect(()=>{ if(!open)setPorEliminar(null); },[open]);
   if(!open)return null;
 
   const totalTurnos=instancias.reduce((a,i)=>a+(i.secuencia||[]).reduce((s,d)=>s+d.length,0),0);
@@ -382,6 +511,82 @@ function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,load
   const handleSave=()=>{ if(!nombre.trim())return setErr('Ponle un nombre al molde.'); if(instancias.length===0)return setErr('Agrega al menos una rotativa.'); setErr(''); onSave(nombre.trim()); };
   const lbl={fontSize:11,fontWeight:800,color:'var(--ink3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:0.4};
   const tabBtn=(key,icon,label)=>{ const active=tab===key; return <button onClick={()=>setTab(key)} style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:6,padding:'9px 8px',borderRadius:9,cursor:'pointer',fontFamily:'inherit',background:active?'#fff':'transparent',border:'none',color:active?'var(--primary)':'var(--ink3)',fontSize:13,fontWeight:800,boxShadow:active?'0 1px 3px rgba(15,23,42,0.10)':'none'}}><SGTIcon name={icon} size={15} color={active?'var(--primary)':'var(--ink3)'}/>{label}</button>; };
+
+  // Desktop (R18): guardar el molde actual y los moldes guardados, a la vista
+  // en el mismo panel (sin pestañas).
+  if(esDesktop){
+    return(
+      <>
+        <Sheet open={open} onClose={onClose} title="Moldes de planificación" anchoDesktop={560}>
+          <FormularioPanel>
+            <section className="sgt-dp-seccion" aria-label="Molde actual">
+              <div className="sgt-d-seccion-titulo">{planActualId?`Actualizar «${nombreInicial||'molde'}»`:'Guardar el molde actual'}</div>
+              <div className="sgt-dp-minis">
+                <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Rotativas</div><div className="sgt-dp-mini__valor">{instancias.length}</div></div>
+                <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Turnos</div><div className="sgt-dp-mini__valor">{formatoNumero(totalTurnos)}</div></div>
+                <div className={`sgt-dp-mini${pend>0?' sgt-dp-mini--aviso':''}`}><div className="sgt-dp-mini__etiqueta">Sin asignar</div><div className="sgt-dp-mini__valor">{pend}</div></div>
+              </div>
+              {pend>0&&<AvisoDesktop tono="aviso">Hay {pend} rotativa{pend===1?'':'s'} sin funcionario. Puedes guardar igual.</AvisoDesktop>}
+              {err&&<AvisoDesktop tono="aviso"><span role="alert">{err}</span></AvisoDesktop>}
+              <form className="sgt-dp-fila-campos" onSubmit={(e)=>{ e.preventDefault(); handleSave(); }}>
+                <CampoDesktop etiqueta="Nombre del molde" htmlFor="sgt-dp-nombre-molde">
+                  <input id="sgt-dp-nombre-molde" className="sgt-d-input" value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Ej. UCI · Mayo 2026" autoComplete="off"/>
+                </CampoDesktop>
+                <BotonDesktop type="submit" variante="primario" icono="check">{planActualId?'Actualizar molde':'Guardar molde'}</BotonDesktop>
+              </form>
+            </section>
+
+            <section className="sgt-dp-seccion" aria-label="Moldes guardados">
+              <div className="sgt-dp-seccion__cabecera">
+                <span className="sgt-d-seccion-titulo">Moldes guardados del servicio</span>
+                {!loading&&<ChipDesktop>{moldes.length}</ChipDesktop>}
+              </div>
+              <p className="sgt-dp-ayuda" style={{margin:0}}>Cargar un molde reemplaza las rotativas que ves ahora en la pantalla.</p>
+              {loading?(
+                <div className="sgt-dp-cargando" role="status" aria-busy="true">
+                  {[70,52].map(w=><div key={w} className="sgt-d-cargando" style={{width:`${w}%`}}/>)}
+                  <span className="sgt-dp-visualmente-oculto">Cargando…</span>
+                </div>
+              ):moldes.length===0?(
+                <div className="sgt-dp-opciones__vacio" style={{border:'1px dashed var(--line)',borderRadius:12}}>No hay moldes guardados todavía.</div>
+              ):(
+                <div className="sgt-dp-lista">
+                  {moldes.map(pl=>{ const asignadas=(pl.asignaciones||[]).filter(a=>a.idFuncionario).length; const actual=pl.idPlanificacion===planActualId; return(
+                    <div key={pl.idPlanificacion} className={`sgt-dp-item${actual?' sgt-dp-item--actual':''}`}>
+                      <span className="sgt-dp-item__icono" aria-hidden="true"><SGTIcon name="calendar" size={16} color="var(--primary)"/></span>
+                      <div className="sgt-dp-item__texto">
+                        <div className="sgt-dp-item__titulo"><span>{pl.nombre}</span>{actual&&<ChipDesktop tono="primario" mayus>En pantalla</ChipDesktop>}</div>
+                        <div className="sgt-dp-item__detalle">{(pl.asignaciones||[]).length} rotativas · {asignadas} asignadas</div>
+                      </div>
+                      <BotonDesktop tamano="sm" variante="secundario" onClick={()=>onLoad(pl.idPlanificacion)} aria-label={`Cargar molde ${pl.nombre}`}>
+                        <FolderOpen size={12} strokeWidth={2.2} aria-hidden="true"/>Cargar
+                      </BotonDesktop>
+                      <BotonDesktop tamano="sm" variante="peligro" className="sgt-d-btn--icono" onClick={()=>setPorEliminar(pl)} aria-label={`Eliminar molde ${pl.nombre}`} title="Eliminar molde">
+                        <Trash2 size={12} strokeWidth={2.2} aria-hidden="true"/>
+                      </BotonDesktop>
+                    </div>
+                  );})}
+                </div>
+              )}
+            </section>
+          </FormularioPanel>
+        </Sheet>
+        {porEliminar&&(
+          <ConfirmacionPlan
+            titulo="¿Eliminar molde?"
+            tono="peligro"
+            icono={<Trash2 size={15} strokeWidth={2.2}/>}
+            etiquetaConfirmar="Sí, eliminar"
+            onCancelar={()=>setPorEliminar(null)}
+            onConfirmar={()=>{ const pl=porEliminar; setPorEliminar(null); onDelete(pl); }}
+          >
+            <p>Se eliminará el molde <strong>{porEliminar.nombre}</strong> con sus {(porEliminar.asignaciones||[]).length} rotativas asignadas.</p>
+            <p>Si tiene una vigencia activa, el sistema no lo permitirá: primero hay que anularla en «Vigencias».</p>
+          </ConfirmacionPlan>
+        )}
+      </>
+    );
+  }
 
   return(
     <Sheet open={open} onClose={onClose} title="Moldes de planificación" maxHeight="88%">
@@ -436,6 +641,7 @@ function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,load
 
 /* ─── EliminarTurnosSheet (deshacer una generación por rango de fechas) ─────── */
 function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
+  const{esDesktop}=useLayout();
   const[fechaInicio,setFechaInicio]=useState('');
   const[fechaFin,setFechaFin]=useState('');
   const[err,setErr]=useState('');
@@ -450,6 +656,48 @@ function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
     if(fechaFin<fechaInicio)return setErr('La fecha de fin no puede ser anterior a la de inicio.');
     setErr(''); setConfirmando(true);
   };
+
+  // Desktop (R18): rango en el panel lateral; la confirmación, centrada.
+  if(esDesktop){
+    return(
+      <>
+        <Sheet open={open} onClose={()=>!eliminando&&onClose()} title="Eliminar turnos generados" anchoDesktop={520}>
+          <FormularioPanel pie={(
+            <>
+              <BotonDesktop variante="secundario" onClick={()=>!eliminando&&onClose()} disabled={eliminando}>Cancelar</BotonDesktop>
+              <BotonDesktop variante="peligro-solido" onClick={handle} disabled={eliminando}><Trash2 size={14} strokeWidth={2.2} aria-hidden="true"/>Eliminar turnos del rango</BotonDesktop>
+            </>
+          )}>
+            <p className="sgt-dp-texto">Borra (deja fuera de la agenda) los turnos que <strong>{nombreMolde||'este molde'}</strong> generó dentro del rango de fechas indicado. Útil para deshacer una generación duplicada. No afecta otros moldes ni turnos fuera del rango.</p>
+            <AvisoDesktop>Para las generaciones nuevas conviene usar «Vigencias» (eliminar desde una fecha o anular), que identifica sus turnos con exactitud.</AvisoDesktop>
+            {err&&<AvisoDesktop tono="aviso"><span role="alert">{err}</span></AvisoDesktop>}
+            <div className="sgt-d-formulario">
+              <CampoDesktop etiqueta="Desde" htmlFor="sgt-dp-eliminar-desde">
+                <input id="sgt-dp-eliminar-desde" type="date" className="sgt-d-input" value={fechaInicio} onChange={e=>setFechaInicio(e.target.value)}/>
+              </CampoDesktop>
+              <CampoDesktop etiqueta="Hasta" htmlFor="sgt-dp-eliminar-hasta">
+                <input id="sgt-dp-eliminar-hasta" type="date" className="sgt-d-input" value={fechaFin} onChange={e=>setFechaFin(e.target.value)}/>
+              </CampoDesktop>
+            </div>
+          </FormularioPanel>
+        </Sheet>
+        {confirmando&&(
+          <ConfirmacionPlan
+            titulo="¿Eliminar estos turnos?"
+            tono="peligro"
+            icono={<Trash2 size={15} strokeWidth={2.2}/>}
+            etiquetaConfirmar="Sí, eliminar"
+            etiquetaOcupado="Eliminando…"
+            ocupado={eliminando}
+            onCancelar={()=>setConfirmando(false)}
+            onConfirmar={()=>onConfirm(fechaInicio,fechaFin)}
+          >
+            Se eliminarán los turnos generados por este molde entre el <strong>{fechaCorta(fechaInicio)}</strong> y el <strong>{fechaCorta(fechaFin)}</strong>. Esta acción no se puede deshacer desde la app.
+          </ConfirmacionPlan>
+        )}
+      </>
+    );
+  }
 
   return(
     <Sheet open={open} onClose={()=>!eliminando&&onClose()} title="Eliminar turnos generados" maxHeight="80%">
@@ -491,6 +739,7 @@ function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
 
 /* ─── VigenciasSheet (historial de vigencias: acortar / anular / editar desde fecha) ── */
 function VigenciasSheet({open,onClose,ejecuciones,cargando,onAcortar,onAnular,onEditarDesde,procesando,moldeActualId,nombreMoldeActual}){
+  const{esDesktop}=useLayout();
   const[confirmAnular,setConfirmAnular]=useState(null);
   const[acortarId,setAcortarId]=useState(null);
   const[fechaEliminarDesde,setFechaEliminarDesde]=useState('');
@@ -515,6 +764,102 @@ function VigenciasSheet({open,onClose,ejecuciones,cargando,onAcortar,onAnular,on
     setErrEdit('');
     onEditarDesde(editDesde,editHasta);
   };
+
+  // Desktop (R18): historial de vigencias en el panel lateral ancho; anular se
+  // confirma en un diálogo centrado.
+  if(esDesktop){
+    return(
+      <>
+        <Sheet open={open} onClose={()=>!procesando&&onClose()} title="Vigencias del servicio" anchoDesktop="lg">
+          <FormularioPanel>
+            <p className="sgt-dp-texto">Todas las planificaciones vigentes o históricas de <strong>este servicio</strong> (de cualquier molde). Solo puede haber una vigencia <strong>activa</strong> a la vez por servicio; eliminar o anular una nunca afecta a otra.</p>
+            {cargando?(
+              <div className="sgt-dp-cargando" role="status" aria-busy="true">
+                {[80,64,72].map(w=><div key={w} className="sgt-d-cargando" style={{width:`${w}%`}}/>)}
+                <span className="sgt-dp-visualmente-oculto">Cargando vigencias…</span>
+              </div>
+            ):(ejecuciones||[]).length===0?(
+              <EstadoVacioDesktop icono="clock" titulo="Sin vigencias" texto="Aún no se ha generado ninguna vigencia para este servicio."/>
+            ):(
+              <div className="sgt-dp-lista">
+                {ejecuciones.map(e=>{
+                  const activa=e.estado==='ACTIVA';
+                  const enModoAcortar=acortarId===e.idEjecucion;
+                  const minEliminar=toDateStr(new Date(Math.max(parseLocalDate(e.fechaInicioEfectiva).getTime()+86400000,parseLocalDate(hoyStr).getTime())));
+                  return(
+                    <article key={e.idEjecucion} className={`sgt-dp-vigencia ${activa?'sgt-dp-vigencia--activa':'sgt-dp-vigencia--anulada'}`} aria-label={`Vigencia ${activa?'activa':'anulada'} de ${e.nombrePlanificacion||'molde eliminado'}`}>
+                      <div className="sgt-dp-vigencia__cabecera">
+                        <ChipDesktop tono={activa?'exito':'neutral'} mayus>{activa?'Activa':'Anulada'}</ChipDesktop>
+                        <span className="sgt-dp-vigencia__nombre">{e.nombrePlanificacion||'(molde eliminado)'}</span>
+                        <span className="sgt-dp-vigencia__rango">{fechaCorta(e.fechaInicioEfectiva)} → {fechaCorta(e.fechaFinEfectiva)}</span>
+                      </div>
+                      <div className="sgt-dp-vigencia__meta">
+                        Ancla de rotativa: {fechaCorta(e.fechaInicioRotativa)}{e.fechaGeneracion?` · Generada: ${fechaHora(e.fechaGeneracion)}`:''}{e.nombreActor?` · ${e.nombreActor}`:''}
+                      </div>
+                      {activa&&!enModoAcortar&&(
+                        <div className="sgt-dp-acciones" style={{justifyContent:'flex-start',marginTop:2}}>
+                          <BotonDesktop tamano="sm" variante="secundario" onClick={()=>{setAcortarId(e.idEjecucion);setFechaEliminarDesde(minEliminar);}} disabled={procesando}>Eliminar desde fecha</BotonDesktop>
+                          <BotonDesktop tamano="sm" variante="peligro" onClick={()=>setConfirmAnular(e.idEjecucion)} disabled={procesando}>Anular todo</BotonDesktop>
+                        </div>
+                      )}
+                      {activa&&enModoAcortar&&(
+                        <div className="sgt-dp-vigencia__acortar">
+                          <div className="sgt-dp-fila-campos">
+                            <CampoDesktop etiqueta="Eliminar turnos desde" htmlFor={`sgt-dp-acortar-${e.idEjecucion}`}>
+                              <input id={`sgt-dp-acortar-${e.idEjecucion}`} type="date" className="sgt-d-input" value={fechaEliminarDesde} min={minEliminar} max={e.fechaFinEfectiva} onChange={ev=>setFechaEliminarDesde(ev.target.value)}/>
+                            </CampoDesktop>
+                            <BotonDesktop variante="secundario" onClick={()=>setAcortarId(null)} disabled={procesando}>Cancelar</BotonDesktop>
+                            <BotonDesktop variante="peligro-solido" onClick={()=>{onAcortar(e.idEjecucion,fechaEliminarDesde);setAcortarId(null);}} disabled={procesando||!fechaEliminarDesde}>Confirmar</BotonDesktop>
+                          </div>
+                          <div className="sgt-dp-ayuda">Se eliminarán los turnos desde esa fecha en adelante (no antes de hoy). Los anteriores quedan intactos.</div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {moldeActualId&&hayActivaDelMoldeActual&&(
+              <section className="sgt-dp-tarjeta-suave" aria-label={`Editar ${nombreMoldeActual||'el molde'} desde una fecha`}>
+                <div className="sgt-dp-tarjeta-suave__titulo">Editar "{nombreMoldeActual}" desde una fecha</div>
+                <p className="sgt-dp-texto">Aplica <strong>las asignaciones actuales del molde cargado</strong> (las que ves ahora en la pantalla principal) desde la fecha que elijas en adelante. La vigencia activa del servicio se acorta o anula automáticamente hasta el día anterior, conservando el mismo ancla de rotativa; los turnos anteriores a esa fecha no se tocan.</p>
+                {errEdit&&<AvisoDesktop tono="aviso"><span role="alert">{errEdit}</span></AvisoDesktop>}
+                <div className="sgt-dp-fila-campos">
+                  <CampoDesktop etiqueta="Desde" htmlFor="sgt-dp-editar-desde">
+                    <input id="sgt-dp-editar-desde" type="date" className="sgt-d-input" value={editDesde} min={hoyStr} onChange={e=>setEditDesde(e.target.value)}/>
+                  </CampoDesktop>
+                  <CampoDesktop etiqueta="Hasta (nuevo fin efectivo)" htmlFor="sgt-dp-editar-hasta">
+                    <input id="sgt-dp-editar-hasta" type="date" className="sgt-d-input" value={editHasta} min={editDesde||hoyStr} onChange={e=>setEditHasta(e.target.value)}/>
+                  </CampoDesktop>
+                </div>
+                <div className="sgt-dp-acciones">
+                  <BotonDesktop variante="primario" icono="check" onClick={confirmarEditar} disabled={procesando}>{procesando?'Aplicando…':'Aplicar cambios desde esta fecha'}</BotonDesktop>
+                </div>
+              </section>
+            )}
+            {moldeActualId&&!hayActivaDelMoldeActual&&(
+              <p className="sgt-dp-ayuda" style={{margin:0,textAlign:'center'}}>"{nombreMoldeActual}" no tiene una vigencia activa todavía — usa "Generar" para crear la primera.</p>
+            )}
+          </FormularioPanel>
+        </Sheet>
+        {confirmAnular!=null&&(
+          <ConfirmacionPlan
+            titulo="¿Anular esta vigencia?"
+            tono="peligro"
+            icono="alert"
+            etiquetaConfirmar="Sí, anular"
+            etiquetaOcupado="Anulando…"
+            ocupado={procesando}
+            onCancelar={()=>setConfirmAnular(null)}
+            onConfirmar={()=>{onAnular(confirmAnular);setConfirmAnular(null);}}
+          >
+            Se eliminarán (soft-delete) todos los turnos que esta vigencia generó. No afecta otras vigencias, otras planificaciones ni turnos manuales. Esta acción no se puede deshacer desde la app.
+          </ConfirmacionPlan>
+        )}
+      </>
+    );
+  }
 
   return(
     <Sheet open={open} onClose={()=>!procesando&&onClose()} title="Vigencias del servicio" maxHeight="88%">
@@ -616,10 +961,63 @@ function VigenciasSheet({open,onClose,ejecuciones,cargando,onAcortar,onAnular,on
 }
 
 /* ─── DetalleDiaSheet (Semana X · Día, agrupado por tipo real) ─────────────── */
-function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssignInstance}){
+function DetalleDiaSheet({open,onClose,diaIndex,entradasDelDia,tipoColor,onAssignInstance,tonoTipo,funcionarios}){
+  const{esDesktop}=useLayout();
   if(!open||diaIndex==null)return null;
   const grupos=buildDayCoverage(entradasDelDia);
   const semana=Math.floor(diaIndex/7)+1, dl=DIA_NOMBRE[diaIndex%7];
+
+  // Desktop (R18): el equipo del día por tipo de turno (vacantes primero), como
+  // el panel del día del Centro de operaciones. Cada persona o vacante abre su
+  // asignación.
+  if(esDesktop){
+    const porId=new Map((funcionarios||[]).map(f=>[Number(f.idFuncionario),f]));
+    const tono=tonoTipo||crearTonoTipo([]);
+    const totalAsig=grupos.reduce((a,g)=>a+g.asignadas.length,0);
+    const totalVac=grupos.reduce((a,g)=>a+g.pendientes.length,0);
+    return(
+      <Sheet open={open} onClose={onClose} title={`Semana ${semana} · ${dl}`} anchoDesktop={560}>
+        <FormularioPanel>
+          {grupos.length===0?(
+            <EstadoVacioDesktop icono="calendar" titulo="Día libre" texto="Ninguna rotativa del molde tiene turno este día."/>
+          ):(
+            <div className="sgt-dp-minis">
+              <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Asignados</div><div className="sgt-dp-mini__valor">{totalAsig}</div></div>
+              <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Total</div><div className="sgt-dp-mini__valor">{totalAsig+totalVac}</div></div>
+              <div className={`sgt-dp-mini${totalVac?' sgt-dp-mini--alerta':''}`}><div className="sgt-dp-mini__etiqueta">Vacantes</div><div className="sgt-dp-mini__valor">{totalVac}</div></div>
+            </div>
+          )}
+          {grupos.map(({tipo,asignadas,pendientes})=>{
+            const t=tono(tipo); const total=asignadas.length+pendientes.length;
+            return(
+              <section key={tipo.idTipoTurno} className={`sgt-dp-grupo sgt-dp-grupo--${t.clase}`} aria-label={`${tipo.nombre} ${rangoHoras(tipo)}`}>
+                <div className={`sgt-dp-grupo__cabecera sgt-dp-bloque--${t.clase}`} style={t.estilo}>
+                  <IconoKit name={t.icono} size={13} strokeWidth={2.4}/>
+                  <span className="sgt-dp-grupo__titulo">{tipo.nombre} · {rangoHoras(tipo)}</span>
+                  {pendientes.length>0?<ChipDesktop tono="alerta" mayus>{pendientes.length} vacante{pendientes.length===1?'':'s'}</ChipDesktop>:<ChipDesktop tono="exito" mayus>Completo</ChipDesktop>}
+                  <span className={`sgt-dp-grupo__cob ${pendientes.length?'sgt-dp-bloque__cob--falta':'sgt-dp-bloque__cob--ok'}`}>{asignadas.length}/{total}</span>
+                </div>
+                <div className="sgt-dp-grupo__cuerpo">
+                  {pendientes.map(inst=>(
+                    <button key={inst.id} type="button" className="sgt-dp-persona sgt-dp-persona--vacante" onClick={()=>onAssignInstance&&onAssignInstance(inst)} aria-label={`Vacante ${inst.label}${inst.nombrePuesto?` · ${inst.nombrePuesto}`:''}: asignar funcionario`}>
+                      <span className="sgt-dp-avatar sgt-dp-avatar--sm sgt-dp-avatar--vacante" aria-hidden="true"><IconoKit name="plus" size={10} strokeWidth={2.8}/></span>
+                      <span className="sgt-dp-persona__texto"><span className="sgt-dp-persona__nombre">Vacante · {inst.label}</span><span className="sgt-dp-persona__detalle">{inst.nombrePuesto||'Sin puesto'}</span></span>
+                    </button>
+                  ))}
+                  {asignadas.map(inst=>{ const f=porId.get(Number(inst.idFuncionario)); const nombre=f?nombreFunc(f):inst.nombreFuncionario; return(
+                    <button key={inst.id} type="button" className="sgt-dp-persona" onClick={()=>onAssignInstance&&onAssignInstance(inst)} aria-label={`${nombre} · ${inst.label}${inst.nombrePuesto?` · ${inst.nombrePuesto}`:''}: cambiar asignación`} title={f?.rutCompleto?`RUT ${f.rutCompleto}`:undefined}>
+                      <span className={`sgt-dp-avatar sgt-dp-avatar--sm ${claseAvatar(inst.nombrePuesto)}`} aria-hidden="true">{inicialesDeNombre(nombre)}</span>
+                      <span className="sgt-dp-persona__texto"><span className="sgt-dp-persona__nombre">{nombre}</span><span className="sgt-dp-persona__detalle">{inst.label} · {inst.nombrePuesto||'Sin puesto'}</span></span>
+                    </button>
+                  );})}
+                </div>
+              </section>
+            );
+          })}
+        </FormularioPanel>
+      </Sheet>
+    );
+  }
 
   return(
     <Sheet open={open} onClose={onClose} title={`Semana ${semana} · ${dl}`} maxHeight="88%">
@@ -757,7 +1155,8 @@ function RelativeWeekGrid({maxSemanas,daysIndex,tipoColor,onDayClick}){
 const ghostBtnGB={width:30,height:30,borderRadius:8,background:'var(--surface2)',border:'1px solid var(--line)',display:'grid',placeItems:'center',cursor:'pointer',flexShrink:0};
 
 /* ─── GenerarView (elegir lunes + previsualización) ──────────────────────────── */
-function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId,onCancel,onConfirm,generando,planActualId}){
+function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId,onCancel,onConfirm,generando,planActualId,nombreMolde,tonoTipo,funcionarios}){
+  const{esDesktop}=useLayout();
   const[fecha,setFecha]=useState(''); // ancla de la rotativa (lunes): fija la fase del ciclo
   // Vigencia efectiva: el día en que la planificación realmente empieza y termina a regir. Por
   // defecto igual al ancla (el caso más común), pero siempre editable de forma independiente —
@@ -899,6 +1298,217 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
       </div>
     );
   };
+
+  // Desktop (R18): sub-pantalla ancha que conserva su volver. A la izquierda el
+  // lunes de inicio, la vigencia efectiva y las reglas (a la vista, sin
+  // pestaña); a la derecha la vista previa del ciclo a lo ancho.
+  if(esDesktop){
+    const tono=tonoTipo||crearTonoTipo(tipos);
+    const porId=new Map((funcionarios||[]).map(f=>[Number(f.idFuncionario),f]));
+    const fmtD=(dt)=>dt?fechaCorta(toDateStr(dt)):'—';
+    const hoyDs=toDateStr(new Date());
+    const nombreDia=(dt)=>`${mayusculaInicial(DIAS_LARGOS[(dt.getDay()+6)%7])} ${dt.getDate()} de ${MESES_LARGOS[dt.getMonth()]} de ${dt.getFullYear()}`;
+    const puedeGenerar=rangoValido&&!generando;
+    const n=conflictos.length;
+    return(
+      <>
+        <EncabezadoDesktop
+          izquierda={(
+            <BotonDesktop variante="fantasma" className="sgt-d-btn--icono" onClick={onCancel} aria-label="Volver a Planificación" title="Volver a Planificación">
+              <ChevronLeft size={18} strokeWidth={2.4} aria-hidden="true"/>
+            </BotonDesktop>
+          )}
+          titulo="Generar planificación"
+          subtitulo={`${nombreMolde?`Molde «${nombreMolde}»`:'Molde sin guardar'} · ${instancias.length} rotativas · ciclo de ${semanas} semana${semanas===1?'':'s'}`}
+          acciones={(
+            <>
+              <BotonDesktop variante="secundario" onClick={onCancel}>Cancelar</BotonDesktop>
+              <BotonDesktop variante="primario" onClick={()=>rangoValido&&setConfirmando(true)} disabled={!puedeGenerar}>
+                <CalendarCheck2 size={14} strokeWidth={2.2} aria-hidden="true"/>Confirmar y generar
+              </BotonDesktop>
+            </>
+          )}
+        />
+        <PaginaDesktop>
+          <div className="sgt-dp-generar">
+            <div className="sgt-dp-generar__lateral">
+              <PanelDesktop titulo="1 · Lunes de inicio" subtitulo="Ancla de la rotativa: fija la fase del ciclo" icono="calendar">
+                <div className="sgt-dp-mes">
+                  <BotonDesktop variante="secundario" tamano="sm" className="sgt-d-btn--icono" onClick={()=>setPickSeed(toDateStr(new Date(year,month-1,1)))} aria-label="Mes anterior"><ChevronLeft size={14} strokeWidth={2.4} aria-hidden="true"/></BotonDesktop>
+                  <div className="sgt-dp-mes__titulo" aria-live="polite">{MONTHS_LONG[month]} <span>{year}</span></div>
+                  <BotonDesktop variante="secundario" tamano="sm" className="sgt-d-btn--icono" onClick={()=>setPickSeed(toDateStr(new Date(year,month+1,1)))} aria-label="Mes siguiente"><ChevronRight size={14} strokeWidth={2.4} aria-hidden="true"/></BotonDesktop>
+                </div>
+                <div className="sgt-dp-cal" role="group" aria-label={`Lunes de ${MESES_LARGOS[month]} de ${year}`}>
+                  {WEEK_DAYS_LBL.map((d,i)=><span key={d} className={`sgt-dp-cal__cabecera${i>=5?' sgt-dp-cal__cabecera--finde':''}`} aria-hidden="true">{d}</span>)}
+                  {weeks.flat().map(({date,inMonth})=>{ const ds=toDateStr(date), esLunes=date.getDay()===1, selectable=esLunes&&inMonth, sel=ds===fecha; return(
+                    <button
+                      key={ds}
+                      type="button"
+                      disabled={!selectable}
+                      aria-pressed={selectable?sel:undefined}
+                      aria-label={nombreDia(date)}
+                      onClick={()=>setFecha(ds)}
+                      className={`sgt-dp-cal__dia${selectable?' sgt-dp-cal__dia--lunes':''}${sel?' sgt-dp-cal__dia--sel':''}${!inMonth?' sgt-dp-cal__dia--fuera':''}${ds===hoyDs?' sgt-dp-cal__dia--hoy':''}`}
+                    >{date.getDate()}</button>
+                  );})}
+                </div>
+                <p className="sgt-dp-ayuda" style={{margin:'8px 0 0'}}>Debe ser <strong>lunes</strong> (resaltados).{start&&<> Ancla elegida: <strong>{nombreDia(start)}</strong>.</>}</p>
+              </PanelDesktop>
+
+              {start&&(
+                <PanelDesktop titulo="2 · Vigencia efectiva" subtitulo="Rango en que realmente se crearán turnos" icono="clock">
+                  <p className="sgt-dp-ayuda" style={{margin:'0 0 10px'}}>Puede empezar en una fecha distinta al ancla (p. ej. ancla lunes 28 de julio, vigencia efectiva desde el sábado 1 de agosto) y abarcar varios ciclos o varios meses — no está limitado a un mes.</p>
+                  <div className="sgt-d-formulario">
+                    <CampoDesktop etiqueta="Inicio efectivo" htmlFor="sgt-dp-inicio-efectivo">
+                      <input id="sgt-dp-inicio-efectivo" type="date" className="sgt-d-input" value={inicioEfectiva} min={fecha} onChange={e=>{setInicioEfectiva(e.target.value);setInicioEditadoManualmente(true);}}/>
+                    </CampoDesktop>
+                    <CampoDesktop etiqueta="Término efectivo" htmlFor="sgt-dp-fin-efectivo">
+                      <input id="sgt-dp-fin-efectivo" type="date" className="sgt-d-input" value={finEfectiva} min={inicioEfectiva||fecha} onChange={e=>{setFinEfectiva(e.target.value);setFinEditadoManualmente(true);}}/>
+                    </CampoDesktop>
+                  </div>
+                  {!anclaValida&&<AvisoDesktop tono="aviso" style={{marginTop:10}}><span role="alert">El inicio efectivo no puede ser anterior al ancla de la rotativa ({fmt(start)}).</span></AvisoDesktop>}
+                  {anclaValida&&!rangoValido&&finEfectiva&&<AvisoDesktop tono="aviso" style={{marginTop:10}}><span role="alert">La fecha de término no puede ser anterior al inicio efectivo.</span></AvisoDesktop>}
+                  {rangoValido&&<div className="sgt-dp-ayuda" style={{marginTop:8}}>{diasTotalesRango} día{diasTotalesRango===1?'':'s'} · ≈{cantidadCiclos} ciclo{cantidadCiclos===1?'':'s'} de la rotativa</div>}
+                </PanelDesktop>
+              )}
+
+              <PanelDesktop
+                titulo="Reglas de horario"
+                subtitulo={reglas.length?`${seleccion.size} de ${reglas.length} seleccionada${reglas.length===1?'':'s'} para esta generación`:'Sin reglas activas para este servicio'}
+                icono="sliders"
+                acciones={reglas.length>0&&(
+                  <BotonDesktop variante="fantasma" tamano="sm" onClick={()=>setSeleccion(todasSeleccionadas?new Set():new Set(reglas.map(r=>r.idRegla)))}>{todasSeleccionadas?'Quitar todas':'Seleccionar todas'}</BotonDesktop>
+                )}
+              >
+                {reglas.length===0?(
+                  <div className="sgt-dp-ayuda">Se usarán los horarios base de cada tipo de turno.</div>
+                ):(
+                  <div className="sgt-dp-reglas">
+                    {reglas.map(r=>{ const sel=seleccion.has(r.idRegla); return(
+                      <div key={r.idRegla} className={`sgt-dp-regla${sel?' sgt-dp-regla--sel':''}`}>
+                        <label className="sgt-dp-regla__cabecera">
+                          <input type="checkbox" className="sgt-dp-regla__input" checked={sel} onChange={()=>toggleRegla(r.idRegla)}/>
+                          <span className="sgt-dp-regla__nombre">{r.nombre}</span>
+                        </label>
+                        <div className="sgt-dp-regla__chips">
+                          {r.aplicaFinDeSemana&&<ChipDesktop tono="primario" mayus>Fin de semana</ChipDesktop>}
+                          {r.aplicaFeriado&&<ChipDesktop tono="primario" mayus>Feriado</ChipDesktop>}
+                          <ChipDesktop tono="alerta" mayus>{formatDesplazamientoHoras(r.tiempoMinutos)}</ChipDesktop>
+                        </div>
+                        <div className="sgt-dp-regla__cambios">
+                          {r.idTipoTurnoInicio!=null&&filaCambio(r.idTipoTurnoInicio,r.nombreTipoTurnoInicio,'inicio',r.tiempoMinutos)}
+                          {r.idTipoTurnoFin!=null&&filaCambio(r.idTipoTurnoFin,r.nombreTipoTurnoFin,'fin',r.tiempoMinutos)}
+                        </div>
+                      </div>
+                    );})}
+                  </div>
+                )}
+              </PanelDesktop>
+            </div>
+
+            <PanelDesktop
+              className="sgt-dp-generar__previa"
+              titulo="3 · Vista previa"
+              subtitulo={start?`Un ciclo de la rotativa desde el ${fmtD(start)}`:'Elige el lunes de inicio para ver dónde se generarán los turnos'}
+              icono="calendar"
+            >
+              {!start?(
+                <EstadoVacioDesktop icono="calendar" titulo="Sin lunes de inicio" texto="Selecciona un lunes para ver dónde se generarán los turnos."/>
+              ):(
+                <div className="sgt-dp-previa">
+                  <div className="sgt-dp-minis sgt-dp-minis--4">
+                    <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Rotativas</div><div className="sgt-dp-mini__valor">{instancias.length}</div></div>
+                    <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Turnos (aprox.)</div><div className="sgt-dp-mini__valor">{formatoNumero(totalTurnosEstimado)}</div></div>
+                    <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Vigencia</div><div className="sgt-dp-mini__valor">{rangoValido?`${diasTotalesRango} días`:'—'}</div></div>
+                    <div className="sgt-dp-mini"><div className="sgt-dp-mini__etiqueta">Patrón del ciclo</div><div className="sgt-dp-mini__valor sgt-dp-mini__valor--texto">{minD?`${fmtD(minD)} → ${fmtD(maxD)}`:'—'}</div></div>
+                  </div>
+
+                  {!planActualId?(
+                    <AvisoDesktop>Guarda el molde para detectar choques con turnos ya existentes.</AvisoDesktop>
+                  ):cargandoConf?(
+                    <div className="sgt-dp-estado" role="status"><IconoKit name="clock" size={13}/>Verificando conflictos…</div>
+                  ):n>0?(
+                    <section className="sgt-dp-conflictos" aria-label="Conflictos de horario">
+                      <div className="sgt-dp-conflictos__titulo"><IconoKit name="alert" size={14} strokeWidth={2.4}/>{n} turno{n===1?'':'s'} quedará{n===1?'':'n'} vacante{n===1?'':'s'} por conflicto</div>
+                      <table className="sgt-d-tabla sgt-dp-conflictos__tabla">
+                        <thead><tr><th>Funcionario</th><th>Fecha</th><th>Horario</th><th>Rotativa</th><th>Conflicto en</th></tr></thead>
+                        <tbody>
+                          {conflictos.slice(0,8).map((cf,i)=>{ const f=porId.get(Number(cf.idFuncionario)); const nombre=f?nombreFunc(f):(cf.nombreFuncionario||'—'); const dtc=parseLocalDate(cf.fecha); return(
+                            <tr key={i}>
+                              <td><span className="sgt-dp-persona-linea"><span className="sgt-dp-avatar sgt-dp-avatar--sm" aria-hidden="true">{inicialesDeNombre(nombre)}</span><span>{nombre}</span></span></td>
+                              <td className="sgt-dp-num">{dtc?`${DIAS_LARGOS[(dtc.getDay()+6)%7].slice(0,3)} ${fechaCorta(cf.fecha)}`:cf.fecha}</td>
+                              <td className="sgt-dp-num">{formatHora(cf.horaInicio)}–{formatHora(cf.horaFin)}</td>
+                              <td>{cf.nombreRotativa}</td>
+                              <td>{cf.servicioEnConflicto?<ChipDesktop tono="aviso">{cf.servicioEnConflicto}</ChipDesktop>:'—'}</td>
+                            </tr>
+                          );})}
+                        </tbody>
+                      </table>
+                      {n>8&&<div className="sgt-dp-ayuda" style={{padding:'6px 12px 8px'}}>y {n-8} más…</div>}
+                    </section>
+                  ):(
+                    <AvisoDesktop tono="exito">Sin conflictos: todos los turnos se asignarán.</AvisoDesktop>
+                  )}
+
+                  <div className="sgt-dp-leyenda">
+                    <span className="sgt-dp-leyenda__item"><span className="sgt-dp-punto sgt-dp-punto--feriado" aria-hidden="true"/>Feriado</span>
+                    <span className="sgt-dp-leyenda__item"><span className="sgt-dp-leyenda__muestra sgt-dp-bloque--regla" aria-hidden="true"><IconoKit name="clock" size={9} strokeWidth={2.6}/></span>Horario ajustado por regla</span>
+                    <span className="sgt-dp-leyenda__item"><span className="sgt-dp-leyenda__muestra sgt-dp-bloque--conflicto" aria-hidden="true"><IconoKit name="alert" size={9} strokeWidth={2.6}/></span>Choca con un turno existente</span>
+                    <span className="sgt-dp-leyenda__item"><span className="sgt-dp-leyenda__muestra sgt-dp-leyenda__muestra--fuera" aria-hidden="true"/>Fuera de la vigencia efectiva</span>
+                  </div>
+
+                  <GrillaSemanas
+                    semanas={semanas}
+                    ariaLabel="Vista previa del primer ciclo"
+                    renderDia={(diaIndex,d)=>{
+                      const grupos=buildDayCoverage(daysIndex[diaIndex]||[]); const dt=fechaReal(diaIndex); const ds=toDateStr(dt);
+                      const esFeriado=feriados.has(ds);
+                      const fuera=Boolean((inicioEfectivaDt&&dt<inicioEfectivaDt)||(finEfectivaDt&&dt>finEfectivaDt));
+                      return(
+                        <div className={`sgt-dp-diaprev${esFeriado?' sgt-dp-diaprev--feriado':''}${grupos.length?'':' sgt-dp-diaprev--libre'}${fuera?' sgt-dp-diaprev--fuera':''}`} title={fuera?'Fuera de la vigencia efectiva: aquí no se crean turnos':esFeriado?'Feriado — se ajustan los horarios':undefined}>
+                          <div className="sgt-dp-diaprev__fecha">
+                            {esFeriado&&<span className="sgt-dp-punto sgt-dp-punto--feriado" aria-hidden="true"/>}
+                            <span className={`sgt-dp-diaprev__num${d>=5?' sgt-dp-diaprev__num--finde':''}`}>{dt.getDate()}</span>
+                            <span className="sgt-dp-diaprev__mes">{MONTHS_SHORT[dt.getMonth()].toLowerCase()}</span>
+                            {esFeriado&&<span className="sgt-dp-diaprev__etiqueta">Feriado</span>}
+                          </div>
+                          {grupos.length===0&&<span className="sgt-dp-diaprev__libre">Sin turnos</span>}
+                          {grupos.map(({tipo,asignadas,pendientes})=>{ const enConf=conflictoKeys.has(`${ds}|${formatHora(tipo.horaInicio)}`); const afectada=!enConf&&reglaAfecta(tipo,dt); const t=tono(tipo); return(
+                            <span key={tipo.idTipoTurno} className={`sgt-dp-bloque sgt-dp-bloque--${t.clase}${enConf?' sgt-dp-bloque--conflicto':''}${afectada?' sgt-dp-bloque--regla':''}`} style={enConf||afectada?undefined:t.estilo} title={`${tipo.nombre} ${rangoHoras(tipo)} · ${asignadas.length+pendientes.length} turno${asignadas.length+pendientes.length===1?'':'s'}${enConf?' · choca con un turno existente: quedará vacante':afectada?' · horario ajustado por una regla':''}`}>
+                              <IconoKit name={enConf?'alert':afectada?'clock':t.icono} size={10} strokeWidth={2.4}/>
+                              <span className="sgt-dp-bloque__nombre">{tipo.nombre}</span>
+                              <span className="sgt-dp-bloque__cob">{asignadas.length+pendientes.length}</span>
+                            </span>
+                          );})}
+                        </div>
+                      );
+                    }}
+                  />
+                </div>
+              )}
+            </PanelDesktop>
+          </div>
+        </PaginaDesktop>
+
+        {confirmando&&(
+          <ConfirmacionPlan
+            titulo="¿Generar la planificación?"
+            icono={<CalendarCheck2 size={15} strokeWidth={2.2}/>}
+            etiquetaConfirmar="Sí, generar"
+            etiquetaOcupado="Generando…"
+            ocupado={generando}
+            onCancelar={()=>setConfirmando(false)}
+            onConfirmar={()=>onConfirm(fecha,inicioEfectiva,finEfectiva,[...seleccion])}
+          >
+            <p>Se crearán <strong>≈{formatoNumero(totalTurnosEstimado)} turnos</strong> entre el <strong>{fmtD(inicioEfectivaDt)}</strong> y el <strong>{fmtD(finEfectivaDt)}</strong> ({diasTotalesRango} días).</p>
+            {inicioEfectiva!==fecha&&<p>Ancla de rotativa: <strong>{fmtD(start)}</strong> (fase del ciclo).</p>}
+            <p>{n>0?<><strong>{n}</strong> quedará{n===1?'':'n'} vacante{n===1?'':'s'} por conflicto de horario.</>:'Los turnos con choque de horario se crearán sin asignar (vacantes).'}</p>
+            <p>{reglasSel.length>0?<>Se aplicarán <strong>{reglasSel.length}</strong> regla{reglasSel.length===1?'':'s'} de horario.</>:'Sin reglas de horario (horarios base).'}</p>
+          </ConfirmacionPlan>
+        )}
+      </>
+    );
+  }
 
   return(
     <div className="dash-page-bg" style={{flex:1,display:'flex',flexDirection:'column',animation:'sgtSlideLeft .3s ease',overflow:'hidden'}}>
@@ -1081,6 +1691,7 @@ function GenerarView({instancias,daysIndex,maxSemanas,tipoColor,tipos,servicioId
 /* ─── Vista principal ────────────────────────────────────────────────────────── */
 function PlanGuardarBase({onBack}){
   const{user}=useAuth();
+  const{esDesktop}=useLayout();
   const servicioId=user?.servicioId;
 
   const[plantillas,setPlantillas]=useState([]);
@@ -1093,6 +1704,8 @@ function PlanGuardarBase({onBack}){
   const[error,setError]=useState('');
 
   const tipoColor=useMemo(()=>makeTipoColor(tipos),[tipos]);
+  // Desktop: día (sol, verde) / noche (luna, rosado), como el resto del modo desktop.
+  const tonoTipo=useMemo(()=>crearTonoTipo(tipos),[tipos]);
 
   const{instancias,inject,assign,unassign,removeInstancia,reset,loadMolde,toAsignaciones,daysIndex,maxSemanas}=usePlanificacionState({plantillas,funcionarios,puestos});
 
@@ -1252,6 +1865,7 @@ function PlanGuardarBase({onBack}){
   const dayEntradas=detailDia!=null?(daysIndex[detailDia]||[]):[];
 
   if(cargandoDatos){
+    if(esDesktop)return <MoldeCargandoDesktop/>;
     return(
       <div style={{flex:1,display:'flex',flexDirection:'column',background:'var(--surface2)'}}>
         <TopHeader title="Planificación" dense leftSlot={<button onClick={onBack} style={{background:'transparent',border:'none',padding:4,cursor:'pointer',display:'flex'}}><SGTIcon name="chevron-left" size={24} color="var(--ink)"/></button>}/>
@@ -1261,7 +1875,58 @@ function PlanGuardarBase({onBack}){
   }
 
   if(generarOpen){
-    return <GenerarView instancias={instancias} daysIndex={daysIndex} maxSemanas={maxSemanas} tipoColor={tipoColor} tipos={tipos} servicioId={servicioId} generando={generando} planActualId={planActualId} onCancel={()=>setGenerarOpen(false)} onConfirm={onGenerar}/>;
+    return <GenerarView instancias={instancias} daysIndex={daysIndex} maxSemanas={maxSemanas} tipoColor={tipoColor} tipos={tipos} servicioId={servicioId} generando={generando} planActualId={planActualId} onCancel={()=>setGenerarOpen(false)} onConfirm={onGenerar} nombreMolde={planNombre} tonoTipo={tonoTipo} funcionarios={funcionarios}/>;
+  }
+
+  // Desktop (R18): vista raíz del menú (sin volver). El molde a lo ancho y los
+  // mismos paneles que en el móvil, como paneles laterales.
+  if(esDesktop){
+    return(
+      <>
+        <MoldeDesktop
+          servicioNombre={localStorage.getItem('sgt_servicio_activo_nombre')||''}
+          planNombre={planNombre}
+          planActualId={planActualId}
+          instancias={instancias}
+          puestos={puestos}
+          funcionarios={funcionarios}
+          tipos={tipos}
+          daysIndex={daysIndex}
+          maxSemanas={maxSemanas}
+          coberturaDia={buildDayCoverage}
+          tonoTipo={tonoTipo}
+          formatoRango={rangoHoras}
+          error={error}
+          onCerrarError={()=>setError('')}
+          toast={toast}
+          onNuevoMolde={nuevoMolde}
+          onMoldes={openMoldes}
+          onVigencias={abrirVigencias}
+          onEliminarTurnos={abrirEliminarTurnos}
+          onAgregar={()=>setInjectOpen(true)}
+          onGenerar={()=>setGenerarOpen(true)}
+          onAsignar={(inst)=>setAssignInstance(inst)}
+          onDia={(di)=>setDetailDia(di)}
+        />
+        <InyectarSheet open={injectOpen} onClose={()=>setInjectOpen(false)} onInject={onInject} plantillas={plantillas} puestos={puestos}/>
+        <MoldesSheet open={moldesOpen} onClose={()=>setMoldesOpen(false)} onSave={onSave} onLoad={onLoad} onDelete={onDeleteMolde} instancias={instancias} moldes={moldes} loading={cargandoMoldes} nombreInicial={planNombre} planActualId={planActualId}/>
+        <EliminarTurnosSheet open={eliminarOpen} onClose={()=>setEliminarOpen(false)} onConfirm={onEliminarTurnos} eliminando={eliminandoTurnos} nombreMolde={planNombre}/>
+        <VigenciasSheet
+          open={vigenciasOpen}
+          onClose={()=>setVigenciasOpen(false)}
+          ejecuciones={ejecuciones}
+          cargando={cargandoEjecuciones}
+          onAcortar={onAcortarEjecucion}
+          onAnular={onAnularEjecucion}
+          onEditarDesde={onEditarDesdeFecha}
+          procesando={procesandoVigencia}
+          moldeActualId={planActualId}
+          nombreMoldeActual={planNombre}
+        />
+        <AsignarFuncionarioSheet open={!!assignInstance} onClose={()=>setAssignInstance(null)} instancia={assignInstance?instancias.find(i=>i.id===assignInstance.id):null} instancias={instancias} funcionarios={funcionarios} onAssign={onAssign} onUnassign={(id)=>{ unassign(id); flash('Asignación retirada'); }} onRemove={(id)=>{ removeInstancia(id); flash('Rotativa quitada'); }}/>
+        <DetalleDiaSheet open={detailDia!=null} onClose={()=>setDetailDia(null)} diaIndex={detailDia} entradasDelDia={dayEntradas} tipoColor={tipoColor} tonoTipo={tonoTipo} funcionarios={funcionarios} onAssignInstance={(inst)=>{ setDetailDia(null); setTimeout(()=>setAssignInstance(inst),220); }}/>
+      </>
+    );
   }
 
   return(
