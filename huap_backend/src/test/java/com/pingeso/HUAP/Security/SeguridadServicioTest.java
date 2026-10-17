@@ -122,4 +122,20 @@ class SeguridadServicioTest {
         autenticarComo(1L, null, "ADMINISTRADOR", null);
         assertThat(seguridadServicio.esGestionDelServicio()).isFalse();
     }
+
+    // ============================ C-18: cómo se reconoce al administrador ============================
+
+    @Test
+    void elAdministradorSeReconoceSoloPorElRolDeSistemaADMINISTRADOR() {
+        // El backend emite «ADMINISTRADOR» o «USUARIO» (Rol_Sistema); «ADMIN» no es un rol del sistema.
+        autenticarComo(1L, "JEFATURA", "ADMINISTRADOR", 4L);
+        assertThat(seguridadServicio.esAdministrador()).isTrue();
+
+        autenticarComo(1L, "JEFATURA", "ADMIN", 4L);
+        assertThat(seguridadServicio.esAdministrador()).isFalse();
+        assertThatThrownBy(() -> seguridadServicio.exigirMismoServicio(2L)).isInstanceOf(AccessDeniedException.class);
+
+        autenticarComo(1L, "JEFATURA", "USUARIO", 4L);
+        assertThat(seguridadServicio.esAdministrador()).isFalse();
+    }
 }
