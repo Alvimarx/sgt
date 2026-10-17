@@ -4,7 +4,7 @@
 // incrustado en el Centro de operaciones (R16, "Propuesta C"); aquí se
 // extrajo para que lo compartan todas las vistas, con secciones según el rol
 // (navegacion.js).
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import './desktop.css';
 import { SGTIcon } from '../Style/UIPrimitives';
 import { useNotifications } from '../../context/NotificationContext';
@@ -37,6 +37,20 @@ const DesktopShell = ({ user, activo, onNavigate, onLogout, onSwitchService, con
 
   const badges = { solicitudes: conteoSolicitudes, notificaciones: unreadCount };
 
+  // Con muchos ítems (administrador) el menú scrollea y el ítem activo puede
+  // quedar fuera de la vista a 768 px de alto: se acerca lo justo para que se
+  // vea, con aire para el título de su grupo. Si ya se ve, no se mueve nada.
+  const navRef = useRef(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const item = nav?.querySelector('[aria-current="page"]');
+    if (!nav || !item) return;
+    const n = nav.getBoundingClientRect();
+    const i = item.getBoundingClientRect();
+    if (i.top < n.top + 28) nav.scrollTop -= n.top + 28 - i.top;
+    else if (i.bottom > n.bottom - 8) nav.scrollTop += i.bottom - (n.bottom - 8);
+  }, [activo, grupos]);
+
   return (
     <div className="sgt-desktop">
       <aside className="sgt-desktop__sidebar" aria-label="Navegación principal">
@@ -48,7 +62,7 @@ const DesktopShell = ({ user, activo, onNavigate, onLogout, onSwitchService, con
           </div>
         </div>
 
-        <nav className="sgt-desktop__nav">
+        <nav className="sgt-desktop__nav" ref={navRef}>
           {grupos.map((g) => (
             <React.Fragment key={g.nombre}>
               <div className="sgt-desktop__grupo">{g.nombre}</div>

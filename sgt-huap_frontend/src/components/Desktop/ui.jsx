@@ -6,13 +6,19 @@
 // las pantallas se vean como un mismo producto. Guía: docs/desktop/GUIA-DESKTOP.md
 import React from 'react';
 import { SGTIcon } from '../Style/UIPrimitives';
+// El kit trae su CSS: así carga antes que el CSS de cada grupo (que se importa
+// después del kit) y una regla de grupo le gana a la del kit en un empate.
+import './desktop.css';
 
 const cx = (...clases) => clases.filter(Boolean).join(' ');
 
 // Área con scroll propio dentro del marco. `ancho`: 'completo' | 'amplio'
-// (1440) | 'medio' (1120) | 'angosto' (760).
-export const PaginaDesktop = ({ ancho = 'completo', children, className, style }) => (
-  <div className={cx('sgt-d-pagina', className)} style={style}>
+// (1440) | 'medio' (1120) | 'angosto' (760); con ancho máximo, el contenido
+// queda alineado a la izquierda, bajo el título. `llena`: la página ocupa el
+// alto disponible para que un PanelDesktop `llena` crezca con su tabla hasta
+// ese alto y desde ahí la tabla scrollee por dentro con el encabezado fijo.
+export const PaginaDesktop = ({ ancho = 'completo', llena = false, children, className, style }) => (
+  <div className={cx('sgt-d-pagina', llena && 'sgt-d-pagina--llena', className)} style={style}>
     <div className={cx('sgt-d-contenido', ancho !== 'completo' && `sgt-d-contenido--${ancho}`)}>{children}</div>
   </div>
 );
@@ -34,9 +40,9 @@ export const EncabezadoDesktop = ({ titulo, subtitulo, acciones, izquierda }) =>
 // `scroll`: el cuerpo ocupa el alto disponible y scrollea solo.
 export const PanelDesktop = ({
   titulo, subtitulo, icono, iconoColor = 'var(--primary)', iconoFondo,
-  acciones, children, sinPadding = false, scroll = false, className, style, ...rest
+  acciones, children, sinPadding = false, scroll = false, llena = false, className, style, ...rest
 }) => (
-  <section className={cx('sgt-d-panel', className)} style={style} aria-label={typeof titulo === 'string' ? titulo : undefined} {...rest}>
+  <section className={cx('sgt-d-panel', llena && 'sgt-d-panel--llena', className)} style={style} aria-label={typeof titulo === 'string' ? titulo : undefined} {...rest}>
     {titulo && (
       <div className="sgt-d-panel__cabecera">
         {icono && (

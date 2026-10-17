@@ -366,7 +366,7 @@ html.sgt-modo-desktop body {
 }
 .sgt-d-contenido {
   width: 100%;
-  margin: 0 auto;
+  margin: 0; /* con ancho máximo, alineado bajo el título (no centrado) */
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -374,6 +374,15 @@ html.sgt-modo-desktop body {
 .sgt-d-contenido--amplio { max-width: 1440px; }
 .sgt-d-contenido--medio { max-width: 1120px; }
 .sgt-d-contenido--angosto { max-width: 760px; }
+
+/* Página que ocupa todo el alto (PaginaDesktop `llena` + PanelDesktop `llena`):
+   el panel crece con su contenido hasta el alto disponible; desde ahí su tabla
+   scrollea por dentro y el encabezado de la tabla queda fijo. */
+.sgt-d-pagina--llena { display: flex; flex-direction: column; }
+.sgt-d-pagina--llena > .sgt-d-contenido { flex: 1; min-height: 0; }
+.sgt-d-panel--llena { flex: 0 1 auto; min-height: 0; }
+.sgt-d-panel--llena > .sgt-d-panel__cuerpo { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sgt-d-panel--llena .sgt-d-tabla-envoltura { flex: 1; min-height: 0; }
 
 /* Encabezado de página (para vistas que no usan TopHeader en desktop) */
 .sgt-d-encabezado {
@@ -653,6 +662,7 @@ html.sgt-modo-desktop body {
   align-items: center;
   gap: 6px;
 }
+.sgt-d-segmento:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .sgt-d-segmento[aria-pressed='true'],
 .sgt-d-segmento[aria-selected='true'] {
   background: #fff;
