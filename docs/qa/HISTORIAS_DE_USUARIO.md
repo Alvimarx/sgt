@@ -55,7 +55,7 @@ Cada HU tiene estos campos:
 
 - **Móvil** es una ventana de menos de 1200 px, con la barra inferior: bajo 600 px la app ocupa toda la pantalla y entre 600 y 1199 px se ve dentro de un marco de teléfono. **Desktop** es una ventana de 1200 px o más: menú lateral (`DesktopShell`). El umbral está en `src/layout/layout.js`. Los proyectos de `playwright.config.js` son `movil` (390 × 844), `desktop` (1366 × 768) y `desktop-fhd` (1920 × 1080).
 - En desktop, todo panel `Sheet` se abre como panel lateral desde la derecha y se cierra con Escape.
-- Permisos del backend: `SecurityConfig` niega por rol en el filtro de seguridad (rutas de administración global y de servicio, y `PUT /solicitudes/*/estado`). Algunos controllers niegan además con `@PreAuthorize` o con `SeguridadServicio`. Las negaciones dentro de un controller responden 403, salvo en `POST /turnos/alterar`, que responde 400 (HU-ASG-02). Las del filtro, según BUG-001, terminan en 401 y el frontend cierra la sesión (no verificado en esta revisión; ver HU-AUT-07).
+- Permisos del backend: `SecurityConfig` niega por rol en el filtro de seguridad (rutas de administración global y de servicio, y `PUT /solicitudes/*/estado`). Algunos controllers niegan además con `@PreAuthorize` o con `SeguridadServicio`. Las negaciones dentro de un controller responden 403. Las excepciones, que responden 400, son `POST /turnos/alterar` (HU-ASG-02), la respuesta de alguien que no es el receptor de una solicitud (HU-SOL-08; `SolicitudService.java:275` y `:306`) y la cancelación de una solicitud propia ya resuelta (HU-SOL-11). Las del filtro, según BUG-001, terminan en 401 y el frontend cierra la sesión (no verificado en esta revisión; ver HU-AUT-07).
 
 ### 1.5 Funciones del backend que no tienen pantalla
 
@@ -607,7 +607,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Al confirmar, la solicitud queda con la marca CANCELADA (neutra), con el motivo «Cancelada por el solicitante · motivo original: …», y el turno se puede volver a pedir.
   4. La bitácora registra el evento «Cancelada por el solicitante» y el filtro por estado RECHAZADA lo incluye.
   5. Una jefatura puede cancelar una solicitud propia aunque no pueda decidirla.
-  6. Negativos (API): cancelar una solicitud ajena responde 403 «Solo puedes cancelar tus propias solicitudes»; una ya resuelta, «Esta solicitud ya fue resuelta: no se puede cancelar».
+  6. Negativos (API): cancelar una solicitud ajena responde 403 «Solo puedes cancelar tus propias solicitudes»; una propia ya resuelta, 400 «Esta solicitud ya fue resuelta: no se puede cancelar». El backend revisa primero quién la emitió (`SolicitudService.java:241-248`): una ajena ya resuelta responde 403.
 - **Trazabilidad:** R15.
 - **Estado:** **Implementada.** Evidencia: `SolicitudesView` (`handleCancelar`, `confirmarCancelacion`; `canCancelar` y `esCancelada` en `evaluarSolicitud`); `SolicitudService.cancelarSolicitud`; `BitacoraView` (evento `SOLICITUD_CANCELADA`).
 - **Prueba E2E:** `medico` y `jefatura`; muta; ambos. Ya existe: foto con datos simulados en `interacciones-turnos.spec.js`.
@@ -682,7 +682,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Criterios de aceptación:**
   1. Solo en ofertas «Pend. apertura»: «Aprobar» la deja «Abierta» (en el Centro, «Oferta abierta al servicio.») y «Rechazar» la deja «Rechazada».
   2. Una oferta en otro estado responde «La oferta no está en estado PENDIENTE_APROBACION».
-  3. Negativos: el médico no ve los botones y por API recibe 403; una oferta de otro servicio también responde 403.
+  3. Negativos: el médico no ve los botones y por API recibe 403; una oferta de otro servicio también responde 403, salvo al administrador (`SeguridadServicio.exigirMismoServicio`).
 - **Trazabilidad:** FUN-SGT-031; MF-012.
 - **Estado:** **Implementada.** Evidencia: `OfertaGeneralCard` y `evaluarOferta` (`puedeDecidirApertura`); `OfertaGeneralController` (`@PreAuthorize`); `OfertaGeneralService.aprobarOferta`, `rechazarOferta` y `exigirMismoServicioQueOferta`. Observación: las ofertas no tienen la segregación de funciones de las solicitudes (H-07): una jefatura puede abrir su propia oferta, y ni la interfaz ni el backend lo impiden (§5.1).
 - **Prueba E2E:** `jefatura`, con una oferta creada por `medico`; muta; ambos.
@@ -742,7 +742,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   2. Móvil: título «Bandeja» con «N sin leer» o «Todo al día», y las marcas «N sin leer» y «N recibidas». Desktop: segmentos «Todas», «Sin leer» y «Leídas» con sus conteos.
   3. El contador del menú, el del encabezado y las marcas «Nueva» coinciden.
   4. Sin notificaciones veo «No tienes notificaciones en este momento.».
-  5. Negativo (API): pedir la bandeja o el contador de otro funcionario responde 403 «No puedes consultar la bandeja de otro funcionario».
+  5. Negativo (API): pedir la bandeja o el contador de otro funcionario responde 403 «No puedes consultar la bandeja de otro funcionario», salvo al administrador (`NotificacionController.java:24-28`).
 - **Trazabilidad:** FUN-SGT-034; MF-014; TC-034, TC-035; BUG-006.
 - **Estado:** **Implementada.** Evidencia: `NotificationContext` (polling); `NotificationView`; `NotificacionController.getBandeja` y `contarSinLeer` (`exigirPropiaONadaBandeja`). Sobre los datos: las notificaciones 5 a 12 del seed (Medicina Interna; el administrador ve tres) usan los estados `NO_LEIDA` y `LEIDA`, que el código no reconoce. Aparecen como «Nueva», pero el contador marca 0, así que con esos datos el criterio 3 falla.
 - **Prueba E2E:** 30000013-3, que tiene una notificación sin leer (la 16); no muta; ambos. Ya existe: foto de `notifications` en `pantallas.spec.js`.
@@ -1535,8 +1535,16 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **QA:** BUG-002, BUG-004, BUG-006 y BUG-007, con propuestas como «filtrar `findAllSolicitudes()` por servicio del solicitante» y «validar en el controlador que `idFuncionario` del path coincide con el `Authentication.getPrincipal()`».
 - **Código (regla escrita):** `SeguridadServicio`: «Todo endpoint que reciba un {@code servicioId} (o un recurso del que se pueda derivar uno) desde el cliente debe llamar a {@link #exigirMismoServicio(Long)} antes de usarlo.»; `REVISION_POST_CORRECCIONES_SGT.md` §4: «**GETs restantes sin scoping por servicio**: no auditados exhaustivamente esta etapa — la corrección se limitó a los endpoints de escritura mencionados en las 12 secciones.».
 - **Código hoy, sin control:** `GET /solicitudes` y sus variantes (la bandeja de gestión depende de él), los `GET /turnos/servicio/{id}/**`, `GET /turnos/funcionario/{id}`, `GET /ofertas-generales/servicio/{id}`, `GET /funcionarios/{id}/summary`, `GET /Personal/summary` (todo el padrón del hospital, con RUT), `PUT /notificaciones/{id}/leer`, `DELETE /notificaciones/{id}` y `GET /notificaciones/{id}`. La bitácora exige rol de gestión, pero no filtra por servicio. Las escrituras de puestos y reglas no comprueban el servicio de la sesión. **Ya corregido:** bandeja y contador de notificaciones, nómina de funcionarios (`/funcionarios/summary`), exportaciones, alteración y CRUD de turnos, y decisión de solicitudes y ofertas.
+- **También sin control (E2E de la fase 2a, 17 oct, confirmado en el código):**
+  - `GET /turnos` (`TurnoController.java:79-82`) entrega a cualquier sesión, médico incluido, todos los turnos del hospital, con el nombre y el RUT de quien está asignado. El filtro de seguridad restringe solo las escrituras de `/turnos/**`.
+  - `GET /turnos/{id}` (`:94-98`) y `GET /turnos/puesto/{id}` (`:387-390`).
+  - `GET /ofertas-generales/ofertor/{id}` (`OfertaGeneralController.java:92-95`).
+  - `GET /planificaciones/servicio/{id}` (`PlanificacionController.java:49-55`) entrega el molde de otro servicio con los nombres de su personal. `GLOBAL_ADMIN_PATHS` protege solo las escrituras.
+  - `GET /notificaciones/solicitud/{id}` (`NotificacionController.java:72-75`).
+  - Sin datos personales: las lecturas de configuración por servicio (puestos, rotativas, tipos de turno, reglas, `GET /planificaciones/{id}` y sus `/ejecuciones`).
+  - `GET /funcionarios/status/{rut}`, que a cualquier sesión le dice si un RUT está registrado y con qué id.
 - **Pregunta:** ¿Se corrige antes de entregar a TIC o se entrega como riesgo conocido?
-- **Recomendación:** con datos reales de personal, corregir antes: `GET /solicitudes` filtrado por rol y servicio, `exigirMismoServicio` en los GET por servicio, y control de dueño en las notificaciones. Es el mayor riesgo de seguridad que queda.
+- **Recomendación:** con datos reales de personal, corregir antes: `GET /solicitudes` filtrado por rol y servicio, `exigirMismoServicio` en los GET por servicio y por id de recurso, y control de dueño en las notificaciones. `GET /turnos` (todos los turnos) se restringe al administrador, o se quita si la interfaz no lo usa. Es el mayor riesgo de seguridad que queda.
 
 ### C-18 · Cómo se reconoce al administrador
 
@@ -1636,6 +1644,8 @@ TMPDIR=~/.cache/sgt-pw-tmp npx playwright test e2e/hu --project=movil --project=
 ```
 
 Quedaron sin automatizar AUT-01 (criterio 6: el seed no tiene un funcionario sin servicios) y AUT-02 (criterio 5: exige esperar 5 minutos reales). Los estados que el seed no tiene se prueban con respuestas GET simuladas en el navegador.
+
+**Fase 2a (17 oct 2026):** `e2e/hu/permisos.spec.js` cubre los criterios de la fila 2a y `e2e/hu/lecturas-c17.spec.js` las lecturas de C-17. Son 53 pruebas por proyecto. Las que solo usan la API corren una vez, en `desktop`. Cada prueba de C-17 hace antes una lectura legítima de control, para que un cambio de ruta no quede escondido en la falla esperada. Antes de cada escritura que debe ser negada, la prueba confirma los datos que la hacen inválida. Con la fase 1, la suite completa queda en verde (323 pasan, de ellas 62 fallas esperadas: 24 de la fase 1 y 38 de la 2a; 93 omitidas) y la base, igual a la pristina. Sin automatizar: JER-02 (criterio 2), porque hoy muta (C-03); SOL-11 (criterio 6, «ya resuelta»), porque ese mensaje solo le llega al emisor y crear una resuelta muta (fase 3); y las excepciones del administrador que escriben (SOL-12, criterio 4; ASG-02, criterio 5). Ninguno de la fila resultó ser de la 2b: todos se niegan dentro del controller o del service. Caben también en la 2a, sin mutar, la mitad «otro servicio» de SOL-09 (criterio 8) y OFE-02 (criterio 2).
 
 ### 6.3 HU que no se pueden probar de punta a punta sin arreglar algo antes
 
