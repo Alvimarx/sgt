@@ -123,11 +123,11 @@ class BitacoraAlcanceServicioTest {
         gestionDe(ENFERMERIA);
         when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDe(100L, URGENCIAS)));
         when(turnoRepository.findById(101L)).thenReturn(Optional.of(turnoDe(101L, URGENCIAS)));
-        when(bitacoraRepository.findByTurno_IdTurno(100L)).thenReturn(List.of(generacionUrgencias));
 
-        assertThrows(AccessDeniedException.class, () -> service.findByTurno(100L));
-        assertThrows(AccessDeniedException.class, () -> service.findByTurno(101L));
-        verify(bitacoraRepository, never()).findByTurno_IdTurno(any());
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () -> service.historialDelTurno(100L));
+        assertEquals("No tienes acceso a datos de otro servicio", ex.getMessage());
+        assertThrows(AccessDeniedException.class, () -> service.historialDelTurno(101L));
+        verify(bitacoraRepository, never()).findEventosOrigenByTurnos(any());
     }
 
     // ============================ C-06: «Ver historial» del turno ============================
@@ -145,13 +145,55 @@ class BitacoraAlcanceServicioTest {
         return t;
     }
 
-    @Test
-    void historialDelTurno_elMedicoVeElDeSuTurnoDeHoy() {
-        medico(369L, URGENCIAS);
-        when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDeServicioYDueno(100L, URGENCIAS, 369L)));
-        when(bitacoraRepository.findByTurno_IdTurno(100L)).thenReturn(List.of(generacionUrgencias));
+    private static java.time.LocalDateTime a(int dia, int hora) {
+        return java.time.LocalDateTime.of(2026, 10, dia, hora, 0);
+    }
 
-        assertEquals(List.of(generacionUrgencias), service.findByTurno(100L));
+    /**
+     * El turno 100 de Urgencias, hoy del médico 369: lo generó la planificación (día 1), el 368
+     * pidió botarlo (día 2, aprobado), el 369 pidió cubrirlo (día 3), y el 368 lo había ofrecido en
+     * una oferta general que la jefatura rechazó (día 4). Los eventos de solicitudes y ofertas
+     * guardan su momento en fechaInicioAfectada; los directos, en fechaModificacion.
+     */
+    private List<Long> historialDelTurno100(java.util.function.Supplier<List<com.pingeso.HUAP.DTO.BitacoraResponseDTO>> pedir) {
+        TurnoEntity turno = turnoDeServicioYDueno(100L, URGENCIAS, 369L);
+        when(turnoRepository.findById(100L)).thenReturn(Optional.of(turno));
+        BitacoraEntity generado = BitacoraEntity.builder().idEvento(10L).tipoEvento("GENERACION_TURNO")
+                .turno(turno).fechaModificacion(a(1, 9)).build();
+        SolicitudEntity botar = SolicitudEntity.builder().idSolicitud(30L).funcionario(funcionario(368L, URGENCIAS))
+                .turno(turno).motivo("Motivo personal de otra persona").build();
+        SolicitudEntity cobertura = SolicitudEntity.builder().idSolicitud(31L).funcionario(funcionario(369L, URGENCIAS))
+                .turno(turno).build();
+        BitacoraEntity botarAprobado = BitacoraEntity.builder().idEvento(11L).tipoEvento("CAMBIO_ESTADO_APROBADA")
+                .solicitud(botar).fechaInicioAfectada(a(2, 9)).build();
+        BitacoraEntity coberturaCreada = BitacoraEntity.builder().idEvento(12L).tipoEvento("SOLICITUD_CREADA")
+                .solicitud(cobertura).fechaInicioAfectada(a(3, 9)).build();
+        when(bitacoraRepository.findEventosOrigenByTurnos(List.of(100L)))
+                .thenReturn(List.of(generado, botarAprobado, coberturaCreada));
+        OfertaGeneralEntity rechazada = OfertaGeneralEntity.builder().idOfertaGeneral(40L).turno(turno)
+                .ofertor(funcionario(368L, URGENCIAS)).estado(OfertaGeneralEntity.EstadoOferta.RECHAZADA).build();
+        when(ofertaGeneralRepository.findByTurnoIdInWithPostulaciones(List.of(100L))).thenReturn(List.of(rechazada));
+        when(ofertaGeneralRepository.findById(40L)).thenReturn(Optional.of(rechazada));
+        BitacoraEntity ofertaRechazada = BitacoraEntity.builder().idEvento(13L).tipoEvento("OFERTA_GENERAL_RECHAZADA")
+                .motivo("idOferta=40").fechaInicioAfectada(a(4, 9)).build();
+        when(bitacoraRepository.findByMotivoIn(List.of("idOferta=40"))).thenReturn(List.of(ofertaRechazada));
+
+        return pedir.get().stream().map(com.pingeso.HUAP.DTO.BitacoraResponseDTO::getIdEvento).toList();
+    }
+
+    @Test
+    void historialDelTurno_laGestion_traeLosDirectosLosDeSolicitudesYLosDeOfertas_delMasRecienteAlMasAntiguo() {
+        gestionDe(URGENCIAS);
+
+        assertEquals(List.of(13L, 12L, 11L, 10L), historialDelTurno100(() -> service.historialDelTurno(100L)));
+    }
+
+    @Test
+    void historialDelTurno_elMedicoVeElDeSuTurnoDeHoy_sinSolicitudesAjenasNiOfertasRechazadasDeOtros() {
+        medico(369L, URGENCIAS);
+
+        assertEquals(List.of(12L, 10L), historialDelTurno100(() -> service.historialDelTurno(100L)));
+        verify(bitacoraRepository, never()).findByMotivoIn(any());
     }
 
     @Test
@@ -160,22 +202,20 @@ class BitacoraAlcanceServicioTest {
         when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDeServicioYDueno(100L, URGENCIAS, 368L)));
         when(turnoRepository.findById(101L)).thenReturn(Optional.of(turnoDeServicioYDueno(101L, URGENCIAS, null)));
 
-        AccessDeniedException ajeno = assertThrows(AccessDeniedException.class, () -> service.findByTurno(100L));
+        AccessDeniedException ajeno = assertThrows(AccessDeniedException.class, () -> service.historialDelTurno(100L));
         assertEquals("Solo puedes ver el historial de tus turnos", ajeno.getMessage());
-        assertThrows(AccessDeniedException.class, () -> service.findByTurno(101L));
-        verify(bitacoraRepository, never()).findByTurno_IdTurno(any());
+        assertThrows(AccessDeniedException.class, () -> service.historialDelTurno(101L));
+        verify(bitacoraRepository, never()).findEventosOrigenByTurnos(any());
     }
 
     @Test
-    void historialDelTurno_laGestionVeLosDeSuServicio_yElAdministradorTodos() {
-        gestionDe(URGENCIAS);
-        when(turnoRepository.findById(100L)).thenReturn(Optional.of(turnoDeServicioYDueno(100L, URGENCIAS, 368L)));
-        when(bitacoraRepository.findByTurno_IdTurno(100L)).thenReturn(List.of(generacionUrgencias));
-        assertEquals(List.of(generacionUrgencias), service.findByTurno(100L));
-
+    void historialDelTurno_elAdministradorVeCualquierTurno() {
         when(seguridadServicio.esAdministrador()).thenReturn(true);
         when(turnoRepository.findById(200L)).thenReturn(Optional.of(turnoDeServicioYDueno(200L, ENFERMERIA, 20L)));
-        assertTrue(service.findByTurno(200L).isEmpty());
+        when(bitacoraRepository.findEventosOrigenByTurnos(List.of(200L))).thenReturn(List.of(solicitudEnfermeria));
+
+        assertEquals(List.of(2L), service.historialDelTurno(200L).stream()
+                .map(com.pingeso.HUAP.DTO.BitacoraResponseDTO::getIdEvento).toList());
     }
 
     @Test
@@ -184,7 +224,7 @@ class BitacoraAlcanceServicioTest {
         when(turnoRepository.findById(999L)).thenReturn(Optional.empty());
 
         org.springframework.web.server.ResponseStatusException ex = assertThrows(
-                org.springframework.web.server.ResponseStatusException.class, () -> service.findByTurno(999L));
+                org.springframework.web.server.ResponseStatusException.class, () -> service.historialDelTurno(999L));
         assertEquals(404, ex.getStatusCode().value());
     }
 

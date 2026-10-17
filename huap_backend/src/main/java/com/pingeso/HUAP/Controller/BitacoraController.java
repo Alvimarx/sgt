@@ -68,15 +68,17 @@ public class BitacoraController {
 
     // C-06 (HU-DET-04): «Ver historial» del detalle del turno. Es la única ruta de la bitácora
     // abierta al MEDICO, y solo para el turno que tiene hoy; la gestión, para los turnos de su
-    // servicio; el ADMINISTRADOR, todos (BitacoraService.findByTurno).
-    @Operation(summary = "Listar eventos asociados directamente a un turno",
-            description = "El historial del turno. ADMINISTRADOR: cualquier turno. JEFATURA o SUBROGANTE: "
-                    + "los turnos de su servicio. Cualquiera, el turno que tiene asignado hoy. "
-                    + "Otro turno: 403. Turno inexistente: 404.")
+    // servicio; el ADMINISTRADOR, todos (BitacoraService.historialDelTurno).
+    @Operation(summary = "Historial de un turno (formato enriquecido)",
+            description = "Los eventos del turno, de sus solicitudes (como turno o turno del receptor) y de sus "
+                    + "ofertas generales, del más reciente al más antiguo, en el formato de /bitacoras/dto. "
+                    + "ADMINISTRADOR: cualquier turno. JEFATURA o SUBROGANTE: los turnos de su servicio. "
+                    + "Cualquiera: el turno que tiene asignado hoy, sin las solicitudes en que no participa ni "
+                    + "las ofertas rechazadas de otros. Otro turno: 403. Turno inexistente: 404.")
     @GetMapping("/turno/{idTurno}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE','MEDICO')")
-    public ResponseEntity<List<BitacoraEntity>> getByTurno(@PathVariable Long idTurno) {
-        return ResponseEntity.ok(bitacoraService.findByTurno(idTurno));
+    public ResponseEntity<List<BitacoraResponseDTO>> getByTurno(@PathVariable Long idTurno) {
+        return ResponseEntity.ok(bitacoraService.historialDelTurno(idTurno));
     }
 
     @Operation(summary = "Listar eventos asociados a una solicitud")

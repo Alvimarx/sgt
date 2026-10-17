@@ -19,6 +19,9 @@ public interface BitacoraRepository extends JpaRepository<BitacoraEntity, Long> 
 
     List<BitacoraEntity> findBySolicitud_IdSolicitud(Long idSolicitud);
 
+    /** Eventos cuyo motivo es uno de los indicados, p. ej. los de una oferta general ({@code "idOferta=X"}). */
+    List<BitacoraEntity> findByMotivoIn(List<String> motivos);
+
     List<BitacoraEntity> findByActivoTrue();
 
     @Query("""

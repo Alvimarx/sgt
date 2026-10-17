@@ -85,29 +85,77 @@ public class BitacoraService {
     }
 
     /**
-     * C-06 (HU-DET-04): el historial de un turno, para «Ver historial» del detalle. Lo ve el
-     * ADMINISTRADOR, la gestión del servicio del turno y quien tiene hoy el turno, aunque sea
-     * médico; cualquier otro recibe 403. Si el turno no existe, 404. Antes se revisaba el servicio
-     * solo si había eventos: un turno sin eventos de otro servicio respondía 200 con la lista vacía.
+     * C-06 (HU-DET-04): el historial de un turno, para «Ver historial» del detalle, en el formato
+     * de {@code /bitacoras/dto} y del evento más reciente al más antiguo. Trae los eventos ligados
+     * al turno (generación, asignaciones manuales, cambio de horario), los de las solicitudes cuyo
+     * turno o turno del receptor es ese y los de las ofertas generales de ese turno.
+     *
+     * <p>Lo ve el ADMINISTRADOR, la gestión del servicio del turno y quien tiene hoy el turno,
+     * aunque sea médico; cualquier otro recibe 403. Si el turno no existe, 404. A quien lo ve por
+     * ser el dueño (el médico) se le aplican las lecturas vigentes: de las solicitudes, solo
+     * aquellas en que es emisor o receptor (C-17); de las ofertas, no las rechazadas de otros
+     * (C-16). Así no lee el motivo de la solicitud de otra persona sobre ese turno.
      */
     @Transactional(readOnly = true)
-    public List<BitacoraEntity> findByTurno(Long idTurno) {
+    public List<BitacoraResponseDTO> historialDelTurno(Long idTurno) {
         TurnoEntity turno = turnoRepository.findById(idTurno)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El turno no existe"));
-        exigirAccesoAlHistorialDelTurno(turno);
-        return bitacoraRepository.findByTurno_IdTurno(idTurno);
+        boolean completo = verHistorialCompleto(turno);
+        Long idUsuario = completo ? null : seguridadServicio.idUsuarioActual();
+
+        // Directos, de solicitudes (como turno o como turno del receptor) y de ofertas generales,
+        // sin repetir. Los de una oferta llevan «idOferta=X» en el motivo.
+        java.util.Map<Long, BitacoraEntity> eventos = new java.util.LinkedHashMap<>();
+        bitacoraRepository.findEventosOrigenByTurnos(List.of(idTurno))
+                .forEach(e -> eventos.putIfAbsent(e.getIdEvento(), e));
+        List<String> motivosDeOfertas = ofertaGeneralRepository.findByTurnoIdInWithPostulaciones(List.of(idTurno)).stream()
+                .filter(o -> completo || o.getEstado() != OfertaGeneralEntity.EstadoOferta.RECHAZADA
+                        || (o.getOfertor() != null && Objects.equals(o.getOfertor().getIdFuncionario(), idUsuario)))
+                .map(o -> PREFIJO_OFERTA + o.getIdOfertaGeneral())
+                .toList();
+        if (!motivosDeOfertas.isEmpty()) {
+            bitacoraRepository.findByMotivoIn(motivosDeOfertas).forEach(e -> eventos.putIfAbsent(e.getIdEvento(), e));
+        }
+
+        return eventos.values().stream()
+                .filter(e -> completo || e.getSolicitud() == null
+                        || AlcanceServicio.participaEnSolicitud(e.getSolicitud(), idUsuario))
+                .sorted(MAS_RECIENTE_PRIMERO)
+                .map(this::convertToDTO)
+                .toList();
     }
 
-    private void exigirAccesoAlHistorialDelTurno(TurnoEntity turno) {
-        if (seguridadServicio.esAdministrador()) return;
+    /**
+     * ¿Quién pide el historial lo ve completo? El ADMINISTRADOR y la gestión del servicio del turno,
+     * sí. Quien tiene hoy el turno (también una jefatura de otro servicio), con las lecturas de un
+     * médico. Cualquier otro: 403.
+     */
+    private boolean verHistorialCompleto(TurnoEntity turno) {
+        if (seguridadServicio.esAdministrador()) return true;
+        Long servicioDelTurno = AlcanceServicio.servicioDe(turno);
+        boolean gestion = seguridadServicio.esGestionDelServicio();
+        if (gestion && servicioDelTurno != null && servicioDelTurno.equals(seguridadServicio.idServicioActual())) {
+            return true;
+        }
         boolean esSuyoHoy = turno.getFuncionario() != null
                 && Objects.equals(turno.getFuncionario().getIdFuncionario(), seguridadServicio.idUsuarioActual());
-        if (esSuyoHoy) return;
-        if (seguridadServicio.esGestionDelServicio()) {
-            seguridadServicio.exigirMismoServicio(AlcanceServicio.servicioDe(turno));
-            return;
-        }
-        throw new AccessDeniedException("Solo puedes ver el historial de tus turnos");
+        if (esSuyoHoy) return false;
+        throw new AccessDeniedException(gestion ? OTRO_SERVICIO : "Solo puedes ver el historial de tus turnos");
+    }
+
+    /**
+     * Del más reciente al más antiguo. Los eventos de solicitudes y ofertas guardan su momento en
+     * {@code fechaInicioAfectada}; los demás, en {@code fechaModificacion}. A igual momento, el de id
+     * mayor (el que se guardó después) va primero.
+     */
+    private static final java.util.Comparator<BitacoraEntity> MAS_RECIENTE_PRIMERO = java.util.Comparator
+            .<BitacoraEntity, LocalDateTime>comparing(BitacoraService::momentoDelEvento,
+                    java.util.Comparator.nullsLast(java.util.Comparator.<LocalDateTime>reverseOrder()))
+            .thenComparing(BitacoraEntity::getIdEvento,
+                    java.util.Comparator.nullsLast(java.util.Comparator.<Long>reverseOrder()));
+
+    private static LocalDateTime momentoDelEvento(BitacoraEntity evento) {
+        return evento.getFechaModificacion() != null ? evento.getFechaModificacion() : evento.getFechaInicioAfectada();
     }
 
     @Transactional(readOnly = true)
