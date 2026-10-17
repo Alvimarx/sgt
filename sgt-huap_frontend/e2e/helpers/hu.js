@@ -88,6 +88,9 @@ export const fallaNueva = (motivo) => base.fail(!process.env.SGT_VER_FALLAS, `Fa
 export const esMovil = (testInfo) => testInfo.project.name === 'movil';
 export const esDesktop = (testInfo) => testInfo.project.name !== 'movil';
 
+/** Una prueba que solo usa la API corre una vez, en el proyecto desktop (fase 2a). */
+export const soloPorApi = (testInfo) => base.skip(esMovil(testInfo), 'Prueba solo por API: corre una vez, en el proyecto desktop.');
+
 // Peticiones POST que no escriben en la base: el paso 1 del login, la elección
 // del servicio y el cambio de servicio (solo emiten tokens).
 const POST_SIN_ESCRITURA = /\/api\/v2\/funcionarios\/(login|login\/select-service|switch-service)$/;
@@ -233,6 +236,45 @@ export async function irA(page, view, { tab = 'home', returns = {} } = {}) {
   await esperarQuieta(page);
 }
 
+// ── API: negativos de permiso (fase 2a) ──────────────────────────────────────
+const tokens = new Map();
+
+/**
+ * JWT de un rol de USUARIOS o de APOYO para un servicio (login y select-service
+ * por API, que no escriben), guardado mientras no venza. Sin `servicioId`, el
+ * primer servicio del usuario: el administrador y el multiservicio lo indican.
+ */
+export async function tokenRol(request, quien, servicioId = null) {
+  const datos = USUARIOS[quien] || APOYO[quien];
+  if (!datos) throw new Error(`usuario desconocido: ${quien}`);
+  const clave = `${quien}|${servicioId ?? ''}`;
+  if (tokens.has(clave) && !vencido(tokens.get(clave))) return tokens.get(clave);
+  const token = await tokenDe(request, datos.rut, servicioId);
+  tokens.set(clave, token);
+  return token;
+}
+
+/**
+ * Llamada a la API con un JWT que NO exige una respuesta 2xx: es para los
+ * negativos de permiso. Devuelve el estado y el cuerpo (JSON o, si no lo es,
+ * texto). Una escritura solo se manda a una ruta que el backend niega HOY,
+ * confirmado en el código (cada prueba cita dónde): si respondiera 2xx, la
+ * base cambió y hay que restaurarla.
+ */
+export async function apiLlamar(request, token, metodo, ruta, { data } = {}) {
+  const r = await request.fetch(`/api/v2${ruta}`, { method: metodo, headers: { Authorization: `Bearer ${token}` }, data });
+  const texto = await r.text();
+  let cuerpo = texto;
+  try { cuerpo = JSON.parse(texto); } catch { /* texto plano, como un CSV */ }
+  return { status: r.status(), cuerpo };
+}
+
+/** Solicitudes de Urgencias por id, como las ve la jefatura de ese servicio en su bandeja (GET /solicitudes). */
+export async function solicitudesDeUrgencias(request) {
+  const todas = await apiGet(request, await tokenRol(request, 'jefatura'), '/solicitudes');
+  return new Map(todas.filter((s) => s.turno?.servicio?.idServicio === SERVICIO.urgencias).map((s) => [s.idSolicitud, s]));
+}
+
 // ── Piezas de la interfaz ────────────────────────────────────────────────────
 /** Menú lateral (desktop). */
 export const menuLateral = (page) => page.getByRole('complementary', { name: 'Navegación principal' });
@@ -244,3 +286,66 @@ export const barraInferior = (page, etiqueta) => page.getByRole('button', { name
 
 /** Botón «volver» de la cabecera móvil (TopHeader), que no tiene nombre accesible. */
 export const volverMovil = (page) => page.locator('.top-header__left button').first();
+
+// ── Vista de solicitudes ─────────────────────────────────────────────────────
+/** Abre Solicitudes (menú en desktop, barra inferior en móvil) y espera la carga. */
+export async function abrirSolicitudes(page, testInfo) {
+  if (esDesktop(testInfo)) await itemMenu(page, 'Solicitudes').click();
+  else await barraInferior(page, 'Solicitudes').click();
+  await expect(page.getByText('Cargando solicitudes...')).toHaveCount(0, { timeout: 15_000 });
+  await esperarQuieta(page);
+}
+
+/** Pestaña de Solicitudes por su nombre, con o sin contador. */
+export const pestana = (page, testInfo, nombre) => (esDesktop(testInfo)
+  ? page.getByRole('tablist', { name: 'Vista de solicitudes' }).getByRole('tab', { name: new RegExp(`^${nombre}( \\d+)?$`) })
+  : page.getByRole('button', { name: new RegExp(`^${nombre}( \\d+)?$`) }));
+
+export async function elegirPestana(page, testInfo, nombre) {
+  await pestana(page, testInfo, nombre).click();
+  await esperarQuieta(page);
+}
+
+/**
+ * Lee todas las solicitudes u ofertas de la pestaña abierta: en móvil, las
+ * tarjetas; en desktop, el detalle de cada ítem de la lista (se abre uno por uno).
+ */
+export async function leerLista(page, testInfo) {
+  if (esDesktop(testInfo)) {
+    const opciones = page.getByRole('listbox').getByRole('option');
+    const n = await opciones.count();
+    const items = [];
+    for (let i = 0; i < n; i += 1) {
+      await opciones.nth(i).click();
+      const det = page.getByRole('region', { name: 'Detalle' });
+      await expect(opciones.nth(i)).toHaveAttribute('aria-selected', 'true');
+      items.push(await det.evaluate((el) => ({
+        titulo: el.querySelector('h2')?.textContent.trim(),
+        fecha: el.querySelector('.sgt-dt-detalle-sol__subtitulo')?.textContent.trim().replace(/^(Creada|Publicada) el /, ''),
+        estado: el.querySelector('.sgt-dt-detalle-sol__cabecera .sgt-d-chip')?.textContent.trim(),
+        filas: Object.fromEntries([...el.querySelectorAll('.sgt-dt-ficha__fila')].map((f) => [f.querySelector('dt').textContent.trim(), f.querySelector('dd').textContent.trim()])),
+        motivo: el.querySelector('.sgt-dt-motivo__texto')?.textContent.trim(),
+        notas: [...el.querySelectorAll('.sgt-d-aviso')].map((a) => a.textContent.trim()),
+        botones: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()),
+      })));
+    }
+    return items;
+  }
+  return page.locator('.sgt-list-row').evaluateAll((tarjetas) => tarjetas.map((el) => {
+    const [cabecera, ...resto] = el.children;
+    const textos = cabecera.children[1];
+    const filas = {};
+    resto.filter((c) => c.tagName === 'DIV' && c.children.length === 2 && [...c.children].every((x) => x.tagName === 'SPAN'))
+      .forEach((c) => { filas[c.children[0].textContent.trim()] = c.children[1].textContent.trim(); });
+    const caja = resto.find((c) => c.firstElementChild?.textContent.trim() === 'Motivo');
+    return {
+      titulo: textos?.children[0]?.textContent.trim(),
+      fecha: textos?.children[1]?.textContent.trim(),
+      estado: cabecera.children[2]?.textContent.trim(),
+      filas,
+      motivo: caja?.children[1]?.textContent.trim(),
+      notas: resto.filter((c) => /^(⏳|✕)/.test(c.textContent.trim())).map((c) => c.textContent.trim()),
+      botones: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()),
+    };
+  }));
+}

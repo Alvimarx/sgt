@@ -9,7 +9,7 @@
 //  - HU-OFE-05: ofertas vigentes en el Centro y en «Ofertas generales».
 import {
   test, expect, fallaConocida, ID, SERVICIO, esDesktop, hoyChile, sumarDias,
-  entrar, itemMenu, barraInferior, esperarQuieta,
+  entrar, esperarQuieta, abrirSolicitudes, pestana, elegirPestana, leerLista,
 } from '../helpers/hu.js';
 import { solicitudSimulada, ofertaSimulada, nombreSolicitud } from '../helpers/datos.js';
 
@@ -20,21 +20,8 @@ const hhmm = (h) => String(h).slice(0, 5);
 const numDia = (iso) => String(Number(iso.slice(8, 10)));
 
 // ── Vista de solicitudes ─────────────────────────────────────────────────────
-async function abrirSolicitudes(page, testInfo) {
-  if (esDesktop(testInfo)) await itemMenu(page, 'Solicitudes').click();
-  else await barraInferior(page, 'Solicitudes').click();
-  await expect(page.getByText('Cargando solicitudes...')).toHaveCount(0, { timeout: 15_000 });
-  await esperarQuieta(page);
-}
-
-const pestana = (page, testInfo, nombre) => (esDesktop(testInfo)
-  ? page.getByRole('tablist', { name: 'Vista de solicitudes' }).getByRole('tab', { name: new RegExp(`^${nombre}( \\d+)?$`) })
-  : page.getByRole('button', { name: new RegExp(`^${nombre}( \\d+)?$`) }));
-
-async function elegirPestana(page, testInfo, nombre) {
-  await pestana(page, testInfo, nombre).click();
-  await esperarQuieta(page);
-}
+// abrirSolicitudes, pestana, elegirPestana y leerLista viven en helpers/hu.js
+// (las usa también la fase 2a).
 
 // Fecha corta como la muestran las tarjetas («15 oct 2026»), con el Intl del navegador.
 const fechaCL = (page, valor) => page.evaluate((v) => {
@@ -42,48 +29,6 @@ const fechaCL = (page, valor) => page.evaluate((v) => {
   const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(...s.split('-').map((n, i) => Number(n) - (i === 1 ? 1 : 0))) : new Date(s.replace(' ', 'T'));
   return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
 }, valor);
-
-// Lee todas las solicitudes u ofertas de la pestaña abierta: en móvil, las
-// tarjetas; en desktop, el detalle de cada ítem de la lista (se abre uno por uno).
-async function leerLista(page, testInfo) {
-  if (esDesktop(testInfo)) {
-    const opciones = page.getByRole('listbox').getByRole('option');
-    const n = await opciones.count();
-    const items = [];
-    for (let i = 0; i < n; i += 1) {
-      await opciones.nth(i).click();
-      const det = page.getByRole('region', { name: 'Detalle' });
-      await expect(opciones.nth(i)).toHaveAttribute('aria-selected', 'true');
-      items.push(await det.evaluate((el) => ({
-        titulo: el.querySelector('h2')?.textContent.trim(),
-        fecha: el.querySelector('.sgt-dt-detalle-sol__subtitulo')?.textContent.trim().replace(/^(Creada|Publicada) el /, ''),
-        estado: el.querySelector('.sgt-dt-detalle-sol__cabecera .sgt-d-chip')?.textContent.trim(),
-        filas: Object.fromEntries([...el.querySelectorAll('.sgt-dt-ficha__fila')].map((f) => [f.querySelector('dt').textContent.trim(), f.querySelector('dd').textContent.trim()])),
-        motivo: el.querySelector('.sgt-dt-motivo__texto')?.textContent.trim(),
-        notas: [...el.querySelectorAll('.sgt-d-aviso')].map((a) => a.textContent.trim()),
-        botones: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()),
-      })));
-    }
-    return items;
-  }
-  return page.locator('.sgt-list-row').evaluateAll((tarjetas) => tarjetas.map((el) => {
-    const [cabecera, ...resto] = el.children;
-    const textos = cabecera.children[1];
-    const filas = {};
-    resto.filter((c) => c.tagName === 'DIV' && c.children.length === 2 && [...c.children].every((x) => x.tagName === 'SPAN'))
-      .forEach((c) => { filas[c.children[0].textContent.trim()] = c.children[1].textContent.trim(); });
-    const caja = resto.find((c) => c.firstElementChild?.textContent.trim() === 'Motivo');
-    return {
-      titulo: textos?.children[0]?.textContent.trim(),
-      fecha: textos?.children[1]?.textContent.trim(),
-      estado: cabecera.children[2]?.textContent.trim(),
-      filas,
-      motivo: caja?.children[1]?.textContent.trim(),
-      notas: resto.filter((c) => /^(⏳|✕)/.test(c.textContent.trim())).map((c) => c.textContent.trim()),
-      botones: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()),
-    };
-  }));
-}
 
 // ── Datos simulados del médico ───────────────────────────────────────────────
 async function escenarioMedico(api) {

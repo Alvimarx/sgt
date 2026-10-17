@@ -86,6 +86,14 @@ export function rotativaDelBloque(turnos) {
   return mejor?.r ?? null;
 }
 
+/**
+ * Ids de quienes participan en una solicitud (forma de GET /solicitudes): el
+ * emisor y, en intercambios y ofertas particulares, el receptor. BUG-002: un
+ * médico solo debería ver las solicitudes en las que participa.
+ */
+export const participantesSolicitud = (s) => [s?.funcionario?.idFuncionario, s?.funcionarioReceptor?.idFuncionario]
+  .filter((id) => id != null);
+
 // ── Formas de entidad para respuestas GET simuladas ──────────────────────────
 // Las solicitudes y las ofertas traen el turno y las personas como entidades
 // (con apelPat, servicio, puesto…), no como los DTO de /turnos/servicio.
