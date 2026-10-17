@@ -2,6 +2,10 @@
 import React from 'react';
 import { SGT_DATA } from './data';
 import { SGTIcon, TopHeader, DashboardCard } from '../Style/UIPrimitives';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, BotonDesktop } from '../Desktop/ui';
+import { GrillaModulosDesktop } from '../Desktop/gestion/ModulosDesktop';
+import '../Desktop/admin/mantenedores.css';
 
 const SectionLabel = ({ children }) => {
   const PA = SGT_DATA.PALETTE;
@@ -15,6 +19,70 @@ const SectionLabel = ({ children }) => {
 
 const AdminDashboard = ({ onBack, onGoFuncionariosSistema, onGoServicios, onGoAsignacion, onGoFuncionarios, onGoSolitudes, onGoPuestos, onGoStats, onGoBitacora, onGoAuditoria, onGoTiposTurno, onGoPlantillas, onGoPlanificacion, onGoReglas, onGoAsignacionTurnos }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
+
+  // Desktop (R18): los mismos módulos, con los mismos textos, íconos, colores
+  // y acciones que las tarjetas móviles, en una columna por área con la misma
+  // grilla de módulos que los paneles de Jefatura y Subrogante. Se llega desde
+  // Mi Perfil (no es un ítem del menú), así que conserva su "volver".
+  if (esDesktop) {
+    const grupos = [
+      {
+        titulo: 'Gestión Organizacional',
+        modulos: [
+          { icono: 'building', titulo: 'Crear Servicio', descripcion: 'Agrega y configura nuevas unidades de trabajo.', onClick: onGoServicios },
+          { icono: 'users', titulo: 'Asignación de Funcionarios', descripcion: 'Asigna funcionarios a servicios y rotativas.', onClick: onGoAsignacion },
+          { icono: 'user', titulo: 'Personal del Sistema', descripcion: 'Visualiza el personal asociado al servicio.', onClick: onGoFuncionariosSistema },
+          { icono: 'org-chart', titulo: 'Jerarquía de Funcionarios', descripcion: 'Designa nuevas jefaturas al sistema.', onClick: onGoFuncionarios },
+          { icono: 'home', titulo: 'Gestionar Puestos', descripcion: 'Crea, edita y elimina puestos del sistema.', onClick: onGoPuestos },
+        ],
+      },
+      {
+        titulo: 'Gestión de Turnos',
+        modulos: [
+          { icono: 'users', titulo: 'Asignación de turnos', descripcion: 'Asigna o quita funcionarios de turnos', onClick: onGoAsignacionTurnos },
+          { icono: 'calendar', titulo: 'Crear tipo de Turno', descripcion: 'Diseña un nuevo tipo de turno.', onClick: onGoTiposTurno },
+          { icono: 'rotate', titulo: 'Crear Rotativa', descripcion: 'Diseña una nueva rotativa.', onClick: onGoPlantillas },
+          { icono: 'calendar', titulo: 'Crear Planificación Mensual', descripcion: 'Diseña una nueva planificación mensual.', onClick: onGoPlanificacion },
+          { icono: 'sliders', titulo: 'Reglas de Horario del Servicio', descripcion: 'Ajuste automático de horas en fines de semana y feriados.', onClick: onGoReglas },
+        ],
+      },
+      {
+        titulo: 'Gestión Operacional',
+        modulos: [
+          { icono: 'alert', titulo: 'Evaluar Solicitudes', descripcion: 'Acepta o rechaza solicitudes de cambio de turno, vacaciones o permisos.', onClick: onGoSolitudes },
+          { icono: 'sliders', titulo: 'Estadísticas del Servicio', descripcion: 'Cobertura, turnos vacantes y horas cubiertas.', onClick: onGoStats },
+        ],
+      },
+      {
+        titulo: 'Control y Auditoría',
+        modulos: [
+          { icono: 'history', titulo: 'Bitácora de Cambios', descripcion: 'Registro cronológico de todos los eventos del sistema.', onClick: onGoBitacora },
+          { icono: 'shield-search', titulo: 'Auditoría de Asistencia', descripcion: 'Revisa qué turnos pasados tuvieron cobertura o quedaron vacantes.', onClick: onGoAuditoria },
+        ],
+      },
+    ];
+    const servicio = localStorage.getItem('sgt_servicio_activo_nombre');
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Administración"
+          subtitulo={servicio ? `${servicio} · Selecciona un módulo para configurar la plataforma.` : 'Selecciona un módulo para configurar la plataforma.'}
+          izquierda={<BotonDesktop variante="secundario" icono="chevron-left" aria-label="Volver a Mi Perfil" title="Volver a Mi Perfil" onClick={onBack} />}
+        />
+        <PaginaDesktop ancho="amplio">
+          <div className="sgt-da-mant-modulos">
+            {grupos.map((g, i) => (
+              <section key={g.titulo} className="sgt-da-mant-grupo" aria-labelledby={`admin-grupo-${i}`}>
+                <h2 id={`admin-grupo-${i}`} className="sgt-da-mant-grupo__titulo">{g.titulo}</h2>
+                <GrillaModulosDesktop modulos={g.modulos} ariaLabel={`Módulos de ${g.titulo}`} />
+              </section>
+            ))}
+          </div>
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>

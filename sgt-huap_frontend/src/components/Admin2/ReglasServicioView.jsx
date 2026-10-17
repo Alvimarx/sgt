@@ -1,10 +1,14 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { SGT_DATA } from './data';
+import { Pencil, Trash2 } from 'lucide-react';
 import { SGTBadge, SGTIcon, TopHeader, ConfirmDialog } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import { reglasServicioService } from '../../services/reglasServicioService';
 import { tiposTurnoService, formatHora, shiftHora, formatDesplazamientoHoras } from '../../services/rotativasService';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop, ChipDesktop, EstadoVacioDesktop } from '../Desktop/ui';
+import { AvisoMantenedorDesktop, CambioHorarioDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
 
 const HORAS_MIN = -5;
 const HORAS_MAX = 5;
@@ -22,6 +26,7 @@ const FORM_VACIO = {
 const ReglasServicioView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
   const { user } = useAuth();
+  const { esDesktop } = useLayout();
   const servicioId = user?.servicioId;
 
   const [reglas, setReglas] = useState([]);
@@ -33,6 +38,9 @@ const ReglasServicioView = ({ onBack }) => {
   const [guardando, setGuardando] = useState(false);
   const [confirmDel, setConfirmDel] = useState(null);
   const [eliminando, setEliminando] = useState(false);
+  // Desktop: al abrir el formulario (nueva regla o editar otra), el foco va al
+  // nombre. En móvil no hace nada.
+  const nombreReglaRef = useRef(null);
 
   const cargar = useCallback(async () => {
     if (!servicioId) { setError('No hay un servicio activo.'); setLoading(false); return; }
@@ -52,6 +60,9 @@ const ReglasServicioView = ({ onBack }) => {
   }, [servicioId]);
 
   useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => {
+    if (esDesktop && formOpen) nombreReglaRef.current?.focus();
+  }, [esDesktop, formOpen, form.idRegla]);
 
   const abrirNueva = () => { setForm(FORM_VACIO); setFormOpen(true); };
   const abrirEdicion = (r) => {
@@ -183,6 +194,229 @@ const ReglasServicioView = ({ onBack }) => {
       </div>
     );
   };
+
+  // ─── Desktop (R18) ───────────────────────────────────────────────────────
+  // Vista raíz del menú (sin volver). Página "medio" en dos columnas: a la
+  // izquierda las reglas del servicio, cada una con su condición, su ajuste y
+  // el horario antes → después; a la derecha el mismo formulario del móvil
+  // (mismo estado, mismas validaciones, mismo guardar) cuando se crea o edita
+  // una regla, o los horarios base del servicio como referencia. Eliminar usa
+  // la misma confirmación.
+  if (esDesktop) {
+    const servicioNombre = localStorage.getItem('sgt_servicio_activo_nombre');
+    // Horario de un tipo de turno antes y después del ajuste (mismo cálculo
+    // que filaCambio del móvil).
+    const cambio = (idTipo, fallbackNombre, bound, tiempo) => {
+      const { nombre, hi, hf } = infoTipo(idTipo, fallbackNombre);
+      const conHoras = hi != null && hf != null;
+      return {
+        bound,
+        nombre,
+        hi: conHoras ? formatHora(hi) : null,
+        hf: conHoras ? formatHora(hf) : null,
+        nuevoInicio: bound === 'inicio' ? shiftHora(hi, tiempo) : formatHora(hi),
+        nuevoFin: bound === 'fin' ? shiftHora(hf, tiempo) : formatHora(hf),
+      };
+    };
+    const minutosForm = Math.round(horasDesplazarNum * 60);
+    const hayVistaPrevia = horasEnRango && (form.idTipoTurnoInicio !== '' || form.idTipoTurnoFin !== '');
+    const idEditando = formOpen ? form.idRegla : null;
+    // Al cerrar el formulario, el foco vuelve al botón "Nueva regla".
+    const cerrarFormDesktop = () => {
+      cerrarForm();
+      requestAnimationFrame(() => document.getElementById('reglas-nueva')?.focus());
+    };
+    const selectTipoDesktop = (campo, id) => (
+      <select
+        id={id}
+        className="sgt-d-select"
+        value={form[campo]}
+        onChange={e => setForm(f => ({ ...f, [campo]: e.target.value }))}
+        disabled={tipos.length === 0}
+      >
+        <option value="">— Ninguno —</option>
+        {tipos.map(t => (
+          <option key={t.idTipoTurno} value={t.idTipoTurno}>
+            {t.nombre} ({formatHora(t.horaInicio)}–{formatHora(t.horaTermino)})
+          </option>
+        ))}
+      </select>
+    );
+    const casilla = (campo, texto) => (
+      <label className="sgt-da-mant-casilla">
+        <input type="checkbox" checked={form[campo]} onChange={() => setForm(f => ({ ...f, [campo]: !f[campo] }))} />
+        {texto}
+      </label>
+    );
+
+    return (
+      <>
+        <EncabezadoDesktop
+          titulo="Reglas de Horario del Servicio"
+          subtitulo={`${servicioNombre ? `${servicioNombre} · ` : ''}Ajusta automáticamente las horas de los turnos en fines de semana y feriados.`}
+          acciones={!formOpen && (
+            <BotonDesktop id="reglas-nueva" variante="primario" icono="plus" onClick={abrirNueva}>Nueva regla</BotonDesktop>
+          )}
+        />
+        <PaginaDesktop ancho="medio">
+          {error && <AvisoMantenedorDesktop tono="alerta" icono="alert" onCerrar={() => setError('')}>{error}</AvisoMantenedorDesktop>}
+          <div className="sgt-da-mant-columnas" style={{ '--da-mant-lateral': '380px' }}>
+            <PanelDesktop
+              titulo="Reglas del servicio"
+              subtitulo={loading ? 'Cargando reglas…' : `${reglas.length} ${reglas.length === 1 ? 'regla configurada' : 'reglas configuradas'}`}
+              icono="sliders"
+              iconoColor="var(--success)"
+              iconoFondo="var(--success-soft)"
+            >
+              <p className="sgt-da-mant-intro" style={{ marginBottom: 12 }}>
+                Una regla puede correr la <strong>entrada</strong> de un tipo de turno y/o la <strong>salida</strong> de otro.
+              </p>
+              {loading ? (
+                <div className="sgt-da-mant-reglas" aria-busy="true">
+                  {[0, 1].map((i) => <div key={i} className="sgt-d-cargando" style={{ height: 74, borderRadius: 12 }} />)}
+                </div>
+              ) : reglas.length === 0 ? (
+                <EstadoVacioDesktop
+                  icono="sliders"
+                  titulo="Sin reglas configuradas"
+                  texto="Crea una regla para ajustar automáticamente las horas en fines de semana y feriados."
+                />
+              ) : (
+                <div className="sgt-da-mant-reglas">
+                  {reglas.map(r => (
+                    <article
+                      key={r.idRegla}
+                      className={`sgt-da-mant-regla${idEditando === r.idRegla ? ' sgt-da-mant-regla--editando' : ''}`}
+                      aria-label={r.nombre}
+                    >
+                      <div className="sgt-da-mant-regla__cabecera">
+                        <span className="sgt-da-mant-regla__nombre">{r.nombre}</span>
+                        {idEditando === r.idRegla && <ChipDesktop tono="primario" mayus>En edición</ChipDesktop>}
+                        <span className="sgt-da-mant-acciones">
+                          <BotonDesktop tamano="sm" variante="secundario" onClick={() => abrirEdicion(r)} aria-label={`Editar ${r.nombre}`}>
+                            <Pencil size={12} aria-hidden="true" />Editar
+                          </BotonDesktop>
+                          <BotonDesktop tamano="sm" variante="peligro" onClick={() => setConfirmDel(r)} aria-label={`Eliminar ${r.nombre}`}>
+                            <Trash2 size={12} aria-hidden="true" />Eliminar
+                          </BotonDesktop>
+                        </span>
+                      </div>
+                      <div className="sgt-da-mant-regla__chips">
+                        {r.aplicaFinDeSemana && <ChipDesktop tono="primario" mayus>Fin de semana</ChipDesktop>}
+                        {r.aplicaFeriado && <ChipDesktop tono="primario" mayus>Feriado</ChipDesktop>}
+                        <ChipDesktop tono="alerta" mayus>{formatDesplazamientoHoras(r.tiempoMinutos)}</ChipDesktop>
+                      </div>
+                      <div className="sgt-da-mant-cambios-lista" style={{ marginTop: 10 }}>
+                        {r.idTipoTurnoInicio != null && <CambioHorarioDesktop {...cambio(r.idTipoTurnoInicio, r.nombreTipoTurnoInicio, 'inicio', r.tiempoMinutos)} />}
+                        {r.idTipoTurnoFin != null && <CambioHorarioDesktop {...cambio(r.idTipoTurnoFin, r.nombreTipoTurnoFin, 'fin', r.tiempoMinutos)} />}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </PanelDesktop>
+
+            {formOpen ? (
+              <PanelDesktop titulo={form.idRegla ? 'Editar regla' : 'Nueva regla'} icono={form.idRegla ? 'sliders' : 'plus'}>
+                <form noValidate className="sgt-da-mant-campos" onSubmit={(e) => { e.preventDefault(); if (puedeGuardar) guardar(); }}>
+                  <CampoDesktop etiqueta="Nombre de la regla" htmlFor="regla-nombre">
+                    <input
+                      id="regla-nombre"
+                      ref={nombreReglaRef}
+                      type="text"
+                      className="sgt-d-input"
+                      value={form.nombre}
+                      onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                      placeholder="Ej.: Ajuste mañana finde/feriado"
+                    />
+                  </CampoDesktop>
+
+                  <div className="sgt-d-campo" role="group" aria-labelledby="regla-condicion">
+                    <span className="sgt-d-campo__etiqueta" id="regla-condicion">Condición</span>
+                    <div className="sgt-da-mant-casillas">
+                      {casilla('aplicaFinDeSemana', 'Fines de semana (sáb. y dom.)')}
+                      {casilla('aplicaFeriado', 'Feriados')}
+                    </div>
+                  </div>
+
+                  <CampoDesktop
+                    etiqueta="Tiempo a desplazar (horas)"
+                    htmlFor="regla-horas"
+                    error={!horasEnRango ? `El ajuste debe ser un número entero de horas, entre ${HORAS_MIN} y ${HORAS_MAX}.` : undefined}
+                    ayuda={`Se suma a la entrada del tipo elegido en "inicio" y a la salida del tipo elegido en "fin". Ej.: +1 h corre la entrada del día de 08:00 a 09:00 y la salida de la noche a 09:00. Máximo ±${HORAS_MAX} h.`}
+                  >
+                    <div className="sgt-da-mant-con-unidad">
+                      <input
+                        id="regla-horas"
+                        type="number" step="1" min={HORAS_MIN} max={HORAS_MAX}
+                        className="sgt-d-input"
+                        value={form.horasDesplazar}
+                        aria-invalid={!horasEnRango}
+                        onChange={e => setForm(f => ({ ...f, horasDesplazar: e.target.value }))}
+                      />
+                      <span className="sgt-da-mant-sec">horas</span>
+                    </div>
+                  </CampoDesktop>
+
+                  <CampoDesktop etiqueta={<>Tipo de turno cuya <strong>entrada</strong> se ajusta</>} htmlFor="regla-tipo-inicio">
+                    {selectTipoDesktop('idTipoTurnoInicio', 'regla-tipo-inicio')}
+                  </CampoDesktop>
+                  <CampoDesktop etiqueta={<>Tipo de turno cuya <strong>salida</strong> se ajusta</>} htmlFor="regla-tipo-fin">
+                    {selectTipoDesktop('idTipoTurnoFin', 'regla-tipo-fin')}
+                  </CampoDesktop>
+
+                  {hayVistaPrevia && (
+                    <div className="sgt-da-mant-previa" aria-live="polite">
+                      <div className="sgt-d-seccion-titulo" style={{ margin: 0 }}>Vista previa del ajuste</div>
+                      {form.idTipoTurnoInicio !== '' && <CambioHorarioDesktop {...cambio(Number(form.idTipoTurnoInicio), null, 'inicio', minutosForm)} />}
+                      {form.idTipoTurnoFin !== '' && <CambioHorarioDesktop {...cambio(Number(form.idTipoTurnoFin), null, 'fin', minutosForm)} />}
+                    </div>
+                  )}
+
+                  <div className="sgt-da-mant-pie">
+                    <BotonDesktop variante="secundario" onClick={cerrarFormDesktop} disabled={guardando}>Cancelar</BotonDesktop>
+                    <BotonDesktop type="submit" variante="primario" icono="check" disabled={!puedeGuardar}>{guardando ? 'Guardando…' : 'Guardar regla'}</BotonDesktop>
+                  </div>
+                </form>
+              </PanelDesktop>
+            ) : (
+              <PanelDesktop titulo="Horarios base del servicio" subtitulo="Lo que una regla puede correr" icono="clock" iconoColor="#0F766E" iconoFondo="#E0F2EF">
+                {loading ? (
+                  <div className="sgt-da-mant-tipos-ref" aria-busy="true">
+                    {[0, 1].map((i) => <div key={i} className="sgt-d-cargando" style={{ height: 34, borderRadius: 10 }} />)}
+                  </div>
+                ) : tipos.length === 0 ? (
+                  <div className="sgt-da-mant-sec">Este servicio no tiene tipos de turno. Créalos en Tipos de turno.</div>
+                ) : (
+                  <div className="sgt-da-mant-tipos-ref">
+                    {tipos.map(t => (
+                      <div key={t.idTipoTurno} className="sgt-da-mant-tipo-ref">
+                        <SGTIcon name="clock" size={13} color="var(--ink3)" />
+                        <span className="sgt-da-mant-tipo-ref__nombre">{t.nombre}</span>
+                        <span className="sgt-da-mant-horario">{formatHora(t.horaInicio)}–{formatHora(t.horaTermino)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </PanelDesktop>
+            )}
+          </div>
+        </PaginaDesktop>
+
+        <ConfirmDialog
+          open={!!confirmDel}
+          icon="alert" tone="danger"
+          title="Eliminar regla"
+          busy={eliminando}
+          confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar'}
+          onConfirm={eliminar}
+          onCancel={() => setConfirmDel(null)}
+        >
+          La regla "{confirmDel?.nombre}" dejará de aplicarse en las próximas generaciones. Los turnos ya creados no se modifican.
+        </ConfirmDialog>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>

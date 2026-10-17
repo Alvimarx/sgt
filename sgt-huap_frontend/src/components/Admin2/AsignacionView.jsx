@@ -5,6 +5,10 @@ import { SGTIcon, TopHeader, ConfirmDialog } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getPersonal, asignarServicio } from '../../services/funcionarioService';
 import { getCurrentUser } from '../../services/authService'
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop, PersonaDesktop } from '../Desktop/ui';
+import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
+import { AvisoMantenedorDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES DE SEGURIDAD 
@@ -44,7 +48,7 @@ const sanitizeQuery = (raw) =>
  * Ej: "12.345.678-9" → "***678-9"
  */
 const maskRut = (rut = '') => {
-    const clean = rut.replace(/[^0-9kK\-]/g, '');
+    const clean = rut.replace(/[^0-9kK-]/g, '');
     if (clean.length < 5) return '***';
     return `***${clean.slice(-5)}`;
 };
@@ -54,6 +58,7 @@ const maskRut = (rut = '') => {
 // ---------------------------------------------------------------------------
 const AsignacionView = ({ onBack }) => {
     const PA = SGT_DATA.PALETTE;
+    const { esDesktop } = useLayout();
     const currentUserRut = getCurrentUser()?.rut;
 
     // Datos cargados desde la API
@@ -252,6 +257,137 @@ const AsignacionView = ({ onBack }) => {
         fontSize: 15, color: PA.ink, fontWeight: 600, marginTop: 6,
         appearance: 'none', outline: 'none', boxSizing: 'border-box',
     };
+
+    // ---------------------------------------------------------------------------
+    // RENDER DESKTOP (R18): vista raíz del menú (sin volver). El mismo
+    // formulario (buscador con la misma regla de 2 caracteres y el RUT
+    // enmascarado, servicio y guardar) y al lado el resumen de lo elegido; la
+    // misma confirmación y los mismos mensajes. El buscador es el de Asignación
+    // de funcionarios de jefatura (flechas, Enter y Escape).
+    // ---------------------------------------------------------------------------
+    if (esDesktop) {
+        const nombreServicio = servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre;
+        return (
+            <>
+                <EncabezadoDesktop titulo="Asignación de Funcionarios" subtitulo="Asocia a un funcionario con su servicio correspondiente." />
+                <PaginaDesktop ancho="medio">
+                    {errorCarga && <AvisoMantenedorDesktop tono="alerta" icono="alert">{errorCarga}</AvisoMantenedorDesktop>}
+                    {mensaje.texto && (
+                        <AvisoMantenedorDesktop
+                            tono={mensaje.tipo === 'success' ? 'exito' : 'alerta'}
+                            icono={mensaje.tipo === 'success' ? 'check-circle' : 'alert'}
+                            rol={mensaje.tipo === 'success' ? 'status' : 'alert'}
+                            onCerrar={() => setMensaje({ tipo: '', texto: '' })}
+                        >
+                            {mensaje.texto}
+                        </AvisoMantenedorDesktop>
+                    )}
+                    <div className="sgt-da-mant-columnas">
+                        <PanelDesktop titulo="Nueva asignación" icono="user-plus" iconoColor="#B45309" iconoFondo="#FDF3E3" className="sgt-da-mant-abierto">
+                            <div className="sgt-d-formulario">
+                                <BusquedaFuncionarioDesktop
+                                    id="buscar-funcionario"
+                                    listaId="lista-funcionarios"
+                                    etiqueta={<>1. Buscar funcionario {loadingDatos && <span className="sgt-da-mant-sec" style={{ textTransform: 'none', letterSpacing: 0 }}>(Cargando…)</span>}</>}
+                                    placeholder="Nombre o RUT del funcionario"
+                                    maxLength={MAX_SEARCH_LENGTH}
+                                    valor={searchQuery}
+                                    onChange={handleSearchChange}
+                                    onFocus={() => setShowDropdown(true)}
+                                    onCerrar={() => setShowDropdown(false)}
+                                    disabled={loadingDatos}
+                                    abierto={dropdownVisible}
+                                    wrapperRef={searchWrapperRef}
+                                    vacio="No se encontraron funcionarios con ese nombre o RUT"
+                                    ayuda={searchQuery.length > 0 && searchQuery.length < 2 && (
+                                        <div className="sgt-d-campo__ayuda">Escribe al menos 2 caracteres para buscar</div>
+                                    )}
+                                    resultados={resultados.map((u, idx) => {
+                                        const uId = getUserId(u);
+                                        return {
+                                            clave: `${uId ?? 'sin-id'}-${idx}`,
+                                            nombre: getNombreCompleto(u),
+                                            detalle: `RUT ${maskRut(u.rutCompleto || u.rut)}`,
+                                            iniciales: getInitials(u.nombre, u.apellidoPaterno),
+                                            seleccionado: Boolean(selectedUser && getUserId(selectedUser) === uId),
+                                            onElegir: () => handleSelectUser(u),
+                                        };
+                                    })}
+                                />
+                                <CampoDesktop etiqueta="2. Asignar a servicio" htmlFor="select-servicio">
+                                    <select
+                                        id="select-servicio"
+                                        className="sgt-d-select"
+                                        value={selectedServicioId}
+                                        onChange={(e) => setSelectedServicioId(e.target.value)}
+                                        disabled={loadingDatos || servicios.length === 0}
+                                    >
+                                        <option value="" disabled>
+                                            {servicios.length === 0 && !loadingDatos
+                                                ? 'No hay servicios disponibles'
+                                                : 'Selecciona un servicio…'}
+                                        </option>
+                                        {servicios.map((srv, index) => {
+                                            const srvId = srv.idServicio ?? srv.id ?? `s_${index}`;
+                                            const srvNombre = srv.nombreServicio || srv.nombre || 'Servicio';
+                                            return <option key={srvId} value={srvId}>{srvNombre}</option>;
+                                        })}
+                                    </select>
+                                </CampoDesktop>
+                            </div>
+                            <div className="sgt-da-mant-pie" style={{ marginTop: 14 }}>
+                                <BotonDesktop
+                                    variante="primario"
+                                    icono="check"
+                                    onClick={handleGuardarClick}
+                                    disabled={!canSubmit}
+                                    aria-disabled={!canSubmit}
+                                    title={!selectedUser ? 'Selecciona un funcionario primero' : !selectedServicioId ? 'Selecciona un servicio primero' : ''}
+                                >
+                                    {guardando ? 'Guardando...' : 'Guardar asignación'}
+                                </BotonDesktop>
+                            </div>
+                        </PanelDesktop>
+
+                        <PanelDesktop titulo="Resumen" icono="check-circle" iconoColor="var(--success)" iconoFondo="var(--success-soft)">
+                            <dl className="sgt-da-mant-datos">
+                                <dt>Funcionario</dt>
+                                <dd>
+                                    {selectedUser ? (
+                                        <PersonaDesktop
+                                            nombre={getNombreCompleto(selectedUser)}
+                                            iniciales={getInitials(selectedUser.nombre, selectedUser.apellidoPaterno)}
+                                            detalle={`RUT ${maskRut(selectedUser.rutCompleto || selectedUser.rut)}`}
+                                            fondo="var(--primary)"
+                                            tinta="#fff"
+                                        />
+                                    ) : <span className="sgt-da-mant-sec">Sin seleccionar</span>}
+                                </dd>
+                                <dt>Servicio</dt>
+                                <dd>{nombreServicio || <span className="sgt-da-mant-sec">Sin seleccionar</span>}</dd>
+                            </dl>
+                            <p className="sgt-da-mant-intro" style={{ marginTop: 12, color: 'var(--ink3)' }}>
+                                El funcionario queda asociado al servicio con rol Médico. Las jefaturas y subrogancias se designan en <strong>Jerarquía de Funcionarios</strong>.
+                            </p>
+                        </PanelDesktop>
+                    </div>
+                </PaginaDesktop>
+
+                <ConfirmDialog
+                    open={showConfirm && !!servicioSeleccionado}
+                    icon="users" tone="primary"
+                    title="Confirmar asignación"
+                    busy={guardando}
+                    confirmLabel={guardando ? 'Guardando...' : 'Confirmar'}
+                    onConfirm={handleConfirmar}
+                    onCancel={() => setShowConfirm(false)}
+                >
+                    ¿Deseas asignar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> al servicio{' '}
+                    <strong style={{ color: PA.ink }}>{servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre}</strong>?
+                </ConfirmDialog>
+            </>
+        );
+    }
 
     // ---------------------------------------------------------------------------
     // RENDER

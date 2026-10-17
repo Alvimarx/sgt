@@ -1,0 +1,434 @@
+/* ==============================================================
+   MODO DESKTOP (R18) — Mantenedores de administración
+   --------------------------------------------------------------
+   Panel de Administración, Servicios, Personal del sistema,
+   Asignación a servicios, Jerarquía de funcionarios, Tipos de turno
+   y Reglas de horario.
+
+   Todas las clases llevan el prefijo sgt-da-mant- (dentro del
+   prefijo sgt-da- del grupo de Administración). Complementan el kit
+   (desktop.css, prefijo sgt-d-) con el lenguaje visual de la
+   "Propuesta C". El layout móvil no usa ninguna de estas clases.
+   Para pisar una regla del kit se usa selector compuesto, que no
+   depende del orden de carga.
+   ============================================================== */
+
+/* Paneles con un desplegable (buscador) que no debe recortarse. */
+.sgt-d-panel.sgt-da-mant-abierto { overflow: visible; }
+
+/* ---------- Distribución ---------- */
+
+/* Contenido principal + columna lateral de ancho fijo. */
+.sgt-da-mant-columnas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--da-mant-lateral, 340px);
+  gap: 12px;
+  align-items: start;
+  min-height: 0;
+}
+/* Con PaginaDesktop `llena`: el panel principal crece hasta el alto
+   disponible y su tabla scrollea por dentro. */
+.sgt-da-mant-columnas--llena {
+  flex: 0 1 auto;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.sgt-da-mant-columnas--llena > .sgt-d-panel { min-height: 0; max-height: 100%; }
+
+/* ---------- Texto auxiliar ---------- */
+.sgt-da-mant-sec { font-size: 10.5px; font-weight: 600; color: var(--ink3); }
+.sgt-da-mant-num { font-variant-numeric: tabular-nums; }
+.sgt-da-mant-nowrap { white-space: nowrap; }
+.sgt-da-mant-intro {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ink2);
+}
+.sgt-da-mant-intro strong { color: var(--ink); font-weight: 800; }
+.sgt-da-mant-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Aviso que se puede descartar ---------- */
+.sgt-da-mant-aviso { display: flex; align-items: flex-start; gap: 8px; }
+.sgt-da-mant-aviso__icono { display: grid; margin-top: 1px; flex-shrink: 0; }
+.sgt-da-mant-aviso__texto { flex: 1; min-width: 0; }
+.sgt-da-mant-aviso__cerrar {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  opacity: 0.8;
+  border-radius: 6px;
+}
+.sgt-da-mant-aviso__cerrar:hover { opacity: 1; }
+.sgt-da-mant-aviso__cerrar:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+/* ---------- Celdas de tabla ---------- */
+.sgt-da-mant-celda { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.sgt-da-mant-celda__nombre {
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sgt-da-mant-icono {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.sgt-da-mant-icono--apagado { background: var(--line2); color: var(--ink3); }
+.sgt-da-mant-apagado { color: var(--ink3); }
+.sgt-da-mant-acciones {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.sgt-da-mant-edicion { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sgt-da-mant-edicion .sgt-d-input { height: 28px; max-width: 380px; }
+
+/* Servicio + rol del funcionario en ese servicio */
+.sgt-da-mant-roles { display: flex; flex-wrap: wrap; gap: 4px; }
+.sgt-da-mant-rol {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  border-radius: 99px;
+  padding: 3px 8px 3px 9px;
+  background: var(--line2);
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.sgt-da-mant-rol__cargo {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.sgt-da-mant-rol--jefatura { background: var(--warn-soft); }
+.sgt-da-mant-rol--jefatura .sgt-da-mant-rol__cargo { color: #8A5D00; }
+.sgt-da-mant-rol--subrogante { background: var(--primary-soft); }
+.sgt-da-mant-rol--subrogante .sgt-da-mant-rol__cargo { color: var(--primary); }
+/* Acceso de un administrador del sistema a un servicio donde no tiene
+   asignación (el backend lo informa como JEFATURA sin rol de servicio). */
+.sgt-da-mant-rol--acceso {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+}
+.sgt-da-mant-rol--acceso .sgt-da-mant-rol__cargo { color: var(--ink3); }
+
+/* Horario "HH:MM–HH:MM" de un tipo de turno */
+.sgt-da-mant-horario { font-variant-numeric: tabular-nums; font-weight: 800; white-space: nowrap; }
+
+/* ---------- Formularios ---------- */
+
+/* Formulario dentro de un panel lateral: cuerpo con scroll y pie fijo. */
+.sgt-da-mant-form { min-height: 100%; display: flex; flex-direction: column; }
+.sgt-da-mant-form__cuerpo {
+  flex: 1;
+  padding: 14px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sgt-da-mant-form__pie {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  background: #fff;
+  border-top: 1px solid var(--line2);
+}
+
+/* Pie de un formulario dentro de un panel de la página. */
+.sgt-da-mant-pie {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px solid var(--line2);
+}
+.sgt-da-mant-pie__nota {
+  margin-right: auto;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink3);
+  line-height: 1.4;
+}
+.sgt-da-mant-pie__nota strong { color: var(--ink2); font-weight: 800; }
+
+/* Pila de campos de un formulario angosto. */
+.sgt-da-mant-campos { display: flex; flex-direction: column; gap: 12px; }
+
+/* Paso que todavía no se puede mostrar (p. ej. sin servicio elegido) */
+.sgt-da-mant-vacio-paso {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 11px;
+  border-radius: 10px;
+  border: 1px dashed var(--line);
+  background: var(--surface2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+
+/* Casillas de verificación nativas en filas */
+.sgt-da-mant-casillas { display: flex; flex-direction: column; gap: 6px; }
+.sgt-da-mant-casilla {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--d-radio-sm);
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.sgt-da-mant-casilla:hover { border-color: var(--primary); }
+.sgt-da-mant-casilla input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.sgt-da-mant-casilla:has(input:checked) { background: var(--primary-soft); border-color: #CFDCEA; }
+.sgt-da-mant-casilla:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* Campo numérico corto con su unidad */
+.sgt-da-mant-con-unidad { display: flex; align-items: center; gap: 8px; }
+.sgt-da-mant-con-unidad .sgt-d-input { width: 92px; }
+
+/* Opciones excluyentes en tarjeta (radio nativo, flechas del teclado). */
+.sgt-da-mant-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(var(--da-mant-tarjetas, 2), minmax(0, 1fr));
+  gap: 8px;
+}
+.sgt-da-mant-tarjeta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.sgt-da-mant-tarjeta:hover { border-color: #C9D6E6; }
+/* El radio nativo cubre la tarjeta, transparente: el clic en cualquier parte
+   lo marca y conserva el teclado y la semántica del radio. */
+.sgt-da-mant-tarjeta__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.sgt-da-mant-tarjeta--sel,
+.sgt-da-mant-tarjeta--sel:hover { border-color: var(--primary); background: var(--primary-soft); }
+.sgt-da-mant-tarjeta:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sgt-da-mant-tarjeta__marca {
+  width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  border: 2px solid var(--line);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.sgt-da-mant-tarjeta--sel .sgt-da-mant-tarjeta__marca { border-color: var(--primary); }
+.sgt-da-mant-tarjeta--sel .sgt-da-mant-tarjeta__marca::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--primary);
+}
+.sgt-da-mant-tarjeta__texto { min-width: 0; }
+.sgt-da-mant-tarjeta__titulo { display: block; font-size: 12.5px; font-weight: 800; }
+.sgt-da-mant-tarjeta__desc { display: block; margin-top: 1px; font-size: 10.5px; font-weight: 600; color: var(--ink3); }
+
+/* Datos clave · valor (resumen de lo elegido) */
+.sgt-da-mant-datos {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 9px 12px;
+  align-items: center;
+  margin: 0;
+  font-size: 12px;
+}
+.sgt-da-mant-datos dt {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink3);
+}
+.sgt-da-mant-datos dd { margin: 0; min-width: 0; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+
+/* ---------- Jerarquía ---------- */
+.sgt-da-mant-niveles { display: flex; flex-direction: column; gap: 12px; }
+.sgt-da-mant-nivel__cabecera { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.sgt-da-mant-nivel__titulo {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ink3);
+}
+.sgt-da-mant-personas { display: flex; flex-wrap: wrap; gap: 6px; }
+.sgt-da-mant-persona {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 10px 3px 3px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sgt-da-mant-persona__avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font-size: 8.5px;
+  font-weight: 800;
+  flex-shrink: 0;
+  background: var(--line2);
+  color: var(--ink2);
+}
+.sgt-da-mant-persona--jefatura .sgt-da-mant-persona__avatar { background: #E9D9C2; color: #6E4E1F; }
+.sgt-da-mant-persona--subrogante .sgt-da-mant-persona__avatar { background: var(--primary-soft); color: var(--primary); }
+.sgt-da-mant-persona__nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sgt-da-mant-nivel__vacio { font-size: 11.5px; font-weight: 600; color: var(--ink3); }
+
+/* ---------- Reglas de horario ---------- */
+.sgt-da-mant-reglas { display: flex; flex-direction: column; gap: 10px; }
+.sgt-da-mant-regla {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 11px 13px 12px;
+  background: #fff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sgt-da-mant-regla--editando {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(23, 65, 108, 0.1);
+}
+.sgt-da-mant-regla__cabecera { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sgt-da-mant-regla__nombre {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sgt-da-mant-regla__chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+/* Línea "Entrada · Tipo 08:00–20:00 → 09:00–20:00" de una regla y de su vista previa */
+.sgt-da-mant-cambio-linea { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; font-weight: 600; }
+.sgt-da-mant-cambio-linea__tipo { font-weight: 800; color: var(--ink); }
+.sgt-da-mant-cambio-linea__base { color: var(--ink3); font-variant-numeric: tabular-nums; }
+.sgt-da-mant-cambio-linea__nuevo { color: var(--ink2); font-variant-numeric: tabular-nums; }
+.sgt-da-mant-cambio-linea__nuevo strong { color: var(--primary); font-weight: 900; }
+.sgt-da-mant-cambios-lista { display: flex; flex-direction: column; gap: 5px; }
+
+/* Vista previa de la regla en el formulario */
+.sgt-da-mant-previa {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface2);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Tipos de turno del servicio (referencia en el panel de ayuda) */
+.sgt-da-mant-tipos-ref { display: flex; flex-direction: column; gap: 6px; }
+.sgt-da-mant-tipo-ref {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.sgt-da-mant-tipo-ref__nombre { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Panel de administración (módulos agrupados) ---------- */
+.sgt-da-mant-modulos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 12px;
+  align-items: start;
+}
+/* Entre 1200 y 1299 px las cuatro columnas quedan muy angostas: 2 × 2. */
+@media (max-width: 1299px) {
+  .sgt-da-mant-modulos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.sgt-da-mant-grupo { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sgt-da-mant-grupo__titulo {
+  margin: 0 2px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--ink3);
+}
+/* Dentro de una columna, los módulos van uno bajo otro. */
+.sgt-da-mant-grupo .sgt-dg-modulos { grid-template-columns: minmax(0, 1fr); gap: 10px; }

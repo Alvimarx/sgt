@@ -1,14 +1,36 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SGT_DATA, DASHBOARD_ICON_THEMES } from './data'; // Ajusta la ruta según tu estructura
 import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
 import { usePagination, PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
 import { getServicios } from '../../services/servicioService';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, BuscadorDesktop, PersonaDesktop } from '../Desktop/ui';
+import { PaginacionDesktop } from '../Desktop/gestion/PaginacionDesktop';
+import { AvisoMantenedorDesktop, RolesServicioDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
 
 const AVATAR_THEME = DASHBOARD_ICON_THEMES.green;
 
+// Desktop (R18): filas por página de la tabla y colores del avatar, los mismos
+// de "Personal del servicio": jefatura, urgenciólogo o médico.
+const POR_PAGINA_DESKTOP = 50;
+const AVATAR_DESKTOP = {
+  jefatura: ['#E9D9C2', '#6E4E1F'],
+  urgenciologo: ['#D5E3EE', '#2B4E6B'],
+  medico: ['#E8E2EE', '#4E3A6F'],
+};
+const coloresAvatarSistema = (u) => {
+  // Solo cuenta la jefatura asignada (con rol de servicio), no el acceso de
+  // administrador que el backend informa en todos los servicios.
+  const esJefatura = (u.servicios || []).some((s) => s.idRolServicio != null && /JEF/i.test(s.rolServicioNombre || ''));
+  if (esJefatura) return AVATAR_DESKTOP.jefatura;
+  if (/urgenci/i.test(u.profesion || '')) return AVATAR_DESKTOP.urgenciologo;
+  return AVATAR_DESKTOP.medico;
+};
+
 const FuncionarioSistemaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
 
   // Estados de datos
   const [funcionarios, setFuncionarios] = useState([]);
@@ -67,8 +89,9 @@ const FuncionarioSistemaView = ({ onBack }) => {
     return nombreCompleto.includes(termino) || rut.includes(termino);
   });
 
-  // 4. Paginación
-  const pg = usePagination(funcionariosFiltrados, 10);
+  // 4. Paginación (en desktop, la tabla de a POR_PAGINA_DESKTOP)
+  const pg = usePagination(funcionariosFiltrados, esDesktop ? POR_PAGINA_DESKTOP : 10);
+  const tablaRef = useRef(null);
 
   // Reiniciar a la página 1 al cambiar de servicio
   useEffect(() => { pg.setPage(1); }, [selectedServicio]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -79,6 +102,111 @@ const FuncionarioSistemaView = ({ onBack }) => {
     background: '#fff', fontSize: 14, color: PA.ink, fontWeight: 600,
     outline: 'none', boxSizing: 'border-box'
   };
+
+  // Desktop (R18): vista raíz del menú (sin volver). El mismo personal, el
+  // mismo buscador (nombre o RUT), el mismo filtro por servicio (que recarga
+  // desde el backend) y la misma paginación, en una tabla densa de a 50.
+  if (esDesktop) {
+    const servicioSel = servicios.find((srv) => String(srv.idServicio || srv.id) === String(selectedServicio));
+    const ambito = servicioSel ? (servicioSel.nombreServicio || servicioSel.nombre) : 'todos los servicios';
+    const n = funcionariosFiltrados.length;
+    const subtitulo = loading
+      ? 'Cargando registros del sistema...'
+      : searchQuery
+        ? `${n} de ${funcionarios.length} funcionarios · ${ambito}`
+        : `${n} ${n === 1 ? 'funcionario' : 'funcionarios'} · ${ambito}`;
+    // Al cambiar de página la tabla vuelve arriba.
+    const cambiarPagina = (p) => {
+      pg.setPage(p);
+      const envoltura = tablaRef.current?.querySelector('.sgt-d-tabla-envoltura');
+      if (envoltura) envoltura.scrollTop = 0;
+    };
+    return (
+      <>
+        <EncabezadoDesktop titulo="Personal del Sistema" subtitulo="Funcionarios registrados en el SGT, con sus servicios y su rol en cada uno." />
+        <PaginaDesktop ancho="amplio" llena>
+          {mensaje.texto && (
+            <AvisoMantenedorDesktop tono="alerta" icono="alert" onCerrar={() => setMensaje({ tipo: '', texto: '' })}>{mensaje.texto}</AvisoMantenedorDesktop>
+          )}
+          <PanelDesktop
+            llena
+            titulo="Personal registrado"
+            subtitulo={subtitulo}
+            icono="user-gear"
+            iconoColor="var(--success)"
+            iconoFondo="var(--success-soft)"
+            sinPadding
+            acciones={(
+              <div className="sgt-d-toolbar" style={{ flexWrap: 'nowrap' }}>
+                <BuscadorDesktop
+                  value={searchQuery}
+                  onChange={(v) => { setSearchQuery(v); pg.setPage(1); }}
+                  placeholder="Buscar por nombre, apellidos o RUT..."
+                  ariaLabel="Buscar por nombre, apellidos o RUT"
+                  style={{ width: 280 }}
+                />
+                <select
+                  className="sgt-d-select"
+                  aria-label="Filtrar por servicio"
+                  style={{ width: 220 }}
+                  value={selectedServicio}
+                  onChange={(e) => setSelectedServicio(e.target.value)}
+                >
+                  <option value="">Todos los Servicios (Global)</option>
+                  {servicios.map((srv, index) => {
+                    const srvId = srv.idServicio || srv.id || `s_${index}`;
+                    const srvNombre = srv.nombreServicio || srv.nombre || 'Servicio';
+                    return <option key={srvId} value={srvId}>{srvNombre}</option>;
+                  })}
+                </select>
+              </div>
+            )}
+          >
+            {/* display: contents: el contenedor no genera caja y la tabla sigue
+                siendo hija flexible del cuerpo del panel. */}
+            <div ref={tablaRef} style={{ display: 'contents' }}>
+              <TablaDesktop
+                ariaLabel="Personal registrado en el sistema"
+                cargando={loading}
+                filas={loading ? [] : pg.pageItems}
+                claveFila={(u, i) => u.idFuncionario || `fg_${i}`}
+                vacio="No se encontraron funcionarios con los filtros aplicados."
+                columnas={[
+                  {
+                    id: 'funcionario', titulo: 'Funcionario', ancho: '27%',
+                    render: (u) => {
+                      const [fondo, tinta] = coloresAvatarSistema(u);
+                      return (
+                        <PersonaDesktop
+                          nombre={`${u.nombre || ''} ${u.apellidoPaterno || ''} ${u.apellidoMaterno || ''}`.replace(/\s+/g, ' ').trim()}
+                          iniciales={`${(u.nombre || 'U').charAt(0)}${(u.apellidoPaterno || '').charAt(0)}`.toUpperCase()}
+                          fondo={fondo}
+                          tinta={tinta}
+                        />
+                      );
+                    },
+                  },
+                  { id: 'rut', titulo: 'RUT', ancho: 118, render: (u) => <span className="sgt-da-mant-num sgt-da-mant-nowrap">{u.rutCompleto || u.rut}</span> },
+                  { id: 'profesion', titulo: 'Profesión', ancho: '19%', render: (u) => u.profesion || 'No Especificada' },
+                  { id: 'servicios', titulo: 'Servicios y rol', render: (u) => <RolesServicioDesktop servicios={u.servicios} /> },
+                ]}
+              />
+            </div>
+            {!loading && (
+              <PaginacionDesktop
+                pagina={pg.page}
+                totalPaginas={pg.totalPages}
+                total={n}
+                porPagina={POR_PAGINA_DESKTOP}
+                onCambiar={cambiarPagina}
+                unidad="funcionarios"
+              />
+            )}
+          </PanelDesktop>
+        </PaginaDesktop>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>

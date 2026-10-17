@@ -2,9 +2,12 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Clock, Plus, Pencil, Trash2, X, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { tiposTurnoService, formatHora } from '../../services/rotativasService';
-import { SGTIcon, TopHeader } from '../Style/UIPrimitives';
+import { SGTIcon, TopHeader, Sheet, ConfirmDialog } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import { SGT_DATA } from './data';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, CampoDesktop, BotonDesktop, ChipDesktop, AvisoDesktop } from '../Desktop/ui';
+import { AvisoMantenedorDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
 
 // ─── Paleta de colores compartida con el resto de la app ───────────────────
 const PA = SGT_DATA.PALETTE;
@@ -18,6 +21,19 @@ const turnoColor = (index) => {
         grad: `linear-gradient(150deg, oklch(0.72 0.12 ${h}) 0%, oklch(0.42 0.12 ${h}) 100%)`,
         glow: `oklch(0.55 0.12 ${h} / 0.35)`,
     };
+};
+
+// Duración de un horario "HH:MM"–"HH:MM" en minutos (cruza medianoche si el
+// término es anterior o igual al inicio). Solo para mostrar en desktop.
+const duracionMinutos = (inicio, termino) => {
+    const aMin = (h) => { const [hh, mm] = String(h || '').split(':').map(Number); return (hh || 0) * 60 + (mm || 0); };
+    const dur = (aMin(termino) - aMin(inicio) + 1440) % 1440;
+    return dur === 0 ? 1440 : dur;
+};
+const fmtDuracion = (min) => {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m ? `${h} h ${m} min` : `${h} h`;
 };
 
 // ─── Sub-componente: card de tipo de turno ──────────────────────────────────
@@ -77,7 +93,7 @@ function TurnoCard({ turno, index, onEdit, onDelete }) {
 }
 
 // ─── Sub-componente: formulario de creación/edición ─────────────────────────
-function TurnoForm({ inicial, onSave, onCancel, saving }) {
+function TurnoForm({ inicial, onSave, onCancel, saving, desktop = false, errorGuardado = '' }) {
     const [nombre, setNombre]           = useState(inicial?.nombre        ?? '');
     const [horaInicio, setHoraInicio]   = useState(formatHora(inicial?.horaInicio)  || '');
     const [horaTermino, setHoraTermino] = useState(formatHora(inicial?.horaTermino) || '');
@@ -85,6 +101,24 @@ function TurnoForm({ inicial, onSave, onCancel, saving }) {
     const nombreRef = useRef(null);
 
     useEffect(() => { nombreRef.current?.focus(); }, []);
+    // Desktop: el panel lateral toma el foco al abrirse (después que este
+    // efecto); se devuelve al nombre en el tick siguiente.
+    useEffect(() => {
+        if (!desktop) return undefined;
+        const t = setTimeout(() => nombreRef.current?.focus(), 0);
+        return () => clearTimeout(t);
+    }, [desktop]);
+    // Desktop: el panel lateral tapa la página, donde la vista muestra el error
+    // de un guardado fallido; se repite aquí el del último intento hecho con el
+    // panel abierto (no uno anterior que ya estaba en la página).
+    const [errorIntento, setErrorIntento] = useState('');
+    const guardandoAntes = useRef(saving);
+    useEffect(() => {
+        if (!desktop) return;
+        if (saving) setErrorIntento('');
+        else if (guardandoAntes.current) setErrorIntento(errorGuardado || '');
+        guardandoAntes.current = saving;
+    }, [desktop, saving, errorGuardado]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -102,6 +136,51 @@ function TurnoForm({ inicial, onSave, onCancel, saving }) {
         outline: 'none', boxSizing: 'border-box',
     };
     const labelStyle = { fontSize: 12, color: PA.ink3, marginBottom: 4, display: 'block' };
+
+    // Desktop (R18): el mismo formulario y la misma validación, dentro del
+    // panel lateral (el título lo pone el panel).
+    if (desktop) {
+        const completo = horaInicio && horaTermino && horaInicio !== horaTermino;
+        const cruza = completo && horaTermino <= horaInicio;
+        return (
+            <form onSubmit={handleSubmit} className="sgt-da-mant-form" noValidate>
+                <div className="sgt-da-mant-form__cuerpo">
+                    <CampoDesktop etiqueta="Nombre del turno" htmlFor="tipo-turno-nombre">
+                        <input
+                            id="tipo-turno-nombre"
+                            ref={nombreRef}
+                            className="sgt-d-input"
+                            value={nombre}
+                            onChange={e => setNombre(e.target.value)}
+                            placeholder="ej. Diurno, Nocturno, Guardia…"
+                        />
+                    </CampoDesktop>
+                    <div className="sgt-d-formulario">
+                        <CampoDesktop etiqueta="Hora inicio" htmlFor="tipo-turno-inicio">
+                            <input id="tipo-turno-inicio" type="time" className="sgt-d-input" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} />
+                        </CampoDesktop>
+                        <CampoDesktop etiqueta="Hora término" htmlFor="tipo-turno-termino">
+                            <input id="tipo-turno-termino" type="time" className="sgt-d-input" value={horaTermino} onChange={e => setHoraTermino(e.target.value)} />
+                        </CampoDesktop>
+                    </div>
+                    {completo && (
+                        <AvisoDesktop>
+                            Duración: <strong>{fmtDuracion(duracionMinutos(horaInicio, horaTermino))}</strong>
+                            {cruza ? ' · termina al día siguiente.' : '.'}
+                        </AvisoDesktop>
+                    )}
+                    {err && <AvisoMantenedorDesktop tono="alerta" icono="alert">{err}</AvisoMantenedorDesktop>}
+                    {!err && errorIntento && <AvisoMantenedorDesktop tono="alerta" icono="alert">{errorIntento}</AvisoMantenedorDesktop>}
+                </div>
+                <div className="sgt-da-mant-form__pie">
+                    <BotonDesktop variante="secundario" onClick={onCancel}>Cancelar</BotonDesktop>
+                    <BotonDesktop type="submit" variante="primario" icono="check" disabled={saving}>
+                        {saving ? 'Guardando…' : 'Guardar'}
+                    </BotonDesktop>
+                </div>
+            </form>
+        );
+    }
 
     return (
         <form onSubmit={handleSubmit} style={{
@@ -283,6 +362,7 @@ function ConfirmDelete({ turno, rotativas = [], loadingImpacto = false, onConfir
 // ─── Vista principal ─────────────────────────────────────────────────────────
 export default function TiposTurnoView({ onBack }) {
     const { user } = useAuth();
+    const { esDesktop } = useLayout();
 
     const [tipos,       setTipos]       = useState([]);
     const [loading,     setLoading]     = useState(false);
@@ -361,6 +441,140 @@ export default function TiposTurnoView({ onBack }) {
     const openCreate = () => { setEditing(null); setShowForm(true); };
     const openEdit   = (t) => { setEditing(t);   setShowForm(true); };
     const closeForm  = () => { setEditing(null); setShowForm(false); };
+
+    // ─── Desktop (R18) ───────────────────────────────────────────────────────
+    // Vista raíz del menú (sin volver). Tabla con el horario y la duración de
+    // cada tipo; crear y editar con el mismo TurnoForm en un panel lateral;
+    // eliminar con la misma consulta de rotativas afectadas, en ConfirmDialog.
+    if (esDesktop) {
+        const hayImpacto = afectadas.length > 0;
+        const servicio = localStorage.getItem('sgt_servicio_activo_nombre');
+        return (
+            <>
+                <EncabezadoDesktop
+                    titulo="Tipos de Turno"
+                    subtitulo={`${servicio ? `${servicio} · ` : ''}Horarios que usan las rotativas y la planificación del servicio.`}
+                    acciones={<BotonDesktop variante="primario" icono="plus" onClick={openCreate}>Nuevo tipo de turno</BotonDesktop>}
+                />
+                <PaginaDesktop ancho="medio" llena>
+                    {error && (
+                        <AvisoMantenedorDesktop tono="alerta" icono="alert" onCerrar={() => setError('')}>{error}</AvisoMantenedorDesktop>
+                    )}
+                    <PanelDesktop
+                        llena
+                        titulo="Catálogo de tipos de turno"
+                        subtitulo={loading ? 'Cargando tipos de turno…' : `${tipos.length} ${tipos.length === 1 ? 'tipo' : 'tipos'} en el servicio`}
+                        icono="clock"
+                        iconoColor="#0F766E"
+                        iconoFondo="#E0F2EF"
+                        sinPadding
+                    >
+                        <TablaDesktop
+                            ariaLabel="Tipos de turno del servicio"
+                            cargando={loading}
+                            filas={loading ? [] : tipos}
+                            claveFila={(t) => t.idTipoTurno}
+                            filaSeleccionada={showForm && editing ? editing.idTipoTurno : undefined}
+                            vacio="No hay tipos de turno definidos para este servicio. Crea el primero con «Nuevo tipo de turno»."
+                            columnas={[
+                                {
+                                    id: 'nombre', titulo: 'Tipo de turno',
+                                    render: (t) => {
+                                        const c = turnoColor(tipos.indexOf(t));
+                                        return (
+                                            <span className="sgt-da-mant-celda">
+                                                <span className="sgt-da-mant-icono" style={{ background: c.bg, color: c.ink }} aria-hidden="true"><Clock size={14} /></span>
+                                                <span className="sgt-da-mant-celda__nombre">{t.nombre}</span>
+                                            </span>
+                                        );
+                                    },
+                                },
+                                {
+                                    id: 'horario', titulo: 'Horario', ancho: 150,
+                                    render: (t) => <span className="sgt-da-mant-horario">{formatHora(t.horaInicio)} – {formatHora(t.horaTermino)}</span>,
+                                },
+                                {
+                                    id: 'duracion', titulo: 'Duración', ancho: 200,
+                                    render: (t) => {
+                                        const hi = formatHora(t.horaInicio);
+                                        const ht = formatHora(t.horaTermino);
+                                        return (
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                <span className="sgt-da-mant-num">{fmtDuracion(duracionMinutos(hi, ht))}</span>
+                                                {ht <= hi && <ChipDesktop>Cruza medianoche</ChipDesktop>}
+                                            </span>
+                                        );
+                                    },
+                                },
+                                {
+                                    id: 'acciones', titulo: 'Acciones', ancho: 220, alinear: 'derecha',
+                                    render: (t) => (
+                                        <span className="sgt-da-mant-acciones">
+                                            <BotonDesktop tamano="sm" variante="secundario" onClick={() => openEdit(t)} aria-label={`Editar ${t.nombre}`}>
+                                                <Pencil size={12} aria-hidden="true" />Editar
+                                            </BotonDesktop>
+                                            <BotonDesktop tamano="sm" variante="peligro" onClick={() => openConfirmDelete(t)} aria-label={`Eliminar ${t.nombre}`}>
+                                                <Trash2 size={12} aria-hidden="true" />Eliminar
+                                            </BotonDesktop>
+                                        </span>
+                                    ),
+                                },
+                            ]}
+                        />
+                    </PanelDesktop>
+                </PaginaDesktop>
+
+                <Sheet open={showForm} onClose={closeForm} title={editing ? 'Editar tipo de turno' : 'Nuevo tipo de turno'} anchoDesktop="md">
+                    <TurnoForm
+                        key={editing ? editing.idTipoTurno : 'nuevo'}
+                        desktop
+                        inicial={editing}
+                        onSave={handleSave}
+                        onCancel={closeForm}
+                        saving={saving}
+                        errorGuardado={error}
+                    />
+                </Sheet>
+
+                <ConfirmDialog
+                    open={!!confirmDel}
+                    icon="alert" tone="danger"
+                    title="¿Eliminar tipo de turno?"
+                    busy={deleting || loadingImpacto}
+                    confirmLabel={deleting ? 'Eliminando…' : hayImpacto ? 'Sí, eliminar igual' : 'Sí, eliminar'}
+                    onConfirm={handleDelete}
+                    onCancel={() => setConfirmDel(null)}
+                >
+                    <div style={{ marginBottom: 8 }}>
+                        Estás a punto de eliminar <strong style={{ color: PA.ink }}>{confirmDel?.nombre}</strong> del catálogo.
+                    </div>
+                    {loadingImpacto ? (
+                        <div style={{ fontSize: 12.5, color: PA.ink3 }}>Verificando uso en rotativas…</div>
+                    ) : hayImpacto ? (
+                        <div style={{ background: PA.warnSoft, borderRadius: 12, padding: '10px 12px', textAlign: 'left' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                                <AlertCircle size={16} color={PA.warn} style={{ flexShrink: 0, marginTop: 1 }} />
+                                <div style={{ fontSize: 12.5, color: PA.ink2, lineHeight: 1.5 }}>
+                                    Este turno está en uso en{' '}
+                                    <strong style={{ color: PA.ink }}>{afectadas.length} rotativa{afectadas.length === 1 ? '' : 's'}</strong>.
+                                    Esos días pasarán a quedar <strong style={{ color: PA.ink }}>libres</strong>.
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingLeft: 24 }}>
+                                {afectadas.map((nombre) => (
+                                    <span key={nombre} style={{ fontSize: 11.5, fontWeight: 700, color: PA.warn, background: '#fff', borderRadius: 999, padding: '2px 9px', border: `1px solid ${PA.line}` }}>
+                                        {nombre}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: 12.5, color: PA.ink3 }}>No está asignado a ninguna rotativa. Esta acción no se puede deshacer.</div>
+                    )}
+                </ConfirmDialog>
+            </>
+        );
+    }
 
     return (
         <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtSlideLeft .3s ease', overflow: 'hidden' }}>

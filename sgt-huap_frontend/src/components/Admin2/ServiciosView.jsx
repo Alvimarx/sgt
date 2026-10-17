@@ -1,6 +1,6 @@
 // ServiciosView.jsx
 import React, { useState, useEffect } from 'react';
-import { Pencil, Trash2, X, Check, AlertCircle, Plus } from 'lucide-react';
+import { Pencil, Trash2, X, Check, AlertCircle, Plus, PowerOff } from 'lucide-react';
 import { SGT_DATA } from './data';
 import { SGTIcon, TopHeader, IconBadge3D, StatusBadge, ConfirmDialog } from '../Style/UIPrimitives';
 import { usePagination, PaginationControls, ListEmptyState, LoadingState } from '../Style/ListControls';
@@ -12,9 +12,15 @@ import {
     eliminarServicio,
     getDependenciasServicio 
 } from '../../services/servicioService'; 
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, TablaDesktop, CampoDesktop, BotonDesktop, ChipDesktop, SegmentosDesktop } from '../Desktop/ui';
+import { AvisoMantenedorDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
 
 const ServiciosView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
+  // Desktop: filtro de la tabla por estado (solo presentación).
+  const [filtroEstado, setFiltroEstado] = useState('todos');
   
   const [servicios, setServicios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -157,6 +163,184 @@ const ServiciosView = ({ onBack }) => {
       background: '#fff', fontSize: 15, color: PA.ink, fontWeight: 600,
       appearance: 'none', outline: 'none', boxSizing: 'border-box',
   };
+
+  // ─── Desktop (R18) ───────────────────────────────────────────────────────
+  // Vista raíz del menú (sin volver). Una tabla con todos los servicios
+  // (activos primero, inactivos después, con su estado), edición en línea con
+  // el mismo guardarEdicion (Enter guarda, Escape cancela), el alta en un panel
+  // al lado y las mismas confirmaciones. El filtro por estado es solo de
+  // presentación y aparece cuando hay servicios inactivos.
+  if (esDesktop) {
+    const deshabilitadoCrear = !nuevoServicio.trim() || creando;
+    const filtro = inactivos.length > 0 ? filtroEstado : 'todos';
+    const filas = filtro === 'activos' ? activos : filtro === 'inactivos' ? inactivos : [...activos, ...inactivos];
+    return (
+      <>
+        <EncabezadoDesktop titulo="Servicios" subtitulo="Administra los servicios disponibles en el sistema." />
+        <PaginaDesktop ancho="medio" llena>
+          {error && (
+            <AvisoMantenedorDesktop tono="alerta" icono="alert" onCerrar={() => setError('')}>{error}</AvisoMantenedorDesktop>
+          )}
+          <div className="sgt-da-mant-columnas sgt-da-mant-columnas--llena">
+            <PanelDesktop
+              llena
+              titulo="Servicios del sistema"
+              subtitulo={loading ? 'Cargando datos…' : `${activos.length} ${activos.length === 1 ? 'activo' : 'activos'} · ${inactivos.length} ${inactivos.length === 1 ? 'inactivo' : 'inactivos'}`}
+              icono="building"
+              sinPadding
+              acciones={!loading && (inactivos.length > 0 ? (
+                <SegmentosDesktop
+                  ariaLabel="Filtrar por estado"
+                  valor={filtro}
+                  onChange={setFiltroEstado}
+                  opciones={[
+                    { id: 'todos', etiqueta: 'Todos', conteo: servicios.length },
+                    { id: 'activos', etiqueta: 'Activos', conteo: activos.length },
+                    { id: 'inactivos', etiqueta: 'Inactivos', conteo: inactivos.length },
+                  ]}
+                />
+              ) : (
+                <ChipDesktop tono="primario">{servicios.length}</ChipDesktop>
+              ))}
+            >
+              <TablaDesktop
+                ariaLabel="Servicios del sistema"
+                cargando={loading}
+                filas={loading ? [] : filas}
+                claveFila={(srv) => srvId(srv)}
+                filaSeleccionada={editingId}
+                vacio={servicios.length === 0
+                  ? 'No hay servicios registrados. Agrega el primero desde el panel de la derecha.'
+                  : 'No hay servicios con ese estado.'}
+                columnas={[
+                  {
+                    id: 'nombre', titulo: 'Servicio',
+                    render: (srv) => {
+                      const id = srvId(srv);
+                      if (editingId === id) {
+                        return (
+                          <div className="sgt-da-mant-edicion">
+                            <input
+                              autoFocus
+                              className="sgt-d-input"
+                              aria-label={`Nuevo nombre para ${srvNombre(srv)}`}
+                              value={editNombre}
+                              onChange={(e) => setEditNombre(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') guardarEdicion(id); if (e.key === 'Escape') cancelarEdicion(); }}
+                              disabled={guardandoEdicion}
+                            />
+                          </div>
+                        );
+                      }
+                      return (
+                        <span className={`sgt-da-mant-celda${srv.eliminado ? ' sgt-da-mant-apagado' : ''}`}>
+                          <span className={`sgt-da-mant-icono${srv.eliminado ? ' sgt-da-mant-icono--apagado' : ''}`} aria-hidden="true">
+                            <SGTIcon name="building" size={13} strokeWidth={2.2} />
+                          </span>
+                          <span className="sgt-da-mant-celda__nombre">{srvNombre(srv)}</span>
+                        </span>
+                      );
+                    },
+                  },
+                  {
+                    id: 'estado', titulo: 'Estado', ancho: 110,
+                    render: (srv) => (srv.eliminado
+                      ? <ChipDesktop mayus>Inactivo</ChipDesktop>
+                      : <ChipDesktop tono="exito" mayus>Activo</ChipDesktop>),
+                  },
+                  {
+                    id: 'acciones', titulo: 'Acciones', ancho: 220, alinear: 'derecha',
+                    render: (srv) => {
+                      const id = srvId(srv);
+                      const nombre = srvNombre(srv);
+                      if (srv.eliminado) return null;
+                      if (editingId === id) {
+                        return (
+                          <span className="sgt-da-mant-acciones">
+                            <BotonDesktop tamano="sm" variante="fantasma" onClick={cancelarEdicion} disabled={guardandoEdicion}>Cancelar</BotonDesktop>
+                            <BotonDesktop tamano="sm" variante="primario" icono="check" onClick={() => guardarEdicion(id)} disabled={!editNombre.trim() || guardandoEdicion}>
+                              {guardandoEdicion ? 'Guardando…' : 'Guardar'}
+                            </BotonDesktop>
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="sgt-da-mant-acciones">
+                          <BotonDesktop tamano="sm" variante="secundario" onClick={() => iniciarEdicion(srv)} aria-label={`Editar ${nombre}`}>
+                            <Pencil size={12} aria-hidden="true" />Editar
+                          </BotonDesktop>
+                          <BotonDesktop tamano="sm" variante="peligro" onClick={() => abrirConfirmEliminar(srv)} aria-label={`Desactivar ${nombre}`}>
+                            <PowerOff size={12} aria-hidden="true" />Desactivar
+                          </BotonDesktop>
+                        </span>
+                      );
+                    },
+                  },
+                ]}
+              />
+            </PanelDesktop>
+
+            <PanelDesktop titulo="Nuevo servicio" icono="plus" style={{ alignSelf: 'start' }}>
+              <form onSubmit={handleCrear} className="sgt-da-mant-campos">
+                <CampoDesktop etiqueta="Nombre del servicio" htmlFor="servicio-nuevo" ayuda="Se pedirá confirmación antes de registrarlo.">
+                  <input
+                    id="servicio-nuevo"
+                    type="text"
+                    className="sgt-d-input"
+                    placeholder="Ej: Urgencias, Pediatría…"
+                    value={nuevoServicio}
+                    onChange={(e) => setNuevoServicio(e.target.value)}
+                    disabled={creando}
+                  />
+                </CampoDesktop>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <BotonDesktop type="submit" variante="primario" icono="plus" disabled={deshabilitadoCrear}>Agregar</BotonDesktop>
+                </div>
+              </form>
+            </PanelDesktop>
+          </div>
+        </PaginaDesktop>
+
+        <ConfirmDialog
+          open={!!confirmCrear}
+          icon="building" tone="primary"
+          title="¿Agregar nuevo servicio?"
+          busy={creando}
+          confirmLabel={creando ? 'Agregando…' : 'Sí, agregar'}
+          onConfirm={ejecutarCrear}
+          onCancel={() => setConfirmCrear(null)}
+        >
+          Estás a punto de registrar el servicio <strong style={{ color: PA.ink }}>{confirmCrear}</strong>.
+        </ConfirmDialog>
+
+        <ConfirmDialog
+          open={!!confirmDel}
+          icon="alert" tone="danger"
+          title="¿Desactivar servicio?"
+          busy={eliminando || loadingImpacto}
+          confirmLabel={eliminando ? 'Desactivando…' : 'Sí, desactivar'}
+          onConfirm={handleEliminar}
+          onCancel={() => setConfirmDel(null)}
+        >
+          <div style={{ marginBottom: 8 }}>
+            Estás a punto de desactivar <strong style={{ color: PA.ink }}>{confirmDel ? srvNombre(confirmDel) : ''}</strong>.
+          </div>
+          {loadingImpacto ? (
+            <div style={{ fontSize: 12.5, color: PA.ink3 }}>Verificando registros asociados…</div>
+          ) : dependencias > 0 ? (
+            <div style={{ background: PA.warnSoft, borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 8, textAlign: 'left' }}>
+              <AlertCircle size={16} color={PA.warn} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12.5, color: PA.ink2, lineHeight: 1.5 }}>
+                El servicio tiene <strong style={{ color: PA.ink }}>{dependencias} registro(s)</strong> asociados. Se ocultará de la gestión, pero los datos históricos se conservan.
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, color: PA.ink3 }}>No tiene registros asociados. Dejará de aparecer en la gestión activa.</div>
+          )}
+        </ConfirmDialog>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease', overflow: 'hidden' }}>

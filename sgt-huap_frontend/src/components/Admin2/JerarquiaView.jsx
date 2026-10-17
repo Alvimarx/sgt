@@ -4,6 +4,10 @@ import { SGT_DATA } from './data';
 import { SGTIcon, TopHeader, ConfirmDialog } from '../Style/UIPrimitives';
 import { getServicios } from '../../services/servicioService';
 import { getFuncionariosSummary, asignarRolJerarquia } from '../../services/funcionarioService';
+import { useLayout } from '../../layout/layout';
+import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop } from '../Desktop/ui';
+import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
+import { AvisoMantenedorDesktop, OpcionesTarjetaDesktop, PersonasNivelDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS (Importados desde AsignacionView)
@@ -26,7 +30,7 @@ const sanitizeQuery = (raw) =>
     raw.replace(/[<>"'`;]/g, '').slice(0, MAX_SEARCH_LENGTH);
 
 const maskRut = (rut = '') => {
-    const clean = rut.replace(/[^0-9kK\-]/g, '');
+    const clean = rut.replace(/[^0-9kK-]/g, '');
     if (clean.length < 5) return '***';
     return `***${clean.slice(-5)}`;
 };
@@ -36,6 +40,7 @@ const maskRut = (rut = '') => {
 // ---------------------------------------------------------------------------
 const JerarquiaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
+  const { esDesktop } = useLayout();
 
   const [funcionarios, setFuncionarios] = useState([]);
   const [servicios, setServicios] = useState([]);
@@ -117,6 +122,14 @@ const JerarquiaView = ({ onBack }) => {
       return () => clearTimeout(timer);
   }, [mensaje.texto]);
 
+  // Desktop: la "Jerarquía actual" se arma con los datos cargados al abrir la
+  // vista, que no se vuelven a pedir. Tras una designación exitosa se avisa
+  // que no la incluye. En móvil no se dibuja.
+  const [designoEnLaVisita, setDesignoEnLaVisita] = useState(false);
+  useEffect(() => {
+      if (mensaje.tipo === 'success') setDesignoEnLaVisita(true);
+  }, [mensaje.tipo]);
+
   // ---------------------------------------------------------------------------
   // BÚSQUEDA Y FILTRADO
   // ---------------------------------------------------------------------------
@@ -196,6 +209,199 @@ const JerarquiaView = ({ onBack }) => {
     background: '#fff', fontSize: 15, color: PA.ink, fontWeight: 600, marginTop: 6,
     appearance: 'none', outline: 'none', boxSizing: 'border-box'
   };
+
+  // ---------------------------------------------------------------------------
+  // DESKTOP (R18): vista raíz del menú (sin volver). Los mismos tres pasos
+  // (servicio, buscador con la misma regla de 2 caracteres y el RUT
+  // enmascarado, y nivel) en un panel, y al lado la jerarquía actual del
+  // servicio elegido; la misma confirmación y los mismos mensajes.
+  // ---------------------------------------------------------------------------
+  if (esDesktop) {
+    const nombreServicio = servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre;
+    // Jerarquía actual del servicio elegido, armada con los funcionarios que la
+    // vista ya cargó (sin llamadas nuevas), como la vista previa de Jerarquía
+    // del servicio de jefatura. Solo cuentan los roles asignados en el
+    // servicio: a los administradores del sistema el backend los informa como
+    // JEFATURA en todos los servicios, sin rol de servicio (idRolServicio null).
+    const relEnServicio = (u) => (u?.servicios || []).find(
+      (s) => String(s.idServicio) === String(selectedServicioId) && s.idRolServicio != null,
+    );
+    const miembros = selectedServicioId ? funcionarios.filter((u) => relEnServicio(u)) : [];
+    const conRol = (patron) => miembros
+      .filter((u) => patron.test(relEnServicio(u)?.rolServicioNombre || ''))
+      .map((u) => ({ clave: String(getUserId(u)), nombre: getNombreCompleto(u) }));
+    const jefaturas = conRol(/JEF/i);
+    const subrogantes = conRol(/SUBROG/i);
+    const nivel = selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante';
+    const rolActual = selectedUser ? relEnServicio(selectedUser)?.rolServicioNombre : null;
+    const ETIQUETA_ROL = { JEFATURA: 'Jefatura', SUBROGANTE: 'Subrogante', MEDICO: 'Médico' };
+    return (
+      <>
+        <EncabezadoDesktop titulo="Jerarquía de Funcionarios" subtitulo="Designa quién es la jefatura oficial de un servicio o nombra a un subrogante temporal." />
+        <PaginaDesktop ancho="medio">
+          {errorCarga && <AvisoMantenedorDesktop tono="alerta" icono="alert">{errorCarga}</AvisoMantenedorDesktop>}
+          {mensaje.texto && (
+            <AvisoMantenedorDesktop
+              tono={mensaje.tipo === 'success' ? 'exito' : 'alerta'}
+              icono={mensaje.tipo === 'success' ? 'check-circle' : 'alert'}
+              rol={mensaje.tipo === 'success' ? 'status' : 'alert'}
+              onCerrar={() => setMensaje({ tipo: '', texto: '' })}
+            >
+              {mensaje.texto}
+            </AvisoMantenedorDesktop>
+          )}
+          <div className="sgt-da-mant-columnas">
+            <PanelDesktop titulo="Designar autoridad" icono="org-chart" iconoColor="#6D28D9" iconoFondo="#EFEAFB" className="sgt-da-mant-abierto">
+              <div className="sgt-d-formulario">
+                <CampoDesktop etiqueta="1. Seleccionar Servicio" htmlFor="select-servicio">
+                  <select
+                    id="select-servicio"
+                    className="sgt-d-select"
+                    value={selectedServicioId}
+                    onChange={e => setSelectedServicioId(e.target.value)}
+                    disabled={loadingDatos || servicios.length === 0}
+                  >
+                    <option value="" disabled>
+                      {loadingDatos ? 'Cargando servicios...' : 'Seleccione un servicio...'}
+                    </option>
+                    {servicios.map((srv, index) => {
+                      const srvId = srv.idServicio ?? srv.id ?? `s_${index}`;
+                      const srvNombre = srv.nombreServicio || srv.nombre || 'Servicio';
+                      return <option key={srvId} value={srvId}>{srvNombre}</option>;
+                    })}
+                  </select>
+                </CampoDesktop>
+                <BusquedaFuncionarioDesktop
+                  id="buscar-funcionario"
+                  listaId="lista-funcionarios"
+                  etiqueta={<>2. Buscar Funcionario {loadingDatos && <span className="sgt-da-mant-sec" style={{ textTransform: 'none', letterSpacing: 0 }}>(Cargando…)</span>}</>}
+                  placeholder="Nombre o RUT del funcionario"
+                  maxLength={MAX_SEARCH_LENGTH}
+                  valor={searchQuery}
+                  onChange={handleSearchChange}
+                  onFocus={() => setShowDropdown(true)}
+                  onCerrar={() => setShowDropdown(false)}
+                  disabled={loadingDatos}
+                  abierto={dropdownVisible}
+                  wrapperRef={searchWrapperRef}
+                  vacio="No se encontraron funcionarios con ese nombre o RUT"
+                  ayuda={searchQuery.length > 0 && searchQuery.length < 2 && (
+                    <div className="sgt-d-campo__ayuda">Escribe al menos 2 caracteres para buscar</div>
+                  )}
+                  resultados={resultados.map((u, i) => {
+                    const uId = getUserId(u);
+                    return {
+                      clave: `${uId ?? 'sin-id'}-${i}`,
+                      nombre: getNombreCompleto(u),
+                      detalle: `RUT ${maskRut(u.rutCompleto || u.rut)}`,
+                      iniciales: getInitials(u.nombre, u.apellidoPaterno),
+                      seleccionado: Boolean(selectedUser && getUserId(selectedUser) === uId),
+                      onElegir: () => handleSelectUser(u),
+                    };
+                  })}
+                />
+                <div className="sgt-d-campo sgt-d-formulario__ancho-completo">
+                  <span className="sgt-d-campo__etiqueta" id="nivel-jerarquia">3. Nivel de Jerarquía</span>
+                  <OpcionesTarjetaDesktop
+                    nombre="nivel-jerarquia"
+                    etiquetadoPor="nivel-jerarquia"
+                    valor={selectedRole}
+                    onCambiar={setSelectedRole}
+                    opciones={[
+                      { id: 'jefe', titulo: 'Jefatura', descripcion: 'Jefatura oficial del servicio.' },
+                      { id: 'subrogante', titulo: 'Subrogante', descripcion: 'Reemplaza a la jefatura de forma temporal.' },
+                    ]}
+                  />
+                </div>
+              </div>
+              <div className="sgt-da-mant-pie" style={{ marginTop: 14 }}>
+                <span className="sgt-da-mant-pie__nota">
+                  {selectedUser && selectedServicioId ? (
+                    <>
+                      Se designará a <strong>{getNombreCompleto(selectedUser)}</strong> como <strong>{nivel}</strong> de <strong>{nombreServicio}</strong>.
+                      {' '}{rolActual ? `Hoy es ${ETIQUETA_ROL[String(rolActual).toUpperCase()] || rolActual} en el servicio.` : 'Hoy no tiene rol en el servicio.'}
+                    </>
+                  ) : 'Elige el servicio y el funcionario para designar.'}
+                </span>
+                <BotonDesktop
+                  variante="primario"
+                  icono="crown"
+                  onClick={handleGuardarClick}
+                  disabled={!canSubmit}
+                  aria-disabled={!canSubmit}
+                  title={!selectedUser ? 'Selecciona un funcionario primero' : !selectedServicioId ? 'Selecciona un servicio primero' : ''}
+                >
+                  {guardando ? 'Guardando...' : 'Designar Autoridad'}
+                </BotonDesktop>
+              </div>
+            </PanelDesktop>
+
+            <PanelDesktop
+              titulo="Jerarquía actual"
+              subtitulo={nombreServicio || 'Elige un servicio'}
+              icono="crown"
+              iconoColor="#B45309"
+              iconoFondo="#FDF3E3"
+            >
+              {loadingDatos ? (
+                <div className="sgt-da-mant-niveles" aria-busy="true">
+                  {[0, 1, 2].map((i) => <div key={i} className="sgt-d-cargando" style={{ height: 30 }} />)}
+                </div>
+              ) : !selectedServicioId ? (
+                <div className="sgt-da-mant-vacio-paso">
+                  <SGTIcon name="org-chart" size={15} color="var(--ink3)" />
+                  Elige un servicio para ver su jefatura y sus subrogantes actuales.
+                </div>
+              ) : (
+                <div className="sgt-da-mant-niveles">
+                  <PersonasNivelDesktop
+                    titulo={`Jefatura (${jefaturas.length})`}
+                    icono="crown"
+                    nivel="jefatura"
+                    personas={jefaturas}
+                    vacio="Sin jefatura designada"
+                  />
+                  <PersonasNivelDesktop
+                    titulo={`Subrogantes (${subrogantes.length})`}
+                    icono="shield-check"
+                    nivel="subrogante"
+                    personas={subrogantes}
+                    vacio="Sin subrogante designado"
+                  />
+                  <div>
+                    <div className="sgt-da-mant-nivel__cabecera">
+                      <SGTIcon name="users" size={13} color="var(--ink3)" strokeWidth={2.2} />
+                      <span className="sgt-da-mant-nivel__titulo">Funcionarios</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, fontWeight: 700 }}>{miembros.length} en el servicio</div>
+                  </div>
+                  {designoEnLaVisita && (
+                    <AvisoMantenedorDesktop tono="aviso" icono="history" rol="note">
+                      Muestra la jerarquía como estaba al abrir esta pantalla. Lo que designaste se verá al volver a entrar.
+                    </AvisoMantenedorDesktop>
+                  )}
+                </div>
+              )}
+            </PanelDesktop>
+          </div>
+        </PaginaDesktop>
+
+        <ConfirmDialog
+          open={showConfirm && !!servicioSeleccionado && !!selectedUser}
+          icon="org-chart" tone="primary"
+          title="Confirmar jerarquía"
+          busy={guardando}
+          confirmLabel={guardando ? 'Guardando...' : 'Confirmar'}
+          onConfirm={handleConfirmar}
+          onCancel={() => setShowConfirm(false)}
+        >
+          ¿Deseas designar a <strong style={{ color: PA.ink }}>{selectedUser ? getNombreCompleto(selectedUser) : ''}</strong> como{' '}
+          <strong style={{ color: PA.ink }}>{selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante'}</strong> del servicio{' '}
+          <strong style={{ color: PA.ink }}>{servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre}</strong>?
+        </ConfirmDialog>
+      </>
+    );
+  }
 
   return (
     <div className="dash-page-bg" style={{ flex: 1, display: 'flex', flexDirection: 'column', animation: 'sgtFade .3s ease' }}>
