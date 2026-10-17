@@ -568,4 +568,66 @@ class FuncionarioControllerTest {
         assertNotNull(regla, "GET /Personal/summary debe declarar @PreAuthorize");
         assertEquals("hasAnyRole('JEFATURA','ADMINISTRADOR')", regla.value());
     }
+
+    // ============================ C-20: un error interno no responde 401 ni 403 ============================
+
+    @Test
+    void statusPorRut_200_404_yLosErroresLleganAlManejadorGlobal_nunca401() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(funcionarioService.isPresent("existe")).thenReturn(50L);
+        when(funcionarioService.isPresent("no-existe")).thenReturn(-1L);
+        when(funcionarioService.isPresent("falla")).thenThrow(
+                new org.springframework.dao.DataAccessResourceFailureException("base de datos caída"));
+        when(funcionarioService.isPresent("x")).thenThrow(new IllegalArgumentException("El rut no tiene un largo correcto"));
+
+        assertEquals(HttpStatus.OK, controller.checkFuncionario("existe").getStatusCode());
+        assertEquals(50L, controller.checkFuncionario("existe").getBody());
+        assertEquals(HttpStatus.NOT_FOUND, controller.checkFuncionario("no-existe").getStatusCode());
+        // GlobalExceptionHandler: 500 sin detalles y 400 con el mensaje; antes, 401 y el frontend cerraba la sesión.
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> controller.checkFuncionario("falla"));
+        assertThrows(IllegalArgumentException.class, () -> controller.checkFuncionario("x"));
+    }
+
+    @Test
+    void login_unErrorInterno_noEs401NiCuentaComoIntentoFallido() {
+        com.pingeso.HUAP.DTO.LoginRequest req = new com.pingeso.HUAP.DTO.LoginRequest();
+        req.setRut("rut-de-prueba");
+        req.setPassword("clave");
+        when(funcionarioService.authenticateWithPassword("rut-de-prueba", "clave")).thenThrow(
+                new org.springframework.dao.DataAccessResourceFailureException("base de datos caída"));
+
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> controller.login(req));
+        verify(loginAttemptService, never()).loginFailed(any());
+    }
+
+    @Test
+    void login_conCredencialesMalas_sigueEn401YCuentaElIntento() {
+        com.pingeso.HUAP.DTO.LoginRequest req = new com.pingeso.HUAP.DTO.LoginRequest();
+        req.setRut("rut-de-prueba");
+        req.setPassword("mala");
+        when(funcionarioService.authenticateWithPassword("rut-de-prueba", "mala"))
+                .thenThrow(new RuntimeException("Credenciales incorrectas"));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.login(req).getStatusCode());
+        verify(loginAttemptService).loginFailed("rut-de-prueba");
+    }
+
+    @Test
+    void cambiarDeServicio_unErrorInternoNoEs403_yElAccesoDenegadoSi() {
+        autenticar(305L, "JEFATURA", "USUARIO", SERVICIO_A);
+        when(seguridadServicio.idUsuarioActual()).thenReturn(305L);
+        com.pingeso.HUAP.Entity.FuncionarioEntity usuario =
+                com.pingeso.HUAP.Entity.FuncionarioEntity.builder().idFuncionario(305L).nombre("Jefa").build();
+        when(funcionarioService.findById(305L)).thenReturn(usuario);
+        when(funcionarioService.resolverAccesoServicio(usuario, SERVICIO_B)).thenThrow(
+                new org.springframework.dao.DataAccessResourceFailureException("base de datos caída"));
+        when(funcionarioService.resolverAccesoServicio(usuario, 300L))
+                .thenThrow(new RuntimeException("Acceso denegado al servicio indicado"));
+
+        assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> controller.switchService(new com.pingeso.HUAP.DTO.SelectServiceRequest(null, SERVICIO_B)));
+        ResponseEntity<?> denegado = controller.switchService(new com.pingeso.HUAP.DTO.SelectServiceRequest(null, 300L));
+        assertEquals(HttpStatus.FORBIDDEN, denegado.getStatusCode());
+        assertEquals(Map.of("error", "Acceso denegado al servicio indicado"), denegado.getBody());
+    }
 }

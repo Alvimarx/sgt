@@ -2,7 +2,9 @@ package com.pingeso.HUAP.Controller;
 
 import com.pingeso.HUAP.DTO.*;
 import jakarta.persistence.EntityExistsException;
+import jakarta.persistence.PersistenceException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -104,6 +106,11 @@ public class FuncionarioController {
                         logger.info("[LOGIN] Autenticando RUT {}", rut);
             usuario = funcionarioService.authenticateWithPassword(
                     rut, loginRequest.getPassword());
+        } catch (DataAccessException | PersistenceException | NullPointerException e) {
+            // C-20: un error interno (base de datos caída, por ejemplo) no es un fallo de
+            // credenciales: sale como 500 sin detalles y no cuenta como intento fallido. Antes
+            // respondía 401 «Credenciales inválidas» y acercaba el bloqueo de la cuenta.
+            throw e;
         } catch (RuntimeException e) {
                         logger.warn("[LOGIN] Fallo de autenticación para rut={}: {}", rut, e.getMessage());
             loginAttemptService.loginFailed(rut);
@@ -165,31 +172,27 @@ public class FuncionarioController {
 
     /**
      * Verifica si existe un funcionario registrado en el sistema de turnos.
-     * Devuelve 200 OK si existe, 404 NOT FOUND si no, o 401 si ocurre un error controlado.
+     * Devuelve 200 con su id si existe, 404 si no, 400 si el RUT está mal formado y 500 ante un
+     * error interno (GlobalExceptionHandler, sin detalles).
+     *
+     * <p>C-20: antes cualquier error respondía 401, y con un 401 el frontend cierra la sesión.
      *
      * @param rut RUT del funcionario a consultar.
      * @return ResponseEntity sin cuerpo con el estado de la verificación.
      */
     @Operation(summary = "Verificar si un funcionario está registrado",
-            description = "Devuelve el ID del funcionario si existe (200), 404 si no, o 401 ante un error controlado. "
-                    + "Requiere rol JEFATURA o ADMINISTRADOR.")
+            description = "Devuelve el ID del funcionario si existe (200), 404 si no, 400 si el RUT está mal "
+                    + "formado y 500 ante un error interno. Requiere rol JEFATURA o ADMINISTRADOR.")
     @GetMapping("/status/{rut}")
     // SEC (C-17): antes cualquier sesión averiguaba si un RUT está en el SGT y con qué id. Solo
     // lo usa la asignación de funcionarios (jefatura y administrador), igual que /register.
     @PreAuthorize("hasAnyRole('JEFATURA','ADMINISTRADOR')")
     public ResponseEntity<Long> checkFuncionario(@PathVariable String rut){
-        try {
-            Long funcionarioId = funcionarioService.isPresent(rut);
-            if (funcionarioId == -1L) {
-                return ResponseEntity.notFound().build(); // 404 Not Found
-            }
-            return ResponseEntity.ok(funcionarioId); // 200 OK
-
-        } catch (RuntimeException e) {
-            // Tip de Senior: Al menos registra el error en un log antes de mutearlo con el HTTP Status
-            logger.error("Error al verificar funcionario con RUT: {}", rut, e);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        Long funcionarioId = funcionarioService.isPresent(rut);
+        if (funcionarioId == -1L) {
+            return ResponseEntity.notFound().build(); // 404 Not Found
         }
+        return ResponseEntity.ok(funcionarioId); // 200 OK
     }
 
 
@@ -486,6 +489,9 @@ public class FuncionarioController {
         FuncionarioService.AccesoServicio acceso;
         try {
             acceso = funcionarioService.resolverAccesoServicio(usuario, idServicioElegido);
+        } catch (DataAccessException | PersistenceException | NullPointerException e) {
+            // C-20: un error interno sale como 500 sin detalles, no como 403 con su mensaje.
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
         }
@@ -533,6 +539,9 @@ public class FuncionarioController {
         FuncionarioService.AccesoServicio acceso;
         try {
             acceso = funcionarioService.resolverAccesoServicio(usuario, request.getServicioId());
+        } catch (DataAccessException | PersistenceException | NullPointerException e) {
+            // C-20: un error interno sale como 500 sin detalles, no como 403 con su mensaje.
+            throw e;
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", e.getMessage()));
