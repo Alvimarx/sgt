@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLayout } from '../../layout/layout';
 import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop, AvisoDesktop } from '../Desktop/ui';
 import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
+import { ID_ROL_SERVICIO, esRolJefatura, esRolSubrogante, rolEnServicio } from '../../utils/rolesServicio';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS (Importados de AsignacionView)
@@ -41,7 +42,7 @@ const maskRut = (rut = '') => {
 // nuevo, solo se agrupan por el rol que cada uno ya tiene en este servicio
 // (mismo criterio que usa "Personal del Servicio" para sus badges de rol).
 // ---------------------------------------------------------------------------
-const JerarquiaPreview = ({ jefe, subrogantes, totalFuncionarios, PA }) => (
+const JerarquiaPreview = ({ jefaturas, subrogantes, totalFuncionarios, PA }) => (
     <div style={{ background: '#fff', border: `1px solid ${PA.line}`, borderRadius: 16, padding: 16, marginBottom: 22, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
             Jerarquía actual del servicio
@@ -50,9 +51,11 @@ const JerarquiaPreview = ({ jefe, subrogantes, totalFuncionarios, PA }) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <IconBadge3D icon="crown" theme="amber" size={36} iconSize={17} radius={10} />
             <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>Jefatura</div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: PA.ink3, textTransform: 'uppercase' }}>
+                    Jefatura{jefaturas.length > 1 ? 's' : ''}
+                </div>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: PA.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {jefe ? getNombreCompleto(jefe) : 'Sin jefatura designada'}
+                    {jefaturas.length > 0 ? jefaturas.map(getNombreCompleto).join(', ') : 'Sin jefatura designada'}
                 </div>
             </div>
         </div>
@@ -184,15 +187,19 @@ const JerarquiaJefaturaView = ({ onBack }) => {
   const resultados = filteredUsers();
   const dropdownVisible = showDropdown && searchQuery.length >= 2;
 
-  // Rol de cada funcionario en el servicio activo (mismo criterio que
-  // "Personal del Servicio" usa para sus badges de rol) — solo para
-  // agrupar visualmente, no dispara ninguna llamada nueva.
-  const rolEnServicioActivo = (u) => {
-    const rel = u.servicios?.find(s => Number(s.idServicio) === Number(servicioActivoId));
-    return (rel?.rolServicioNombre || '').toLowerCase();
+  // Rol de cada funcionario en el servicio activo, con el mismo criterio que la
+  // Jerarquía del administrador (utils/rolesServicio.js). El rol llega como
+  // JEFATURA o SUBROGANTE: antes se buscaba 'jefe' en el nombre y la vista
+  // previa decía «Sin jefatura designada» aunque la hubiera. Puede haber varias.
+  const jefaturasActuales = funcionarios.filter(u => esRolJefatura(rolEnServicio(u, servicioActivoId)));
+  const subrogantesActuales = funcionarios.filter(u => esRolSubrogante(rolEnServicio(u, servicioActivoId)));
+
+  // Después de designar se vuelve a pedir el personal: la vista previa muestra
+  // al nuevo subrogante. Si la recarga falla, quedan los datos anteriores.
+  const recargarFuncionarios = async () => {
+    const res = await getFuncionariosSummary(servicioActivoId);
+    if (res.success) setFuncionarios(Array.isArray(res.data) ? res.data : []);
   };
-  const jefeActual = funcionarios.find(u => rolEnServicioActivo(u).includes('jefe'));
-  const subrogantesActuales = funcionarios.filter(u => rolEnServicioActivo(u).includes('subrogante'));
 
   // ---------------------------------------------------------------------------
   // HANDLERS
@@ -221,7 +228,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
     setGuardando(true);
     setShowConfirm(false);
 
-    const idRolReal = selectedRole === 'jefe' ? 1 : 2; 
+    const idRolReal = selectedRole === 'jefe' ? ID_ROL_SERVICIO.jefatura : ID_ROL_SERVICIO.subrogante;
     const idFunc = selectedUser.idFuncionario || selectedUser.id || selectedUser.rutCompleto;
 
     const result = await asignarRolJerarquia(idFunc, servicioActivoId, idRolReal);
@@ -230,6 +237,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
       setMensaje({ tipo: 'success', texto: 'Jerarquía designada con éxito.' });
       setSelectedUser(null);
       setSearchQuery('');
+      await recargarFuncionarios();
     } else {
       setMensaje({ tipo: 'error', texto: result.error || 'Ocurrió un error al designar la jerarquía.' });
     }
@@ -359,7 +367,8 @@ const JerarquiaJefaturaView = ({ onBack }) => {
               )}
               {!loadingDatos && !errorCarga && servicioActivoId && (
                 <div className="sgt-dg-jerarquia">
-                  {filaJerarquia('crown', 'amber', 'Jefatura', jefeActual ? getNombreCompleto(jefeActual) : 'Sin jefatura designada')}
+                  {filaJerarquia('crown', 'amber', `Jefatura${jefaturasActuales.length > 1 ? 's' : ''}`,
+                    jefaturasActuales.length > 0 ? jefaturasActuales.map(getNombreCompleto).join(', ') : 'Sin jefatura designada')}
                   <div className="sgt-dg-jerarquia__linea" />
                   {filaJerarquia('shield-check', 'blue', `Subrogante${subrogantesActuales.length !== 1 ? 's' : ''}`,
                     subrogantesActuales.length > 0 ? subrogantesActuales.map(getNombreCompleto).join(', ') : 'Sin subrogante designado')}
@@ -437,7 +446,7 @@ const JerarquiaJefaturaView = ({ onBack }) => {
         {/* Vista previa de la jerarquía actual */}
         {!loadingDatos && !errorCarga && servicioActivoId && (
           <JerarquiaPreview
-            jefe={jefeActual}
+            jefaturas={jefaturasActuales}
             subrogantes={subrogantesActuales}
             totalFuncionarios={funcionarios.length}
             PA={PA}

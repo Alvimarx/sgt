@@ -8,6 +8,7 @@ import { useLayout } from '../../layout/layout';
 import { EncabezadoDesktop, PaginaDesktop, PanelDesktop, CampoDesktop, BotonDesktop } from '../Desktop/ui';
 import { BusquedaFuncionarioDesktop } from '../Desktop/gestion/BusquedaFuncionarioDesktop';
 import { AvisoMantenedorDesktop, OpcionesTarjetaDesktop, PersonasNivelDesktop } from '../Desktop/admin/PiezasMantenedoresDesktop';
+import { esRolJefatura, esRolSubrogante, relacionEnServicio, rolEnServicio } from '../../utils/rolesServicio';
 
 // ---------------------------------------------------------------------------
 // CONSTANTES Y HELPERS (Importados desde AsignacionView)
@@ -122,13 +123,13 @@ const JerarquiaView = ({ onBack }) => {
       return () => clearTimeout(timer);
   }, [mensaje.texto]);
 
-  // Desktop: la "Jerarquía actual" se arma con los datos cargados al abrir la
-  // vista, que no se vuelven a pedir. Tras una designación exitosa se avisa
-  // que no la incluye. En móvil no se dibuja.
-  const [designoEnLaVisita, setDesignoEnLaVisita] = useState(false);
-  useEffect(() => {
-      if (mensaje.tipo === 'success') setDesignoEnLaVisita(true);
-  }, [mensaje.tipo]);
+  // Después de designar se vuelve a pedir el personal: la "Jerarquía actual"
+  // (desktop) y el rol que se muestra al elegir a alguien quedan al día. Si la
+  // recarga falla, quedan los datos anteriores.
+  const recargarFuncionarios = async () => {
+    const res = await getFuncionariosSummary();
+    if (res.success) setFuncionarios(Array.isArray(res.data) ? res.data : []);
+  };
 
   // ---------------------------------------------------------------------------
   // BÚSQUEDA Y FILTRADO
@@ -187,7 +188,8 @@ const JerarquiaView = ({ onBack }) => {
       setMensaje({ tipo: 'success', texto: 'Jerarquía designada con éxito.' });
       setSelectedUser(null);
       setSearchQuery('');
-      setSelectedServicioId('');
+      // El servicio queda elegido para que se vea su jerarquía ya actualizada.
+      await recargarFuncionarios();
     } else {
       setMensaje({ tipo: 'error', texto: result.error || 'Ocurrió un error al designar la jerarquía.' });
     }
@@ -219,19 +221,15 @@ const JerarquiaView = ({ onBack }) => {
   if (esDesktop) {
     const nombreServicio = servicioSeleccionado?.nombreServicio || servicioSeleccionado?.nombre;
     // Jerarquía actual del servicio elegido, armada con los funcionarios que la
-    // vista ya cargó (sin llamadas nuevas), como la vista previa de Jerarquía
-    // del servicio de jefatura. Solo cuentan los roles asignados en el
-    // servicio: a los administradores del sistema el backend los informa como
-    // JEFATURA en todos los servicios, sin rol de servicio (idRolServicio null).
-    const relEnServicio = (u) => (u?.servicios || []).find(
-      (s) => String(s.idServicio) === String(selectedServicioId) && s.idRolServicio != null,
-    );
+    // vista cargó (y recarga después de designar), con el mismo criterio que la
+    // vista previa de Jerarquía del servicio de jefatura (utils/rolesServicio.js).
+    const relEnServicio = (u) => relacionEnServicio(u, selectedServicioId);
     const miembros = selectedServicioId ? funcionarios.filter((u) => relEnServicio(u)) : [];
-    const conRol = (patron) => miembros
-      .filter((u) => patron.test(relEnServicio(u)?.rolServicioNombre || ''))
+    const conRol = (esRol) => miembros
+      .filter((u) => esRol(rolEnServicio(u, selectedServicioId)))
       .map((u) => ({ clave: String(getUserId(u)), nombre: getNombreCompleto(u) }));
-    const jefaturas = conRol(/JEF/i);
-    const subrogantes = conRol(/SUBROG/i);
+    const jefaturas = conRol(esRolJefatura);
+    const subrogantes = conRol(esRolSubrogante);
     const nivel = selectedRole === 'jefe' ? 'Jefatura' : 'Subrogante';
     const rolActual = selectedUser ? relEnServicio(selectedUser)?.rolServicioNombre : null;
     const ETIQUETA_ROL = { JEFATURA: 'Jefatura', SUBROGANTE: 'Subrogante', MEDICO: 'Médico' };
@@ -375,11 +373,6 @@ const JerarquiaView = ({ onBack }) => {
                     </div>
                     <div style={{ fontSize: 12.5, fontWeight: 700 }}>{miembros.length} en el servicio</div>
                   </div>
-                  {designoEnLaVisita && (
-                    <AvisoMantenedorDesktop tono="aviso" icono="history" rol="note">
-                      Muestra la jerarquía como estaba al abrir esta pantalla. Lo que designaste se verá al volver a entrar.
-                    </AvisoMantenedorDesktop>
-                  )}
                 </div>
               )}
             </PanelDesktop>

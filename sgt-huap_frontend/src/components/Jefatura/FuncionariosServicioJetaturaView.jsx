@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLayout } from '../../layout/layout';
 import { EncabezadoDesktop, PaginaDesktop, AvisoDesktop } from '../Desktop/ui';
 import { PersonalServicioDesktop } from '../Desktop/gestion/PersonalServicioDesktop';
+import { esRolJefatura, esRolSubrogante } from '../../utils/rolesServicio';
 
 const FuncionariosServicioJefaturaView = ({ onBack }) => {
   const PA = SGT_DATA.PALETTE;
@@ -78,8 +79,9 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
     const filas = personalFiltrado.map((u, i) => {
       const relServicio = u.servicios?.find(s => Number(s.idServicio) === Number(servicioActivoId));
       const nombreRolEnServicio = relServicio ? relServicio.rolServicioNombre : 'Sin rol asignado';
-      const esJefe = nombreRolEnServicio.toLowerCase().includes('jefe');
-      const esSubrogante = nombreRolEnServicio.toLowerCase().includes('subrogante');
+      // El rol llega como JEFATURA o SUBROGANTE (no contiene 'jefe').
+      const esJefe = esRolJefatura(nombreRolEnServicio);
+      const esSubrogante = esRolSubrogante(nombreRolEnServicio);
       return {
         id: u.idFuncionario || `f_${i}`,
         nombre: `${u.nombre || ''} ${u.apellidoPaterno || ''} ${u.apellidoMaterno || ''}`.trim(),
@@ -170,8 +172,8 @@ const FuncionariosServicioJefaturaView = ({ onBack }) => {
               const nombreRolEnServicio = relServicio ? relServicio.rolServicioNombre : 'Sin rol asignado';
               
               // Determinar un color de etiqueta según el rol para mejorar UI
-              const esJefe = nombreRolEnServicio.toLowerCase().includes('jefe');
-              const esSubrogante = nombreRolEnServicio.toLowerCase().includes('subrogante');
+              const esJefe = esRolJefatura(nombreRolEnServicio);
+              const esSubrogante = esRolSubrogante(nombreRolEnServicio);
               
               let badgeBg = PA.surface2;
               let badgeColor = PA.ink2;
