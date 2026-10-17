@@ -153,3 +153,59 @@ export const ofertaSimulada = ({ id, estado, ofertor, turno, servicio, postulant
     idPostulacion: id * 10 + i, postulante: personaEntidad(p), seleccionado: false, fechaPostulacion: ahoraISO(),
   })),
 });
+
+// ── R13: descanso post nocturno (fase 3) ─────────────────────────────────────
+
+/** Término de un turno como 'YYYY-MM-DDTHH:mm' (comparable con inicioDe). */
+export const finDe = (t) => `${t.diaFinalTurno || t.diaInicioTurno}T${String(t.horaFin).slice(0, 5)}`;
+
+/**
+ * Choques de darle `candidato` a quien tiene `calendario` (sus turnos), según R13
+ * y HU-SOL-14, escritos aparte del validador del backend:
+ *  - 'solape': los intervalos [inicio, fin) se cruzan (tocarse en el borde no cuenta);
+ *  - 'noche-dia': una noche del calendario termina la mañana del día en que
+ *    empieza el candidato, que es de día (criterio 1);
+ *  - 'dia-noche': el candidato es una noche que termina la mañana de un turno
+ *    de día del calendario (criterio 2).
+ * Un día seguido de la noche de ese mismo día (24 horas corridas) y dos noches
+ * seguidas no chocan (criterio 3).
+ */
+export function choquesR13(candidato, calendario) {
+  const choques = [];
+  calendario.filter((e) => e.id !== candidato.id).forEach((e) => {
+    if (inicioDe(candidato) < finDe(e) && inicioDe(e) < finDe(candidato)) choques.push({ regla: 'solape', turno: e });
+    else if (esNoche(e) && !esNoche(candidato) && e.diaFinalTurno === candidato.diaInicioTurno) choques.push({ regla: 'noche-dia', turno: e });
+    else if (esNoche(candidato) && !esNoche(e) && candidato.diaFinalTurno === e.diaInicioTurno) choques.push({ regla: 'dia-noche', turno: e });
+  });
+  return choques;
+}
+
+/**
+ * Si `candidato` (una noche) queda encadenado con el calendario de una de las dos
+ * formas que R13 permite (HU-SOL-14, criterio 3): '24h' (el día y la noche del
+ * mismo día) o 'dos-noches' (una noche pegada a otra). null si no.
+ */
+export function encadenamientoR13(candidato, calendario) {
+  if (!esNoche(candidato)) return null;
+  if (calendario.some((e) => !esNoche(e) && e.diaInicioTurno === candidato.diaInicioTurno)) return '24h';
+  if (calendario.some((e) => esNoche(e) && (e.diaFinalTurno === candidato.diaInicioTurno || candidato.diaFinalTurno === e.diaInicioTurno))) return 'dos-noches';
+  return null;
+}
+
+/** Nombre con que el backend nombra a la persona en los mensajes de R13 (nombre y apellido paterno, de /funcionarios/summary). */
+export const nombreMensajeR13 = (f) => [f?.nombre, f?.apellidoPaterno].filter(Boolean).join(' ').trim();
+
+const escapar = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Mensaje de R13 que cita el catálogo (HU-SOL-14, criterios 1 y 2), con el nombre
+ * oculto como «{nombre}» (ver sinNombre en hu.js). Lo que va entre paréntesis el
+ * catálogo lo deja abierto («(…)»): se exige solo que cite el turno que choca.
+ */
+export function patronMensajeR13(regla, turno) {
+  const turnoCitado = `\\([^)]*${escapar(turno.diaInicioTurno)}[^)]*\\)`;
+  const motivo = regla === 'noche-dia'
+    ? `sale de su turno de noche ${turnoCitado} la mañana de ese mismo día`
+    : `saldría de ese turno de noche la misma mañana en que empieza su turno de día ${turnoCitado}`;
+  return new RegExp(`^No es posible asignar el turno a \\{nombre\\} porque ${motivo}\\. Se permite un día seguido de su noche \\(24 horas corridas\\), pero no una noche seguida de día\\.$`);
+}

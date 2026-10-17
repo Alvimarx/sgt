@@ -9,7 +9,7 @@
 //  - HU-OFE-05: ofertas vigentes en el Centro y en «Ofertas generales».
 import {
   test, expect, fallaConocida, ID, SERVICIO, esDesktop, hoyChile, sumarDias,
-  entrar, esperarQuieta, abrirSolicitudes, pestana, elegirPestana, leerLista,
+  entrar, esperarQuieta, abrirSolicitudes, pestana, elegirPestana, leerLista, fechaCL,
 } from '../helpers/hu.js';
 import { solicitudSimulada, ofertaSimulada, nombreSolicitud } from '../helpers/datos.js';
 
@@ -23,12 +23,7 @@ const numDia = (iso) => String(Number(iso.slice(8, 10)));
 // abrirSolicitudes, pestana, elegirPestana y leerLista viven en helpers/hu.js
 // (las usa también la fase 2a).
 
-// Fecha corta como la muestran las tarjetas («15 oct 2026»), con el Intl del navegador.
-const fechaCL = (page, valor) => page.evaluate((v) => {
-  const s = String(v);
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(...s.split('-').map((n, i) => Number(n) - (i === 1 ? 1 : 0))) : new Date(s.replace(' ', 'T'));
-  return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' });
-}, valor);
+// fechaCL (fecha corta como la muestran las tarjetas) vive en helpers/hu.js.
 
 // ── Datos simulados del médico ───────────────────────────────────────────────
 async function escenarioMedico(api) {

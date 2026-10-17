@@ -6,8 +6,15 @@
 // backend). Ojo: localhost y no 127.0.0.1, que es el origen que permite el
 // CORS del backend local (CORS_ALLOWED_ORIGINS en .env.local).
 //
-//   npx playwright test                       # todo
+//   npx playwright test                       # todo, salvo lo que escribe
 //   npx playwright test --project=movil       # solo el layout móvil
+//   npx playwright test e2e/hu/               # historias de usuario (solo lectura)
+//   SGT_MUTA=1 npx playwright test e2e/hu-muta/  # las que escriben en la base
+//                                             # local: después, restaurarla
+//
+// Ojo: el filtro es una expresión regular; `e2e/hu` sin barra abarca también
+// e2e/hu-muta/ (sin SGT_MUTA esas se omiten). Detalle en el catálogo de
+// historias de usuario (docs/qa/HISTORIAS_DE_USUARIO.md §6.2).
 //
 // Navegador: por defecto el Chromium que descarga Playwright
 // (`npx playwright install chromium`). Para usar uno ya instalado en el

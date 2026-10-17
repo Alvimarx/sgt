@@ -11,6 +11,8 @@ import {
   test, expect, fallaConocida, ID, SERVICIO, MESES, esMovil, esDesktop,
   hoyChile, sumarDias, diaSemana, mesDe, anioDe, mesRelativo,
   entrar, usuarioSesion, itemMenu, barraInferior, esperarQuieta,
+  esperarCalendario, abrirCalendario, textoMes, tituloCalendario, botonMesCal, celdaDia, panelDiaDesktop,
+  abrirDia, detalle, abrirDetalle, cerrarDetalle, leerInfo,
 } from '../helpers/hu.js';
 import { turnosPorDia, rotativaDelBloque, horasDe } from '../helpers/datos.js';
 
@@ -29,80 +31,8 @@ const verFugaz = (page, texto) => page.waitForFunction(
   (t) => document.body.innerText.includes(t), texto, { polling: 'raf', timeout: 15_000 },
 );
 
-// ── Calendario ───────────────────────────────────────────────────────────────
-async function esperarCalendario(page, testInfo) {
-  if (esDesktop(testInfo)) await expect(page.locator('.sgt-dt-cargando-celda')).toHaveCount(0, { timeout: 15_000 });
-  else await expect(page.getByText('Cargando turnos del mes…')).toHaveCount(0, { timeout: 15_000 });
-  await esperarQuieta(page);
-}
-
-async function abrirCalendario(page, testInfo) {
-  if (esDesktop(testInfo)) await itemMenu(page, 'Calendario').click();
-  else await barraInferior(page, 'Calendario').click();
-  await esperarCalendario(page, testInfo);
-}
-
-const textoMes = (ym) => `${MESES[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
-const tituloCalendario = (page, testInfo) => (esDesktop(testInfo)
-  ? page.getByRole('heading', { level: 1 })
-  : page.getByText(new RegExp(`^(Asignación de turnos · )?(${MESES.join('|')}) \\d{4}$`)));
-const botonMesCal = (page, sentido) => page.getByRole('button', { name: sentido < 0 ? 'Mes anterior' : 'Mes siguiente' }).first();
-
-async function mesMostrado(page, testInfo) {
-  const texto = (await tituloCalendario(page, testInfo).textContent()).trim();
-  const [, mes, anio] = texto.match(new RegExp(`(${MESES.join('|')}) (\\d{4})$`));
-  return `${anio}-${String(MESES.indexOf(mes) + 1).padStart(2, '0')}`;
-}
-
-async function irAMes(page, testInfo, ym) {
-  const actual = await mesMostrado(page, testInfo);
-  const delta = (Number(ym.slice(0, 4)) - Number(actual.slice(0, 4))) * 12 + Number(ym.slice(5, 7)) - Number(actual.slice(5, 7));
-  for (let i = 0; i < Math.abs(delta); i += 1) {
-    await botonMesCal(page, delta).click();
-    await esperarCalendario(page, testInfo);
-  }
-  await expect(tituloCalendario(page, testInfo)).toHaveText(new RegExp(`${textoMes(ym)}$`));
-}
-
-const celdaDia = (page, testInfo, iso) => (esDesktop(testInfo)
-  ? page.getByRole('button', { name: new RegExp(`^${numDia(iso)} de ${mesMin(mesDe(iso))}:`) })
-  : page.getByRole('button', { name: new RegExp(`^${numDia(iso)} de ${MESES[mesDe(iso) - 1]}(,|$)`) }));
-const panelDiaDesktop = (page, iso) => page.getByRole('region', { name: `Detalle del ${capital(DIAS_LARGOS[diaSemana(iso)])} ${numDia(iso)} de ${mesMin(mesDe(iso))}` });
-
-async function abrirDia(page, testInfo, iso) {
-  await irAMes(page, testInfo, iso.slice(0, 7));
-  await celdaDia(page, testInfo, iso).click();
-  if (esDesktop(testInfo)) await expect(panelDiaDesktop(page, iso)).toBeVisible();
-  else await expect(page.getByText('Cobertura del día', { exact: true })).toBeVisible();
-}
-
-// Detalle del turno (sheet en móvil, panel lateral en desktop).
-const detalle = (page, testInfo) => (esDesktop(testInfo)
-  ? page.getByRole('dialog', { name: 'Detalle del turno' })
-  : page.getByText('Detalle del turno', { exact: true }).locator('xpath=../..'));
-
-async function abrirDetalle(page, testInfo, turno) {
-  const nombre = turno.idFuncionario == null ? `Cupo libre: ${turno.nombrePuesto}` : `Ver detalle de ${turno.nombreFuncionario}`;
-  const zona = esDesktop(testInfo) ? panelDiaDesktop(page, turno.diaInicioTurno) : page;
-  await zona.getByRole('button', { name: nombre, exact: true }).first().click();
-  await expect(detalle(page, testInfo)).toBeVisible();
-  return detalle(page, testInfo);
-}
-
-async function cerrarDetalle(page, testInfo) {
-  if (esDesktop(testInfo)) await page.keyboard.press('Escape');
-  else await page.mouse.click(195, 24); // el fondo oscuro del sheet de más arriba
-  await expect(detalle(page, testInfo)).toHaveCount(0);
-}
-
-async function leerInfo(det, testInfo) {
-  if (esDesktop(testInfo)) {
-    return Object.fromEntries(await det.getByRole('region', { name: 'Información del turno' }).locator('.sgt-dt-ficha__fila')
-      .evaluateAll((filas) => filas.map((f) => [f.querySelector('dt').textContent.trim(), f.querySelector('dd').textContent.trim()])));
-  }
-  return Object.fromEntries(await det.getByText('Información del turno', { exact: true }).locator('xpath=following-sibling::div[1]/div')
-    .evaluateAll((filas) => filas.map((f) => [...f.querySelectorAll(':scope > span')].map((s) => s.textContent.trim()))));
-}
+// Calendario y detalle del turno: esperarCalendario, abrirCalendario, irAMes,
+// abrirDia, abrirDetalle, leerInfo… viven en helpers/hu.js (los usa también la fase 3).
 
 // Integrantes por puesto, tal como los dibuja cada presentación.
 async function leerEquipo(det, testInfo) {

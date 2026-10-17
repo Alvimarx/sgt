@@ -10,7 +10,8 @@
 import {
   test, expect, fallaConocida, ID, SERVICIO, MESES, esDesktop,
   hoyChile, ahoraChile, mesDe, anioDe, diasDelMes, mesRelativo,
-  entrar, irA, itemMenu, barraInferior, esperarQuieta, usuarioSesion,
+  entrar, irA, itemMenu, barraInferior, usuarioSesion,
+  abrirDesdePanel, abrirBitacora, filtrarBitacoraPorEstado,
 } from '../helpers/hu.js';
 import { nombreResumen, inicioDe } from '../helpers/datos.js';
 
@@ -24,16 +25,7 @@ const semanasDelMes = (anio, mes) => {
 };
 const iso = (anio, mes, dia) => `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
 
-async function abrirDesdePanel(page, testInfo, { menu, panel, modulo }) {
-  if (esDesktop(testInfo)) {
-    await itemMenu(page, menu).click();
-  } else {
-    await barraInferior(page, 'Perfil').click();
-    await page.getByRole('button', { name: new RegExp(`^${panel}`) }).click();
-    await page.getByRole('button', { name: new RegExp(`^${modulo}\\b`) }).click();
-  }
-  await esperarQuieta(page);
-}
+// abrirDesdePanel, abrirBitacora y filtrarBitacoraPorEstado viven en helpers/hu.js (los usa también la fase 3).
 
 // Selector de período (PeriodoSelector en móvil, PeriodoDesktop en desktop).
 const etiquetaPeriodo = (page, testInfo) => (esDesktop(testInfo)
@@ -308,11 +300,6 @@ test('HU-EST-01 · criterio 4: los números coinciden con el calendario del mism
 // HU-BIT-01 · Consultar la bitácora de cambios
 // ═════════════════════════════════════════════════════════════════════════════
 
-const abrirBitacora = async (page, testInfo) => {
-  await abrirDesdePanel(page, testInfo, { menu: 'Bitácora', panel: 'Panel de Jefatura', modulo: 'Bitácora de Cambios' });
-  await expect(page.getByText('Cargando bitácora...')).toHaveCount(0, { timeout: 20_000 });
-};
-
 // Cuántos registros dice la vista y la fecha de cada uno, en orden.
 const conteoBitacora = async (page, testInfo) => {
   const texto = esDesktop(testInfo)
@@ -460,12 +447,7 @@ test('HU-BIT-01 · criterio 4: las cancelaciones aparecen como «Cancelada por e
   await abrirBitacora(page, testInfo);
 
   // Filtro por estado «Rechazada»: la cancelación queda incluida.
-  if (esDesktop(testInfo)) await page.locator('#bitacora-estado').selectOption('RECHAZADA');
-  else {
-    await page.getByRole('button', { name: /^Filtrar/ }).click();
-    await page.getByRole('button', { name: /^Estado/ }).click();
-    await page.locator('button.sgt-filter-chip', { hasText: /^Rechazada$/ }).click();
-  }
+  await filtrarBitacoraPorEstado(page, testInfo, { valor: 'RECHAZADA', texto: 'Rechazada' });
   // Es el último en llegar: la vista lo muestra primero.
   if (esDesktop(testInfo)) {
     const fila = page.locator('table[aria-label="Registros de la bitácora"] tbody tr').first();

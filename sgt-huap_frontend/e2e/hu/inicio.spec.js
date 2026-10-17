@@ -12,7 +12,7 @@
 import {
   test, expect, fallaConocida, ID, SERVICIO, APOYO, MESES, esMovil, esDesktop,
   hoyChile, sumarDias, lunesDe, diaSemana, mesDe, anioDe,
-  entrar, usuarioSesion, esperarQuieta,
+  entrar, usuarioSesion, esperarQuieta, etiquetaDia, filtros, filtro, filaDia, esperarAgenda, leerAgenda,
 } from '../helpers/hu.js';
 import {
   diasVisiblesAgenda, turnosPorDia, cuposDisponiblesR9, rotativaDelBloque, esNoche, horasDe,
@@ -23,37 +23,14 @@ const SOLO_MOVIL = 'HU-CAL-01 y HU-CAL-02 son solo móvil: en desktop el inicio 
 const SOLO_DESKTOP = 'HU-CAL-05 es solo desktop (Centro de operaciones).';
 const URGENCIAS = { idServicio: SERVICIO.urgencias, nombre: 'Urgencias' };
 
-const DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const DIAS_LARGOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const numDia = (iso) => Number(iso.slice(8, 10));
-const etiquetaDia = (iso) => `${DIAS_CORTOS[diaSemana(iso)]} ${numDia(iso)}`;
 const hhmm = (h) => String(h).slice(0, 5);
 
 // ── Agenda móvil ─────────────────────────────────────────────────────────────
-const filtros = (page) => page.getByRole('tablist', { name: 'Filtros de agenda' });
-const filtro = (page, nombre) => filtros(page).getByRole('tab', { name: new RegExp(`^${nombre}( \\d+)?$`) });
-const filaDia = (page, iso) => page.locator('.day-row').filter({
-  has: page.locator(`.day-header-btn[aria-label^="${etiquetaDia(iso)},"]`),
-});
-
-async function esperarAgenda(page) {
-  await expect(page.getByText('Cargando agenda…')).toHaveCount(0, { timeout: 15_000 });
-}
-
-// La lista en orden: separadores de mes («M:…») y días («D:Lun 19»).
-const leerAgenda = (page) => page.evaluate(() => [...document.querySelector('.agenda-days-list').children].map((el) => {
-  const btn = el.querySelector(':scope > .day-header-btn');
-  if (el.classList.contains('day-row') && btn) {
-    return {
-      clave: `D:${btn.getAttribute('aria-label').split(',')[0]}`,
-      texto: btn.textContent,
-      hoy: el.classList.contains('day-row--today'),
-      expandido: btn.getAttribute('aria-expanded') === 'true',
-    };
-  }
-  return { clave: `M:${el.textContent.trim()}` };
-}));
+// filtros, filtro, filaDia, esperarAgenda, leerAgenda y etiquetaDia viven en
+// helpers/hu.js (los usa también la fase 3).
 
 // Secuencia esperada a partir de una lista de días.
 const secuencia = (dias) => {
