@@ -89,9 +89,12 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     user?.rol === "SUBROGANTE" ||
     ["ADMIN", "ADMINISTRADOR"].includes(String(user?.rolSistema || "").toUpperCase());
 
+  // Cupos libres de los días que muestra la agenda (de hoy en adelante, más la
+  // noche de ayer que termina hoy): antes contaba todos los del servicio,
+  // también los que ya pasaron.
   const freeTurnsCount = useMemo(
-    () => (agendaData.turnos || []).filter((t) => t.turnoLibre).length,
-    [agendaData.turnos]
+    () => agendaDays.reduce((acc, day) => acc + (shiftsByDay[day.key] || []).filter((t) => t.turnoLibre).length, 0),
+    [agendaDays, shiftsByDay]
   );
 
   // Cambios de turno propios en curso (misTurnos con solicitud pendiente o ya aprobada),
