@@ -548,7 +548,7 @@ class SolicitudServiceTest {
         FuncionarioEntity receptor = funcionario(6L);
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
-                .funcionario(emisor).funcionarioReceptor(receptor)
+                .funcionario(emisor).funcionarioReceptor(receptor).aceptadoReceptor(true)
                 .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -569,7 +569,7 @@ class SolicitudServiceTest {
     void cambiarEstado_tipoIntercambio_aprobada_conTurnoDeseadoNull_lanzaRuntimeException() {
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
-                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L)).aceptadoReceptor(true)
                 .turno(null).turnoReceptor(turno(2L)).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -584,7 +584,7 @@ class SolicitudServiceTest {
     void cambiarEstado_tipoIntercambio_aprobada_conTurnoPropioNull_lanzaRuntimeException() {
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
-                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L)).aceptadoReceptor(true)
                 .turno(turno(1L)).turnoReceptor(null).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -602,7 +602,7 @@ class SolicitudServiceTest {
         FuncionarioEntity receptor = funcionario(6L);
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 5))
-                .funcionario(funcionario(5L)).funcionarioReceptor(receptor)
+                .funcionario(funcionario(5L)).funcionarioReceptor(receptor).aceptadoReceptor(true)
                 .turno(turno).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -621,7 +621,7 @@ class SolicitudServiceTest {
     void cambiarEstado_tipoOfertaParticular_aprobada_conTurnoNull_lanzaRuntimeException() {
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 5))
-                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L)).aceptadoReceptor(true)
                 .turno(null).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -980,7 +980,7 @@ class SolicitudServiceTest {
         FuncionarioEntity receptor = funcionario(6L);
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
-                .funcionario(emisor).funcionarioReceptor(receptor)
+                .funcionario(emisor).funcionarioReceptor(receptor).aceptadoReceptor(true)
                 .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -1067,7 +1067,7 @@ class SolicitudServiceTest {
         FuncionarioEntity receptor = funcionario(6L);
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
-                .funcionario(emisor).funcionarioReceptor(receptor)
+                .funcionario(emisor).funcionarioReceptor(receptor).aceptadoReceptor(true)
                 .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -1092,7 +1092,7 @@ class SolicitudServiceTest {
         TurnoEntity turnoPropio = turnoDeServicio(2L, servicioB);
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
-                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L)).aceptadoReceptor(true)
                 .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
         when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
@@ -1111,10 +1111,11 @@ class SolicitudServiceTest {
 
     // ============================ cambiarEstado: segregación de funciones completa (item 4) ============================
 
+    /** Oferta particular ya aceptada por el receptor (C-11: sin eso no se aprueba). */
     private SolicitudEntity solicitudOfertaParticular(FuncionarioEntity emisor, FuncionarioEntity receptor, TurnoEntity turno) {
         return SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 5))
-                .funcionario(emisor).funcionarioReceptor(receptor)
+                .funcionario(emisor).funcionarioReceptor(receptor).aceptadoReceptor(true)
                 .turno(turno).estado(PENDIENTE).build();
     }
 
@@ -1396,5 +1397,51 @@ class SolicitudServiceTest {
         }
         assertEquals(APROBADA, aprobada.getEstado());
         verify(solicitudRepository, never()).save(any());
+    }
+
+    // ============================ C-11: el receptor acepta antes de que se apruebe ============================
+
+    @Test
+    void aprobar_intercambioUOfertaParticular_sinLaAceptacionDelReceptor_409YNoMueveTurnos() {
+        for (int tipo : new int[]{4, 5}) {
+            for (Boolean aceptado : new Boolean[]{null, false}) {
+                TurnoEntity turnoDeseado = turnoDe(1L, 6L);
+                TurnoEntity turnoPropio = turnoDe(2L, 5L);
+                SolicitudEntity solicitud = SolicitudEntity.builder()
+                        .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, tipo))
+                        .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L)).aceptadoReceptor(aceptado)
+                        .turno(tipo == 4 ? turnoDeseado : turnoPropio).turnoReceptor(tipo == 4 ? turnoPropio : null)
+                        .estado(PENDIENTE).build();
+                when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+                when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+
+                actorAutenticado(9L);
+                org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                        org.springframework.web.server.ResponseStatusException.class,
+                        () -> service.cambiarEstado(1L, APROBADA), "tipo " + tipo + ", aceptado " + aceptado);
+                assertEquals(409, ex.getStatusCode().value());
+                assertEquals("El receptor todavía no acepta esta solicitud: no se puede aprobar", ex.getReason());
+                assertEquals(PENDIENTE, solicitud.getEstado());
+                assertEquals(6L, turnoDeseado.getFuncionario().getIdFuncionario());
+                assertEquals(5L, turnoPropio.getFuncionario().getIdFuncionario());
+            }
+        }
+        verify(turnoRepository, never()).save(any());
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void rechazar_unIntercambioQueElReceptorNoHaAceptado_sePermite() {
+        // C-11 limita solo la aprobación: la gestión puede rechazar mientras espera al receptor.
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(funcionario(5L)).funcionarioReceptor(funcionario(6L))
+                .turno(turnoDe(1L, 6L)).turnoReceptor(turnoDe(2L, 5L)).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        solicitudSaveDevuelveArgumento();
+
+        actorAutenticado(9L);
+        assertEquals(RECHAZADA, service.cambiarEstado(1L, RECHAZADA).getEstado());
+        verify(turnoRepository, never()).save(any());
     }
 }

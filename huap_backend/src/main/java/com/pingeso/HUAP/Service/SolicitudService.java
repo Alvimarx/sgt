@@ -518,6 +518,15 @@ public class SolicitudService {
                         "Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)");
             }
 
+            // SEC (C-11, RN-SGT-019): un intercambio o una oferta particular se aprueba solo
+            // después de que el receptor la aceptó. Antes solo lo exigía la interfaz, y por API
+            // se aprobaba un intercambio que el receptor nunca aceptó.
+            if ((Integer.valueOf(4).equals(tipoSolicitud) || Integer.valueOf(5).equals(tipoSolicitud))
+                    && !Boolean.TRUE.equals(solicitud.getAceptadoReceptor())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "El receptor todavía no acepta esta solicitud: no se puede aprobar");
+            }
+
             exigirTurnoAunDelEmisor(solicitud, tipoSolicitud);
 
             // Revalidación OBLIGATORIA y definitiva con el calendario más reciente: el funcionario
