@@ -72,6 +72,23 @@ export function choqueConCalendario(candidato, calendario = []) {
   return null;
 }
 
+// Bloque día/noche de un turno (R9): su día de inicio y su tipo de turno. Es la
+// misma clave que el teamKey de la agenda (funcionarioService.mapTurnoForAgenda).
+const claveBloque = (t) => `${fechaInicioDe(t)}|${t?.idTipoTurno ?? 'sin-tipo'}`;
+
+/** Los dos turnos son del mismo bloque (mismo día y mismo tipo de turno). */
+export const mismoBloque = (a, b) => claveBloque(a) === claveBloque(b);
+
+/**
+ * ¿Puede tomar este cupo libre quien tiene `misTurnos`? No, si ya trabaja en
+ * ese bloque (R9) o si el cupo choca con alguno de sus turnos: solape o
+ * descanso post nocturno (R13) en los dos sentidos. Es la regla de
+ * «Disponibles» y la del selector de Cobertura. `misTurnos` debería traer
+ * todos los turnos de la persona: el backend valida contra todos.
+ */
+export const puedeTomarCupo = (cupo, misTurnos = []) =>
+  !misTurnos.some((t) => mismoBloque(cupo, t)) && !choqueConCalendario(cupo, misTurnos);
+
 const minutosDesdeEpoca = (fecha, hora) => {
   const [y, m, d] = fecha.split('-').map(Number);
   const [hh, mm] = hora.split(':').map(Number);

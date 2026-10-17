@@ -14,6 +14,7 @@ import {
   TopHeader,
 } from "../Style/UIPrimitives";
 import { useNotifications } from "../../context/NotificationContext";
+import { puedeTomarCupo } from "../../utils/reglasTurno";
 
 // ---------------------------------------------------------------------------
 // ESTADO INICIAL
@@ -291,34 +292,22 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
     [agendaDays, shiftsByDay]
   );
 
-  // "Disponibles": cupos libres que el usuario REALMENTE podría tomar.
-  // Se excluyen (a) los cupos de un equipo día/noche del que ya es parte
-  // (mismo teamKey: ya está trabajando en ese bloque, no puede doblar ahí), y
-  // (b) los turnos de DÍA cuando viene saliendo de su turno de noche: la noche
-  // que empieza el día anterior termina la mañana de ese día (fechaFin).
-  const misTeamKeys = useMemo(
-    () => new Set(
-      (agendaData.turnos || []).filter((t) => t.miTurno && t.teamKey).map((t) => t.teamKey)
-    ),
+  // "Disponibles": cupos libres que el usuario REALMENTE podría tomar, con la
+  // misma regla que el selector de Cobertura (utils/reglasTurno.js,
+  // puedeTomarCupo). Se excluyen (a) los cupos de un bloque día/noche donde ya
+  // trabaja (R9), y (b) los que chocan con sus turnos según el backend: solape o
+  // descanso post nocturno (R13) en los dos sentidos — el día que sigue a su
+  // noche y también la noche que termina la mañana de su turno de día.
+  const misTurnosAgenda = useMemo(
+    () => (agendaData.turnos || []).filter((t) => t.miTurno),
     [agendaData.turnos]
   );
-  const misMananasPostNoche = useMemo(
-    () => new Set(
-      (agendaData.turnos || [])
-        .filter((t) => t.miTurno && t.tipo === "noche" && t.fechaFin && t.fechaFin !== t.fecha)
-        .map((t) => t.fechaFin)
-    ),
-    [agendaData.turnos]
-  );
-  const esDisponibleParaMi = (s) =>
-    s.turnoLibre &&
-    !(s.teamKey && misTeamKeys.has(s.teamKey)) &&
-    !(s.tipo === "dia" && misMananasPostNoche.has(s.fecha));
+  const esDisponibleParaMi = (s) => s.turnoLibre && puedeTomarCupo(s, misTurnosAgenda);
 
   const countDisponibles = useMemo(
     () => agendaDays.reduce((acc, day) => acc + getShifts(day.key).filter(esDisponibleParaMi).length, 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [agendaDays, shiftsByDay, misTeamKeys, misMananasPostNoche]
+    [agendaDays, shiftsByDay, misTurnosAgenda]
   );
   const FILTERS = [
     { id: "todos",        label: "Todos"      },
@@ -337,7 +326,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agendaDays, filter, shiftsByDay, misTeamKeys, misMananasPostNoche]);
+  }, [agendaDays, filter, shiftsByDay, misTurnosAgenda]);
 
   // ---------------------------------------------------------------------------
   // RENDER

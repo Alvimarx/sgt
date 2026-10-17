@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
 import { turnosComprometidos } from '../../utils/reglasSolicitud';
+import { puedeTomarCupo } from '../../utils/reglasTurno';
 import { SGT_DATA } from './data';
 import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
@@ -546,7 +547,18 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
       // sentido y además ensuciaba el picker con todo el historial de la persona.
       fetches.push(turnosService.getFuturos(userId).then(d => setMisTurnos(Array.isArray(d) ? d : [])).catch(() => {}));
     if (tipoSel === 3)
-      fetches.push(turnosService.getSinAsignar(servicioId).then(d => setTurnosLibres(Array.isArray(d) ? d : [])).catch(() => {}));
+      // Solo los cupos que se pueden tomar, con la misma regla que «Disponibles»
+      // (utils/reglasTurno.js, puedeTomarCupo): fuera los de un bloque donde ya
+      // trabaja y los que chocan con sus turnos (solape o R13, en los dos
+      // sentidos). Se compara con todos sus turnos, de cualquier servicio, como
+      // el backend; si no se pueden traer, el selector no filtra por ellos.
+      fetches.push(Promise.all([
+        turnosService.getSinAsignar(servicioId),
+        turnosService.getByMedico(userId).catch(() => []),
+      ]).then(([libres, mios]) => {
+        const misTurnos = Array.isArray(mios) ? mios : [];
+        setTurnosLibres((Array.isArray(libres) ? libres : []).filter((cupo) => puedeTomarCupo(cupo, misTurnos)));
+      }).catch(() => {}));
     if (tipoSel === 4 || tipoSel === 5)
       fetches.push(usuariosService.getAll(servicioId).then(d => {
         const lista = (Array.isArray(d) ? d : [])
