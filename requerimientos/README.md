@@ -45,7 +45,7 @@ por qué se hizo y cómo se hizo.
 | R15 | 2026-08-26 | Turno comprometido único + cancelar solicitudes | pendiente de visto bueno |
 | R16 | 2026-08-27 | Modo desktop: Centro de operaciones (Propuesta C) | pendiente de visto bueno |
 | R17 | 2026-08-28 | Desktop: ancho fluido + gestión de asignación completa + ofertas vigentes | pendiente de visto bueno |
-| R18 | 2026-10-16 | Modo desktop en todas las pantallas | en curso |
+| R18 | 2026-10-16 | Modo desktop en todas las pantallas | implementado (falta revisión) |
 
 ## Estado por lote
 

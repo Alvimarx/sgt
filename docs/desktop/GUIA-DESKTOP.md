@@ -29,8 +29,9 @@ vista. El requerimiento y sus decisiones están en
 | Menú | `src/components/Desktop/navegacion.js` | Ítems por rol, grupos, ítem activo según la vista |
 | Navegación | `src/components/Admin2/Prop4.jsx` (`navegarDesktop`) | Destino del menú → `currentView`, con el "volver" que corresponde |
 | Panel lateral | `Sheet` / `PanelLateral` en `src/components/Style/UIPrimitives.jsx` | En desktop todo `Sheet` se abre como panel desde la derecha (`anchoDesktop`: `md` 480, `lg` 640, `xl` 860 o px) |
-| Kit | `src/components/Desktop/ui.jsx` | Página, encabezado, panel, tabla, botón, chip, buscador, campo, segmentos, KPI, persona, aviso, estado vacío |
-| Estilos | `src/components/Desktop/desktop.css` | Todo bajo `.sgt-desktop`, `.sgt-entrada`, `.sgt-panel-lateral` o clases `sgt-d-*` |
+| Kit | `src/components/Desktop/ui.jsx` | Página, encabezado, panel, tabla, botón, chip, buscador, campo, segmentos, KPI, persona, aviso, estado vacío. `PaginaDesktop` y `PanelDesktop` aceptan `llena` (lista larga: la tabla scrollea por dentro con el encabezado fijo) |
+| Estilos | `src/components/Desktop/desktop.css` (lo importa `ui.jsx`) | Todo bajo `.sgt-desktop`, `.sgt-entrada`, `.sgt-panel-lateral` o clases `sgt-d-*` |
+| Piezas por grupo | `src/components/Desktop/turnos/`, `gestion/`, `admin/`, `planificacion/` | Componentes de presentación de cada grupo de pantallas, con su CSS (`sgt-dt-*`, `sgt-dg-*`, `sgt-da-*`, `sgt-dp-*`) |
 | Home | `src/components/Desktop/CentroOperacionesDesktop.jsx` | Centro de operaciones (R16/R17), ahora dentro del marco |
 
 Ajustes automáticos dentro del marco (no hay que hacer nada):
@@ -82,6 +83,11 @@ const MiVista = ({ onBack }) => {
   desktop se reemplazan por `Sheet`/`PanelLateral` o `ConfirmDialog`.
 - Toasts o barras fijas con `bottom: 82` (pensado para la TabBar): en desktop,
   `bottom: 26`.
+- CSS propio de un grupo: en cada componente se importa `../ui` antes que el
+  CSS del grupo, y para pisar una regla del kit se usa selector compuesto
+  (`.sgt-d-panel.sgt-dg-panel-abierto`), que no depende del orden de carga.
+- Íconos: si `SGTIcon` no tiene el que hace falta (candado, lápiz, basurero),
+  se usa `lucide-react`, que ya es dependencia del proyecto.
 
 ### Volver
 
@@ -89,7 +95,8 @@ En desktop el menú lateral es la navegación. **Vista raíz** (a la que se lleg
 desde el menú): sin botón volver (no pasar `leftSlot` a `TopHeader` cuando
 `esDesktop`). **Sub-pantalla interna** (editor, asistente, "generar",
 formulario de página completa): se mantiene su volver, porque vuelve a la lista
-de la misma vista.
+de la misma vista. Los paneles de Jefatura, Subrogante y Administración no
+tienen ítem en el menú: se abren desde Mi Perfil y conservan su volver.
 
 ## 4. Lenguaje visual ("Propuesta C")
 
@@ -115,12 +122,12 @@ apiladas. Nada de texto de 16 px ni botones de ancho completo en desktop.
 
 | Tipo | Patrón desktop |
 |---|---|
-| Lista de entidades (personal, servicios, puestos, tipos de turno, bitácora, auditoría) | Encabezado + barra (buscador, filtros, acción principal) + `TablaDesktop` en un `PanelDesktop`. Crear/editar en `Sheet` (`anchoDesktop="lg"`); eliminar con `ConfirmDialog` |
+| Lista de entidades (personal, servicios, puestos, tipos de turno, bitácora, auditoría) | Encabezado + barra (buscador, filtros, acción principal) + `TablaDesktop` en un `PanelDesktop llena` dentro de un `PaginaDesktop llena`. Crear/editar en `Sheet` (`anchoDesktop="lg"`); eliminar con `ConfirmDialog`. Entidades de un solo campo (Puestos): edición en línea y alta en un panel al lado, más rápido que un `Sheet` |
 | Bandeja con decisiones (solicitudes, notificaciones) | Segmentos (pestañas) + lista o tabla densa + detalle al lado (`sgt-d-split`) o en panel lateral. Acciones visibles sin abrir cada tarjeta |
 | Calendario | Grilla mensual grande con información por día (cobertura, mis turnos); el día abre su detalle en panel lateral |
 | Editor (rotativas, planificación) | Dos o tres columnas: lista o catálogo a la izquierda, área de trabajo al centro, propiedades o resumen a la derecha |
 | Paneles de gestión y dashboards | Grilla de tarjetas o KPIs (`sgt-d-grid`, `sgt-d-kpis`) + paneles con datos |
-| Formularios y perfil | Página angosta (`PaginaDesktop ancho="angosto"`) con `sgt-d-formulario` en 2 columnas |
+| Formularios y perfil | Página angosta (`PaginaDesktop ancho="angosto"`, alineada bajo el título) con `sgt-d-formulario` en 2 columnas |
 | Entrada (login, servicio) | Pantalla completa: marca a la izquierda, formulario en tarjeta a la derecha |
 
 ## 6. Accesibilidad
@@ -143,12 +150,17 @@ cd sgt-huap_frontend
 # Regresión del MÓVIL (debe pasar sin --update-snapshots):
 PW_CHROMIUM_PATH=/usr/bin/chromium SGT_VISTAS=solicitudes,calendar_view \
   npx playwright test e2e/visual --project=movil
-# Fotos desktop para revisar el diseño (se guardan en e2e/__pantallas__/desktop/):
+# Fotos desktop para revisar el diseño (se guardan en e2e/__pantallas__/desktop/).
+# "=all" reescribe todas: el modo por defecto no reescribe diferencias mínimas.
 PW_CHROMIUM_PATH=/usr/bin/chromium SGT_VISTAS=solicitudes \
-  npx playwright test e2e/visual --project=desktop --project=desktop-fhd --update-snapshots
+  npx playwright test e2e/visual --project=desktop --project=desktop-fhd --update-snapshots=all
 npx eslint <archivos tocados>      # sin errores nuevos
 npx vite build --outDir /tmp/sgt-dist-check   # compila
 ```
+
+Además de `pantallas.spec.js` (una foto por vista y rol), cada grupo tiene
+`e2e/visual/interacciones-<grupo>.spec.js`: abre y cancela paneles, diálogos,
+asistentes y filtros, y falla si la consola del navegador registra errores.
 
 Las fotos dependen de los datos: correr contra la base de desarrollo recién
 creada (fechas relativas, `scripts/generar_turnos_demo.sh`) y sin crear,
