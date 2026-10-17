@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
+import { turnosComprometidos } from '../../utils/reglasSolicitud';
 import { SGT_DATA } from './data';
 import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
@@ -493,7 +494,18 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
 
 // ── CrearSolicitudSheet ───────────────────────────────────────────────────────
 
-const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, initialPreset }) => {
+const SIN_TURNOS = new Set();
+
+// R15: el turno propio de un intercambio ya está en otra solicitud pendiente de
+// quien pide. /turnos/intercambiables devuelve entonces una lista vacía sin decir
+// por qué; el asistente lo sabe por las solicitudes propias y lo dice.
+const NOTA_PROPIO_COMPROMETIDO = 'No hay turnos intercambiables con el que elegiste: ese turno ya está comprometido en otra solicitud pendiente tuya. Cancélala desde Solicitudes para proponer este intercambio.';
+const ERROR_PROPIO_COMPROMETIDO = 'El turno que ofreces entregar ya está comprometido en otra solicitud pendiente tuya. Cancélala desde Solicitudes para crear esta.';
+const NOTA_SIN_INTERCAMBIABLES = 'No hay turnos intercambiables con el que elegiste: el turno que entregas ya empezó o está comprometido en otra solicitud tuya, esa persona no tiene turnos futuros de este servicio, o el canje dejaría turnos incompatibles.';
+
+// turnosComprometidos: ids (texto) de los turnos que quien pide ya comprometió en
+// sus solicitudes pendientes (utils/reglasSolicitud.js, turnosComprometidos).
+const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, initialPreset, turnosComprometidos: comprometidos = SIN_TURNOS }) => {
   const { esDesktop } = useLayout();
   const [step, setStep]         = useState(1); // 1=tipo, 2=form, 3=picker
   const [tipoSel, setTipoSel]   = useState(null);
@@ -601,9 +613,13 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
     return null;
   };
 
+  const propioComprometido = tipoSel === 4 && form.idTurnoPropio != null && comprometidos.has(String(form.idTurnoPropio));
+  const notaSinIntercambiables = propioComprometido ? NOTA_PROPIO_COMPROMETIDO : NOTA_SIN_INTERCAMBIABLES;
+
   const handleSubmit = async () => {
     setLoading(true); setError(null);
     try {
+      if (propioComprometido) { setError(ERROR_PROPIO_COMPROMETIDO); setLoading(false); return; }
       if (tipoSel === 6) {
         if (!form.idTurno) { setError('Rellena todos los campos requeridos.'); setLoading(false); return; }
         await ofertasGeneralesService.crear({ idFuncionario: Number(userId), idTurno: Number(form.idTurno), motivo: form.motivo });
@@ -718,9 +734,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
       campos.push(selector('receptor', 'Con quién intercambiar *', funcLabel(form.idReceptor, form.receptorLabel), 'Seleccionar funcionario'));
       if (form.idReceptor) {
         campos.push(selector('turnoDeseado', 'Turno del receptor que quieres *', turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel), 'Seleccionar turno', {
-          nota: form.idTurnoPropio && turnosReceptor.length === 0 && !loadingReceptor
-            ? 'No hay turnos intercambiables con el que elegiste: el turno que entregas ya empezó o está comprometido en otra solicitud tuya, esa persona no tiene turnos futuros de este servicio, o el canje dejaría turnos incompatibles.'
-            : null,
+          nota: form.idTurnoPropio && turnosReceptor.length === 0 && !loadingReceptor ? notaSinIntercambiables : null,
         }));
       }
     }
@@ -826,9 +840,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
                   <PickerBtn label="Seleccionar turno" value={turnoLabel(turnosReceptor, form.idTurnoDeseado, form.turnoDeseadoLabel)} pkey="turnoDeseado" />
                   {form.idTurnoPropio && turnosReceptor.length === 0 && !loadingReceptor && (
                     <div style={{ marginTop: 6, fontSize: 11.5, color: PA.ink3, fontWeight: 600 }}>
-                      No hay turnos intercambiables con el que elegiste: el turno que entregas ya
-                      empezó o está comprometido en otra solicitud tuya, esa persona no tiene turnos
-                      futuros de este servicio, o el canje dejaría turnos incompatibles.
+                      {notaSinIntercambiables}
                     </div>
                   )}
                 </div>
@@ -1220,6 +1232,10 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     listaSinAgrupar = currentList.filter((sol) => !agrupadas.has(sol.idSolicitud));
   }
 
+  // Turnos que el usuario ya comprometió en sus solicitudes pendientes (R15): el
+  // asistente de intercambio los reconoce y dice que hay que cancelar la otra.
+  const misTurnosComprometidos = useMemo(() => turnosComprometidos(solicitudes, user?.id), [solicitudes, user?.id]);
+
   const pendienteCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length;
   const recibidasCount = recibidas.filter(s => s.estado === 'PENDIENTE').length;
 
@@ -1461,6 +1477,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
           servicioId={user?.servicioId}
           onCreated={load}
           initialPreset={crearPreset}
+          turnosComprometidos={misTurnosComprometidos}
         />
 
         <EditMotivoSheet
@@ -1653,6 +1670,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         servicioId={user?.servicioId}
         onCreated={load}
         initialPreset={crearPreset}
+        turnosComprometidos={misTurnosComprometidos}
       />
 
       <EditMotivoSheet
