@@ -85,10 +85,8 @@ const AdminStats = ({ onBack }) => {
   const [expandedIds, setExpandedIds]               = useState(new Set());
 
   const [showCobertura, setShowCobertura]           = useState(false);
-  const [showPuestos, setShowPuestos]               = useState(false);
   const [todosDetalle, setTodosDetalle]             = useState(null);
   const [loadingTodos, setLoadingTodos]             = useState(false);
-  const [expandedPuestosIds, setExpandedPuestosIds] = useState(new Set());
 
   const [filtroOpen, setFiltroOpen]           = useState(false);
   const [filtroActivo, setFiltroActivo]       = useState(new Set());
@@ -187,13 +185,6 @@ const AdminStats = ({ onBack }) => {
   };
 
   const handleAbrirCobertura = () => { setShowCobertura(true); cargarTodosDetalle(); };
-  const handleAbrirPuestos   = () => { setShowPuestos(true); setExpandedPuestosIds(new Set()); cargarTodosDetalle(); };
-
-  const togglePuesto = (nombre) => setExpandedPuestosIds(prev => {
-    const next = new Set(prev);
-    next.has(nombre) ? next.delete(nombre) : next.add(nombre);
-    return next;
-  });
 
   const opcionesTipo      = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.tipoTurno).filter(Boolean))].sort(), [todosDetalle]);
   const opcionesPuesto    = React.useMemo(() => [...new Set((todosDetalle || []).map(t => t.nombrePuesto).filter(Boolean))].sort(), [todosDetalle]);
@@ -210,19 +201,6 @@ const AdminStats = ({ onBack }) => {
       return true;
     });
   }, [todosDetalle, filtroTipo, filtroPuesto, filtroFecha, filtroPlantilla]);
-
-  const puestosAgrupados = React.useMemo(() => {
-    if (!todosDetalle) return null;
-    const map = {};
-    todosDetalle.forEach(t => {
-      const p = t.nombrePuesto || 'Sin puesto';
-      if (!map[p]) map[p] = { nombre: p, turnos: [], total: 0, asignados: 0 };
-      map[p].turnos.push(t);
-      map[p].total++;
-      if (t.asignado) map[p].asignados++;
-    });
-    return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [todosDetalle]);
 
   // Desktop (R18): vista raíz del menú (sin volver). Fila de KPIs, los mismos
   // gráficos CSS (CoverageBar) en paneles lado a lado y los dos detalles
