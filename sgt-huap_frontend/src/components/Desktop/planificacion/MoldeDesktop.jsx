@@ -248,7 +248,7 @@ const MoldeDesktop = ({
               className="sgt-d-btn--icono"
               onClick={onEliminarTurnos}
               aria-label="Eliminar turnos generados"
-              title="Eliminar turnos generados por este molde (legado)"
+              title="Eliminar los turnos de las rotativas del molde en un rango de fechas (legado)"
             >
               <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
             </BotonDesktop>

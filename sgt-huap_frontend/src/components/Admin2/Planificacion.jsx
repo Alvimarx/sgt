@@ -640,6 +640,10 @@ function MoldesSheet({open,onClose,onSave,onLoad,onDelete,instancias,moldes,load
 }
 
 /* ─── EliminarTurnosSheet (deshacer una generación por rango de fechas) ─────── */
+// C-22 (17 oct 2026): el texto dice lo que hace el backend
+// (PlanificacionService.eliminarTurnosGenerados): borra por las rotativas del
+// molde dentro del rango, sin mirar qué generó cada turno, y no anula vigencias.
+const TEXTO_VIGENCIAS='Para las generaciones nuevas conviene usar «Vigencias» (eliminar desde una fecha o anular), que borra solo los turnos de esa vigencia.';
 function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
   const{esDesktop}=useLayout();
   const[fechaInicio,setFechaInicio]=useState('');
@@ -668,8 +672,8 @@ function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
               <BotonDesktop variante="peligro-solido" onClick={handle} disabled={eliminando}><Trash2 size={14} strokeWidth={2.2} aria-hidden="true"/>Eliminar turnos del rango</BotonDesktop>
             </>
           )}>
-            <p className="sgt-dp-texto">Borra (deja fuera de la agenda) los turnos que <strong>{nombreMolde||'este molde'}</strong> generó dentro del rango de fechas indicado. Útil para deshacer una generación duplicada. No afecta otros moldes ni turnos fuera del rango.</p>
-            <AvisoDesktop>Para las generaciones nuevas conviene usar «Vigencias» (eliminar desde una fecha o anular), que identifica sus turnos con exactitud.</AvisoDesktop>
+            <p className="sgt-dp-texto">Borra (deja fuera de la agenda) todos los turnos de las rotativas de <strong>{nombreMolde||'este molde'}</strong> que empiezan dentro del rango de fechas, sin mirar qué los generó: también los de otros moldes que usen esas mismas rotativas y los asignados a mano con ellas. No anula ninguna vigencia.</p>
+            <AvisoDesktop>{TEXTO_VIGENCIAS}</AvisoDesktop>
             {err&&<AvisoDesktop tono="aviso"><span role="alert">{err}</span></AvisoDesktop>}
             <div className="sgt-d-formulario">
               <CampoDesktop etiqueta="Desde" htmlFor="sgt-dp-eliminar-desde">
@@ -692,7 +696,7 @@ function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
             onCancelar={()=>setConfirmando(false)}
             onConfirmar={()=>onConfirm(fechaInicio,fechaFin)}
           >
-            Se eliminarán los turnos generados por este molde entre el <strong>{fechaCorta(fechaInicio)}</strong> y el <strong>{fechaCorta(fechaFin)}</strong>. Esta acción no se puede deshacer desde la app.
+            Se eliminarán todos los turnos de las rotativas de este molde que empiezan entre el <strong>{fechaCorta(fechaInicio)}</strong> y el <strong>{fechaCorta(fechaFin)}</strong>, también los de otros moldes que usen esas rotativas. Esta acción no se puede deshacer desde la app.
           </ConfirmacionPlan>
         )}
       </>
@@ -703,8 +707,9 @@ function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
     <Sheet open={open} onClose={()=>!eliminando&&onClose()} title="Eliminar turnos generados" maxHeight="80%">
       <div style={{padding:'4px 18px 24px',display:'flex',flexDirection:'column',gap:14}}>
         <div style={{fontSize:12.5,color:'var(--ink3)',fontWeight:600,lineHeight:1.4}}>
-          Borra (deja fuera de la agenda) los turnos que <strong style={{color:'var(--ink)'}}>{nombreMolde||'este molde'}</strong> generó dentro del rango de fechas indicado. Útil para deshacer una generación duplicada. No afecta otros moldes ni turnos fuera del rango.
+          Borra (deja fuera de la agenda) todos los turnos de las rotativas de <strong style={{color:'var(--ink)'}}>{nombreMolde||'este molde'}</strong> que empiezan dentro del rango de fechas, sin mirar qué los generó: también los de otros moldes que usen esas mismas rotativas y los asignados a mano con ellas. No anula ninguna vigencia.
         </div>
+        <div style={{fontSize:12,color:'var(--ink2)',fontWeight:600,lineHeight:1.4,background:'var(--surface2)',borderRadius:10,padding:'10px 12px'}}>{TEXTO_VIGENCIAS}</div>
         {err&&<div style={{display:'flex',alignItems:'center',gap:6,background:'var(--warn-soft)',color:'var(--warn)',borderRadius:10,padding:'10px 12px',fontSize:12.5,fontWeight:700}}><SGTIcon name="alert" size={14}/>{err}</div>}
         <div>
           <span style={lbl}>Desde</span>
@@ -725,7 +730,7 @@ function EliminarTurnosSheet({open,onClose,onConfirm,eliminando,nombreMolde}){
             <div style={{display:'flex',justifyContent:'center',paddingBottom:14}}><div style={{width:40,height:4,background:'var(--line)',borderRadius:99}}/></div>
             <div style={{display:'flex',justifyContent:'center',marginBottom:14}}><div style={{width:56,height:56,borderRadius:16,background:'var(--warn-soft)',display:'grid',placeItems:'center'}}><SGTIcon name="trash" size={26} color="var(--warn)"/></div></div>
             <div style={{fontWeight:800,fontSize:18,color:'var(--ink)',textAlign:'center',marginBottom:10}}>¿Eliminar estos turnos?</div>
-            <p style={{fontSize:14,color:'var(--ink2)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center'}}>Se eliminarán los turnos generados por este molde entre el <strong style={{color:'var(--ink)'}}>{fechaInicio}</strong> y el <strong style={{color:'var(--ink)'}}>{fechaFin}</strong>. Esta acción no se puede deshacer desde la app.</p>
+            <p style={{fontSize:14,color:'var(--ink2)',margin:'0 0 22px',lineHeight:1.5,textAlign:'center'}}>Se eliminarán todos los turnos de las rotativas de este molde que empiezan entre el <strong style={{color:'var(--ink)'}}>{fechaCorta(fechaInicio)}</strong> y el <strong style={{color:'var(--ink)'}}>{fechaCorta(fechaFin)}</strong>, también los de otros moldes que usen esas rotativas. Esta acción no se puede deshacer desde la app.</p>
             <div style={{display:'flex',gap:10}}>
               <button onClick={()=>setConfirmando(false)} disabled={eliminando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'1.5px solid var(--line)',background:'none',color:'var(--ink2)',fontSize:15,fontWeight:700,cursor:eliminando?'not-allowed':'pointer',fontFamily:'inherit'}}>Cancelar</button>
               <button onClick={()=>onConfirm(fechaInicio,fechaFin)} disabled={eliminando} style={{flex:1,padding:'13px 0',borderRadius:12,border:'none',background:'var(--warn)',color:'#fff',fontSize:15,fontWeight:700,cursor:eliminando?'not-allowed':'pointer',opacity:eliminando?0.7:1,fontFamily:'inherit'}}>{eliminando?'Eliminando…':'Sí, eliminar'}</button>
@@ -1940,7 +1945,7 @@ function PlanGuardarBase({onBack}){
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <button onClick={nuevoMolde} title="Molde nuevo" style={ghostBtnGB}><SGTIcon name="plus" size={16} color="var(--ink2)"/></button>
             <button onClick={abrirVigencias} title="Ver vigencias del servicio (eliminar desde fecha, anular, editar)" style={ghostBtnGB}><SGTIcon name="clock" size={15} color="var(--primary)"/></button>
-            <button onClick={abrirEliminarTurnos} title="Eliminar turnos generados por este molde (legado)" style={ghostBtnGB}><SGTIcon name="trash" size={15} color="var(--warn)"/></button>
+            <button onClick={abrirEliminarTurnos} aria-label="Eliminar turnos generados" title="Eliminar los turnos de las rotativas del molde en un rango de fechas (legado)" style={ghostBtnGB}><SGTIcon name="trash" size={15} color="var(--warn)"/></button>
             <button onClick={()=>setInjectOpen(true)} style={{display:'flex',alignItems:'center',gap:5,padding:'8px 12px',borderRadius:10,background:'var(--primary)',color:'#fff',border:'none',fontSize:12.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}><SGTIcon name="plus" size={14} color="#fff"/> Agregar</button>
           </div>
         }
