@@ -50,7 +50,13 @@ public class SolicitudController {
             description = "Crea una solicitud en estado PENDIENTE. El tipo (permiso, botar turno, "
                     + "cobertura, intercambio u oferta particular) determina qué campos del DTO son "
                     + "relevantes: p. ej. en intercambio se usan idTurno (el deseado) e idTurnoIntercambio "
-                    + "(el que se entrega); en permiso, fechaInicioPermiso/fechaTerminoPermiso.")
+                    + "(el que se entrega); en permiso, fechaInicioPermiso/fechaTerminoPermiso. El turno que "
+                    + "se libera, se cede o se entrega debe ser del emisor.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Solicitud creada"),
+            @ApiResponse(responseCode = "400", description = "Turno ya comprometido, choque de horario u otra regla"),
+            @ApiResponse(responseCode = "403", description = "El turno que se libera, se cede o se entrega no es del emisor"),
+    })
     @PostMapping
     public ResponseEntity<SolicitudEntity> crear(@RequestBody CrearSolicitudDTO dto) {
         return ResponseEntity.ok(solicitudService.crearSolicitud(dto));
@@ -62,6 +68,8 @@ public class SolicitudController {
                     + "jefatura la apruebe con /estado para que el turno se reasigne.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Respuesta registrada"),
+            @ApiResponse(responseCode = "400", description = "Quien responde no es el receptor"),
+            @ApiResponse(responseCode = "409", description = "La solicitud ya fue resuelta"),
     })
     @PutMapping("/{id}/oferta-particular")
     public ResponseEntity<SolicitudEntity> responderOfertaParticular(@PathVariable @Positive Long id,
@@ -72,6 +80,11 @@ public class SolicitudController {
     @Operation(summary = "Responder una solicitud de intercambio",
             description = "El funcionario receptor del intercambio acepta o rechaza. Igual que la oferta "
                     + "particular, aceptar no mueve los turnos: eso ocurre al aprobar con /estado.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Respuesta registrada"),
+            @ApiResponse(responseCode = "400", description = "Quien responde no es el receptor"),
+            @ApiResponse(responseCode = "409", description = "La solicitud ya fue resuelta"),
+    })
     @PutMapping("/{id}/intercambio")
     public ResponseEntity<SolicitudEntity> responderIntercambio(@PathVariable @Positive Long id,
             @RequestParam boolean respuesta) {
@@ -84,10 +97,13 @@ public class SolicitudController {
                     + "permiso/botar turno, asigna el funcionario en cobertura, intercambia ambos turnos "
                     + "en intercambio, o asigna el receptor en oferta particular), y cualquier otra "
                     + "solicitud PENDIENTE que compita por el mismo turno se rechaza automáticamente. "
-                    + "Requiere rol JEFATURA, SUBROGANTE o MEDICO.")
+                    + "Requiere rol ADMINISTRADOR, JEFATURA o SUBROGANTE: el MEDICO no aprueba ni rechaza "
+                    + "(lo niega el filtro de seguridad). Nadie que participe en la solicitud la decide, y "
+                    + "un intercambio o una oferta particular se aprueba solo si el receptor ya la aceptó.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Estado actualizado (y turnos reasignados si corresponde)"),
-            @ApiResponse(responseCode = "403", description = "Sin rol habilitado para cambiar el estado"),
+            @ApiResponse(responseCode = "403", description = "Sin rol habilitado, participa en la solicitud o es de otro servicio"),
+            @ApiResponse(responseCode = "409", description = "Ya resuelta, el receptor no la aceptó o el turno cambió de dueño"),
     })
     @PutMapping("/{id}/estado")
     public ResponseEntity<SolicitudEntity> cambiarEstado(@PathVariable @Positive Long id,
@@ -111,13 +127,18 @@ public class SolicitudController {
         );
     }
 
-    @Operation(summary = "Listar todas las solicitudes")
+    @Operation(summary = "Listar las solicitudes visibles para la sesión",
+            description = "ADMINISTRADOR: todas. JEFATURA y SUBROGANTE: las de su servicio (por el servicio de "
+                    + "sus turnos o, en un permiso sin turno, por el del emisor). MEDICO: aquellas en que es "
+                    + "emisor o receptor. El mismo alcance rige en /tipo/{id} y /turno/{id}.")
     @GetMapping
     public ResponseEntity<List<SolicitudEntity>> getAllSolicitud() {
         return ResponseEntity.ok(solicitudService.findAllSolicitudes());
     }
 
-    @Operation(summary = "Listar solicitudes emitidas por un funcionario")
+    @Operation(summary = "Listar solicitudes emitidas por un funcionario",
+            description = "Las propias, completas. Las de otra persona: la gestión ve solo las de su servicio; "
+                    + "el médico recibe 403. Igual en /receptor/{id}.")
     @GetMapping("/funcionario/{id}")
     public ResponseEntity<List<SolicitudEntity>> getAllSolicitudFuncionario(@PathVariable Long id) {
         return ResponseEntity.ok(solicitudService.findByFuncionario(id));
