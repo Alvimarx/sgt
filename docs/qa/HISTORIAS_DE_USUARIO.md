@@ -275,7 +275,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. El contador del chip coincide con lo listado.
   4. El aviso de la jefatura cuenta todos los cupos, así que puede mostrar más que el chip (diferencia intencional).
 - **Trazabilidad:** R9; MF-005; R13 (coherencia con el backend).
-- **Estado:** **Implementada.** Evidencia: `AgendaView.jsx` (`misTeamKeys`, `misMananasPostNoche`, `esDisponibleParaMi`).
+- **Estado:** **Implementada.** Evidencia: `AgendaView.jsx` (`misTeamKeys`, `misMananasPostNoche`, `esDisponibleParaMi`). R9 no excluye la noche que termina la mañana de un turno de día propio, que es el sentido inverso de R13 (HU-SOL-14, criterio 2): «Disponibles» la ofrece y el backend la rechaza al pedirla (§5.1).
 - **Prueba E2E:** `medico`. El criterio 1 sale con los datos generados: los huecos del molde en «Volante (T VOL)», Médico General 8 y Médico General 10, caen en los mismos bloques que los turnos del médico 369. Para el criterio 2 hay que buscar en la corrida una noche del médico seguida de un cupo de día, o crearlo con la jefatura liberando un turno de día del día siguiente (muta). Móvil.
 
 #### HU-CAL-03 · Ver en el inicio los turnos que ya pedí («Solicitudes», R11)
@@ -403,11 +403,11 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Endpoints:** `POST /solicitudes` (tipo 3).
 - **Criterios de aceptación:**
   1. Dado un cupo libre con turno real, cuando lo toco, se abre «Nueva solicitud» en el paso 2, tipo Cobertura, con el turno precargado. Al enviar, queda PENDIENTE.
-  2. Dado que ya pedí ese cupo, la tarjeta dice «Ya solicitaste este turno» y está deshabilitada. Desaparece «Solicitar turno» y solo queda «Ver historial» (R11, R12).
-  3. Un cupo del que solo se conoce el conteo («Cupo libre — falta cubrir», en cursiva) no se puede tocar.
+  2. Dado que ya pedí ese cupo, su tarjeta en el equipo (agenda o calendario) dice «Ya solicitaste este turno» y no se puede tocar. Si abro el detalle del propio cupo, desaparece «Solicitar turno» y solo queda «Ver historial» (R11, R12). Eso se hace desde el calendario: la agenda abre el turno que representa al bloque (`AgendaView.jsx:562-565` y `:709`), que con los datos de hoy es un turno asignado.
+  3. Un cupo del que solo se conoce el conteo («Cupo libre — falta cubrir», en cursiva) no se puede tocar. Hoy ese estado no se produce: la agenda y el calendario cuentan las vacantes de cada puesto con los mismos turnos que listan. Por eso `vacantesSinTurno` (`ShiftDetail.jsx:144`) siempre vale 0 y esa tarjeta (`ShiftDetail.jsx:1012`, `DetalleTurnoDesktop.jsx:140-145`) no aparece.
   4. Dada la jefatura, la misma tarjeta dice «Asignar funcionario a este cupo» y abre la asignación directa (HU-ASG-02).
 - **Trazabilidad:** R4, R11, R12; MF-009, MF-015.
-- **Estado:** **Implementada.** Evidencia: `ShiftDetail.jsx` (`alTocarVacante`, `handleRequestVacancy`); acción `solicitar-turno` en `AgendaView` y `calendarView`. Desde el calendario, el criterio 2 probablemente falla por la misma causa que HU-DET-01, y tampoco aparecería la marca «Solicitado» del calendario desktop (`CalendarioDesktop.jsx:91` y `:215`). No probado: muta (fase 3).
+- **Estado:** **Parcial.** Evidencia: `ShiftDetail.jsx` (`alTocarVacante`, `handleRequestVacancy`); acción `solicitar-turno` en `AgendaView` y `calendarView`. Desde el calendario, el criterio 2 falla por la misma causa que HU-DET-01 (`mapTurnoCalendario` no copia `solicitudPendiente`): el cupo ya pedido se sigue ofreciendo y queda «Solicitar turno». Por la misma causa, tampoco aparecería la marca «Solicitado» del calendario desktop (`CalendarioDesktop.jsx:91` y `:215`). En la agenda, el criterio se cumple. Automatizada: `e2e/hu-muta/cupos-inicio.spec.js`.
 - **Prueba E2E:** `medico` (y `jefatura` para el criterio 4); muta: crea la solicitud, y cancelarla al final no borra la fila; ambos.
 
 #### HU-DET-03 · Elegir receptor y su turno para pedir un intercambio
@@ -496,7 +496,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Criterios de aceptación:**
   1. El selector lista solo mis turnos que no han empezado, hasta 12 meses hacia adelante (R14).
   2. Al enviar queda PENDIENTE. Al aprobarse, el turno queda sin funcionario y aparece como cupo libre.
-  3. Si ese turno ya está en otra solicitud mía pendiente, veo «Ese turno ya está comprometido en otra solicitud pendiente suya. Cancélela desde Solicitudes para pedir otra cosa sobre él.» (R15).
+  3. Si ese turno ya está en otra solicitud mía pendiente, no se crea nada. Si la otra solicitud lo pide (por ejemplo, otro «Botar turno»), veo «Ud. ya solicitó este turno. Cancele la solicitud pendiente desde Solicitudes si desea cambiarla.» (R12). Si es el turno que entrego en un intercambio pendiente, veo «Ese turno ya está comprometido en otra solicitud pendiente suya. Cancélela desde Solicitudes para pedir otra cosa sobre él.» (R15). El backend revisa en ese orden (`SolicitudService.java:124-133`).
 - **Trazabilidad:** MF-008; FUN-SGT-026; R14, R15; RN-SGT-017.
 - **Estado:** **Implementada.** Evidencia: `TurnoService.getTurnosFuturosFuncionario`; `SolicitudService.crearSolicitud` y `cambiarEstado`. El backend no comprueba que el turno sea del solicitante: solo la interfaz lo limita.
 - **Prueba E2E:** `medico`, y `jefatura` para aprobar; muta; ambos.
@@ -512,7 +512,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   2. Al enviar queda PENDIENTE. Al aprobarse, el turno queda a mi nombre.
   3. Al crear se aplican R12 y R13 (HU-SOL-13 y HU-SOL-14).
 - **Trazabilidad:** MF-009; FUN-SGT-026; R4, R12, R13.
-- **Estado:** **Parcial.** El criterio 1 falla. El selector trae todos los cupos sin funcionario, incluidos los que ya pasaron (`TurnoRepository.findUnassignedTurnosByServicio` no filtra por fecha), y no aplica la elegibilidad de «Disponibles» (R9). El backend acepta pedir un cupo ya pasado (`crearSolicitud` no valida la fecha).
+- **Estado:** **Parcial.** El criterio 1 falla. El selector trae todos los cupos sin funcionario, incluidos los que ya pasaron (`TurnoRepository.findUnassignedTurnosByServicio` no filtra por fecha), y no aplica la elegibilidad de «Disponibles» (R9). El backend acepta pedir un cupo ya pasado (`crearSolicitud` no valida la fecha). El selector también ofrece la noche que termina la mañana de un turno de día propio, que R9 tampoco excluye (HU-CAL-02) y que el backend rechaza al crear (R13).
 - **Prueba E2E:** `medico`; datos: los cupos de la semana pasada del seed (turnos 97, 99, 102 y 106) y los cupos futuros generados; muta; ambos.
 
 #### HU-SOL-06 · Proponer un intercambio (R14)
@@ -529,7 +529,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   5. Si mi turno ya está comprometido, veo «El turno que ofreces entregar ya está comprometido en otra solicitud pendiente suya. Cancélela desde Solicitudes para crear esta.».
   6. Al aprobarse, los turnos se cruzan entre los dos.
 - **Trazabilidad:** MF-010; FUN-SGT-026; R13, R14, R15; RN-SGT-019, RN-SGT-041.
-- **Estado:** **Implementada.** Evidencia: `TurnoService.getTurnosIntercambiables`; `CrearSolicitudSheet` (efecto del selector del receptor y purgas); `SolicitudService.crearSolicitud` y `validarConflictoSegunTipo`.
+- **Estado:** **Parcial.** Evidencia: `TurnoService.getTurnosIntercambiables`; `CrearSolicitudSheet` (efecto del selector del receptor y purgas); `SolicitudService.crearSolicitud` y `validarConflictoSegunTipo`. El criterio 5 falla por la interfaz. Con mi turno comprometido, `/turnos/intercambiables` devuelve una lista vacía (`TurnoService.java:474-477`) y el asistente muestra solo la nota genérica del criterio 2 (`SolicitudesView.jsx:717` en desktop y `:824` en móvil). Al enviar sin turno del receptor, dice «Rellena todos los campos requeridos.» (`:607`). El mensaje de R15 (`SolicitudService.java:134-138`) solo se ve por API. Lo encontró la E2E de la fase 3 (HU-SOL-13, criterio 2).
 - **Prueba E2E:** `medico` y el receptor 30000069-9; muta; ambos.
 
 #### HU-SOL-07 · Ceder un turno a una persona (Oferta particular)
@@ -603,7 +603,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Endpoints:** `PUT /solicitudes/{id}/cancelar`.
 - **Criterios de aceptación:**
   1. El botón aparece solo en mis solicitudes PENDIENTES.
-  2. La confirmación dice «Se cancelará tu solicitud de {tipo}. El turno involucrado queda libre para que pidas otra cosa sobre él.», con «Volver» y «Cancelar solicitud».
+  2. La confirmación dice «Se cancelará tu solicitud de {tipo}.» y, si la solicitud tiene turno (todas menos el permiso), agrega «El turno involucrado queda libre para que pidas otra cosa sobre él.» (`SolicitudesView.jsx:1477` y `:1663`). Tiene «Volver» y «Cancelar solicitud».
   3. Al confirmar, la solicitud queda con la marca CANCELADA (neutra), con el motivo «Cancelada por el solicitante · motivo original: …», y el turno se puede volver a pedir.
   4. La bitácora registra el evento «Cancelada por el solicitante» y el filtro por estado RECHAZADA lo incluye.
   5. Una jefatura puede cancelar una solicitud propia aunque no pueda decidirla.
@@ -639,7 +639,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   3. Otro postulante al mismo cupo no me bloquea. Si rechazaron o cancelé mi solicitud, puedo volver a pedir.
   4. Con dos pestañas abiertas, la segunda solicitud igual se rechaza: la garantía está en el backend.
 - **Trazabilidad:** R12, R15.
-- **Estado:** **Implementada.** Evidencia: `SolicitudService.crearSolicitud` (`existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado`, `contarPendientesQueInvolucranTurno`). Las ofertas generales no participan de este bloqueo: un turno en oferta general se puede además botar o intercambiar.
+- **Estado:** **Parcial.** Evidencia: `SolicitudService.crearSolicitud` (`existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado`, `contarPendientesQueInvolucranTurno`). El criterio 2 falla por la interfaz cuando se intenta otro intercambio: el asistente no deja elegir el turno del receptor y su nota no menciona cancelar (ver HU-SOL-06, criterio 5). Al botar u ofrecer el turno, y por API, el mensaje sí aparece. Las ofertas generales no participan de este bloqueo: un turno en oferta general se puede además botar o intercambiar.
 - **Prueba E2E:** `medico`; muta (la primera solicitud); ambos.
 
 #### HU-SOL-14 · Respetar el descanso post nocturno (R13)
@@ -670,7 +670,7 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
   1. Al enviar, la oferta aparece en «Ofertas generales» con la marca «Pend. apertura».
   2. Como ofertor no veo «Postular» en mi oferta. Cuando la abren, veo «Tu oferta está abierta · N postulantes».
 - **Trazabilidad:** FUN-SGT-031; MF-012; TC-030.
-- **Estado:** **Implementada.** Evidencia: `CrearSolicitudSheet` (tipo 6); `OfertaGeneralService.crearOferta`. Observaciones: el backend no comprueba que el turno sea del ofertor ni que esté libre de otras solicitudes, y los errores se muestran genéricos.
+- **Estado:** **Implementada.** Evidencia: `CrearSolicitudSheet` (tipo 6); `OfertaGeneralService.crearOferta`. Observaciones: el backend no comprueba que el turno sea del ofertor ni que esté libre de otras solicitudes, y los errores se muestran genéricos. El ofertor no puede retirar su oferta: `OfertaGeneralController` no tiene una ruta para eso.
 - **Prueba E2E:** `medico`; muta; ambos.
 
 #### HU-OFE-02 · Abrir o rechazar una oferta (gestión)
@@ -1307,7 +1307,7 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | CAL-08 | Exportar todo el servicio | — | Sí | Sí | Sí | Implementada | Sí | No | M+D |
 | CAL-09 | Exportar nómina | — | Sí | Sí | Sí | No implementada | Solo API | No | — |
 | DET-01 | Ver detalle de turno | Sí | Sí | Sí | Sí | Parcial | Sí | No | M+D |
-| DET-02 | Pedir un cupo tocándolo (R4) | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
+| DET-02 | Pedir un cupo tocándolo (R4) | Sí | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
 | DET-03 | Elegir receptor desde el detalle | Sí | Sí | Sí | Sí | Implementada | Sí | No | M+D |
 | DET-04 | «Ver historial» | Sí | Sí | Sí | Sí | Contradicción | Tras decidir C-06 | No | M+D |
 | SOL-01 | Mis solicitudes y recibidas | Sí | — | — | — | Implementada | Sí | No (Sí si se crean datos) | M+D |
@@ -1315,14 +1315,14 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | SOL-03 | Permiso | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-04 | Botar turno | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-05 | Cobertura | Sí | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
-| SOL-06 | Intercambio (R14) | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
+| SOL-06 | Intercambio (R14) | Sí | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
 | SOL-07 | Oferta particular | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-08 | Responder como receptor | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-09 | Aprobar o rechazar | Neg. | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-10 | Postulaciones agrupadas (R10) | — | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-11 | Cancelar solicitud (R15) | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | SOL-12 | Modificar motivo | Sí | — | — | — | Implementada | Sí | Sí | M+D |
-| SOL-13 | Anti doble solicitud (R12, R15) | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
+| SOL-13 | Anti doble solicitud (R12, R15) | Sí | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
 | SOL-14 | Descanso post nocturno (R13) | Sí | Sí | Sí | Sí | Parcial | Sí | Sí | M+D |
 | OFE-01 | Publicar oferta general | Sí | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
 | OFE-02 | Abrir o rechazar oferta | Neg. | Sí | Sí | Sí | Implementada | Sí | Sí | M+D |
@@ -1373,8 +1373,8 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 |---|---|---|---|---|---|
 | AUT Autenticación y servicio | 7 | 6 | 1 | 0 | 0 |
 | CAL Calendario y turnos propios | 9 | 6 | 0 | 2 | 1 |
-| DET Detalle de turno | 4 | 2 | 1 | 0 | 1 |
-| SOL Solicitudes | 14 | 11 | 3 | 0 | 0 |
+| DET Detalle de turno | 4 | 1 | 2 | 0 | 1 |
+| SOL Solicitudes | 14 | 9 | 5 | 0 | 0 |
 | OFE Ofertas y postulaciones | 5 | 4 | 1 | 0 | 0 |
 | NOT Notificaciones | 3 | 2 | 0 | 1 | 0 |
 | PAN Paneles de jefatura y subrogante | 3 | 3 | 0 | 0 | 0 |
@@ -1390,7 +1390,7 @@ Roles: **M** médico, **J** jefatura, **S** subrogante, **A** administrador. «S
 | PRF Perfil | 1 | 1 | 0 | 0 | 0 |
 | DSH Dashboard personal | 1 | 1 | 0 | 0 | 0 |
 | PEN Registro pendiente | 1 | 1 | 0 | 0 | 0 |
-| **Total** | **76** | **50** | **15** | **6** | **5** |
+| **Total** | **76** | **47** | **18** | **6** | **5** |
 
 ---
 
@@ -1526,9 +1526,9 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 ### C-16 · Ofertas pasadas y pendientes de apertura a la vista del médico
 
 - **Requerimientos:** R16, deuda anotada: «ofertas PENDIENTE_APROBACION visibles para médicos (decisión de negocio pendiente)»; R17 «El panel "Disponibles · Ofertas generales" oculta las ofertas cuyo turno ya pasó».
-- **Código hoy:** el Centro filtra por vigencia y oculta las rechazadas. La pestaña «Ofertas generales» de Solicitudes muestra todas a todos; la oferta 1 del seed, abierta y de la semana pasada, sigue recibiendo postulaciones.
-- **Pregunta:** ¿El médico ve las ofertas pendientes de apertura? ¿Se ocultan las pasadas en todas partes?
-- **Recomendación:** usar en Solicitudes el mismo filtro de vigencia y mostrarle al médico solo las abiertas.
+- **Código hoy:** el Centro filtra por vigencia y oculta las rechazadas. La pestaña «Ofertas generales» de Solicitudes muestra todas a todos; la oferta 1 del seed, abierta y de la semana pasada, sigue recibiendo postulaciones. Quien publica una oferta no puede retirarla: `OfertaGeneralController` no tiene una ruta para eso (E2E de la fase 3).
+- **Pregunta:** ¿El médico ve las ofertas pendientes de apertura? ¿Se ocultan las pasadas en todas partes? ¿Puede el ofertor retirar su oferta?
+- **Recomendación:** usar en Solicitudes el mismo filtro de vigencia y mostrarle al médico solo las abiertas. Dejar que el ofertor retire su oferta mientras nadie la haya abierto.
 
 ### C-17 · Lecturas sin control por servicio o por dueño
 
@@ -1611,6 +1611,15 @@ Encontradas por la E2E de la fase 1 (17 oct 2026), confirmadas en el código:
 - La bandeja móvil de notificaciones dice «1 recibidas» (`NotificationView.jsx:199`).
 - La bitácora lista una cancelación como «{tipo} · RECHAZADA»; solo el motivo dice que la canceló el solicitante (HU-BIT-01, criterio 4).
 
+Encontradas por la E2E de la fase 3 (17 oct 2026), confirmadas en el código:
+
+- Con mi turno comprometido, el asistente de intercambio nunca muestra el mensaje de R15, que pide cancelar (HU-SOL-06, criterio 5; HU-SOL-13, criterio 2). `/turnos/intercambiables` devuelve una lista vacía sin decir por qué (`TurnoService.java:474-477`), y la nota del asistente enumera cuatro causas posibles. Arreglo: que el endpoint responda el motivo (el mensaje de `SolicitudService.java:134-138`) y que el asistente lo muestre.
+- «Disponibles» (R9) y el selector de Cobertura ofrecen la noche que termina la mañana de un turno de día propio, y el backend la rechaza por R13 (HU-CAL-02, HU-SOL-05). Arreglo: sumar ese caso a `esDisponibleParaMi` (`AgendaView.jsx:313-316`) y filtrar igual el selector.
+- El ofertor no puede retirar una oferta general: `OfertaGeneralController` no tiene una ruta para eso. La oferta queda pendiente hasta que la gestión la abra o la rechace (HU-OFE-01).
+- El mensaje de R13 muestra las fechas en formato ISO, como «2026-10-20T20:00»: `ValidadorAsignacionTurnoService.java:82-84` concatena los `LocalDateTime`.
+- En móvil, el paso 2 de «Oferta general» muestra el botón de volver sin el nombre del tipo: `TIPO_LABEL` (`SolicitudesView.jsx:15`) no tiene el tipo 6 (`:798`).
+- «Cupo libre — falta cubrir» es una rama que nunca se usa (HU-DET-02, criterio 3).
+
 ---
 
 ## 6. Orden sugerido para automatizar las pruebas
@@ -1630,7 +1639,7 @@ Encontradas por la E2E de la fase 1 (17 oct 2026), confirmadas en el código:
 | 1 | Solo lectura por la interfaz, móvil y desktop | AUT-01 (sin el bloqueo), AUT-02 a AUT-06, PEN-01, PRF-01, PAN-01 a PAN-03, CAL-01, CAL-02 (criterio 1), CAL-05 (navegación), CAL-06, CAL-08, DET-01, DET-03 (sin enviar), SOL-01 (con GET simulados), SOL-02 (lectura), OFE-05, NOT-01, ASG-01, PER-01, EST-01, BIT-01, AUD-01, ADM-01, ADM-03, DSH-01, REG-02 (abrir y cancelar) | No |
 | 2a | Negativos de permiso que niega el controller: hoy responden 403 o 400 sin cerrar la sesión. Sirven las solicitudes 14 (APROBADA) y 15 (PENDIENTE) del seed de Urgencias, que no son del médico 369 | AUT-02 (criterio 6), AUT-07 (criterio 3), CAL-08 (criterio 4), NOT-01 (criterio 5), PER-01 (criterio 4), SOL-08 (criterio 4), SOL-11 (criterio 6, solicitud ajena), SOL-12 (criterio 4), OFE-02 (criterio 3), ASG-02 (criterio 5), lecturas de C-17 (hoy responden 200: la prueba deja constancia de la fuga) | No, salvo JER-02 (criterio 2), que hoy muta |
 | 2b | Negativos que niega el filtro de seguridad, después de C-20. Mientras siga BUG-001, esperar 401 e iniciar sesión de nuevo en cada caso | AUT-07 (criterio 4), ASG-05 (criterio 2), SOL-09 (criterio 8, el médico), PUE-01 (criterio 5), ADM-02 (criterio 4), ADM-06 (criterio 4) | No |
-| 3 | Mutaciones de un solo usuario que se deshacen en la misma prueba (crear y cancelar) | SOL-03, SOL-04, SOL-05, SOL-11, SOL-12, SOL-13, SOL-14 (criterios 1 a 3), DET-02, CAL-03, OFE-01 | Sí: deja filas RECHAZADAS. Restaurar al final de la fase |
+| 3 | Mutaciones de un solo usuario que se deshacen en la misma prueba (crear y cancelar) | SOL-03, SOL-04, SOL-05, SOL-11, SOL-12, SOL-13, SOL-14 (criterios 1 a 3), DET-02, CAL-03, OFE-01 | Sí: deja solicitudes RECHAZADAS y ofertas generales pendientes de apertura, que su ofertor no puede retirar. Restaurar al final de la fase |
 | 4 | Flujos de dos o tres usuarios con aprobación (mueven turnos) | SOL-06 a SOL-10, OFE-02 a OFE-04, SOL-14 (criterios 4 y 5), ASG-02, ASG-03, NOT-02 | Sí: restaurar antes de la fase 5 |
 | 5 | Mantenedores del servicio | PUE-01, REG-01, PER-02, JER-01, JER-02 | Sí: restaurar |
 | 6 | Administración global, al final | ADM-02, ADM-04 a ADM-07, ADM-09 a ADM-11, ADM-13 | Sí: restauración completa (`down -v`, levantar y generar) |
@@ -1640,12 +1649,29 @@ Encontradas por la E2E de la fase 1 (17 oct 2026), confirmadas en el código:
 **Avance (17 oct 2026):** la fase 1 está automatizada en `sgt-huap_frontend/e2e/hu/` (7 specs; base común en `e2e/helpers/hu.js` y `e2e/helpers/datos.js`). Son 155 pruebas por proyecto, en `movil` y `desktop`, todas en verde. Las fallas conocidas se marcan con `fallaConocida('C-xx: …')` y las nuevas con `fallaNueva(…)`: la suite queda verde y avisa cuando una se corrige, porque la prueba pasa a «unexpected pass». Con `SGT_VER_FALLAS=1` corren como pruebas normales. Una guarda corta en el navegador toda escritura a la API. Se corre de día. Si `/tmp` es un tmpfs chico, `TMPDIR` debe apuntar a disco, porque Chromium guarda ahí su memoria compartida:
 
 ```bash
-TMPDIR=~/.cache/sgt-pw-tmp npx playwright test e2e/hu --project=movil --project=desktop --reporter=line
+TMPDIR=~/.cache/sgt-pw-tmp npx playwright test e2e/hu/ --project=movil --project=desktop --reporter=line
 ```
 
-Quedaron sin automatizar AUT-01 (criterio 6: el seed no tiene un funcionario sin servicios) y AUT-02 (criterio 5: exige esperar 5 minutos reales). Los estados que el seed no tiene se prueban con respuestas GET simuladas en el navegador.
+La barra final importa: Playwright toma el filtro como expresión regular, y `e2e/hu` abarca también `e2e/hu-muta/` (fase 3). Quedaron sin automatizar AUT-01 (criterio 6: el seed no tiene un funcionario sin servicios) y AUT-02 (criterio 5: exige esperar 5 minutos reales). Los estados que el seed no tiene se prueban con respuestas GET simuladas en el navegador.
 
 **Fase 2a (17 oct 2026):** `e2e/hu/permisos.spec.js` cubre los criterios de la fila 2a y `e2e/hu/lecturas-c17.spec.js` las lecturas de C-17. Son 53 pruebas por proyecto. Las que solo usan la API corren una vez, en `desktop`. Cada prueba de C-17 hace antes una lectura legítima de control, para que un cambio de ruta no quede escondido en la falla esperada. Antes de cada escritura que debe ser negada, la prueba confirma los datos que la hacen inválida. Con la fase 1, la suite completa queda en verde (323 pasan, de ellas 62 fallas esperadas: 24 de la fase 1 y 38 de la 2a; 93 omitidas) y la base, igual a la pristina. Sin automatizar: JER-02 (criterio 2), porque hoy muta (C-03); SOL-11 (criterio 6, «ya resuelta»), porque ese mensaje solo le llega al emisor y crear una resuelta muta (fase 3); y las excepciones del administrador que escriben (SOL-12, criterio 4; ASG-02, criterio 5). Ninguno de la fila resultó ser de la 2b: todos se niegan dentro del controller o del service. Caben también en la 2a, sin mutar, la mitad «otro servicio» de SOL-09 (criterio 8) y OFE-02 (criterio 2).
+
+**Fase 3 (17 oct 2026):** está en `sgt-huap_frontend/e2e/hu-muta/` (4 specs), con `testMuta`, una variante de la base común que deja escribir y anota cada escritura en la prueba. Cada prueba deshace lo suyo. Si algo queda pendiente, una red de seguridad lo cancela y hace fallar la prueba. Las solicitudes canceladas quedan RECHAZADAS, y las ofertas generales, pendientes de apertura (su ofertor no puede retirarlas, §5.1). Sin `SGT_MUTA=1` estas pruebas se omiten, y no corren contra un servidor que no sea el local: `npx playwright test` no escribe en la base. Son 49 pruebas por proyecto. En `movil` pasan 39 y se omiten 10; en `desktop` pasan 40 y se omiten 9. Entre las que pasan hay 4 fallas esperadas por proyecto: dos de HU-SOL-05, la de HU-DET-02 desde el calendario y la de HU-SOL-13 por la interfaz. Dos corridas seguidas, sin restaurar entre ellas, quedan en verde. Cada corrida deja 2 ofertas generales sobre turnos futuros del médico 369, y esos turnos alcanzan para unas 7 corridas. Antes de correr `e2e/hu/` hay que restaurar la base (§6.1, paso 2) y reiniciar el backend, que guarda datos en caché:
+
+```bash
+SGT_MUTA=1 TMPDIR=~/.cache/sgt-pw-tmp npx playwright test e2e/hu-muta/ --project=movil --project=desktop --reporter=line
+```
+
+Quedan para la fase 4:
+
+- SOL-03 (criterio 5).
+- La mitad «al aprobarse» de SOL-04 y SOL-05 (criterio 2).
+- SOL-11 (criterio 5 en móvil).
+- SOL-13 (criterio 3, «si rechazaron»).
+- SOL-14 (criterios 4 y 5).
+- La apertura real de OFE-01 (criterio 2), que aquí se prueba con una respuesta GET simulada.
+
+No se automatizan DET-02 (criterio 3), porque el estado no se produce, ni la regla de 12 horas, que R13 reemplazó (C-04).
 
 ### 6.3 HU que no se pueden probar de punta a punta sin arreglar algo antes
 
@@ -1668,6 +1694,8 @@ Quedaron sin automatizar AUT-01 (criterio 6: el seed no tiene un funcionario sin
 | REG-02 | No hay menú ni módulo | Decidir C-10 |
 | SOL-02 (criterio 3), BIT-01 (criterio 3) | Sin filtro por servicio | Filtrar por servicio en el backend (C-17) |
 | DET-01 (criterio 2) y DET-02 (criterio 2) desde el calendario | `mapTurnoCalendario` no copia `horas` ni `solicitudPendiente` | Copiarlos como en `funcionarioService.js` (§5.1) |
+| SOL-06 (criterio 5) y SOL-13 (criterio 2) por la interfaz | `/turnos/intercambiables` devuelve una lista vacía sin el motivo | Devolver el mensaje de R15 y mostrarlo en el asistente (§5.1) |
+| DET-02 (criterio 3) | El estado no se produce | Quitar la rama y el criterio, o definir cuándo un cupo se conoce solo por su conteo |
 | OFE-05, SOL-05 | Ofertas y cupos pasados visibles | Filtrar por vigencia en Solicitudes y en el selector de Cobertura |
 | AUD-01 (criterio 4) | No muestra al encargado | Cruzar con la bitácora o corregir el manual (C-14) |
 | ADM-09 (eliminar molde en móvil) | Borra sin confirmación | Agregar la confirmación que ya tiene desktop |
