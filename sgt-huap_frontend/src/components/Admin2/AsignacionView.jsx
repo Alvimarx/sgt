@@ -234,8 +234,9 @@ const AsignacionView = ({ onBack }) => {
             setSearchQuery('');
             setSelectedServicioId('');
         } else {
-            
-            setMensaje({ tipo: 'error', texto: 'No se pudo completar la asignación. Intenta de nuevo.' });
+            // El mensaje del backend: por ejemplo, el 409 de C-19 («La persona ya
+            // pertenece a este servicio; no se cambió su rol»).
+            setMensaje({ tipo: 'error', texto: result.error || 'No se pudo completar la asignación. Intenta de nuevo.' });
         }
 
         setGuardando(false);

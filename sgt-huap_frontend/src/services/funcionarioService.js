@@ -5,6 +5,7 @@ import { getUserId as getUserIdFromToken ,
 } from '../utils/tokenManager';
 import { hoyISOEnZonaHospital } from '../utils/dateUtils';
 import { horasDeTurno } from '../utils/reglasTurno';
+import { mensajeDeError } from '../utils/errores';
 
 
 const API_BASE = '/funcionarios';
@@ -388,52 +389,48 @@ export const getFuncionariosSummary = async (servicioId = null) => {
 };
 
 /**
- * Asigna un servicio a un funcionario con rol Médico (ID 3) por defecto.
+ * Suma a la persona (por RUT) al servicio, con rol Médico (ID 3). Si todavía
+ * no está en el SGT la registra antes (GET /funcionarios/status/{rut} → 404 →
+ * POST /funcionarios/register/{rut}) y después crea la relación con
+ * PUT /funcionarios/{id} {servicioId, rol: 3}. Si ya pertenece al servicio, el
+ * backend responde 409 y no cambia su rol (C-19).
+ * Ante un error devuelve el mensaje del backend (los 403 y 409 incluidos) y,
+ * si no lo hay, uno genérico: antes devolvía siempre el genérico y tapaba,
+ * por ejemplo, el aviso de que la persona ya pertenece al servicio.
  */
 export const asignarServicio = async (idServicio, rut) => {
     try {
         let funcionarioId = null;
 
-        // Intentamos obtener el ID del funcionario si ya existe
+        // Si la persona ya está en el SGT, el backend devuelve su id; si no, 404.
         try {
             const exist = await axiosInstance.get(`${API_BASE}/status/${rut}`);
-            funcionarioId = exist.data; // Si es 200 OK, guardamos el ID
-            
+            funcionarioId = exist.data;
         } catch (statusError) {
-
-            // Si Axios lanza error, verificamos si es específicamente un 404 Not Found
-            if (statusError.response && statusError.response.status === 404) {
-                const responseRegister = await axiosInstance.post(`${API_BASE}/register/${rut}`);
-                funcionarioId = responseRegister.data;
-
-            } else {
-            // Si es un error 401, 500 u otro, lo lanzamos al catch principal 
-                throw statusError;
-            }
+            if (statusError.response?.status !== 404) throw statusError;
+            const responseRegister = await axiosInstance.post(`${API_BASE}/register/${rut}`);
+            funcionarioId = responseRegister.data;
         }
-        
-        // Validación previa
+
         if (!funcionarioId || !Number.isFinite(Number(funcionarioId))) {
-            throw new Error('ID de funcionario inválido');
+            return { success: false, error: 'No se pudo identificar al funcionario. Intenta de nuevo.' };
         }
 
-        // A este punto tenemos un funcionarioId válido (ya sea existente o recién creado).
-        // Procedemos con la asignación del servicio.
         const responseAsignacion = await axiosInstance.put(`${API_BASE}/${funcionarioId}`, {
             servicioId: Number(idServicio),
             rol: Rol_Medico,
         });
 
         return { success: true, data: responseAsignacion.data };
-
-    } catch {
-        // 4. Catch global: Atrapa errores de asignación, de servidor caído, o de credenciales (401)
-        return { success: false, error: 'No se pudo completar la asignación. Intenta de nuevo.' };
+    } catch (error) {
+        return { success: false, error: mensajeDeError(error, 'No se pudo completar la asignación. Intenta de nuevo.') };
     }
 };
 
 /**
- * Asigna un rol jerárquico a un funcionario dentro de un servicio.
+ * Asigna un rol jerárquico a un funcionario dentro de un servicio. Ante un
+ * error devuelve el mensaje del backend, por ejemplo el 403 «Solo un
+ * administrador puede designar una jefatura» (C-07).
  */
 export const asignarRolJerarquia = async (funcionarioId, idServicio, idRol) => {
     try {
@@ -443,8 +440,7 @@ export const asignarRolJerarquia = async (funcionarioId, idServicio, idRol) => {
         });
         return { success: true, data: response.data };
     } catch (error) {
-        const mensaje = error.response?.data?.error || 'Error al asignar el rol jerárquico';
-        return { success: false, error: mensaje };
+        return { success: false, error: mensajeDeError(error, 'No se pudo designar la jerarquía. Intenta de nuevo.') };
     }
 };
 

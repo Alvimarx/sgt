@@ -1,5 +1,6 @@
 import axiosInstance from '../utils/axiosConfig';
 import { horasDeTurno } from '../utils/reglasTurno';
+import { mensajeDeError } from '../utils/errores';
 
 const API_BASE = '/turnos';
 
@@ -31,15 +32,16 @@ export const getTurnosPorServicio = async (idServicio) => {
 };
 
 /**
- * Ejecuta una alteración de turno en el backend.
+ * Ejecuta una alteración de turno en el backend. Ante un error devuelve el
+ * mensaje del backend (403 de otro servicio, cruce de horario, R13…) o un
+ * texto vacío: la vista pone el suyo (asignar, reasignar o liberar).
  */
 export const alterarTurno = async (payload) => {
     try {
         const response = await axiosInstance.post(`${API_BASE}/alterar`, payload);
         return { success: true, data: response.data };
     } catch (error) {
-        const mensaje = error.response?.data?.error || 'Error al alterar el turno';
-        return { success: false, error: mensaje };
+        return { success: false, error: mensajeDeError(error, '') };
     }
 };
 

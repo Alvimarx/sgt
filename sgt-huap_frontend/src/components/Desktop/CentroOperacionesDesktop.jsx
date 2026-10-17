@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { mensajeDeError } from '../../utils/errores';
 import { esAdministrador } from '../../utils/roles';
 import { ofertaVisible, participaEnOferta, participaEnSolicitud } from '../../utils/reglasSolicitud';
 import { formatShiftLabel } from '../Comun/turnoPresentacion';
@@ -274,6 +275,10 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
   // ── Acciones ──────────────────────────────────────────────────────────────
   // Guard anti doble-clic: mientras una mutación está en vuelo, los demás
   // clics mutadores se ignoran (evita dobles POST y toasts contradictorios).
+  // Si el backend rechaza (403 o 409: el turno cambió de dueño, el receptor
+  // no ha aceptado, la solicitud ya está resuelta, quien participa no
+  // decide…), el aviso muestra su mensaje (utils/errores.js) y, si no lo hay,
+  // el texto de siempre. Igual que Solicitudes.
   const enVuelo = useRef(false);
   const mutar = async (fn) => {
     if (enVuelo.current) return;
@@ -282,11 +287,11 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
   };
   const aprobar = (id) => mutar(async () => {
     try { await solicitudesService.updateEstado(id, 'APROBADA', myUserId); toast('Solicitud aprobada.'); recargar(); }
-    catch (e) { toast(e?.message || 'No se pudo aprobar la solicitud.'); }
+    catch (e) { toast(mensajeDeError(e, 'No se pudo aprobar la solicitud.')); }
   });
   const rechazar = (id) => mutar(async () => {
     try { await solicitudesService.updateEstado(id, 'RECHAZADA', myUserId); toast('Solicitud rechazada.'); recargar(); }
-    catch (e) { toast(e?.message || 'No se pudo rechazar la solicitud.'); }
+    catch (e) { toast(mensajeDeError(e, 'No se pudo rechazar la solicitud.')); }
   });
   const elegir = (solId, nombre) => mutar(async () => {
     setConfirm(null);
@@ -294,7 +299,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
       await solicitudesService.updateEstado(solId, 'APROBADA', myUserId);
       toast(`Cupo asignado a ${nombre}. Las demás postulaciones fueron rechazadas.`);
       recargar();
-    } catch (e) { toast(e?.message || 'No se pudo asignar el cupo.'); }
+    } catch (e) { toast(mensajeDeError(e, 'No se pudo asignar el cupo.')); }
   });
   const responder = (id, tipo, ok) => mutar(async () => {
     try {
@@ -302,15 +307,15 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
       else await solicitudesService.responderOfertaParticular(id, myUserId, ok);
       toast(ok ? 'Aceptaste — queda pendiente de jefatura.' : 'Rechazada.');
       recargar();
-    } catch (e) { toast(e?.message || 'No se pudo responder.'); }
+    } catch (e) { toast(mensajeDeError(e, 'No se pudo responder.')); }
   });
   const ofAprobar = (id) => mutar(async () => {
     try { await ofertasGeneralesService.aprobar(id, myUserId); toast('Oferta abierta al servicio.'); recargar(); }
-    catch (e) { toast(e?.message || 'No se pudo abrir la oferta.'); }
+    catch (e) { toast(mensajeDeError(e, 'No se pudo abrir la oferta.')); }
   });
   const ofRechazar = (id) => mutar(async () => {
     try { await ofertasGeneralesService.rechazar(id, myUserId); toast('Oferta rechazada.'); recargar(); }
-    catch (e) { toast(e?.message || 'No se pudo rechazar la oferta.'); }
+    catch (e) { toast(mensajeDeError(e, 'No se pudo rechazar la oferta.')); }
   });
   const ofSeleccionar = (idOferta, idPostulacion, nombre) => mutar(async () => {
     setConfirm(null);
@@ -318,7 +323,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
       await ofertasGeneralesService.seleccionar(idOferta, idPostulacion, myUserId);
       toast(`Turno reasignado a ${nombre}.`);
       recargar();
-    } catch (e) { toast(e?.message || 'No se pudo seleccionar al postulante.'); }
+    } catch (e) { toast(mensajeDeError(e, 'No se pudo seleccionar al postulante.')); }
   });
 
   // ── VM del panel expandido de un turno (día o noche) ──────────────────────
