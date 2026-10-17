@@ -7,9 +7,11 @@ import com.pingeso.HUAP.Security.AlcanceServicio;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -154,6 +156,8 @@ public class SolicitudService {
                 .aceptadoReceptor(null)
                 .build();
 
+        exigirTurnoPropioAlCrear(tipoSolicitud.getTipo(), turno, turnoIntercambio, idFuncionarioEmisor);
+
         // Un turno solo puede estar comprometido en UNA solicitud pendiente del mismo funcionario,
         // cuente como turno pedido o como turno entregado. Sin esto se podían apilar solicitudes
         // contradictorias sobre el mismo turno. La garantía vive aquí porque dos pestañas o dos
@@ -183,6 +187,47 @@ public class SolicitudService {
                 funcionario.getIdFuncionario());
 
         return guardada;
+    }
+
+    /**
+     * SEC (S-01 b): liberar un turno (permiso con turno o «Botar turno»), cederlo (oferta
+     * particular) o entregarlo en un intercambio solo se puede con un turno propio. Antes solo lo
+     * limitaba la interfaz, que lista los turnos futuros del usuario; por API se podía
+     * comprometer el turno de otra persona.
+     */
+    private void exigirTurnoPropioAlCrear(Integer tipo, TurnoEntity turno, TurnoEntity turnoIntercambio, Long idEmisor) {
+        if (tipo == null) return;
+        if ((tipo == 1 || tipo == 2 || tipo == 5) && turno != null && !esDe(turno, idEmisor)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Ese turno no es tuyo: solo puedes liberar o ceder tus propios turnos");
+        }
+        if (tipo == 4 && turnoIntercambio != null && !esDe(turnoIntercambio, idEmisor)) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "El turno que ofreces entregar no es tuyo");
+        }
+    }
+
+    /** ¿El turno está asignado a ese funcionario? */
+    private static boolean esDe(TurnoEntity turno, Long idFuncionario) {
+        return turno.getFuncionario() != null && idFuncionario != null
+                && idFuncionario.equals(turno.getFuncionario().getIdFuncionario());
+    }
+
+    /**
+     * SEC (S-01 a): al aprobar un permiso con turno, un «Botar turno» o una «Oferta particular», el
+     * turno debe seguir siendo de quien lo comprometió. Si cambió de dueño entre medio (una
+     * asignación manual, otra aprobación), aprobar liberaría o entregaría el turno de un tercero.
+     * Cobertura e Intercambio ya lo revisan en su rama de {@link #cambiarEstado}.
+     */
+    private void exigirTurnoAunDelEmisor(SolicitudEntity solicitud, Integer tipo) {
+        boolean comprometeSuTurno = Integer.valueOf(1).equals(tipo) || Integer.valueOf(2).equals(tipo)
+                || Integer.valueOf(5).equals(tipo);
+        if (!comprometeSuTurno || solicitud.getTurno() == null) return;
+        Long idEmisor = solicitud.getFuncionario() != null ? solicitud.getFuncionario().getIdFuncionario() : null;
+        if (!esDe(solicitud.getTurno(), idEmisor)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El turno ya cambió de dueño: la solicitud quedó obsoleta");
+        }
     }
 
     // ============================ Validación de 12 horas consecutivas ============================
@@ -312,6 +357,7 @@ public class SolicitudService {
         if (solicitud.getFuncionarioReceptor() == null || !solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
+        exigirPendienteParaResponder(solicitud);
 
         FuncionarioEntity receptor = funcionarioRepository.findById(idReceptor).orElseThrow();
 
@@ -343,6 +389,7 @@ public class SolicitudService {
         if (solicitud.getFuncionarioReceptor() == null || !solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
+        exigirPendienteParaResponder(solicitud);
 
         FuncionarioEntity receptor = funcionarioRepository.findById(idReceptor).orElseThrow();
 
@@ -360,6 +407,17 @@ public class SolicitudService {
         agendarBitacora(evento, guardada.getIdSolicitud(), receptor.getIdFuncionario());
 
         return guardada;
+    }
+
+    /**
+     * SEC (S-01 c): el receptor responde solo mientras la solicitud esté PENDIENTE. Antes podía
+     * rechazar por API una solicitud ya APROBADA (quedaba RECHAZADA con los turnos ya movidos).
+     */
+    private void exigirPendienteParaResponder(SolicitudEntity solicitud) {
+        if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Esta solicitud ya fue resuelta: no se puede responder");
+        }
     }
 
     /**
@@ -433,6 +491,15 @@ public class SolicitudService {
             }
         }
 
+        // SEC (S-01 c): una solicitud ya resuelta no se vuelve a decidir. Antes se podía pasar a
+        // RECHAZADA (o de vuelta a PENDIENTE) una solicitud APROBADA, con sus turnos ya movidos.
+        // La aprobación lo revisa más abajo, con la fila bloqueada.
+        if (nuevoEstado != SolicitudEntity.EstadoSolicitud.APROBADA
+                && solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Esta solicitud ya fue resuelta: no se puede cambiar su estado");
+        }
+
         if (nuevoEstado == SolicitudEntity.EstadoSolicitud.APROBADA) {
             // Serializa aprobaciones concurrentes que compiten por el/los mismo(s) turno(s):
             // se bloquean los turnos involucrados ANTES de tocar cualquier solicitud. En el
@@ -450,6 +517,8 @@ public class SolicitudService {
                 throw new RuntimeException(
                         "Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)");
             }
+
+            exigirTurnoAunDelEmisor(solicitud, tipoSolicitud);
 
             // Revalidación OBLIGATORIA y definitiva con el calendario más reciente: el funcionario
             // pudo haber tomado otro turno entre la creación de la solicitud y esta aprobación.

@@ -70,9 +70,10 @@ class OfertaGeneralConcurrencyTest extends AbstractContainerTest {
         });
     }
 
-    private TurnoEntity turnoVacante() {
+    /** Turno del ofertor: S-01 exige que el turno ofrecido siga siendo suyo al elegir postulante. */
+    private TurnoEntity turnoDe(FuncionarioEntity dueno) {
         return turnoRepository.save(TurnoEntity.builder()
-                .servicio(servicio)
+                .servicio(servicio).funcionario(dueno)
                 .diaInicioTurno(DIA).horaInicio(LocalTime.of(8, 0))
                 .diaFinalTurno(DIA).horaFin(LocalTime.of(20, 0))
                 .build());
@@ -85,7 +86,7 @@ class OfertaGeneralConcurrencyTest extends AbstractContainerTest {
         FuncionarioEntity postulanteB = funcionario();
         FuncionarioEntity jefeA = funcionario();
         FuncionarioEntity jefeB = funcionario();
-        TurnoEntity turno = turnoVacante();
+        TurnoEntity turno = turnoDe(ofertor);
 
         OfertaGeneralEntity oferta = ofertaGeneralRepository.save(OfertaGeneralEntity.builder()
                 .ofertor(ofertor).turno(turno).estado(PENDIENTE_APROBACION).build());

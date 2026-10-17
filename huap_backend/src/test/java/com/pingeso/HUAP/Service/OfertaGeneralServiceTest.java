@@ -115,6 +115,7 @@ class OfertaGeneralServiceTest {
     void crearOferta_happyPath_quedaPendienteDeAprobacion() {
         FuncionarioEntity ofertor = funcionario(1L);
         TurnoEntity turno = turno(1L);
+        turno.setFuncionario(ofertor); // S-01 b: solo se ofrece un turno propio
         when(funcionarioRepository.findById(1L)).thenReturn(Optional.of(ofertor));
         when(turnoRepository.findById(1L)).thenReturn(Optional.of(turno));
         ofertaSaveDevuelveArgumento();
@@ -147,6 +148,7 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), ABIERTA);
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
 
+        actorAutenticado(9L);
         assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L));
         verify(ofertaGeneralRepository, never()).save(any());
     }
@@ -177,6 +179,7 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), CERRADA);
         when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
 
+        actorAutenticado(9L);
         assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L));
         verify(ofertaGeneralRepository, never()).save(any());
     }
@@ -335,6 +338,7 @@ class OfertaGeneralServiceTest {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), PENDIENTE_APROBACION);
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
 
+        actorAutenticado(9L);
         assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L));
     }
 
@@ -344,6 +348,7 @@ class OfertaGeneralServiceTest {
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
         when(postulacionRepository.findById(1L)).thenReturn(Optional.empty());
 
+        actorAutenticado(9L);
         assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 1L));
     }
 
@@ -351,6 +356,7 @@ class OfertaGeneralServiceTest {
     void seleccionarPostulante_happyPath_asignaTurnoYCierraOferta() {
         TurnoEntity turno = turno(1L);
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno, ABIERTA);
+        turno.setFuncionario(o.getOfertor()); // S-01 a: el turno sigue siendo del ofertor
         FuncionarioEntity postulante = funcionario(2L);
         PostulacionEntity postulacion = PostulacionEntity.builder()
                 .idPostulacion(5L).ofertaGeneral(o).postulante(postulante).seleccionado(false).build();
@@ -380,6 +386,7 @@ class OfertaGeneralServiceTest {
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(estaOferta));
         when(postulacionRepository.findById(99L)).thenReturn(Optional.of(postulacionDeOtraOferta));
 
+        actorAutenticado(9L);
         assertThrows(RuntimeException.class, () -> service.seleccionarPostulante(1L, 99L));
         assertNull(turnoDeEstaOferta.getFuncionario());
         verify(turnoRepository, never()).save(any());
@@ -389,7 +396,9 @@ class OfertaGeneralServiceTest {
     @Test
     void seleccionarPostulante_conConflicto12hParaElPostulante_lanzaYNoAsignaNiCierra() {
         TurnoEntity turnoOfrecido = turnoConHorario(1L, LUNES.plusDays(1), LocalTime.of(8, 0), 12);
-        OfertaGeneralEntity o = oferta(1L, funcionario(1L), turnoOfrecido, ABIERTA);
+        FuncionarioEntity ofertor = funcionario(1L);
+        turnoOfrecido.setFuncionario(ofertor); // S-01 a: el turno sigue siendo del ofertor
+        OfertaGeneralEntity o = oferta(1L, ofertor, turnoOfrecido, ABIERTA);
         FuncionarioEntity postulante = funcionario(2L);
         PostulacionEntity postulacion = PostulacionEntity.builder()
                 .idPostulacion(5L).ofertaGeneral(o).postulante(postulante).seleccionado(false).build();
@@ -399,9 +408,10 @@ class OfertaGeneralServiceTest {
         TurnoEntity chocaConPostulante = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 12);
         when(turnoRepository.findByFuncionario_IdFuncionario(2L)).thenReturn(List.of(chocaConPostulante));
 
+        actorAutenticado(9L);
         assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
                 () -> service.seleccionarPostulante(1L, 5L));
-        assertNull(turnoOfrecido.getFuncionario(), "no debe asignarse el turno si hay conflicto");
+        assertSame(ofertor, turnoOfrecido.getFuncionario(), "no debe asignarse el turno si hay conflicto");
         assertFalse(postulacion.getSeleccionado());
         verify(turnoRepository, never()).save(any());
         verify(ofertaGeneralRepository, never()).save(any());
@@ -423,6 +433,82 @@ class OfertaGeneralServiceTest {
         when(ofertaGeneralRepository.findByOfertor_IdFuncionario(1L)).thenReturn(List.of(o));
 
         assertEquals(List.of(o), service.findByOfertor(1L));
+    }
+
+    // ============================ S-01: dueño del turno y segregación de funciones ============================
+
+    @Test
+    void crearOferta_conUnTurnoAjeno_403YNoGuarda() {
+        FuncionarioEntity ofertor = funcionario(1L);
+        TurnoEntity turnoAjeno = turno(1L);
+        turnoAjeno.setFuncionario(funcionario(2L));
+        when(funcionarioRepository.findById(1L)).thenReturn(Optional.of(ofertor));
+        when(turnoRepository.findById(1L)).thenReturn(Optional.of(turnoAjeno));
+        CrearOfertaGeneralDTO dto = new CrearOfertaGeneralDTO();
+        dto.setIdTurno(1L);
+
+        org.springframework.security.access.AccessDeniedException ex = assertThrows(
+                org.springframework.security.access.AccessDeniedException.class, () -> service.crearOferta(dto));
+        assertEquals("Ese turno no es tuyo: solo puedes ofrecer tus propios turnos", ex.getMessage());
+
+        turnoAjeno.setFuncionario(null); // un cupo libre tampoco es propio
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.crearOferta(dto));
+        verify(ofertaGeneralRepository, never()).save(any());
+    }
+
+    @Test
+    void elOfertorNoAbreNiRechazaSuPropiaOferta_403() {
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), PENDIENTE_APROBACION);
+        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+
+        actorAutenticado(5L); // p. ej. una jefatura que ofreció su turno
+        org.springframework.security.access.AccessDeniedException ex = assertThrows(
+                org.springframework.security.access.AccessDeniedException.class, () -> service.aprobarOferta(1L));
+        assertEquals("No puedes abrir ni rechazar tu propia oferta", ex.getMessage());
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.rechazarOferta(1L));
+        assertEquals(PENDIENTE_APROBACION, o.getEstado());
+        verify(ofertaGeneralRepository, never()).save(any());
+    }
+
+    @Test
+    void niElOfertorNiUnPostulanteEligenAlPostulante_403() {
+        FuncionarioEntity ofertor = funcionario(5L);
+        TurnoEntity turno = turno(1L);
+        turno.setFuncionario(ofertor);
+        OfertaGeneralEntity o = oferta(1L, ofertor, turno, ABIERTA);
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        when(postulacionRepository.existsByOfertaGeneral_IdOfertaGeneralAndPostulante_IdFuncionario(1L, 6L)).thenReturn(true);
+
+        actorAutenticado(5L);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.seleccionarPostulante(1L, 7L));
+        actorAutenticado(6L);
+        org.springframework.security.access.AccessDeniedException ex = assertThrows(
+                org.springframework.security.access.AccessDeniedException.class, () -> service.seleccionarPostulante(1L, 7L));
+        assertEquals("No puedes elegir al postulante de una oferta en la que participas", ex.getMessage());
+        assertSame(ofertor, turno.getFuncionario());
+        verify(turnoRepository, never()).save(any());
+    }
+
+    @Test
+    void seleccionar_siElTurnoYaNoEsDelOfertor_409YNoMutaNada() {
+        TurnoEntity turno = turno(1L);
+        turno.setFuncionario(funcionario(8L)); // la jefatura lo reasignó a mano entre medio
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno, ABIERTA);
+        PostulacionEntity postulacion = PostulacionEntity.builder()
+                .idPostulacion(7L).ofertaGeneral(o).postulante(funcionario(6L)).seleccionado(false).build();
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        when(postulacionRepository.findById(7L)).thenReturn(Optional.of(postulacion));
+
+        actorAutenticado(9L);
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> service.seleccionarPostulante(1L, 7L));
+        assertEquals(409, ex.getStatusCode().value());
+        assertEquals("El turno ya no es de quien lo ofreció: la oferta quedó obsoleta", ex.getReason());
+        assertEquals(8L, turno.getFuncionario().getIdFuncionario());
+        assertFalse(postulacion.getSeleccionado());
+        assertEquals(ABIERTA, o.getEstado());
+        verify(turnoRepository, never()).save(any());
+        verify(ofertaGeneralRepository, never()).save(any());
     }
 
     // ============================ C-17: lecturas acotadas por servicio ============================

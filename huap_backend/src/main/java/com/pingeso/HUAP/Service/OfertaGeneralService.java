@@ -7,10 +7,12 @@ import com.pingeso.HUAP.Security.AlcanceServicio;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,6 +54,11 @@ public class OfertaGeneralService {
         TurnoEntity turno = turnoRepository.findById(dto.getIdTurno())
                 .orElseThrow(() -> new RuntimeException("Turno no existe"));
 
+        // SEC (S-01 b): solo se ofrece un turno propio. Antes solo lo limitaba la interfaz.
+        if (!esDe(turno, ofertor.getIdFuncionario())) {
+            throw new AccessDeniedException("Ese turno no es tuyo: solo puedes ofrecer tus propios turnos");
+        }
+
         OfertaGeneralEntity oferta = OfertaGeneralEntity.builder()
                 .ofertor(ofertor)
                 .turno(turno)
@@ -78,6 +85,22 @@ public class OfertaGeneralService {
         seguridadServicio.exigirMismoServicio(servicioOferta);
     }
 
+    /** ¿El turno está asignado a ese funcionario? */
+    private static boolean esDe(TurnoEntity turno, Long idFuncionario) {
+        return turno != null && turno.getFuncionario() != null && idFuncionario != null
+                && idFuncionario.equals(turno.getFuncionario().getIdFuncionario());
+    }
+
+    /**
+     * SEC (S-01 d): la regla de las solicitudes (H-07), quien participa no decide. El ofertor no
+     * abre ni rechaza su propia oferta, aunque sea jefatura, subrogante o administrador.
+     */
+    private void exigirQueNoSeaElOfertor(OfertaGeneralEntity oferta, Long idActor) {
+        if (oferta.getOfertor() != null && Objects.equals(oferta.getOfertor().getIdFuncionario(), idActor)) {
+            throw new AccessDeniedException("No puedes abrir ni rechazar tu propia oferta");
+        }
+    }
+
     /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code ABIERTA}, habilitando postulaciones. */
     @Transactional
     public OfertaGeneralEntity aprobarOferta(Long idOferta) {
@@ -88,6 +111,7 @@ public class OfertaGeneralService {
         // servicio y la bitácora atribuía la acción a un idJefatura arbitrario del parámetro.
         exigirMismoServicioQueOferta(oferta);
         Long idJefatura = seguridadServicio.idUsuarioActual();
+        exigirQueNoSeaElOfertor(oferta, idJefatura);
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION) {
             throw new RuntimeException("La oferta no está en estado PENDIENTE_APROBACION");
@@ -107,6 +131,7 @@ public class OfertaGeneralService {
 
         exigirMismoServicioQueOferta(oferta);
         Long idJefatura = seguridadServicio.idUsuarioActual();
+        exigirQueNoSeaElOfertor(oferta, idJefatura);
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION) {
             throw new RuntimeException("La oferta no está en estado PENDIENTE_APROBACION");
@@ -198,6 +223,11 @@ public class OfertaGeneralService {
         // de ofertas de cualquier servicio, auto-asignándose turnos ajenos.
         exigirMismoServicioQueOferta(oferta);
         Long idJefatura = seguridadServicio.idUsuarioActual();
+        // SEC (S-01 d): quien participa en la oferta (el ofertor o un postulante) no elige.
+        if ((oferta.getOfertor() != null && Objects.equals(oferta.getOfertor().getIdFuncionario(), idJefatura))
+                || postulacionRepository.existsByOfertaGeneral_IdOfertaGeneralAndPostulante_IdFuncionario(idOferta, idJefatura)) {
+            throw new AccessDeniedException("No puedes elegir al postulante de una oferta en la que participas");
+        }
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.ABIERTA) {
             throw new RuntimeException("La oferta no está abierta");
@@ -211,6 +241,12 @@ public class OfertaGeneralService {
         }
 
         TurnoEntity turno = oferta.getTurno();
+        // SEC (S-01 a): el turno debe seguir siendo del ofertor. Si cambió de dueño entre medio
+        // (una asignación manual, una solicitud aprobada), se le entregaría el turno de un tercero.
+        if (!esDe(turno, oferta.getOfertor() != null ? oferta.getOfertor().getIdFuncionario() : null)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "El turno ya no es de quien lo ofreció: la oferta quedó obsoleta");
+        }
         FuncionarioEntity postulante = postulacion.getPostulante();
         validarConflictoPostulante(postulante, turno);
 

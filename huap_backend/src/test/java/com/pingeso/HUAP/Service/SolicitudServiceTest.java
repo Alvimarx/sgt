@@ -76,6 +76,11 @@ class SolicitudServiceTest {
         return TurnoEntity.builder().idTurno(id).build();
     }
 
+    /** Turno asignado a un funcionario (S-01: botar, ceder o entregar exige que el turno sea propio). */
+    private static TurnoEntity turnoDe(long id, long idFuncionario) {
+        return TurnoEntity.builder().idTurno(id).funcionario(funcionario(idFuncionario)).build();
+    }
+
     private static com.pingeso.HUAP.Entity.ServicioEntity servicio(long id) {
         return com.pingeso.HUAP.Entity.ServicioEntity.builder().idServicio(id).nombre("Servicio" + id).build();
     }
@@ -163,7 +168,7 @@ class SolicitudServiceTest {
     @Test
     void crear_tipoBotarTurno_asociaSoloElTurnoABotar() {
         mockFuncionarioYTipo(2);
-        when(turnoRepository.findById(50L)).thenReturn(Optional.of(turno(50L)));
+        when(turnoRepository.findById(50L)).thenReturn(Optional.of(turnoDe(50L, ID_FUNCIONARIO)));
         saveAsignaId();
 
         CrearSolicitudDTO dto = dtoBase();
@@ -200,8 +205,8 @@ class SolicitudServiceTest {
     @Test
     void crear_tipoIntercambio_asociaTurnoDeseadoTurnoPropioYReceptor() {
         mockFuncionarioYTipo(4);
-        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L))); // turno deseado
-        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turno(71L))); // turno propio entregado
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turnoDe(70L, 2L))); // turno deseado
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turnoDe(71L, ID_FUNCIONARIO))); // turno propio entregado
         when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L))); // receptor
         saveAsignaId();
 
@@ -222,7 +227,7 @@ class SolicitudServiceTest {
     @Test
     void crear_tipoOfertaParticular_asociaTurnoYReceptorSinTurnoIntercambio() {
         mockFuncionarioYTipo(5);
-        when(turnoRepository.findById(80L)).thenReturn(Optional.of(turno(80L)));
+        when(turnoRepository.findById(80L)).thenReturn(Optional.of(turnoDe(80L, ID_FUNCIONARIO)));
         when(funcionarioRepository.findById(3L)).thenReturn(Optional.of(funcionario(3L)));
         saveAsignaId();
 
@@ -324,8 +329,8 @@ class SolicitudServiceTest {
     @Test
     void crear_intercambioConElTurnoPropioYaComprometido_lanzaYNoGuarda() {
         mockFuncionarioYTipo(4);
-        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turno(70L)));
-        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turno(71L)));
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turnoDe(70L, 2L)));
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turnoDe(71L, ID_FUNCIONARIO)));
         when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
         when(solicitudRepository.existsByFuncionario_IdFuncionarioAndTurno_IdTurnoAndEstado(
                 anyLong(), anyLong(), any())).thenReturn(false);
@@ -593,7 +598,7 @@ class SolicitudServiceTest {
 
     @Test
     void cambiarEstado_tipoOfertaParticular_aprobada_asignaFuncionarioReceptorAlTurno() {
-        TurnoEntity turno = turno(1L);
+        TurnoEntity turno = turnoDe(1L, 5L); // S-01 a: sigue siendo del emisor
         FuncionarioEntity receptor = funcionario(6L);
         SolicitudEntity solicitud = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 5))
@@ -666,7 +671,7 @@ class SolicitudServiceTest {
 
     @Test
     void cambiarEstado_aprobada_rechazaAutomaticamenteSoloLasCompetidorasPendientesDelMismoTurno() {
-        TurnoEntity turno = turno(1L);
+        TurnoEntity turno = turnoDe(1L, 5L); // S-01 a: sigue siendo del emisor
         SolicitudEntity aprobada = SolicitudEntity.builder()
                 .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 1))
                 .funcionario(funcionario(5L)).turno(turno).estado(PENDIENTE).build();
@@ -1184,6 +1189,7 @@ class SolicitudServiceTest {
         FuncionarioEntity receptor = funcionario(6L);
         ServicioEntity servicioA = servicio(100L);
         TurnoEntity turno = turnoDeServicio(1L, servicioA);
+        turno.setFuncionario(emisor); // S-01 a: sigue siendo del emisor
         SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turno);
         FuncionarioEntity jefatura = funcionario(9L);
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
@@ -1207,6 +1213,7 @@ class SolicitudServiceTest {
         FuncionarioEntity emisor = funcionario(5L);
         FuncionarioEntity receptor = funcionario(6L);
         TurnoEntity turno = turno(1L);
+        turno.setFuncionario(emisor); // S-01 a: sigue siendo del emisor
         SolicitudEntity solicitud = solicitudOfertaParticular(emisor, receptor, turno);
         FuncionarioEntity admin = funcionario(99L);
         when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
@@ -1241,5 +1248,153 @@ class SolicitudServiceTest {
 
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
                 () -> service.cambiarEstado(1L, APROBADA));
+    }
+
+    // ============================ S-01: dueño del turno y solicitudes ya resueltas ============================
+
+    @Test
+    void crear_botarPermisoUOfertaParticular_conUnTurnoAjeno_403YNoGuarda() {
+        for (int tipo : new int[]{1, 2, 5}) {
+            mockFuncionarioYTipo(tipo);
+            when(turnoRepository.findById(50L)).thenReturn(Optional.of(turnoDe(50L, 2L)));
+            CrearSolicitudDTO dto = dtoBase();
+            dto.setIdTurno(50L);
+            dto.setIdFuncionarioReceptor(3L);
+
+            org.springframework.security.access.AccessDeniedException ex = assertThrows(
+                    org.springframework.security.access.AccessDeniedException.class, () -> service.crearSolicitud(dto),
+                    "tipo " + tipo);
+            assertEquals("Ese turno no es tuyo: solo puedes liberar o ceder tus propios turnos", ex.getMessage());
+        }
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_botar_unCupoLibre_tampocoEsPropio_403() {
+        mockFuncionarioYTipo(2);
+        when(turnoRepository.findById(50L)).thenReturn(Optional.of(turno(50L)));
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(50L);
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.crearSolicitud(dto));
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_intercambio_entregandoUnTurnoAjeno_403YNoGuarda() {
+        mockFuncionarioYTipo(4);
+        when(turnoRepository.findById(70L)).thenReturn(Optional.of(turnoDe(70L, 2L)));
+        when(turnoRepository.findById(71L)).thenReturn(Optional.of(turnoDe(71L, 3L))); // no es del emisor
+        when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(funcionario(2L)));
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(70L);
+        dto.setIdTurnoIntercambio(71L);
+        dto.setIdFuncionarioReceptor(2L);
+
+        org.springframework.security.access.AccessDeniedException ex = assertThrows(
+                org.springframework.security.access.AccessDeniedException.class, () -> service.crearSolicitud(dto));
+        assertEquals("El turno que ofreces entregar no es tuyo", ex.getMessage());
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_cobertura_noExigeTurnoPropio() {
+        mockFuncionarioYTipo(3);
+        when(turnoRepository.findById(60L)).thenReturn(Optional.of(turno(60L)));
+        saveAsignaId();
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(60L);
+
+        assertDoesNotThrow(() -> service.crearSolicitud(dto));
+    }
+
+    @Test
+    void aprobar_botarOPermiso_siElTurnoYaCambioDeDueno_409YNoLoLibera() {
+        for (int tipo : new int[]{1, 2}) {
+            TurnoEntity turno = turnoDe(1L, 8L); // la jefatura se lo asignó a otra persona entre medio
+            SolicitudEntity solicitud = SolicitudEntity.builder()
+                    .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, tipo))
+                    .funcionario(funcionario(5L)).turno(turno).estado(PENDIENTE).build();
+            when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+            when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+
+            actorAutenticado(9L);
+            org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                    org.springframework.web.server.ResponseStatusException.class, () -> service.cambiarEstado(1L, APROBADA),
+                    "tipo " + tipo);
+            assertEquals(409, ex.getStatusCode().value());
+            assertEquals("El turno ya cambió de dueño: la solicitud quedó obsoleta", ex.getReason());
+            assertEquals(8L, turno.getFuncionario().getIdFuncionario());
+            assertEquals(PENDIENTE, solicitud.getEstado());
+        }
+        verify(turnoRepository, never()).save(any());
+        verify(solicitudRepository, never()).findByTurno_IdTurno(any());
+    }
+
+    @Test
+    void aprobar_ofertaParticular_siElTurnoYaCambioDeDueno_409YNoLoEntrega() {
+        TurnoEntity turno = turnoDe(1L, 8L);
+        SolicitudEntity solicitud = solicitudOfertaParticular(funcionario(5L), funcionario(6L), turno);
+        solicitud.setAceptadoReceptor(true);
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+
+        actorAutenticado(9L);
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> service.cambiarEstado(1L, APROBADA));
+        assertEquals(409, ex.getStatusCode().value());
+        assertEquals(8L, turno.getFuncionario().getIdFuncionario());
+        verify(turnoRepository, never()).save(any());
+    }
+
+    @Test
+    void responder_unaSolicitudYaResuelta_409YNoGuarda() {
+        for (SolicitudEntity.EstadoSolicitud estado : new SolicitudEntity.EstadoSolicitud[]{APROBADA, RECHAZADA}) {
+            SolicitudEntity solicitud = SolicitudEntity.builder()
+                    .idSolicitud(1L).funcionarioReceptor(funcionario(6L)).aceptadoReceptor(true).estado(estado).build();
+            when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+            actorAutenticado(6L);
+            org.springframework.web.server.ResponseStatusException intercambio = assertThrows(
+                    org.springframework.web.server.ResponseStatusException.class,
+                    () -> service.responderOfertaIntercambio(1L, false));
+            assertEquals(409, intercambio.getStatusCode().value());
+            assertEquals("Esta solicitud ya fue resuelta: no se puede responder", intercambio.getReason());
+            assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                    () -> service.responderOfertaParticular(1L, false));
+            assertEquals(estado, solicitud.getEstado(), "no cambia de estado");
+        }
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void responder_quienNoEsElReceptor_sigueSiendo400AunqueEsteResuelta() {
+        // Primero se revisa quién responde (HU-SOL-08, criterio 4) y después el estado.
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).funcionarioReceptor(funcionario(6L)).estado(APROBADA).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+
+        actorAutenticado(7L);
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.responderOfertaIntercambio(1L, false));
+        assertEquals("No eres el receptor de esta solicitud", ex.getMessage());
+    }
+
+    @Test
+    void rechazarOVolverAPendiente_unaSolicitudYaResuelta_409() {
+        TurnoEntity turno = turnoDe(1L, 6L);
+        SolicitudEntity aprobada = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 2))
+                .funcionario(funcionario(5L)).turno(turno).estado(APROBADA).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(aprobada));
+
+        actorAutenticado(9L);
+        for (SolicitudEntity.EstadoSolicitud nuevo : new SolicitudEntity.EstadoSolicitud[]{RECHAZADA, PENDIENTE}) {
+            org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                    org.springframework.web.server.ResponseStatusException.class, () -> service.cambiarEstado(1L, nuevo));
+            assertEquals(409, ex.getStatusCode().value());
+            assertEquals("Esta solicitud ya fue resuelta: no se puede cambiar su estado", ex.getReason());
+        }
+        assertEquals(APROBADA, aprobada.getEstado());
+        verify(solicitudRepository, never()).save(any());
     }
 }

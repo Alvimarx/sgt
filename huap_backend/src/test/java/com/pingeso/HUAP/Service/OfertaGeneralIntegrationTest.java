@@ -69,6 +69,15 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
                 .build());
     }
 
+    /** Turno del ofertor: S-01 exige que el turno ofrecido sea propio al ofertar y al elegir postulante. */
+    private TurnoEntity turnoDe(FuncionarioEntity dueno) {
+        return turnoRepository.save(TurnoEntity.builder()
+                .servicio(servicio).funcionario(dueno)
+                .diaInicioTurno(DIA).horaInicio(LocalTime.of(8, 0))
+                .diaFinalTurno(DIA).horaFin(LocalTime.of(20, 0))
+                .build());
+    }
+
     private OfertaGeneralEntity ofertaAbierta(FuncionarioEntity ofertor, TurnoEntity turno) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.save(OfertaGeneralEntity.builder()
                 .ofertor(ofertor).turno(turno).estado(PENDIENTE_APROBACION).build());
@@ -81,7 +90,7 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
     @Test
     void crearOferta_persisteEnPendienteAprobacionYRegistraBitacora() {
         FuncionarioEntity ofertor = funcionario();
-        TurnoEntity turno = turnoVacante();
+        TurnoEntity turno = turnoDe(ofertor);
         CrearOfertaGeneralDTO dto = new CrearOfertaGeneralDTO();
         dto.setIdFuncionario(ofertor.getIdFuncionario());
         dto.setIdTurno(turno.getIdTurno());
@@ -151,7 +160,7 @@ class OfertaGeneralIntegrationTest extends AbstractContainerTest {
         FuncionarioEntity ofertor = funcionario();
         FuncionarioEntity postulante = funcionario();
         FuncionarioEntity jefe = funcionario();
-        TurnoEntity turno = turnoVacante();
+        TurnoEntity turno = turnoDe(ofertor);
         OfertaGeneralEntity oferta = ofertaAbierta(ofertor, turno);
         autenticarComo(postulante.getIdFuncionario(), "MEDICO", "USUARIO", servicio.getIdServicio());
         PostulacionEntity postulacion = ofertaGeneralService.postular(oferta.getIdOfertaGeneral());
