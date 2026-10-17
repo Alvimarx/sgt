@@ -9,7 +9,7 @@
 # "sgt-huap"). MySQL, el frontend y cualquier otro contenedor de la VM no se
 # tocan. Detalle: docs/DESPLIEGUE_VM.md.
 #
-# Uso (desde la raíz del repo, con la sesión SSH configurada como "efeso"):
+# Uso (desde cualquier carpeta, con la sesión SSH configurada como "efeso"):
 #   bash scripts/desplegar_backend_hetzner.sh
 #
 # Variables (además de SSH_HOST y DIR_REMOTO, ver scripts/_hetzner_comun.sh):
@@ -22,7 +22,7 @@
 # ==============================================================
 set -euo pipefail
 
-RAIZ=$(git rev-parse --show-toplevel)
+RAIZ=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 # shellcheck source=scripts/_hetzner_comun.sh
 source "$RAIZ/scripts/_hetzner_comun.sh"
 

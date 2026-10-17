@@ -11,7 +11,7 @@
 # MySQL, backend y cualquier otro contenedor de la VM no se tocan. Detalle:
 # docs/DESPLIEGUE_VM.md.
 #
-# Uso (desde la raíz del repo, con la sesión SSH configurada como "efeso"):
+# Uso (desde cualquier carpeta, con la sesión SSH configurada como "efeso"):
 #   bash scripts/desplegar_frontend_hetzner.sh            # despliega HEAD
 #   DATOS_DEMO=1 bash scripts/desplegar_frontend_hetzner.sh  # además genera turnos vigentes
 #
@@ -27,7 +27,7 @@ set -euo pipefail
 URL_PUBLICA="${URL_PUBLICA:-http://167.233.77.149:8090}"
 DATOS_DEMO="${DATOS_DEMO:-0}"
 
-RAIZ=$(git rev-parse --show-toplevel)
+RAIZ=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
 # shellcheck source=scripts/_hetzner_comun.sh
 source "$RAIZ/scripts/_hetzner_comun.sh"
 SHA=$(git -C "$RAIZ" rev-parse --short HEAD)
