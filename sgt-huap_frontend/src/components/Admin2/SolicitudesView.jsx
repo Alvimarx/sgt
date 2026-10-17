@@ -4,6 +4,7 @@ import { solicitudesService, turnosService, usuariosService, ofertasGeneralesSer
 import { ofertaVisible, turnosComprometidos } from '../../utils/reglasSolicitud';
 import { puedeTomarCupo, yaEmpezo } from '../../utils/reglasTurno';
 import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { mensajeDeError } from '../../utils/errores';
 import { SGT_DATA } from './data';
 import { TopHeader, Sheet, SGTIcon, SGTBadge } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
@@ -645,7 +646,7 @@ const CrearSolicitudSheet = ({ open, onClose, userId, servicioId, onCreated, ini
         await solicitudesService.crear(dto);
       }
       onCreated?.(); handleClose();
-    } catch (e) { setError(e?.message || 'No se pudo crear la solicitud.'); }
+    } catch (e) { setError(mensajeDeError(e, 'No se pudo crear la solicitud.')); }
     finally { setLoading(false); }
   };
 
@@ -1013,7 +1014,7 @@ const EditMotivoSheet = ({ solicitud, onClose, onSaved }) => {
       await solicitudesService.modificarMotivo(solicitud.idSolicitud, motivo);
       onSaved?.();
       onClose();
-    } catch { setError('No se pudo guardar. Intenta de nuevo.'); }
+    } catch (e) { setError(mensajeDeError(e, 'No se pudo guardar. Intenta de nuevo.')); }
     finally { setSaving(false); }
   };
 
@@ -1142,14 +1143,14 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     try {
       await solicitudesService.updateEstado(id, 'APROBADA', user.id);
       load();
-    } catch (e) { setError(e?.message || 'Error al aprobar la solicitud.'); }
+    } catch (e) { setError(mensajeDeError(e, 'Error al aprobar la solicitud.')); }
   };
 
   const handleRechazar = async (id) => {
     try {
       await solicitudesService.updateEstado(id, 'RECHAZADA', user.id);
       load();
-    } catch (e) { setError(e?.message || 'Error al rechazar la solicitud.'); }
+    } catch (e) { setError(mensajeDeError(e, 'Error al rechazar la solicitud.')); }
   };
 
   const handleCancelar = async (solicitud) => {
@@ -1163,46 +1164,46 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     try {
       await solicitudesService.cancelar(solicitud.idSolicitud);
       load();
-    } catch (e) { setError(e?.message || 'No se pudo cancelar la solicitud.'); }
+    } catch (e) { setError(mensajeDeError(e, 'No se pudo cancelar la solicitud.')); }
   };
 
   const handleResponder = async (id, acepta) => {
     try {
       await solicitudesService.responderIntercambio(id, user.id, acepta);
       load();
-    } catch (e) { setError(e?.message || 'Error al responder el intercambio.'); }
+    } catch (e) { setError(mensajeDeError(e, 'Error al responder el intercambio.')); }
   };
 
   const handleResponderOfertaParticular = async (id, acepta) => {
     try {
       await solicitudesService.responderOfertaParticular(id, user.id, acepta);
       load();
-    } catch (e) { setError(e?.message || 'Error al responder la oferta.'); }
+    } catch (e) { setError(mensajeDeError(e, 'Error al responder la oferta.')); }
   };
 
   const handleOfertaAprobar = async (id) => {
     try { await ofertasGeneralesService.aprobar(id, user.id); load(); }
-    catch { setError('Error al aprobar la oferta.'); }
+    catch (e) { setError(mensajeDeError(e, 'Error al aprobar la oferta.')); }
   };
 
   const handleOfertaRechazar = async (id) => {
     try { await ofertasGeneralesService.rechazar(id, user.id); load(); }
-    catch { setError('Error al rechazar la oferta.'); }
+    catch (e) { setError(mensajeDeError(e, 'Error al rechazar la oferta.')); }
   };
 
   const handlePostular = async (idOferta) => {
     try { await ofertasGeneralesService.postular(idOferta, user.id); load(); }
-    catch { setError('Error al postular.'); }
+    catch (e) { setError(mensajeDeError(e, 'Error al postular.')); }
   };
 
   const handleRetirar = async (idOferta, idPostulacion) => {
     try { await ofertasGeneralesService.retirarPostulacion(idOferta, idPostulacion, user.id); load(); }
-    catch (err) { console.error('[Retirar]', err); setError('Error al retirar la postulación.'); }
+    catch (e) { setError(mensajeDeError(e, 'Error al retirar la postulación.')); }
   };
 
   const handleSeleccionar = async (idOferta, idPostulacion) => {
     try { await ofertasGeneralesService.seleccionar(idOferta, idPostulacion, user.id); load(); }
-    catch { setError('Error al seleccionar postulante.'); }
+    catch (e) { setError(mensajeDeError(e, 'Error al seleccionar postulante.')); }
   };
 
   const SORT_OPTIONS = [
