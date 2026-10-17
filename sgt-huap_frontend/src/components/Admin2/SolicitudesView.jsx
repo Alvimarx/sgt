@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
-import { ofertaVisible, turnosComprometidos } from '../../utils/reglasSolicitud';
+import { ofertaVisible, participaEnSolicitud, turnosComprometidos } from '../../utils/reglasSolicitud';
 import { puedeTomarCupo, yaEmpezo } from '../../utils/reglasTurno';
 import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { mensajeDeError } from '../../utils/errores';
@@ -102,8 +102,11 @@ function btnStyle(tone) {
 
 // ── Reglas compartidas por la presentación móvil y la desktop (R18) ───────────
 
+// Texto que reemplaza a Aprobar y Rechazar cuando quien mira participa en la solicitud.
+const NOTA_PARTICIPAS = 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.';
+
 // Estado de una solicitud para quien la mira: badge y qué puede hacer con ella.
-function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo, puedeCancelar }) {
+function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo, puedeCancelar, userId }) {
   const tipo  = solicitud?.tipoSolicitud?.tipo;
   const estado = solicitud?.estado;
 
@@ -112,7 +115,14 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
   const receptorAcepto    = esBifasico && solicitud.aceptadoReceptor === true;
   const receptorRechazo   = esBifasico && solicitud.aceptadoReceptor === false;
 
-  const canDecideThis = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
+  // Segregación de funciones: quien participa en la solicitud (emisor, receptor o
+  // dueño de alguno de sus turnos) no la decide; el backend lo rechazaría
+  // (SolicitudService.participantesDirectos). En vez de ofrecer Aprobar y
+  // Rechazar, la vista lo explica. Igual en móvil y desktop.
+  const decisionPosible = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo;
+  const participa = canDecide && participaEnSolicitud(solicitud, userId);
+  const canDecideThis = decisionPosible && !participa;
+  const bloqueadaPorParticipar = decisionPosible && participa;
   const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && estado === 'PENDIENTE';
   const canEditMotivo = !canDecide && !esMiReceptor && estado === 'PENDIENTE' && puedeEditarMotivo;
   // Cancelar la propia solicitud pendiente: es lo que libera el turno comprometido para
@@ -143,7 +153,7 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
 
   return {
     tipo, estado, esBifasico, esperandoReceptor, receptorAcepto, receptorRechazo,
-    canDecideThis, canRespond, canEditMotivo, canCancelar, esCancelada, badgeLabel, badgeTone,
+    canDecideThis, bloqueadaPorParticipar, canRespond, canEditMotivo, canCancelar, esCancelada, badgeLabel, badgeTone,
   };
 }
 
@@ -210,7 +220,7 @@ function evaluarOferta(oferta, userId, canDecide) {
 // sobre el MISMO turno se presentan como una sola disputa, y la jefatura elige a la
 // persona. Al aprobar una, el backend rechaza automáticamente a las demás
 // (rechazarSolicitudesCompetitivas), así que aquí no hay lógica extra de limpieza.
-const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
+const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar, userId }) => {
   const { turno, nombreTipoTurno, posicion, ordenadas } = datosGrupoPostulacion(grupo);
 
   return (
@@ -245,12 +255,19 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
                 </div>
                 <div style={{ fontSize: 10.5, color: PA.ink3, fontWeight: 600 }}>Postuló el {fmtFecha(sol.fechaCreacion)}</div>
               </div>
-              <button onClick={() => onRechazar(sol.idSolicitud)} style={{ ...btnStyle('danger'), padding: '7px 10px', fontSize: 12 }}>
-                <SGTIcon name="close" size={12} color="#fff" />
-              </button>
-              <button onClick={() => onAprobar(sol.idSolicitud)} style={{ ...btnStyle('success'), padding: '7px 12px', fontSize: 12 }}>
-                <SGTIcon name="check" size={12} color="#fff" /> Elegir
-              </button>
+              {participaEnSolicitud(sol, userId) ? (
+                // Su propia postulación: la decide otra jefatura (segregación de funciones).
+                <SGTBadge tone="neutral" size="xs">Tu postulación</SGTBadge>
+              ) : (
+                <>
+                  <button onClick={() => onRechazar(sol.idSolicitud)} aria-label={`Rechazar a ${nombreFuncionario(sol.funcionario)}`} style={{ ...btnStyle('danger'), padding: '7px 10px', fontSize: 12 }}>
+                    <SGTIcon name="close" size={12} color="#fff" />
+                  </button>
+                  <button onClick={() => onAprobar(sol.idSolicitud)} style={{ ...btnStyle('success'), padding: '7px 12px', fontSize: 12 }}>
+                    <SGTIcon name="check" size={12} color="#fff" /> Elegir
+                  </button>
+                </>
+              )}
             </div>
             {sol.motivo && (
               <div style={{ marginTop: 5, fontSize: 11.5, color: PA.ink2, fontWeight: 600, fontStyle: 'italic' }}>
@@ -268,12 +285,12 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar }) => {
   );
 };
 
-const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, onCancelar, esMiReceptor, esMiSolicitud }) => {
+const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, onCancelar, esMiReceptor, esMiSolicitud, userId }) => {
   const {
     tipo, estado, esperandoReceptor, receptorRechazo,
-    canDecideThis, canRespond, canEditMotivo, canCancelar, badgeLabel, badgeTone,
+    canDecideThis, bloqueadaPorParticipar, canRespond, canEditMotivo, canCancelar, badgeLabel, badgeTone,
   } = evaluarSolicitud(solicitud, {
-    canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo: !!onEditMotivo, puedeCancelar: !!onCancelar,
+    canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo: !!onEditMotivo, puedeCancelar: !!onCancelar, userId,
   });
 
   return (
@@ -310,6 +327,12 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
       {receptorRechazo && (
         <div style={{ marginTop: 8, padding: '6px 10px', background: PA.accentSoft, borderRadius: 8, fontSize: 12, color: '#B85A60', fontWeight: 700 }}>
           ✕ Receptor rechazó el intercambio
+        </div>
+      )}
+
+      {bloqueadaPorParticipar && (
+        <div style={{ marginTop: 8, padding: '6px 10px', background: PA.primarySoft, borderRadius: 8, fontSize: 12, color: PA.primary, fontWeight: 700, lineHeight: 1.4 }}>
+          {NOTA_PARTICIPAS}
         </div>
       )}
 
@@ -1295,13 +1318,9 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
     const itemSolicitud = (sol) => {
       const esMiReceptor = String(sol.funcionarioReceptor?.idFuncionario) === String(userId);
       const esMiSolicitud = String(sol.funcionario?.idFuncionario) === String(userId);
-      const ev = evaluarSolicitud(sol, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo: isMedico, puedeCancelar: true });
-      // Segregación de funciones: el backend (SolicitudService.cambiarEstado) no deja
-      // resolver una solicitud a quien participa en ella. En vez de ofrecer Aprobar /
-      // Rechazar (que fallarían), se explica a quién le corresponde.
-      const participa = canDecide && (esMiSolicitud || esMiReceptor);
+      const ev = evaluarSolicitud(sol, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo: isMedico, puedeCancelar: true, userId });
       const acciones = [];
-      if (ev.canDecideThis && !participa) {
+      if (ev.canDecideThis) {
         acciones.push({ clave: 'rechazar', etiqueta: 'Rechazar', variante: 'peligro', icono: 'close', onClick: () => handleRechazar(sol.idSolicitud) });
         acciones.push({ clave: 'aprobar', etiqueta: 'Aprobar', variante: 'exito', icono: 'check', onClick: () => handleAprobar(sol.idSolicitud) });
       }
@@ -1321,9 +1340,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         notas.push({ clave: 'espera', tono: 'aviso', texto: `⏳ Esperando respuesta del receptor${sol.funcionarioReceptor ? ` (${nombreFuncionario(sol.funcionarioReceptor)})` : ''}` });
       }
       if (ev.receptorRechazo) notas.push({ clave: 'rechazo', tono: 'alerta', texto: '✕ Receptor rechazó el intercambio' });
-      if (ev.canDecideThis && participa) {
-        notas.push({ clave: 'segregacion', texto: 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.' });
-      }
+      if (ev.bloqueadaPorParticipar) notas.push({ clave: 'segregacion', texto: NOTA_PARTICIPAS });
 
       const turnoPrincipal = sol.turno ? turnoTexto(sol.turno) : sol.fechaInicioPermiso ? `${fmtFecha(sol.fechaInicioPermiso)} → ${fmtFecha(sol.fechaTerminoPermiso)}` : '';
       return {
@@ -1365,12 +1382,15 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
         postulantesTitulo: `Postulantes · ${grupo.length}`,
         postulantes: ordenadas.map((sol) => {
           const nombre = nombreFuncionario(sol.funcionario);
+          // Su propia postulación: la decide otra jefatura (segregación de funciones).
+          const propia = participaEnSolicitud(sol, userId);
           return {
             clave: sol.idSolicitud,
             nombre,
             detalle: `Postuló el ${fmtFecha(sol.fechaCreacion)}`,
             motivo: sol.motivo,
-            acciones: [
+            chip: propia ? { texto: 'Tu postulación', tono: 'neutral' } : undefined,
+            acciones: propia ? [] : [
               { clave: 'rechazar', etiqueta: 'Rechazar', variante: 'peligro', tamano: 'sm', icono: 'close', ariaLabel: `Rechazar a ${nombre}`, onClick: () => handleRechazar(sol.idSolicitud) },
               { clave: 'elegir', etiqueta: 'Elegir', variante: 'exito', tamano: 'sm', icono: 'check', ariaLabel: `Elegir a ${nombre}`, onClick: () => handleAprobar(sol.idSolicitud) },
             ],
@@ -1668,6 +1688,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             grupo={g}
             onAprobar={handleAprobar}
             onRechazar={handleRechazar}
+            userId={user?.id}
           />
         ))}
         {!loading && tab !== 'ofertas' && listaSinAgrupar.map(s => (
@@ -1683,6 +1704,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             onResponderIntercambio={handleResponder}
             onResponderOfertaParticular={handleResponderOfertaParticular}
             esMiReceptor={String(s.funcionarioReceptor?.idFuncionario) === String(user?.id)}
+            userId={user?.id}
           />
         ))}
       </div>

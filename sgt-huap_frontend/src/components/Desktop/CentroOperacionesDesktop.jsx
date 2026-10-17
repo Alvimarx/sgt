@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
-import { ofertaVisible } from '../../utils/reglasSolicitud';
+import { ofertaVisible, participaEnSolicitud } from '../../utils/reglasSolicitud';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
 // lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
 // En desktop el Sheet se presenta como panel lateral (R18).
@@ -491,6 +491,8 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
             return {
               ...personaVM(nombreCompletoDe(s.funcionario), {}),
               key: s.idSolicitud, idle: !confirming, confirming,
+              // Su propia postulación la decide otra jefatura.
+              propia: participaEnSolicitud(s, myUserId),
               onElegir: () => setConfirm({ t: 'elegir', id: s.idSolicitud }),
               onYes: () => elegir(s.idSolicitud, nombreCompletoDe(s.funcionario)),
               onNo: () => setConfirm(null),
@@ -533,7 +535,9 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
         if (cubierto) { badge = 'Turno ya cubierto'; tone = 'neutral'; }
         const [badgeBg, badgeInk] = BADGE[tone];
 
-        const participo = esMia || esMiReceptor;
+        // Segregación de funciones: emisor, receptor o dueño de alguno de sus
+        // turnos (la misma regla que Solicitudes, utils/reglasSolicitud.js).
+        const participo = participaEnSolicitud(s, myUserId);
         items.push({
           id: s.idSolicitud, tipoL: T.l, c: T.c,
           fecha: fmtFechaCorta(String(s.fechaCreacion || '').slice(0, 10)),
@@ -786,8 +790,11 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <span style={{ width: 20, height: 20, borderRadius: 99, background: p.bg, color: p.ink, display: 'inline-grid', placeItems: 'center', fontSize: '7.5px', fontWeight: 800 }}>{p.i}</span>
                               <span style={{ flex: 1, minWidth: 0, fontSize: '10.5px', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.n}</span>
-                              {s.puedeElegir && (
+                              {s.puedeElegir && !p.propia && (
                                 <button onClick={p.onElegir} style={{ background: '#17416C', color: '#fff', border: 'none', borderRadius: 6, padding: '3px 9px', fontSize: '9.5px', fontWeight: 800, cursor: 'pointer' }}>Elegir</button>
+                              )}
+                              {s.puedeElegir && p.propia && (
+                                <span style={{ fontSize: '8.5px', fontWeight: 800, color: '#7486A0', textTransform: 'uppercase', letterSpacing: '0.3px' }}>Tu postulación</span>
                               )}
                             </div>
                           )}
