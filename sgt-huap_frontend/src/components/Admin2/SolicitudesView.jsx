@@ -12,7 +12,12 @@ import ConfirmacionDesktop from '../Desktop/turnos/ConfirmacionDesktop';
 
 const PA = SGT_DATA.PALETTE;
 
-const TIPO_LABEL  = { 1: 'Permiso', 2: 'Botar turno', 3: 'Cobertura', 4: 'Intercambio', 5: 'Oferta particular' };
+// El 6 (oferta general) no es una solicitud: es el tipo del asistente que crea
+// una oferta. Se nombra aquí para que su paso 2 diga «Oferta general» en el
+// botón de volver (sin él, en móvil quedaba solo la flecha, sin nombre).
+const TIPO_LABEL  = { 1: 'Permiso', 2: 'Botar turno', 3: 'Cobertura', 4: 'Intercambio', 5: 'Oferta particular', 6: 'Oferta general' };
+// Tipos de las solicitudes propiamente tales (filtro por tipo en desktop).
+const TIPOS_SOLICITUD = [1, 2, 3, 4, 5];
 const TIPO_COLOR  = { 1: '#94B8E0', 2: '#D4888D', 3: '#88C4A8', 4: '#B89FD8', 5: '#E0B87A' };
 const MESES_CORTO = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MESES_FULL  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1429,7 +1434,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
           busqueda={busquedaDesktop}
           onBusqueda={setBusquedaDesktop}
           placeholderBusqueda={esOfertas ? 'Buscar ofertor o postulante…' : 'Buscar por nombre o motivo…'}
-          tipos={esOfertas ? null : [{ id: 'todos', etiqueta: 'Todos los tipos' }, ...Object.entries(TIPO_LABEL).map(([id, etiqueta]) => ({ id, etiqueta }))]}
+          tipos={esOfertas ? null : [{ id: 'todos', etiqueta: 'Todos los tipos' }, ...TIPOS_SOLICITUD.map((id) => ({ id: String(id), etiqueta: TIPO_LABEL[id] }))]}
           tipo={tipoDesktop}
           onTipo={setTipoDesktop}
           ordenes={esOfertas ? null : SORT_OPTIONS}
