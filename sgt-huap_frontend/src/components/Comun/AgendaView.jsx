@@ -4,6 +4,8 @@ import { getTurnosServicio } from "../../services/funcionarioService";
 import ShiftDetail from "../Comun/ShiftDetail";
 import { getTipoTurnoColor, getAgendaTeam, formatShiftLabel } from "../Comun/turnoPresentacion";
 import AsignarTurnoLibreSheet from "./AsignarTurnoLibreSheet";
+// Historial de un turno (C-06): comparte con la bitácora cómo se ve cada evento.
+import { HistorialTurnoSheet } from "../Admin2/BitacoraView";
 
 import {
   AlertBanner,
@@ -53,14 +55,16 @@ const formatFechaCorta = (fechaISO) => {
 //   onLogout            — cierra sesión
 //   onOpenNotifications — abre la bandeja de notificaciones
 //   onOpenSolicitudes   — abre el flujo de solicitudes, opcionalmente con preset
-//   onOpenBitacora      — abre la bitácora desde el detalle de turno
+// «Ver historial» del detalle abre aquí mismo el historial de ese turno (C-06).
 // ---------------------------------------------------------------------------
-const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifications, onOpenSolicitudes, onOpenBitacora }) => {
+const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifications, onOpenSolicitudes }) => {
   // El inicio abre en «Mis turnos» (decisión C-05, 17 oct 2026): es lo primero
   // que busca quien entra. Los chips son Todos, Mis turnos, Solicitudes y
   // Disponibles (R1, R9).
   const [filter, setFilter] = useState("miTurno");
   const [detailShift, setDetailShift] = useState(null);
+  // Turno cuyo historial está abierto, encima del detalle.
+  const [historialTurno, setHistorialTurno] = useState(null);
   const [bannerCollapsed, setBannerCollapsed] = useState(false);
   const [agendaData, setAgendaData] = useState(emptyAgendaState);
   const [loadingAgenda, setLoadingAgenda] = useState(true);
@@ -470,7 +474,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
             canAssignFreeTurn={canAssignFreeTurns}
             onAction={(actionId, shift) => {
               if (actionId === "historial") {
-                onOpenBitacora?.();
+                setHistorialTurno(shift);
                 return;
               }
 
@@ -497,6 +501,9 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
           />
         )}
       </Sheet>
+
+      {/* Historial del turno (C-06): encima del detalle; al cerrarlo, se vuelve a él. */}
+      <HistorialTurnoSheet turno={historialTurno} onClose={() => setHistorialTurno(null)} />
 
       {/* Toast flotante — position fixed para funcionar dentro de cualquier contenedor */}
       {selectionToast && (

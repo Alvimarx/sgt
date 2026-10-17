@@ -166,13 +166,20 @@ const accionesDelTurno = ({
         }
     }
 
-    actions.push({
-        id: "historial",
-        label: "Ver historial",
-        icon: "history",
-        tone: "ghost",
-        targetShift: shift,
-    });
+    // «Ver historial» abre el historial de ESTE turno (C-06, 17 oct 2026: GET
+    // /bitacoras/turno/{id}). La gestión lo ve en los turnos de su servicio,
+    // también en los cupos; el médico, solo en los suyos: el backend le
+    // responde 403 en los demás, así que no se le ofrece en turnos ajenos ni
+    // en cupos.
+    if (canManageAssignments || (shift?.miTurno && !turnoLibre)) {
+        actions.push({
+            id: "historial",
+            label: "Ver historial",
+            icon: "history",
+            tone: "ghost",
+            targetShift: shift,
+        });
+    }
 
     return actions;
 };
@@ -227,10 +234,6 @@ const ShiftDetail = ({
 
     const canManageAssignments = Boolean(canManageTurnAssignment || canAssignFreeTurn);
     const turnosGrupo = groupData?.turnos || [];
-
-    const firstVacantShift =
-        turnosGrupo.find(isTurnoLibre) ||
-        (turnoLibre ? shift : null);
 
     const handleAssignVacancy = (vacantShift) => {
         if (!vacantShift || !onAction) return;
@@ -297,6 +300,15 @@ const ShiftDetail = ({
 
         onAction?.(actionId, currentShift);
     };
+
+    // Acciones del pie, las mismas en móvil y desktop. Si no hay ninguna (por
+    // ejemplo, en el cupo que el médico ya pidió), no se muestra la sección.
+    const acciones = accionesDelTurno({
+        shift,
+        canRequestExchange,
+        canManageTurnAssignment,
+        canAssignFreeTurn,
+    });
 
     // Rama desktop (R18): mismas reglas (helpers de arriba), otra presentación.
     if (esDesktop) {
@@ -365,12 +377,7 @@ const ShiftDetail = ({
             };
         }
 
-        const acciones = accionesDelTurno({
-            shift,
-            canRequestExchange,
-            canManageTurnAssignment,
-            canAssignFreeTurn,
-        }).map((a) => ({
+        const accionesDesktop = acciones.map((a) => ({
             ...a,
             clave: `${a.id}-${a.targetShift?.id ?? "actual"}`,
             onClick: () => handleShiftAction(a.id, a.targetShift || shift),
@@ -395,7 +402,7 @@ const ShiftDetail = ({
                 info={info}
                 equipo={equipo}
                 equipoLegado={equipoLegado}
-                acciones={acciones}
+                acciones={accionesDesktop}
                 puedeGestionar={canManageAssignments}
                 sePuedeElegirReceptor={Boolean(onSelectMember) && !canManageAssignments}
             />
@@ -562,18 +569,17 @@ const ShiftDetail = ({
             )}
 
             {/* Acciones */}
-            <div>
-                <SectionLabel>Acciones</SectionLabel>
+            {acciones.length > 0 && (
+                <div>
+                    <SectionLabel>Acciones</SectionLabel>
 
-                <ShiftActions
-                    shift={shift}
-                    canRequestExchange={canRequestExchange}
-                    canManageTurnAssignment={canManageTurnAssignment}
-                    canAssignFreeTurn={canAssignFreeTurn}
-                    assignableVacancyShift={firstVacantShift}
-                    onAction={handleShiftAction}
-                />
-            </div>
+                    <ShiftActions
+                        shift={shift}
+                        actions={acciones}
+                        onAction={handleShiftAction}
+                    />
+                </div>
+            )}
         </div>
     );
 };
@@ -923,20 +929,8 @@ const TeamByPuesto = ({
     </div>
 );
 
-const ShiftActions = ({
-    shift,
-    onAction,
-    canRequestExchange = false,
-    canManageTurnAssignment = false,
-    canAssignFreeTurn = false,
-}) => {
-    const actions = accionesDelTurno({
-        shift,
-        canRequestExchange,
-        canManageTurnAssignment,
-        canAssignFreeTurn,
-    });
-
+// actions: las de accionesDelTurno, ya calculadas por ShiftDetail.
+const ShiftActions = ({ shift, actions, onAction }) => {
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {actions.map((a) => (

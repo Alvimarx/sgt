@@ -74,9 +74,12 @@ const NAV_STORAGE_KEY = "sgt_nav_state";
 // Vistas por nivel de acceso. La restauración usa WHITELIST: una vista que no
 // esté en ninguna lista (renombrada en un deploy, o sessionStorage manipulado)
 // NO se restaura — cae a "agenda" en vez de dejar la pantalla en blanco.
+// C-06 (17 oct 2026): la bitácora general es solo de gestión (el backend se la
+// niega al médico). «Ver historial» del detalle del turno abre el historial de
+// ese turno en la misma vista (HistorialTurnoSheet), no esta.
 const VISTAS_COMUNES = [
   "agenda", "calendar_view", "perfil", "personal_dashboard",
-  "notifications", "solicitudes", "bitacora",
+  "notifications", "solicitudes",
 ];
 // C-10 (17 oct 2026): las reglas de horario son del administrador, como los
 // tipos de turno (C-01); el backend exige ADMINISTRADOR para escribirlas.
@@ -88,7 +91,7 @@ const VISTAS_SOLO_JEFATURA = [
   "jefatura", "funcionarios_servicio_jefatura", "asignacionJefatura", "jerarquiaJefatura",
 ];
 const VISTAS_SOLO_SUBROGANTE = ["subrogante"];
-const VISTAS_GESTION = ["admin_stats", "puestos", "auditoria"];
+const VISTAS_GESTION = ["admin_stats", "puestos", "auditoria", "bitacora"];
 
 // ¿Puede este usuario (ya rehidratado) ver esta vista? Mismos gates que usa
 // Perfil.jsx para mostrar los paneles. Importante en multi-pestaña: si en otra
@@ -386,7 +389,6 @@ const Prop4 = ({ tweaks = {} }) => {
           onLogout={handleLogout}
           onOpenNotifications={handleOpenNotifications}
           onOpenSolicitudes={handleOpenSolicitudes}
-          onOpenBitacora={() => { setBitacoraReturn("agenda"); setCurrentView("bitacora"); }}
         />
       )}
       {currentView === "notifications" && (
@@ -411,10 +413,6 @@ const Prop4 = ({ tweaks = {} }) => {
             }
           }}
           onOpenSolicitudes={handleOpenSolicitudes}
-          onOpenBitacora={() => {
-            setBitacoraReturn("calendar_view");
-            setCurrentView("bitacora");
-          }}
         />
       )}
       {currentView === "perfil" && (

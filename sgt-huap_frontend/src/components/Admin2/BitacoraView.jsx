@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import dayjs from 'dayjs';
 import { eventosService } from '../../services/adminService';
+import { mensajeDeError } from '../../utils/errores';
 import { SGT_DATA, STATUS_TONE_MAP } from './data';
-import { SGTBadge, SGTIcon, TopHeader, StatusBadge } from '../Style/UIPrimitives';
+import { SGTBadge, SGTIcon, TopHeader, StatusBadge, Sheet } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
+import { formatShiftLabel } from '../Comun/turnoPresentacion';
 import PeriodoSelector from '../Style/PeriodoSelector';
 import { buildSemanasDelMes, rangoPeriodo } from '../Style/periodo';
 import { useLayout } from '../../layout/layout';
@@ -47,6 +49,10 @@ const TIPO_TONE = {
   DESASIGNACION:                             'accent',
   REASIGNACION:                              'warn',
   MODIFICACION_HORARIO:                      'warn',
+  // Asignación directa de la gestión (GestionTurnoService).
+  ASIGNACION_MANUAL_TURNO:                   'primary',
+  REASIGNACION_MANUAL_TURNO:                 'warn',
+  LIBERACION_MANUAL_TURNO:                   'accent',
   PERMISO:                                   'warn',
   INTERCAMBIO:                               'neutral',
   COBERTURA:                                 'success',
@@ -76,9 +82,12 @@ function accionDesdeEvento(ev) {
     case 'CAMBIO_ESTADO_RECHAZADA':                   return 'Rechazo';
     case 'RECHAZO_AUTOMATICO':                        return 'Rechazo automático';
     case 'SOLICITUD_CANCELADA':                       return 'Cancelación por el solicitante';
-    case 'ASIGNACION':                                return 'Asignación de turno';
+    case 'ASIGNACION':
+    case 'ASIGNACION_MANUAL_TURNO':                   return 'Asignación de turno';
     case 'DESASIGNACION':                             return 'Desasignación de turno';
-    case 'REASIGNACION':                              return 'Reasignación de turno';
+    case 'LIBERACION_MANUAL_TURNO':                   return 'Liberación de turno';
+    case 'REASIGNACION':
+    case 'REASIGNACION_MANUAL_TURNO':                 return 'Reasignación de turno';
     case 'MODIFICACION_HORARIO':                      return 'Modificación de horario';
     case 'OFERTA_GENERAL_CREADA':                     return 'Ofrecimiento creado';
     case 'OFERTA_GENERAL_APROBADA':                   return 'Aprobación de oferta';
@@ -379,14 +388,16 @@ const FilaFiltro = ({ label, opciones, valor, onSelect }) => {
 // Item de evento (colapsable)
 // ──────────────────────────────────────────────
 
-const EventoItem = ({ evento }) => {
+// `etiqueta`: el título del evento cuando la vista quiere otro que el de la
+// bitácora general (el historial de un turno dice qué le pasó al turno).
+const EventoItem = ({ evento, etiqueta }) => {
   const p = SGT_DATA.PALETTE;
   const [expandido, setExpandido] = useState(false);
   const expandedRef = useRef(null);
 
   const tipo       = evento.tipoEvento || 'Evento';
   const tone       = toneParaTipo(tipo);
-  const label      = labelEvento(evento);
+  const label      = etiqueta || labelEvento(evento);
   const fecha      = fmtFechaHora(evento.fechaModificacion) || fmtFechaHora(evento.fechaInicioAfectada) || '—';
   const estado     = estadoDesdeEvento(evento);
   const solicitante = evento.nombreFuncionarioEmisor || evento.nombreOferente || null;
@@ -453,6 +464,139 @@ const EventoItem = ({ evento }) => {
     </div>
   );
 };
+
+// ──────────────────────────────────────────────
+// Historial de un turno (C-06)
+// ──────────────────────────────────────────────
+
+// GET /bitacoras/turno/{id} entrega la entidad de cada evento, con el actor,
+// el turno y la solicitud anidados; la bitácora general usa el DTO plano de
+// /bitacoras/dto. Para dibujar los dos igual, la entidad se lleva a la forma
+// del DTO (BitacoraService.convertToDTO). Si el backend ya entrega el DTO,
+// pasa tal cual.
+const TIPO_SOLICITUD_NOMBRE = { 1: 'Permiso', 2: 'Botar turno', 3: 'Cobertura', 4: 'Intercambio', 5: 'Oferta particular' };
+const nombreDe = (f) => (f ? [f.nombre, f.apelPat].filter(Boolean).join(' ') || null : null);
+// Campos del DTO para un turno: los del turno del evento sin sufijo, los de la
+// solicitud con «Solicitud» y los del turno del receptor con «Receptor».
+const turnoComoDTO = (t, sufijo = '') => ({
+  [`idTurno${sufijo}`]:        t?.idTurno ?? null,
+  [`diaInicioTurno${sufijo}`]: t?.diaInicioTurno ?? null,
+  [`diaFinalTurno${sufijo}`]:  t?.diaFinalTurno ?? null,
+  [`horaInicioTurno${sufijo}`]: t?.horaInicio ?? null,
+  [`horaFinTurno${sufijo}`]:   t?.horaFin ?? null,
+  [`nombrePuesto${sufijo}`]:   t?.puesto?.nombre ?? null,
+});
+
+function comoEventoDeBitacora(e) {
+  if (!e || typeof e !== 'object') return null;
+  if (!['funcionario', 'turno', 'solicitud'].some((k) => k in e)) return e;
+  const s = e.solicitud || null;
+  return {
+    idEvento: e.idEvento,
+    tipoEvento: e.tipoEvento,
+    motivo: e.motivo,
+    observaciones: e.observaciones,
+    fechaModificacion: e.fechaModificacion,
+    fechaInicioAfectada: e.fechaInicioAfectada,
+    fechaFinAfectada: e.fechaFinAfectada,
+    activo: e.activo,
+    idFuncionario: e.funcionario?.idFuncionario ?? null,
+    nombreFuncionario: nombreDe(e.funcionario),
+    ...turnoComoDTO(e.turno),
+    idFuncionarioTurno: e.turno?.funcionario?.idFuncionario ?? null,
+    nombreFuncionarioTurno: nombreDe(e.turno?.funcionario),
+    idSolicitud: s?.idSolicitud ?? null,
+    tipoSolicitud: TIPO_SOLICITUD_NOMBRE[s?.tipoSolicitud?.tipo] ?? null,
+    estadoSolicitud: s?.estado ?? null,
+    motivoSolicitud: s?.motivo ?? null,
+    aceptadoReceptor: s?.aceptadoReceptor ?? null,
+    fechaInicioPermiso: s?.fechaInicioPermiso ?? null,
+    fechaTerminoPermiso: s?.fechaTerminoPermiso ?? null,
+    idFuncionarioEmisor: s?.funcionario?.idFuncionario ?? null,
+    nombreFuncionarioEmisor: nombreDe(s?.funcionario),
+    ...turnoComoDTO(s?.turno, 'Solicitud'),
+    idFuncionarioReceptor: s?.funcionarioReceptor?.idFuncionario ?? null,
+    nombreFuncionarioReceptor: nombreDe(s?.funcionarioReceptor),
+    ...turnoComoDTO(s?.turnoReceptor, 'Receptor'),
+  };
+}
+
+// Qué le pasó al turno: el título de esos eventos en su historial. En la
+// bitácora general se rotulan «Turno», la categoría; aquí todos lo son.
+const EVENTO_DE_TURNO = {
+  ASIGNACION_MANUAL_TURNO:   'Asignación manual',
+  REASIGNACION_MANUAL_TURNO: 'Reasignación manual',
+  LIBERACION_MANUAL_TURNO:   'Liberación manual',
+  MODIFICACION_HORARIO:      'Cambio de horario',
+};
+
+// Contenido del historial. Se monta de nuevo para cada turno (key), así que
+// nunca muestra, ni por un instante, los eventos de otro.
+const HistorialDelTurno = ({ turno }) => {
+  const p = SGT_DATA.PALETTE;
+  const [estado, setEstado] = useState({ cargando: true, error: null, eventos: [] });
+
+  useEffect(() => {
+    let vigente = true;
+    eventosService.getByTurno(turno.id)
+      .then((data) => {
+        if (!vigente) return;
+        const eventos = (Array.isArray(data) ? data : []).map(comoEventoDeBitacora).filter(Boolean);
+        setEstado({ cargando: false, error: null, eventos: ordenarPorFechaDesc(eventos) });
+      })
+      .catch((e) => {
+        if (vigente) setEstado({ cargando: false, error: mensajeDeError(e, 'No se pudo cargar el historial del turno.'), eventos: [] });
+      });
+    return () => { vigente = false; };
+  }, [turno.id]);
+
+  const { cargando, error, eventos } = estado;
+  const detalle = [turno.nombrePuesto, turno.turnoLibre ? 'Cupo libre' : turno.nombreFuncionario].filter(Boolean).join(' · ');
+
+  return (
+    <div style={{ padding: '4px 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ background: p.surface2, border: `1px solid ${p.line2}`, borderRadius: 12, padding: '10px 12px', textAlign: 'left' }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: p.ink }}>{formatShiftLabel(turno)}</div>
+        {detalle && <div style={{ fontSize: 12, fontWeight: 600, color: p.ink3, marginTop: 2 }}>{detalle}</div>}
+        <div style={{ fontSize: 11.5, fontWeight: 600, color: p.ink3, marginTop: 6 }}>
+          Cambios registrados en este turno, del más reciente al más antiguo.
+        </div>
+      </div>
+      {cargando && <LoadingState label="Cargando historial..." />}
+      {!cargando && error && (
+        <div role="alert" style={{ background: p.accentSoft, border: '1px solid #F3D2D5', borderRadius: 12, padding: 14, fontSize: 13, color: '#8C3F44', fontWeight: 700 }}>
+          {error}
+        </div>
+      )}
+      {!cargando && !error && eventos.length === 0 && (
+        <ListEmptyState
+          icon="history" theme="slate"
+          title="Sin cambios registrados"
+          message="Este turno no tiene eventos en la bitácora."
+        />
+      )}
+      {!cargando && !error && eventos.map((ev) => (
+        <EventoItem key={ev.idEvento} evento={ev} etiqueta={EVENTO_DE_TURNO[ev.tipoEvento]} />
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Historial de UN turno (C-06, 17 oct 2026). Lo abre «Ver historial» del
+ * detalle del turno, en el inicio y en el calendario, en móvil y desktop (en
+ * desktop, como panel lateral sobre el detalle). Pide GET
+ * /bitacoras/turno/{id}: la gestión ve el de los turnos de su servicio y el
+ * médico solo el de los suyos (el backend responde 403 en los demás, y el
+ * detalle no le ofrece «Ver historial» en ellos). No es la bitácora general,
+ * que sigue siendo solo de gestión.
+ * `turno`: el turno del detalle (null = cerrado).
+ */
+export const HistorialTurnoSheet = ({ turno, onClose }) => (
+  <Sheet open={turno?.id != null} onClose={onClose} title="Historial del turno" maxHeight="88%" anchoDesktop={560}>
+    {turno?.id != null && <HistorialDelTurno key={turno.id} turno={turno} />}
+  </Sheet>
+);
 
 // ──────────────────────────────────────────────
 // Componente principal

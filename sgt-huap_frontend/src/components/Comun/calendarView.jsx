@@ -7,6 +7,8 @@ import { getTurnosCalendario } from '../../services/turnosService';
 import ShiftDetail from '../Comun/ShiftDetail';
 import { getTipoTurnoColor, formatShiftLabel } from '../Comun/turnoPresentacion';
 import AsignarTurnoLibreSheet from './AsignarTurnoLibreSheet';
+// Historial de un turno (C-06): comparte con la bitácora cómo se ve cada evento.
+import { HistorialTurnoSheet } from '../Admin2/BitacoraView';
 import { exportarTurnosCsv } from '../../services/exportacionService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { esAdministrador } from '../../utils/roles';
@@ -111,9 +113,8 @@ const getCoverageStats = (shifts = []) => {
 // CALENDARVIEW — componente principal
 // ---------------------------------------------------------------------------
 
-const CalendarView = ({ 
-    onBack, 
-    onOpenBitacora, 
+const CalendarView = ({
+    onBack,
     onOpenSolicitudes,
     modoAsignacionAdmin = false,
 }) => {
@@ -161,6 +162,8 @@ const CalendarView = ({
     const [selectedDay, setSelectedDay] = useState(null);
     const [detailShift, setDetailShift] = useState(null);
     const [assignmentShift, setAssignmentShift] = useState(null);
+    // Turno cuyo historial está abierto, encima del detalle (C-06).
+    const [historialTurno, setHistorialTurno] = useState(null);
     const [refreshTick, setRefreshTick] = useState(0);
 
     const [exportSheetOpen, setExportSheetOpen] = useState(false);
@@ -283,9 +286,11 @@ const CalendarView = ({
     };
 
     // Acciones del detalle del turno (ShiftDetail): las mismas en móvil y desktop.
+    // «Ver historial» abre el historial de ese turno aquí mismo, no la
+    // bitácora general (C-06).
     const handleShiftAction = (actionId, shift) => {
         if (actionId === 'historial') {
-            onOpenBitacora?.();
+            setHistorialTurno(shift);
             return;
         }
 
@@ -474,6 +479,8 @@ const CalendarView = ({
                         />
                     )}
                 </Sheet>
+
+                <HistorialTurnoSheet turno={historialTurno} onClose={() => setHistorialTurno(null)} />
 
                 <AsignarTurnoLibreSheet
                     open={!!assignmentShift}
@@ -671,6 +678,9 @@ const CalendarView = ({
                     />
                 )}
             </Sheet>
+
+            {/* Historial del turno (C-06): encima del detalle; al cerrarlo, se vuelve a él. */}
+            <HistorialTurnoSheet turno={historialTurno} onClose={() => setHistorialTurno(null)} />
 
             <AsignarTurnoLibreSheet
                 open={!!assignmentShift}

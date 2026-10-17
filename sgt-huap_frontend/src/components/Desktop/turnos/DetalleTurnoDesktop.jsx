@@ -160,19 +160,22 @@ const DetalleTurnoDesktop = ({
         )}
       </div>
 
-      <div className="sgt-dt-detalle__acciones" role="group" aria-label="Acciones">
-        {acciones.map((a) => (
-          <BotonDesktop
-            key={a.clave}
-            variante={VARIANTE_ACCION[a.tone] || 'secundario'}
-            icono={a.icon}
-            disabled={a.disabled}
-            onClick={a.onClick}
-          >
-            {a.label}
-          </BotonDesktop>
-        ))}
-      </div>
+      {/* Sin acciones (por ejemplo, el cupo que el médico ya pidió), sin barra. */}
+      {acciones.length > 0 && (
+        <div className="sgt-dt-detalle__acciones" role="group" aria-label="Acciones">
+          {acciones.map((a) => (
+            <BotonDesktop
+              key={a.clave}
+              variante={VARIANTE_ACCION[a.tone] || 'secundario'}
+              icono={a.icon}
+              disabled={a.disabled}
+              onClick={a.onClick}
+            >
+              {a.label}
+            </BotonDesktop>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
