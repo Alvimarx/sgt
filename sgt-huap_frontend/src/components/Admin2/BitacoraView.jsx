@@ -87,15 +87,17 @@ function accionDesdeEvento(ev) {
   }
 }
 
+// Una cancelación queda RECHAZADA en la base, pero se muestra (y se filtra)
+// como CANCELADA, igual que en Solicitudes: no es un rechazo de la jefatura.
 function estadoDesdeEvento(ev) {
   switch (ev.tipoEvento) {
     case 'SOLICITUD_CREADA':
     case 'OFERTA_PARTICULAR_ACEPTADA_POR_RECEPTOR':
     case 'OFERTA_ACEPTADA_POR_RECEPTOR':              return 'PENDIENTE';
     case 'CAMBIO_ESTADO_APROBADA':                    return 'APROBADA';
+    case 'SOLICITUD_CANCELADA':                       return 'CANCELADA';
     case 'CAMBIO_ESTADO_RECHAZADA':
     case 'RECHAZO_AUTOMATICO':
-    case 'SOLICITUD_CANCELADA':
     case 'OFERTA_PARTICULAR_RECHAZADA_POR_RECEPTOR':
     case 'OFERTA_RECHAZADA_POR_RECEPTOR':             return 'RECHAZADA';
     case 'OFERTA_GENERAL_CREADA':
@@ -115,6 +117,29 @@ const TIPO_SOLICITUD_BADGE = {
 };
 
 const esGeneracionTurno = (ev) => ev.tipoEvento === 'GENERACION_TURNO';
+
+// Estado actual de la solicitud del evento: una cancelada por quien la emitió
+// queda RECHAZADA en la base con ese motivo; se muestra como CANCELADA (mismo
+// criterio que evaluarSolicitud en Solicitudes).
+function estadoSolicitudVisible(ev) {
+  const estado = ev.estadoSolicitud;
+  if (estado === 'RECHAZADA' && String(ev.motivoSolicitud || '').startsWith('Cancelada por el solicitante')) return 'CANCELADA';
+  return estado;
+}
+
+// Fecha con que se ordena y se filtra un evento.
+const fechaDeEvento = (ev) => ev.fechaModificacion || ev.fechaInicioAfectada || null;
+
+// Del más reciente al más antiguo; los eventos del mismo instante, del último
+// en llegar al primero (por id). Los que no traen fecha van al final.
+function ordenarPorFechaDesc(eventos) {
+  return [...eventos].sort((a, b) => {
+    const fa = fechaDeEvento(a) ? dayjs(fechaDeEvento(a)).valueOf() : -Infinity;
+    const fb = fechaDeEvento(b) ? dayjs(fechaDeEvento(b)).valueOf() : -Infinity;
+    if (fa !== fb) return fb - fa;
+    return Number(b.idEvento || 0) - Number(a.idEvento || 0);
+  });
+}
 
 // Label legible para el header del item colapsado
 function labelEvento(ev) {
@@ -186,7 +211,7 @@ const BloquePermiso = ({ ev }) => (
     <Row label="Inicio permiso"  value={fmtFechaHora(ev.fechaInicioPermiso)} />
     <Row label="Término permiso" value={fmtFechaHora(ev.fechaTerminoPermiso)} />
     <Row label="Motivo"          value={ev.motivoSolicitud || ev.motivo} />
-    <Row label="Estado"          value={ev.estadoSolicitud} />
+    <Row label="Estado"          value={estadoSolicitudVisible(ev)} />
     <Divider />
     <Row label="Acción"          value={accionDesdeEvento(ev)} />
   </>
@@ -196,7 +221,7 @@ const BloqueBotarTurno = ({ ev }) => (
   <>
     <Row label="Turno a botar" value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePuestoSolicitud)} />
     <Row label="Motivo"        value={ev.motivoSolicitud || ev.motivo} />
-    <Row label="Estado"        value={ev.estadoSolicitud} />
+    <Row label="Estado"        value={estadoSolicitudVisible(ev)} />
     <Divider />
     <Row label="Acción"        value={accionDesdeEvento(ev)} />
   </>
@@ -206,7 +231,7 @@ const BloqueCobertura = ({ ev }) => (
   <>
     <Row label="Turno a cubrir" value={fmtTurno(ev.diaInicioTurnoSolicitud, ev.horaInicioTurnoSolicitud, ev.horaFinTurnoSolicitud, ev.nombrePuestoSolicitud)} />
     <Row label="Motivo"         value={ev.motivoSolicitud || ev.motivo} />
-    <Row label="Estado"         value={ev.estadoSolicitud} />
+    <Row label="Estado"         value={estadoSolicitudVisible(ev)} />
     <Divider />
     <Row label="Acción"         value={accionDesdeEvento(ev)} />
   </>
@@ -227,7 +252,7 @@ const BloqueIntercambio = ({ ev }) => {
       <Row label="Turno receptor"      value={fmtTurno(ev.diaInicioTurnoReceptor, ev.horaInicioTurnoReceptor, ev.horaFinTurnoReceptor, ev.nombrePuestoReceptor)} />
       <Row label="Respuesta receptor"  value={receptorAcepto} />
       <Divider />
-      <Row label="Estado final"        value={ev.estadoSolicitud} />
+      <Row label="Estado final"        value={estadoSolicitudVisible(ev)} />
       <Row label="Acción"              value={accionDesdeEvento(ev)} />
     </>
   );
@@ -245,7 +270,7 @@ const BloqueOfertaParticular = ({ ev }) => {
       <Row label="Receptor"            value={ev.nombreFuncionarioReceptor} />
       <Row label="Respuesta receptor"  value={respuesta} />
       <Divider />
-      <Row label="Estado"              value={ev.estadoSolicitud} />
+      <Row label="Estado"              value={estadoSolicitudVisible(ev)} />
       <Row label="Acción"              value={accionDesdeEvento(ev)} />
     </>
   );
@@ -271,7 +296,7 @@ const BloqueGenerico = ({ ev }) => {
       <Row label="Rango afectado" value={fmtRango(ev.fechaInicioAfectada, ev.fechaFinAfectada)} />
       <Row label="Motivo"         value={ev.motivoSolicitud || ev.motivo} />
       <Row label="Observaciones"  value={ev.observaciones} />
-      <Row label="Estado"         value={ev.estadoSolicitud} />
+      <Row label="Estado"         value={estadoSolicitudVisible(ev)} />
       <Row label="Acción"         value={accionDesdeEvento(ev)} />
     </>
   );
@@ -455,15 +480,18 @@ const BitacoraView = ({ onBack }) => {
     setLoading(true);
     setError(null);
     eventosService.getAllDTO()
-      .then(data => setEventos((data || []).reverse()))
+      .then(data => setEventos(ordenarPorFechaDesc(Array.isArray(data) ? data : [])))
       .catch(() => setError('No se pudo cargar la bitácora.'))
       .finally(() => setLoading(false));
   }, []);
 
-  // Rango del período seleccionado
-  const mesActual = dayjs().subtract(mesOffset, 'month');
-  const semanas   = buildSemanasDelMes(mesActual.year(), mesActual.month() + 1);
-  const rango     = rangoPeriodo(mesOffset, semanaKey, semanas);
+  // Rango del período seleccionado. Se calcula solo cuando cambia el período:
+  // si se rehiciera en cada render, el filtro de abajo también se recalcularía.
+  const { mesActual, rango } = useMemo(() => {
+    const mes = dayjs().subtract(mesOffset, 'month');
+    const semanas = buildSemanasDelMes(mes.year(), mes.month() + 1);
+    return { mesActual: mes, rango: rangoPeriodo(mesOffset, semanaKey, semanas) };
+  }, [mesOffset, semanaKey]);
 
   const opcionesTipoSolicitud = [
     { value: 'Permiso',           label: 'Permiso' },
@@ -478,6 +506,7 @@ const BitacoraView = ({ onBack }) => {
     { value: 'PENDIENTE',  label: 'Pendiente' },
     { value: 'APROBADA',   label: 'Aprobada' },
     { value: 'RECHAZADA',  label: 'Rechazada' },
+    { value: 'CANCELADA',  label: 'Cancelada' },
   ];
 
   const opcionesEncargado = useMemo(() => {
@@ -491,7 +520,7 @@ const BitacoraView = ({ onBack }) => {
       // Ocultar postulaciones
       if (ev.tipoEvento === 'POSTULACION_CREADA' || ev.tipoEvento === 'POSTULACION_RETIRADA') return false;
       // Filtro por período
-      const fechaStr = ev.fechaModificacion || ev.fechaInicioAfectada;
+      const fechaStr = fechaDeEvento(ev);
       if (fechaStr) {
         const ms = dayjs(fechaStr).valueOf();
         if (ms < rango.inicio.startOf('day').valueOf()) return false;
