@@ -10,6 +10,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
@@ -20,7 +22,8 @@ import java.util.List;
  * receptor específico).
  *
  * <p>Ciclo de vida: {@link #crear} (PENDIENTE_APROBACION) → jefatura {@link #aprobar}/
- * {@link #rechazar} → si ABIERTA, otros funcionarios {@link #postular} (o
+ * {@link #rechazar}, o el ofertor la {@link #retirar retira} (RETIRADA) → si ABIERTA, otros
+ * funcionarios {@link #postular} (o
  * {@link #retirarPostulacion} mientras siga abierta) → jefatura {@link #seleccionar} un
  * postulante, lo que asigna el turno y cierra la oferta (CERRADA).
  */
@@ -55,6 +58,22 @@ public class OfertaGeneralController {
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE')")
     public ResponseEntity<OfertaGeneralEntity> rechazar(@PathVariable Long id) {
         return ResponseEntity.ok(ofertaGeneralService.rechazarOferta(id));
+    }
+
+    // C-16 (HU-OFE-01): sin @PreAuthorize porque el ofertor puede tener cualquier rol; el service
+    // exige que quien la retira sea quien la publicó.
+    @Operation(summary = "Retirar una oferta propia",
+            description = "Quien publicó la oferta la retira mientras nadie la haya abierto "
+                    + "(PENDIENTE_APROBACION). Queda RETIRADA y deja un evento en la bitácora.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Oferta retirada"),
+            @ApiResponse(responseCode = "403", description = "Quien la pide no es quien la publicó"),
+            @ApiResponse(responseCode = "404", description = "La oferta no existe"),
+            @ApiResponse(responseCode = "409", description = "La oferta ya no está pendiente de apertura")
+    })
+    @PutMapping("/{id}/retirar")
+    public ResponseEntity<OfertaGeneralEntity> retirar(@PathVariable Long id) {
+        return ResponseEntity.ok(ofertaGeneralService.retirarOferta(id));
     }
 
     @Operation(summary = "Postular a una oferta abierta",

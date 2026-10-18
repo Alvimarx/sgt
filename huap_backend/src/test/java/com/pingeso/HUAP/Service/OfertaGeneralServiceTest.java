@@ -139,14 +139,14 @@ class OfertaGeneralServiceTest {
 
     @Test
     void aprobarOferta_ofertaInexistente_lanza() {
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.empty());
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
         assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L));
     }
 
     @Test
     void aprobarOferta_estadoNoPendiente_lanzaYNoGuarda() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), ABIERTA);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
 
         actorAutenticado(9L);
         assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L));
@@ -156,7 +156,7 @@ class OfertaGeneralServiceTest {
     @Test
     void aprobarOferta_happyPath_pasaAAbierta() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), PENDIENTE_APROBACION);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
         ofertaSaveDevuelveArgumento();
 
         actorAutenticado(9L);
@@ -170,14 +170,14 @@ class OfertaGeneralServiceTest {
 
     @Test
     void rechazarOferta_ofertaInexistente_lanza() {
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.empty());
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
         assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L));
     }
 
     @Test
     void rechazarOferta_estadoNoPendiente_lanzaYNoGuarda() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), CERRADA);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
 
         actorAutenticado(9L);
         assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L));
@@ -187,7 +187,7 @@ class OfertaGeneralServiceTest {
     @Test
     void rechazarOferta_happyPath_pasaARechazada() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), PENDIENTE_APROBACION);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
         ofertaSaveDevuelveArgumento();
 
         actorAutenticado(9L);
@@ -459,7 +459,7 @@ class OfertaGeneralServiceTest {
     @Test
     void elOfertorNoAbreNiRechazaSuPropiaOferta_403() {
         OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), PENDIENTE_APROBACION);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
 
         actorAutenticado(5L); // p. ej. una jefatura que ofreció su turno
         org.springframework.security.access.AccessDeniedException ex = assertThrows(
@@ -566,5 +566,90 @@ class OfertaGeneralServiceTest {
         when(seguridadServicio.esGestionDelServicio()).thenReturn(false);
         when(seguridadServicio.esAdministrador()).thenReturn(true);
         assertEquals(5, service.findByServicio(4L).size());
+    }
+
+    @Test
+    void findByServicio_alMedico_tampocoLasRetiradasDeOtros_niLasSuyasSeLeEsconden() {
+        OfertaGeneralEntity retiradaAjena = oferta(1L, funcionario(6L), turno(1L), RETIRADA);
+        OfertaGeneralEntity retiradaPropia = oferta(2L, funcionario(5L), turno(2L), RETIRADA);
+        when(ofertaGeneralRepository.findByTurno_Servicio_IdServicio(4L)).thenReturn(List.of(retiradaAjena, retiradaPropia));
+        when(seguridadServicio.esAdministrador()).thenReturn(false);
+        when(seguridadServicio.esGestionDelServicio()).thenReturn(false);
+        actorAutenticado(5L);
+
+        assertEquals(List.of(retiradaPropia), service.findByServicio(4L));
+    }
+
+    @Test
+    void soloLaVeSuOfertor_lasRechazadasYLasRetiradas() {
+        for (OfertaGeneralEntity.EstadoOferta e : OfertaGeneralEntity.EstadoOferta.values()) {
+            assertEquals(e == RECHAZADA || e == RETIRADA, e.soloLaVeSuOfertor(), e.name());
+        }
+    }
+
+    // ============================ C-16: el ofertor retira su oferta ============================
+
+    @Test
+    void retirar_elOfertorEnPendienteDeApertura_quedaRetiradaYDejaElEvento() {
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), PENDIENTE_APROBACION);
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        ofertaSaveDevuelveArgumento();
+        actorAutenticado(5L);
+
+        OfertaGeneralEntity resultado = service.retirarOferta(1L);
+
+        assertEquals(RETIRADA, resultado.getEstado());
+        verify(bitacoraService).registrarEventoOferta("OFERTA_GENERAL_RETIRADA", 1L, 5L);
+    }
+
+    @Test
+    void retirar_quienNoLaPublico_403_aunqueSeaGestionOAdministrador() {
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), PENDIENTE_APROBACION);
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        actorAutenticado(9L); // el administrador por defecto de esta clase
+
+        org.springframework.security.access.AccessDeniedException ex = assertThrows(
+                org.springframework.security.access.AccessDeniedException.class, () -> service.retirarOferta(1L));
+        assertEquals("Solo quien publicó la oferta puede retirarla", ex.getMessage());
+        assertEquals(PENDIENTE_APROBACION, o.getEstado());
+        verify(ofertaGeneralRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService);
+    }
+
+    @Test
+    void retirar_unaOfertaQueYaNoEstaPendienteDeApertura_409() {
+        for (OfertaGeneralEntity.EstadoOferta estado : new OfertaGeneralEntity.EstadoOferta[]{ABIERTA, CERRADA, RECHAZADA, RETIRADA}) {
+            OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), estado);
+            when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+            actorAutenticado(5L);
+
+            org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                    org.springframework.web.server.ResponseStatusException.class, () -> service.retirarOferta(1L), estado.name());
+            assertEquals(409, ex.getStatusCode().value());
+            assertEquals("La oferta ya no está pendiente de apertura: no se puede retirar", ex.getReason());
+            assertEquals(estado, o.getEstado());
+        }
+        verify(ofertaGeneralRepository, never()).save(any());
+    }
+
+    @Test
+    void retirar_unaOfertaQueNoExiste_404() {
+        when(ofertaGeneralRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> service.retirarOferta(99L));
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    @Test
+    void unaOfertaRetirada_yaNoSeAbreNiSeRechaza() {
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), RETIRADA);
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        actorAutenticado(9L);
+
+        assertThrows(RuntimeException.class, () -> service.aprobarOferta(1L));
+        assertThrows(RuntimeException.class, () -> service.rechazarOferta(1L));
+        assertEquals(RETIRADA, o.getEstado());
+        verify(ofertaGeneralRepository, never()).save(any());
     }
 }

@@ -42,10 +42,25 @@ public class OfertaGeneralEntity {
     @OneToMany(mappedBy = "ofertaGeneral", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<PostulacionEntity> postulaciones = new ArrayList<>();
 
+    /**
+     * Estados de la oferta. Se guardan por nombre en la columna {@code Estado}, un enum de MySQL
+     * que debe traer los mismos valores: RETIRADA llegó con la migración V3
+     * ({@code BaseDatosMySQL/migraciones/V3__oferta_retirada.sql}).
+     */
     public enum EstadoOferta {
         PENDIENTE_APROBACION,
         ABIERTA,
         CERRADA,
-        RECHAZADA
+        RECHAZADA,
+        /** C-16: su ofertor la retiró antes de que alguien la abriera. */
+        RETIRADA;
+
+        /**
+         * C-16: una oferta rechazada o retirada, fuera de la gestión y del ADMINISTRADOR, solo la
+         * ve quien la publicó.
+         */
+        public boolean soloLaVeSuOfertor() {
+            return this == RECHAZADA || this == RETIRADA;
+        }
     }
 }

@@ -74,7 +74,7 @@ public class BitacoraController {
                     + "ofertas generales, del más reciente al más antiguo, en el formato de /bitacoras/dto. "
                     + "ADMINISTRADOR: cualquier turno. JEFATURA o SUBROGANTE: los turnos de su servicio. "
                     + "Cualquiera: el turno que tiene asignado hoy, sin las solicitudes en que no participa ni "
-                    + "las ofertas rechazadas de otros. Otro turno: 403. Turno inexistente: 404.")
+                    + "las ofertas rechazadas o retiradas de otros. Otro turno: 403. Turno inexistente: 404.")
     @GetMapping("/turno/{idTurno}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR','JEFATURA','SUBROGANTE','MEDICO')")
     public ResponseEntity<List<BitacoraResponseDTO>> getByTurno(@PathVariable Long idTurno) {

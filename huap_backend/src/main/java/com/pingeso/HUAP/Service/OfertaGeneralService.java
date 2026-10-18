@@ -15,10 +15,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 /**
  * Ofertas generales de turno: un funcionario ofrece un turno propio para que cualquiera del
@@ -26,8 +24,9 @@ import java.util.Set;
  * va dirigida a un receptor específico.
  *
  * <p>Ciclo de vida: {@link #crearOferta} (PENDIENTE_APROBACION) → {@link #aprobarOferta} o
- * {@link #rechazarOferta} → si ABIERTA, {@link #postular} / {@link #retirarPostulacion} →
- * {@link #seleccionarPostulante} asigna el turno y cierra la oferta (CERRADA).
+ * {@link #rechazarOferta}, o el ofertor la retira antes ({@link #retirarOferta}, RETIRADA) → si
+ * ABIERTA, {@link #postular} / {@link #retirarPostulacion} → {@link #seleccionarPostulante}
+ * asigna el turno y cierra la oferta (CERRADA).
  *
  * <p>Antes de asignar el turno al postulante ganador, {@link #seleccionarPostulante} valida con
  * {@link ValidadorAsignacionTurnoService} que su calendario resultante no quede con turnos
@@ -103,10 +102,14 @@ public class OfertaGeneralService {
         }
     }
 
-    /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code ABIERTA}, habilitando postulaciones. */
+    /**
+     * Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code ABIERTA}, habilitando postulaciones.
+     * Lee la oferta con lock, como {@link #retirarOferta}: si el ofertor la retira al mismo tiempo,
+     * la segunda operación ve el estado que dejó la primera y no lo pisa.
+     */
     @Transactional
     public OfertaGeneralEntity aprobarOferta(Long idOferta) {
-        OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
+        OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
 
         // SEC (H-02, High): antes cualquier autenticado podía aprobar ofertas de cualquier
@@ -125,10 +128,10 @@ public class OfertaGeneralService {
         return guardada;
     }
 
-    /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code RECHAZADA}. */
+    /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code RECHAZADA}. Lee con lock, como {@link #aprobarOferta}. */
     @Transactional
     public OfertaGeneralEntity rechazarOferta(Long idOferta) {
-        OfertaGeneralEntity oferta = ofertaGeneralRepository.findById(idOferta)
+        OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
 
         exigirMismoServicioQueOferta(oferta);
@@ -142,6 +145,33 @@ public class OfertaGeneralService {
         oferta.setEstado(OfertaGeneralEntity.EstadoOferta.RECHAZADA);
         OfertaGeneralEntity guardada = ofertaGeneralRepository.save(oferta);
         agendarBitacora("OFERTA_GENERAL_RECHAZADA", guardada.getIdOfertaGeneral(), idJefatura);
+        return guardada;
+    }
+
+    /**
+     * C-16 (HU-OFE-01): quien publicó una oferta la retira mientras nadie la haya abierto. Solo el
+     * ofertor (cualquier otra persona, también la gestión o el ADMINISTRADOR: 403) y solo en
+     * {@code PENDIENTE_APROBACION} (en otro estado: 409). Si no existe: 404. Queda
+     * {@code RETIRADA} y deja el evento {@code OFERTA_GENERAL_RETIRADA} en la bitácora.
+     */
+    @Transactional
+    public OfertaGeneralEntity retirarOferta(Long idOferta) {
+        // Con lock, igual que abrir y rechazar: un retiro y una apertura simultáneos no se pisan.
+        OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "La oferta no existe"));
+
+        Long idUsuario = seguridadServicio.idUsuarioActual();
+        if (oferta.getOfertor() == null || !Objects.equals(oferta.getOfertor().getIdFuncionario(), idUsuario)) {
+            throw new AccessDeniedException("Solo quien publicó la oferta puede retirarla");
+        }
+        if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "La oferta ya no está pendiente de apertura: no se puede retirar");
+        }
+
+        oferta.setEstado(OfertaGeneralEntity.EstadoOferta.RETIRADA);
+        OfertaGeneralEntity guardada = ofertaGeneralRepository.save(oferta);
+        agendarBitacora("OFERTA_GENERAL_RETIRADA", guardada.getIdOfertaGeneral(), idUsuario);
         return guardada;
     }
 
@@ -283,16 +313,9 @@ public class OfertaGeneralService {
     }
 
     /**
-     * C-16: estados de una oferta que, fuera de la gestión y del ADMINISTRADOR, solo ve su ofertor.
-     * Si se suma el estado RETIRADA (exige migrar la columna Estado), va aquí también.
-     */
-    private static final Set<OfertaGeneralEntity.EstadoOferta> SOLO_LAS_VE_SU_OFERTOR =
-            EnumSet.of(OfertaGeneralEntity.EstadoOferta.RECHAZADA);
-
-    /**
      * SEC (C-17): las ofertas de un servicio solo las lee ese servicio (o el ADMINISTRADOR).
-     * C-16: al médico no se le entregan las ofertas rechazadas de otras personas; las suyas, sí,
-     * para que sepa qué pasó con ellas. La gestión y el ADMINISTRADOR siguen viendo todas.
+     * C-16: al médico no se le entregan las ofertas rechazadas ni las retiradas de otras personas;
+     * las suyas, sí, para que sepa qué pasó con ellas. La gestión y el ADMINISTRADOR ven todas.
      */
     @Transactional
     public List<OfertaGeneralEntity> findByServicio(Long idServicio) {
@@ -303,7 +326,7 @@ public class OfertaGeneralService {
         }
         Long idUsuario = seguridadServicio.idUsuarioActual();
         return ofertas.stream()
-                .filter(o -> !SOLO_LAS_VE_SU_OFERTOR.contains(o.getEstado())
+                .filter(o -> o.getEstado() == null || !o.getEstado().soloLaVeSuOfertor()
                         || (o.getOfertor() != null && Objects.equals(o.getOfertor().getIdFuncionario(), idUsuario)))
                 .toList();
     }

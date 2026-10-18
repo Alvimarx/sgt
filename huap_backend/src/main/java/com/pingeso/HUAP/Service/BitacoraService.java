@@ -93,8 +93,8 @@ public class BitacoraService {
      * <p>Lo ve el ADMINISTRADOR, la gestión del servicio del turno y quien tiene hoy el turno,
      * aunque sea médico; cualquier otro recibe 403. Si el turno no existe, 404. A quien lo ve por
      * ser el dueño (el médico) se le aplican las lecturas vigentes: de las solicitudes, solo
-     * aquellas en que es emisor o receptor (C-17); de las ofertas, no las rechazadas de otros
-     * (C-16). Así no lee el motivo de la solicitud de otra persona sobre ese turno.
+     * aquellas en que es emisor o receptor (C-17); de las ofertas, no las rechazadas ni las
+     * retiradas de otros (C-16). Así no lee el motivo de la solicitud de otra persona sobre ese turno.
      */
     @Transactional(readOnly = true)
     public List<BitacoraResponseDTO> historialDelTurno(Long idTurno) {
@@ -109,7 +109,7 @@ public class BitacoraService {
         bitacoraRepository.findEventosOrigenByTurnos(List.of(idTurno))
                 .forEach(e -> eventos.putIfAbsent(e.getIdEvento(), e));
         List<String> motivosDeOfertas = ofertaGeneralRepository.findByTurnoIdInWithPostulaciones(List.of(idTurno)).stream()
-                .filter(o -> completo || o.getEstado() != OfertaGeneralEntity.EstadoOferta.RECHAZADA
+                .filter(o -> completo || o.getEstado() == null || !o.getEstado().soloLaVeSuOfertor()
                         || (o.getOfertor() != null && Objects.equals(o.getOfertor().getIdFuncionario(), idUsuario)))
                 .map(o -> PREFIJO_OFERTA + o.getIdOfertaGeneral())
                 .toList();
