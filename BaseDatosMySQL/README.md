@@ -32,5 +32,6 @@ El proyecto no usa una herramienta formal de migraciones (Flyway/Liquibase); los
 | Script | Qué agrega |
 | ------ | ---------- |
 | `migraciones/V2__planificacion_vigencia.sql` | Tabla `planificacion_ejecucion` (vigencia efectiva de una generación) y columna `Turnos.id_ejecucion` (origen inequívoco de cada turno generado). Aditivo; los turnos existentes quedan con `id_ejecucion = NULL` (origen legado). |
+| `migraciones/V3__oferta_retirada.sql` | Valor `RETIRADA` en el enum `Oferta_General.Estado`: quien publica una oferta general la retira mientras nadie la haya abierto (C-16). Aditivo e idempotente (se puede aplicar dos veces). Va antes de desplegar el backend que lo usa: Hibernate (`validate`) no revisa los valores del enum. |
 
-Nota: `despliegue/schema_gestionturnos.sql` y `desarrollo/gestionturnos/01_esquema.sql` están marcados como generados y no se editan a mano; para un ambiente **nuevo**, ejecuta el script base correspondiente y luego, en orden, los scripts de `migraciones/`.
+Nota: `despliegue/schema_gestionturnos.sql` y `desarrollo/gestionturnos/01_esquema.sql` están marcados como generados y no se editan a mano; para un ambiente **nuevo**, ejecuta el script base correspondiente y luego, en orden, los scripts de `migraciones/`. Excepción (17 oct 2026): los dos esquemas base ya traen el cambio de V3, así que sobre una instalación nueva V3 no cambia nada. `scripts/init_db.sh` (VM) y `docker-compose.local.yml` (volumen local nuevo) aplican V2 y V3 solos.

@@ -77,7 +77,7 @@ DROP TABLE IF EXISTS `Oferta_General`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `Oferta_General` (
   `ID_OFERTA_GENERAL` bigint NOT NULL AUTO_INCREMENT,
-  `Estado` enum('ABIERTA','CERRADA','PENDIENTE_APROBACION','RECHAZADA') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `Estado` enum('ABIERTA','CERRADA','PENDIENTE_APROBACION','RECHAZADA','RETIRADA') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `Fecha_creacion` datetime(6) DEFAULT NULL,
   `Motivo` text COLLATE utf8mb4_unicode_ci,
   `ID_OFERTOR` bigint DEFAULT NULL,

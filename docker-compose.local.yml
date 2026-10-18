@@ -35,6 +35,8 @@ services:
       - ./BaseDatosMySQL/desarrollo/gestionturnos/02_datos.sql:/docker-entrypoint-initdb.d/21_gestionturnos_datos.sql:ro
       # migraciones incrementales (el esquema base NO las trae)
       - ./BaseDatosMySQL/migraciones/V2__planificacion_vigencia.sql:/docker-entrypoint-initdb.d/30_V2_planificacion_vigencia.sql:ro
+      # V3 (estado RETIRADA de las ofertas): el esquema base ya la trae; es idempotente
+      - ./BaseDatosMySQL/migraciones/V3__oferta_retirada.sql:/docker-entrypoint-initdb.d/31_V3_oferta_retirada.sql:ro
       # fechas del seed desplazadas a la semana actual (turnos futuros para probar)
       - ./BaseDatosMySQL/desarrollo/gestionturnos/03_fechas_relativas.sql:/docker-entrypoint-initdb.d/40_gestionturnos_fechas_relativas.sql:ro
     healthcheck:

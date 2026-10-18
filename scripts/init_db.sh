@@ -61,6 +61,20 @@ else
   echo "==> [2/5] Migración V2 ya aplicada — omitido."
 fi
 
+# ---------- 2b. Migración V3 (estado RETIRADA de las ofertas generales) ----------
+# Es idempotente (MODIFY con la lista completa del enum), pero se aplica solo si falta:
+# el esquema de instalación nueva ya la trae, y así el ALTER no se repite en cada corrida.
+RET=$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='gestionturnos' AND table_name='Oferta_General' AND column_name='Estado' AND column_type LIKE '%RETIRADA%';")
+if [ "${RET:-0}" -eq 0 ]; then
+  echo "==> [2/5] Aplicando migración V3 (estado RETIRADA en Oferta_General)..."
+  # Igual que V2, no trae "USE gestionturnos;".
+  my gestionturnos < BaseDatosMySQL/migraciones/V3__oferta_retirada.sql
+  RET=$(q "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='gestionturnos' AND table_name='Oferta_General' AND column_name='Estado' AND column_type LIKE '%RETIRADA%';")
+  [ "${RET:-0}" -eq 1 ] || { echo "ERROR: la migración V3 no agregó RETIRADA a Oferta_General.Estado."; exit 1; }
+else
+  echo "==> [2/5] Migración V3 ya aplicada — omitido."
+fi
+
 # ---------- 3. Bootstrap (roles, servicio inicial, admin de arranque) ----------
 echo "==> [3/5] Bootstrap de catálogos y administrador (idempotente)..."
 my < BaseDatosMySQL/despliegue/bootstrap_inicial.sql
