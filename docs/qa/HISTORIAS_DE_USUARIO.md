@@ -1578,6 +1578,7 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hace hoy el códi
 - **Pregunta:** ¿Qué debe pasar en ese caso?
 - **Recomendación:** si la persona ya pertenece al servicio, no tocar el rol y avisar que ya pertenece.
 - **Decisión (17 oct):** se resuelve con C-23: si la persona ya pertenece al servicio, se avisa y no se cambia su rol.
+- **Decisión (17 oct, después de la página):** como sumar al servicio ya no cambia el rol, se agrega una acción aparte, «Quitar subrogancia», para que la jefatura del servicio o el administrador devuelvan a médico a un subrogante (`PUT /funcionarios/{id}/quitar-subrogancia?servicioId=`). Antes no había forma de hacerlo desde la interfaz.
 
 ### C-20 · 401 o 403 cuando falta permiso
 
