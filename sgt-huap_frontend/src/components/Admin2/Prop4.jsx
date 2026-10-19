@@ -11,6 +11,7 @@ import { selectService } from "../../services/authService";
 import { useLayout } from "../../layout/layout";
 import { esAdministrador } from "../../utils/roles";
 import { useSolicitudesPendientes } from "../../hooks/useSolicitudesPendientes";
+import { NOTIFICACIONES_HABILITADAS } from "../../config/funciones";
 
 //Importaciones de Comun
 import AgendaView from "../Comun/AgendaView";
@@ -77,9 +78,11 @@ const NAV_STORAGE_KEY = "sgt_nav_state";
 // C-06 (17 oct 2026): la bitácora general es solo de gestión (el backend se la
 // niega al médico). «Ver historial» del detalle del turno abre el historial de
 // ese turno en la misma vista (HistorialTurnoSheet), no esta.
+// C-09 (19 oct 2026): la bandeja («notifications») solo es una vista permitida
+// con el interruptor encendido; apagado, una vista guardada cae a «agenda».
 const VISTAS_COMUNES = [
-  "agenda", "calendar_view", "perfil", "personal_dashboard",
-  "notifications", "solicitudes",
+  "agenda", "calendar_view", "perfil", "personal_dashboard", "solicitudes",
+  ...(NOTIFICACIONES_HABILITADAS ? ["notifications"] : []),
 ];
 // C-10 (17 oct 2026): las reglas de horario son del administrador, como los
 // tipos de turno (C-01); el backend exige ADMINISTRADOR para escribirlas.
@@ -300,8 +303,14 @@ const Prop4 = ({ tweaks = {} }) => {
     setCurrentView("login");
   };
 
+  // C-09: con las notificaciones apagadas la bandeja no existe; pedirla lleva al inicio.
   const handleOpenNotifications = () => {
-    setCurrentView("notifications");
+    if (NOTIFICACIONES_HABILITADAS) {
+      setCurrentView("notifications");
+    } else {
+      setActiveTab("home");
+      setCurrentView("agenda");
+    }
   };
 
   // Modo desktop (R16/R18): el breakpoint vive en layout/layout.js. En pantallas
@@ -322,7 +331,7 @@ const Prop4 = ({ tweaks = {} }) => {
       case "inicio": setActiveTab("home"); setCurrentView("agenda"); return;
       case "calendario": setCalendarReturn("agenda"); setActiveTab("calendar"); setCurrentView("calendar_view"); return;
       case "solicitudes": setSolicitudesReturn("agenda"); setSolicitudesCreatePreset(null); setActiveTab("requests"); setCurrentView("solicitudes"); return;
-      case "notificaciones": setCurrentView("notifications"); return;
+      case "notificaciones": handleOpenNotifications(); return;
       case "mi_dashboard": setCurrentView("personal_dashboard"); return;
       case "perfil": setActiveTab("me"); setCurrentView("perfil"); return;
       case "asignacion_turnos": setCalendarReturn(panel); setCurrentView("calendar_view"); return;

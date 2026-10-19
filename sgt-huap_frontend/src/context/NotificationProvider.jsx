@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import NotificationContext from "./NotificationContext";
 import { useAuth } from "./AuthContext";
+import { NOTIFICACIONES_HABILITADAS } from "../config/funciones";
 import {
   eliminarNotificacion,
   getNotificacionesSinLeer,
@@ -16,7 +17,7 @@ export function NotificationProvider({ children }) {
   const userId = user?.userId || localStorage.getItem("userId");
   // Obtener número de notificaciones no leídas
   const fetchUnreadCount = async () => {
-    if (!userId) return;
+    if (!NOTIFICACIONES_HABILITADAS || !userId) return;
 
     const result = await getNotificacionesSinLeer(userId);
     setUnreadCount(result.success ? result.data : 0);
@@ -24,7 +25,7 @@ export function NotificationProvider({ children }) {
 
   // Obtener lista de notificaciones
   const fetchNotifications = async () => {
-    if (!userId) return;
+    if (!NOTIFICACIONES_HABILITADAS || !userId) return;
 
     const result = await getNotificacionesUsuario(userId);
     if (!result.success) {
@@ -83,8 +84,9 @@ export function NotificationProvider({ children }) {
   };
 
   useEffect(() => {
-    // Solo intentar si tenemos un userId concreto
-    if (!userId) return;
+    // Solo intentar si tenemos un userId concreto. Con las notificaciones
+    // apagadas (C-09) no hay consulta, ni polling, ni escucha de visibilidad.
+    if (!NOTIFICACIONES_HABILITADAS || !userId) return;
     fetchNotifications();
     fetchUnreadCount();
 

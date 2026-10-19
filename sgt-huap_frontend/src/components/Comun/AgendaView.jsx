@@ -17,6 +17,7 @@ import {
   TopHeader,
 } from "../Style/UIPrimitives";
 import { useNotifications } from "../../context/NotificationContext";
+import { NOTIFICACIONES_HABILITADAS } from "../../config/funciones";
 import { puedeTomarCupo } from "../../utils/reglasTurno";
 import { esAdministrador } from "../../utils/roles";
 
@@ -137,7 +138,8 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
       });
     }
 
-    if (unreadCount > 0) {
+    // C-09 (19 oct 2026): el aviso de la bandeja depende del interruptor.
+    if (NOTIFICACIONES_HABILITADAS && unreadCount > 0) {
       items.push({
         id: "notificaciones-sin-leer",
         tipo: "notificacion",
@@ -346,7 +348,9 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
         }
         rightSlot={
           <div className="agenda-header-actions">
-            <IconBtn icon="tray" badge={unreadCount} onClick={onOpenNotifications} aria-label={`Notificaciones${unreadCount > 0 ? `, ${unreadCount} sin leer` : ""}`} />
+            {NOTIFICACIONES_HABILITADAS && (
+              <IconBtn icon="tray" badge={unreadCount} onClick={onOpenNotifications} aria-label={`Notificaciones${unreadCount > 0 ? `, ${unreadCount} sin leer` : ""}`} />
+            )}
             <button
               className="logout-button"
               onClick={onLogout}

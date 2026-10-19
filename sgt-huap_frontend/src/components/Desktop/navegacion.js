@@ -7,6 +7,7 @@
 // nada que el móvil no ofrezca.
 
 import { esAdministrador } from '../../utils/roles';
+import { NOTIFICACIONES_HABILITADAS } from '../../config/funciones';
 
 export const permisosDe = (user) => {
   const admin = esAdministrador(user);
@@ -31,7 +32,10 @@ export const ITEMS_DESKTOP = [
   { id: 'inicio', grupo: 'Turnos', etiqueta: 'Centro de turnos', icono: 'home' },
   { id: 'calendario', grupo: 'Turnos', etiqueta: 'Calendario', icono: 'calendar' },
   { id: 'solicitudes', grupo: 'Turnos', etiqueta: 'Solicitudes', icono: 'swap', badge: 'solicitudes' },
-  { id: 'notificaciones', grupo: 'Turnos', etiqueta: 'Notificaciones', icono: 'bell', badge: 'notificaciones' },
+  // C-09 (19 oct 2026): sin el interruptor no hay ítem ni contador de la bandeja.
+  ...(NOTIFICACIONES_HABILITADAS
+    ? [{ id: 'notificaciones', grupo: 'Turnos', etiqueta: 'Notificaciones', icono: 'bell', badge: 'notificaciones' }]
+    : []),
 
   { id: 'asignacion_turnos', grupo: 'Gestión del servicio', etiqueta: 'Asignación de turnos', icono: 'users', permiso: 'gestion' },
   { id: 'personal_servicio', grupo: 'Gestión del servicio', etiqueta: 'Personal del servicio', icono: 'stethoscope', permiso: 'jefatura' },
@@ -65,7 +69,7 @@ export const itemsParaUsuario = (user) => {
 const VISTA_A_ITEM = {
   agenda: 'inicio',
   solicitudes: 'solicitudes',
-  notifications: 'notificaciones',
+  ...(NOTIFICACIONES_HABILITADAS ? { notifications: 'notificaciones' } : {}),
   personal_dashboard: 'mi_dashboard',
   perfil: 'perfil',
   funcionarios_servicio_jefatura: 'personal_servicio',
