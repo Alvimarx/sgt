@@ -207,12 +207,13 @@ test('HU-PAN-03 · criterio 1: Mi Perfil del médico muestra solo «Mi Dashboard
   expect(await herramientasVisibles(page)).toEqual(['Mi Dashboard']);
 });
 
-test('HU-PAN-03 · criterio 2: el menú desktop del médico tiene solo Turnos y Mi cuenta (6 ítems)', async ({ page }, testInfo) => {
+test('HU-PAN-03 · criterio 2: el menú desktop del médico tiene solo Turnos y Mi cuenta (5 ítems, sin «Notificaciones»)', async ({ page }, testInfo) => {
   test.skip(esMovil(testInfo), 'El menú lateral existe solo en desktop.');
   await entrar(page, 'medico');
   const nav = menuLateral(page).getByRole('navigation');
   await expect(nav.locator('.sgt-desktop__grupo')).toHaveText(['Turnos', 'Mi cuenta']);
-  await expect(nav.getByRole('button')).toHaveText([/^Centro de turnos/, /^Calendario/, /^Solicitudes/, /^Notificaciones/, /^Mi dashboard/, /^Perfil/]);
+  // C-09 (19 oct): la bandeja está oculta para la entrega, así que el menú no trae «Notificaciones».
+  await expect(nav.getByRole('button')).toHaveText([/^Centro de turnos/, /^Calendario/, /^Solicitudes/, /^Mi dashboard/, /^Perfil/]);
 });
 
 test('HU-PAN-03 · criterio 3: forzar «jefatura», «admin» o «puestos» lleva al inicio', async ({ page }) => {
@@ -353,13 +354,14 @@ test('HU-DSH-01 · criterio 2: turnos, horas, días con y sin turno del período
     const conTurno = new Set(turnos.map((t) => t.diaInicioTurno)).size;
     return {
       Turnos: String(turnos.length),
-      'Horas trabajadas': `${Math.round(turnos.reduce((a, t) => a + horasDe(t), 0))}h`,
+      // P-01 (17 oct): el KPI se llama «Horas programadas» (antes, «Horas trabajadas»).
+      'Horas programadas': `${Math.round(turnos.reduce((a, t) => a + horasDe(t), 0))}h`,
       'Días con turno': String(conTurno),
       'Días sin turno': String(dias - conTurno),
     };
   };
   const leer = async () => Object.fromEntries(await Promise.all(
-    ['Turnos', 'Horas trabajadas', 'Días con turno', 'Días sin turno'].map(async (k) => [k, await kpi(page, testInfo, k)]),
+    ['Turnos', 'Horas programadas', 'Días con turno', 'Días sin turno'].map(async (k) => [k, await kpi(page, testInfo, k)]),
   ));
 
   await expect.poll(leer, { message: 'mes completo' }).toEqual(esperado(delMes, diasDelMes(anio, mes)));

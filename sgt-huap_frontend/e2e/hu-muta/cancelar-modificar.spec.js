@@ -3,6 +3,8 @@
 // deshacen en la misma prueba, en móvil y en desktop.
 //  - HU-SOL-11 (cancelar, R15): criterios 1 a 6. El 6 («ya resuelta») es por API
 //    y corre una vez, en desktop; la parte «solicitud ajena» la cubre la fase 2a.
+//    El 5 se prueba también en móvil: desde P-01 (17 oct) la tarjeta móvil oculta
+//    Aprobar y Rechazar a quien participa, como la desktop.
 //  - HU-SOL-12 (modificar el motivo): criterios 1 a 3 por la interfaz y, por API,
 //    la excepción del administrador del criterio 4 (el resto del 4 es de la 2a).
 //
@@ -20,7 +22,8 @@ import {
 import { inicioDe, choquesR13 } from '../helpers/datos.js';
 
 const CANCELADA_POR = 'Cancelada por el solicitante · motivo original: ';
-const NO_SE_PUDO_GUARDAR = 'No se pudo guardar. Intentá de nuevo.';
+// Lo que responde el backend al motivo de una solicitud que ya no está pendiente (SolicitudService.modificarMotivo).
+const SOLO_PENDIENTE = 'Solo se puede modificar el motivo si la solicitud está en estado PENDIENTE';
 
 // Chip del estado de una solicitud leída con leerSolicitud, y si tiene el tono
 // neutro: en desktop, sin clase de tono; en móvil, los colores de SGTBadge neutral.
@@ -104,7 +107,9 @@ testMuta('HU-SOL-11 · criterio 3: al confirmar queda CANCELADA (neutra), con el
   expect((await muta.cancelar('medico', otra.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
-testMuta('HU-SOL-11 · criterio 4: la bitácora registra «Cancelada por el solicitante» y el filtro por estado RECHAZADA la incluye', async ({ page, request, muta }, testInfo) => {
+testMuta('HU-SOL-11 · criterio 4: la bitácora registra «Cancelada por el solicitante» y la muestra como CANCELADA, con su propio filtro', async ({ page, request, muta }, testInfo) => {
+  // P-01 (17 oct): la bitácora muestra la cancelación como CANCELADA y el filtro por
+  // estado suma «Cancelada» («Rechazada» ya no la incluye). En la base sigue RECHAZADA.
   const { sol, motivo } = await coberturaPorApi(request, muta, 'medico', 'HU-SOL-11 · criterio 4');
   expect((await muta.cancelar('medico', sol.idSolicitud)).status, 'cancelar').toBe(200);
 
@@ -116,18 +121,18 @@ testMuta('HU-SOL-11 · criterio 4: la bitácora registra «Cancelada por el soli
 
   await entrar(page, 'jefatura');
   await abrirBitacora(page, testInfo);
-  await filtrarBitacoraPorEstado(page, testInfo, { valor: 'RECHAZADA', texto: 'Rechazada' });
-  // Es el último evento en llegar: la vista lo muestra primero.
+  await filtrarBitacoraPorEstado(page, testInfo, { valor: 'CANCELADA', texto: 'Cancelada' });
+  // Es el evento más reciente: la vista lo muestra primero.
   if (esDesktop(testInfo)) {
     const fila = page.locator('table[aria-label="Registros de la bitácora"] tbody tr').first();
-    await expect(fila).toContainText('RECHAZADA');
+    await expect(fila).toContainText('CANCELADA');
     await fila.click();
     const panel = page.getByRole('dialog', { name: 'Detalle del evento' });
     await expect(panel).toContainText(`${CANCELADA_POR}${motivo}`);
     await expect(panel).toContainText('Cancelación por el solicitante');
   } else {
     const item = page.locator('.sgt-list-row').first();
-    await expect(item).toContainText('RECHAZADA');
+    await expect(item).toContainText('CANCELADA');
     await item.locator('> div').first().click();
     await expect(item).toContainText(`${CANCELADA_POR}${motivo}`);
     await expect(item).toContainText('Cancelación por el solicitante');
@@ -149,12 +154,9 @@ testMuta('HU-SOL-11 · criterio 5: la jefatura cancela una solicitud propia aunq
   const vista = await leerSolicitud(page, testInfo, motivo);
   expect(vista.estado).toBe('PENDIENTE');
   expect(vista.botones).toContain('Cancelar solicitud');
-  if (esDesktop(testInfo)) {
-    expect(vista.botones.filter((b) => /^(Aprobar|Rechazar)$/.test(b)), 'no puede decidirla').toEqual([]);
-    expect(vista.notas).toContain('Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.');
-  } else {
-    testInfo.annotations.push({ type: 'fase 4', description: 'En móvil la tarjeta sí ofrece Aprobar y Rechazar; que no pueda decidirla lo garantiza el backend al aprobar o rechazar (HU-SOL-09, criterio 6).' });
-  }
+  // P-01 (17 oct): igual en móvil y desktop, sin Aprobar ni Rechazar y con la nota.
+  expect(vista.botones.filter((b) => /^(Aprobar|Rechazar)$/.test(b)), 'no puede decidirla').toEqual([]);
+  await expect(vista.zona).toContainText('Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.');
 
   const { dialogo } = await abrirCancelacion(page, testInfo, vista);
   expect((await confirmarCancelacion(page, dialogo)).status(), 'PUT /cancelar').toBe(200);
@@ -246,9 +248,11 @@ testMuta('HU-SOL-12 · criterio 2: «Guardar cambios» se deshabilita sin texto 
   expect((await muta.cancelar('medico', sol.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
-testMuta('HU-SOL-12 · criterio 3: si no se puede guardar, veo «No se pudo guardar. Intentá de nuevo.»', async ({ page, request, muta }, testInfo) => {
+testMuta('HU-SOL-12 · criterio 3: si no se puede guardar, veo el mensaje del backend y el panel sigue abierto', async ({ page, request, muta }, testInfo) => {
   // Falla real: mientras el panel está abierto, la solicitud deja de estar
-  // pendiente (se cancela por API) y el backend rechaza el cambio con 400.
+  // pendiente (se cancela por API) y el backend rechaza el cambio con 400. Desde
+  // P-01 (17 oct) el aviso dice el motivo del backend; antes era genérico («No se
+  // pudo guardar. Intentá de nuevo.»), que queda solo si el backend no da uno.
   const { sol, motivo } = await coberturaPorApi(request, muta, 'medico', 'HU-SOL-12 · criterio 3');
   await entrar(page, 'medico');
   await abrirSolicitudes(page, testInfo);
@@ -260,8 +264,10 @@ testMuta('HU-SOL-12 · criterio 3: si no se puede guardar, veo «No se pudo guar
   await hoja.getByRole('button', { name: 'Guardar cambios' }).click();
   const r = await respuesta;
   expect(r.status(), 'PATCH /motivo de una solicitud ya resuelta').toBe(400);
-  const aviso = esDesktop(testInfo) ? hoja.getByRole('alert') : hoja.getByText(NO_SE_PUDO_GUARDAR, { exact: true });
-  await expect(aviso).toHaveText(NO_SE_PUDO_GUARDAR);
+  const mensaje = (await r.json()).error;
+  expect(mensaje).toBe(SOLO_PENDIENTE);
+  const aviso = esDesktop(testInfo) ? hoja.getByRole('alert') : hoja.getByText(SOLO_PENDIENTE, { exact: true });
+  await expect(aviso).toHaveText(SOLO_PENDIENTE);
   await expect(hoja.locator('textarea'), 'el panel sigue abierto').toBeVisible();
   expect((await estadoSolicitud(request, 'medico', sol.idSolicitud)).motivo, 'el motivo no cambió').toBe(`${CANCELADA_POR}${motivo}`);
 });

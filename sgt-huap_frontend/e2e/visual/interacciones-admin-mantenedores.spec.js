@@ -260,21 +260,8 @@ test('reglas: nueva con validación, editar y eliminar cancelados', async ({ pag
   await expect(page.getByText('Eliminar regla', { exact: true })).toBeHidden();
 });
 
-// ── Reglas de horario (jefatura de Urgencias y subrogante de Enfermería) ─────
-for (const rol of ['jefatura', 'subrogante']) {
-  test(`reglas (${rol}): formulario de nueva regla cancelado`, async ({ page }) => {
-    await iniciarSesion(page, rol);
-    await irAVista(page, 'reglas');
-    await page.getByRole('button', { name: 'Nueva regla' }).click();
-    await page.getByPlaceholder('Ej.: Ajuste mañana finde/feriado').fill('Regla de prueba');
-    await esperarPanel(page);
-    await foto(page, `reglas-${rol}-nueva`);
-    await page.getByRole('button', { name: 'Cancelar' }).click();
-    // El formulario se cierra (en desktop vuelve el panel de horarios base).
-    await expect.poll(() => page.getByPlaceholder('Ej.: Ajuste mañana finde/feriado')
-      .evaluateAll((campos) => campos.map((c) => c.value))).not.toContain('Regla de prueba');
-  });
-}
+// Reglas de horario (jefatura de Urgencias y subrogante de Enfermería): retiradas. Desde C-10 (17 oct) son solo del
+// administrador y la vista `reglas` ya no les corresponde (cae al inicio): lo guarda hu/gestion.spec.js (HU-REG-02).
 
 // ── Después de guardar, con el backend simulado (solo desktop) ───────────────
 // Estados que solo aparecen tras guardar. Después de iniciar sesión, toda
@@ -307,7 +294,12 @@ test('tipos de turno: guardado sin conexión, el error se ve dentro del panel', 
   }
 });
 
-test('jerarquía: tras designar, la jerarquía actual avisa que no la incluye', async ({ page }, testInfo) => {
+// P-01 (17 oct): después de designar, la vista vuelve a pedir el personal para
+// que la jerarquía actual muestre lo designado, y el servicio queda elegido. Se
+// retiró el aviso «Muestra la jerarquía como estaba al abrir esta pantalla».
+// La escritura se responde en el navegador, así que la recarga trae lo mismo
+// que había: aquí se comprueba que se pide, no lo que trae.
+test('jerarquía: tras designar, el servicio queda elegido y la jerarquía actual se vuelve a pedir', async ({ page }, testInfo) => {
   test.skip(!enDesktop(testInfo), 'la jerarquía actual es del layout desktop');
   await iniciarSesion(page, 'admin');
   await irAVista(page, 'jerarquia');
@@ -323,15 +315,17 @@ test('jerarquía: tras designar, la jerarquía actual avisa que no la incluye', 
   await page.getByRole('radio', { name: /^Subrogante/ }).click();
   await page.getByRole('button', { name: 'Designar Autoridad' }).click();
   await esperarDialogo(page, 'Confirmar jerarquía');
+  const recarga = page.waitForRequest((req) => req.method() === 'GET' && /\/funcionarios\/summary/.test(req.url()));
   await page.getByRole('button', { name: 'Confirmar' }).click();
   await expect(page.getByText('Jerarquía designada con éxito.')).toBeVisible();
   expect(escrituras, 'la designación se respondió en el navegador').toBe(1);
+  await recarga;
 
-  // El formulario se limpia. Se descarta el mensaje (se iría solo a los 5 s):
-  // el aviso no depende de él y aparece al volver a elegir el servicio.
+  // Se descarta el mensaje (se iría solo a los 5 s) para la foto.
   await page.getByRole('button', { name: 'Descartar mensaje' }).click();
-  await page.locator('#select-servicio').selectOption({ label: 'Cirugía' });
-  await expect(page.getByText(/Muestra la jerarquía como estaba al abrir esta pantalla/)).toBeVisible();
+  await expect(page.locator('#select-servicio option:checked')).toHaveText('Cirugía');
+  await expect(page.getByText(/Muestra la jerarquía como estaba al abrir esta pantalla/)).toHaveCount(0);
+  await esperarQuieta(page);
   await page.waitForTimeout(250);
   await foto(page, 'jerarquia-tras-designar');
 });

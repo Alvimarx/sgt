@@ -27,8 +27,11 @@ test.beforeEach(async ({ page }) => {
 
 // Vistas de Prop4 (currentView) por rol. `returns` reproduce desde dónde se
 // llegó cuando la vista cambia según el origen (calendario en modo gestión).
-const COMUNES = ['agenda', 'calendar_view', 'perfil', 'personal_dashboard', 'notifications', 'solicitudes', 'bitacora'];
-const GESTION = ['admin_stats', 'puestos', 'auditoria', 'reglas'];
+// Sin `notifications`: C-09 (19 oct 2026) oculta la bandeja y la vista cae al inicio.
+const COMUNES = ['agenda', 'calendar_view', 'perfil', 'personal_dashboard', 'solicitudes'];
+// La bitácora general es solo de la gestión (C-06, 17 oct: el médico ya no llega a ella). Las reglas de
+// horario son solo del administrador (C-10, 17 oct), así que van aparte, solo en su recorrido.
+const GESTION = ['bitacora', 'admin_stats', 'puestos', 'auditoria'];
 
 const RECORRIDO = {
   medico: [...COMUNES],
@@ -47,7 +50,7 @@ const RECORRIDO = {
   admin: [
     ...COMUNES,
     'admin', 'funcionarios_sistema', 'planificacion', 'servicios', 'asignacion', 'jerarquia', 'tipos_turno', 'plantillas',
-    ...GESTION,
+    ...GESTION, 'reglas',
     { view: 'calendar_view', nombre: 'calendar_view-gestion', returns: { calendar: 'admin' } },
   ],
 };
@@ -62,6 +65,10 @@ for (const [rol, vistas] of Object.entries(RECORRIDO)) {
     await iniciarSesion(page, rol);
     for (const { view, nombre, returns } of items) {
       await irAVista(page, view, { returns });
+      // C-20 (17 oct): un 403 muestra «No tienes permiso…» durante 4,5 s (hoy,
+      // la bitácora del médico). La foto se toma cuando se fue, para que no
+      // dependa del momento; la vista sigue mostrando su propio error.
+      await expect(page.getByText('No tienes permiso para realizar esta acción.')).toBeHidden({ timeout: 10_000 });
       await expect.soft(page, `${rol} · ${nombre}`).toHaveScreenshot(`${rol}-${nombre}.png`);
     }
   });

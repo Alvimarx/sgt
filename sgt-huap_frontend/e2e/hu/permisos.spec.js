@@ -1,23 +1,29 @@
-// Negativos de permiso que niega el controller, fase 2a del catálogo
-// docs/qa/HISTORIAS_DE_USUARIO.md (§6.2). Hoy responden 403 o 400 sin cerrar la
-// sesión: no pasan por el filtro de seguridad, así que BUG-001 (C-20) no los toca.
-//  - Por API, una vez y en el proyecto desktop: AUT-02 (criterio 6), CAL-08 (4),
-//    NOT-01 (5), PER-01 (4), SOL-08 (4), SOL-11 (6, solicitud ajena), SOL-12 (4),
-//    OFE-02 (2 y 3), ASG-02 (5) y la mitad «otro servicio» de SOL-09 (8). Las dos
-//    últimas que se sumaron (OFE-02, criterio 2, y SOL-09, criterio 8) son de la
-//    fase 4: caben aquí porque el backend las niega antes de escribir.
-//  - Por la interfaz, en móvil y en desktop: AUT-07 (criterio 3) y la parte de
-//    OFE-02 (criterio 3) que se ve en pantalla.
-//  - Omitida: JER-02 (criterio 2). Hoy el backend lo permite y la prueba
-//    cambiaría el rol de una persona (C-03).
+// Negativos de permiso, fases 2a y 2b del catálogo docs/qa/HISTORIAS_DE_USUARIO.md
+// (§6.2).
+//  - 2a, lo que niega el controller o el service: responde 403 o 400 sin cerrar la
+//    sesión.
+//    · Por API, una vez y en el proyecto desktop: AUT-02 (criterio 6), CAL-08 (4),
+//      NOT-01 (5), PER-01 (4), SOL-08 (4), SOL-11 (6, solicitud ajena), SOL-12 (4),
+//      OFE-02 (2 y 3), ASG-02 (5), DET-04 (2, el permiso del historial del turno), JER-02 (2) y
+//      la mitad «otro servicio» de SOL-09 (8).
+//      Las dos que se sumaron después (OFE-02, criterio 2, y SOL-09, criterio 8) son de
+//      la fase 4: caben aquí porque el backend las niega antes de escribir.
+//    · Por la interfaz, en móvil y en desktop: AUT-07 (criterio 3, con el 403
+//      simulado) y la parte de OFE-02 (criterio 3) que se ve en pantalla.
+//  - 2b, lo que niega el filtro de seguridad (SecurityConfig), al final del archivo:
+//    AUT-07 (criterio 4), ASG-05 (2), SOL-09 (8, el médico), PUE-01 (5), ADM-02 (4),
+//    ADM-06 (4) y, de C-10, REG-02. Desde C-20 (17 oct) el filtro responde 403, ya no 401, y no cierra
+//    la sesión; antes de eso la fila pedía entrar de nuevo en cada caso (BUG-001).
+//  - JER-02 (criterio 2) ya no muta: desde C-03 (17 oct) el backend lo niega antes de
+//    escribir.
 //
 // No muta la base. Cada escritura (PUT, PATCH o POST) va a una ruta que el
 // backend niega HOY antes de guardar, confirmado en el código (cada prueba cita
 // dónde), y antes de mandarla la prueba comprueba por lectura que los datos son
 // los que supone. Donde se pudo, el dato tiene una segunda red: si el permiso
 // fallara, otra regla también frenaría la escritura antes de guardar (la oferta
-// 1 no está pendiente de apertura; el médico 369 no es de Enfermería). Si una
-// escritura respondiera 2xx, la base cambió: restaurarla.
+// 1 no está pendiente de apertura; el médico 369 no es de Enfermería; en la 2b, el
+// recurso no existe). Si una escritura respondiera 2xx, la base cambió: restaurarla.
 //
 // Datos del seed de Urgencias, ninguno del médico 369: las solicitudes 14
 // (APROBADA, botar turno), 15 (PENDIENTE, cobertura), 16 (intercambio), 17
@@ -25,18 +31,21 @@
 // (ABIERTA), 2 (CERRADA) y 3 (RECHAZADA) y, de Enfermería, un cupo libre. Las
 // personas van por id; los listados con nombres solo se cuentan.
 import {
-  test, expect, fallaConocida, ID, SERVICIO, APOYO, USUARIOS, esDesktop, soloPorApi, hoyChile, mesDe, anioDe,
-  loginApi, apiGet, tokenRol, apiLlamar, solicitudesDeUrgencias, entrar, irA, vistaActual, menuLateral,
-  abrirSolicitudes, elegirPestana, leerLista,
+  test, expect, ID, SERVICIO, APOYO, USUARIOS, esDesktop, soloPorApi, hoyChile, mesDe, anioDe,
+  loginApi, apiGet, tokenRol, apiLlamar, solicitudesDeUrgencias, entrar, vistaActual, menuLateral,
+  itemMenu, barraInferior, abrirSolicitudes, elegirPestana, leerLista,
 } from '../helpers/hu.js';
 import { ofertaSimulada, participantesSolicitud } from '../helpers/datos.js';
 
 const URGENCIAS = { idServicio: SERVICIO.urgencias, nombre: 'Urgencias' };
 const OTRO_SERVICIO = 'No tienes acceso a datos de otro servicio';
+// Lo que responde el backend al que tiene sesión pero no el rol (JwtAccessDeniedHandler) o el permiso (GlobalExceptionHandler).
+const SIN_PERMISO = 'No tienes permiso para realizar esta acción';
 const SOL = { aprobada: 14, pendiente: 15, intercambio: 16, ofertaParticular: 17, rechazada: 18 };
 const OFERTA_ABIERTA = 1;
 const OFERTAS_RESUELTAS = { 2: 'CERRADA', 3: 'RECHAZADA' };
 const MOTIVO_PRUEBA = 'Prueba E2E fase 2a: el backend debe negarlo';
+const MOTIVO_2B = 'Prueba E2E fase 2b: el filtro de seguridad debe negarlo';
 
 // Precondición de toda escritura que debe ser negada: la solicitud está en el
 // seed, con el estado y el tipo que la prueba supone, y el médico no participa.
@@ -72,18 +81,23 @@ test('HU-AUT-02 · criterio 6: select-service con un servicio que no es mío res
 // HU-AUT-07 · Sesión vencida y acciones sin permiso
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('HU-AUT-07 · criterio 3: ante un 403 (el médico abre la bitácora) sigo dentro y la vista muestra su error', async ({ page, api }, testInfo) => {
+test('HU-AUT-07 · criterio 3: ante un 403 sigo dentro, veo el aviso «No tienes permiso…» y la vista muestra su error (403 simulado)', async ({ page, api }, testInfo) => {
   await entrar(page, 'medico');
-  // BitacoraController.getAllDTO exige rol de gestión con @PreAuthorize: la negación es
-  // dentro del controller y GlobalExceptionHandler responde 403. La bitácora está entre
-  // las vistas comunes (C-06): el médico llega con «Ver historial» o al refrescar ahí.
-  const respuesta = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/v2/bitacoras/dto');
-  await irA(page, 'bitacora');
-  expect((await respuesta).status(), 'GET /bitacoras/dto con el token del médico').toBe(403);
-  await expect(page.getByText('No se pudo cargar la bitácora.', { exact: true })).toBeVisible();
+  // El 403 real que daba la bitácora general ya no se alcanza: desde C-06 (17 oct) el médico no llega a esa
+  // vista (el menú no la ofrece y una vista guardada o forzada cae al inicio) y su historial del turno sí le
+  // responde. El 403 se simula en otra lectura, la del calendario, con la respuesta del backend
+  // (JwtAccessDeniedHandler y GlobalExceptionHandler: {"error": "No tienes permiso para realizar esta acción"}).
+  await page.route(/\/api\/v2\/turnos\/servicio\/4\/calendario\/\d+\/\d+$/, (route) => route.fulfill({
+    status: 403, json: { error: SIN_PERMISO },
+  }));
+  if (esDesktop(testInfo)) await itemMenu(page, 'Calendario').click();
+  else await barraInferior(page, 'Calendario').click();
+  await expect(page.getByText('No se pudieron cargar los turnos del mes. Intenta de nuevo.', { exact: true })).toBeVisible();
+  // C-20 (17 oct): el 403 muestra un aviso unos segundos; la vista conserva su propio error.
+  await expect(page.getByRole('status').filter({ hasText: `${SIN_PERMISO}.` })).toBeVisible();
 
   // Sigo dentro: la misma vista, el JWT en su lugar, sin login, y la API me sigue respondiendo.
-  expect(await vistaActual(page)).toBe('bitacora');
+  expect(await vistaActual(page)).toBe('calendar_view');
   expect(await page.evaluate(() => localStorage.getItem('jwt_token')), 'la sesión sigue guardada').toBeTruthy();
   await expect(page.getByPlaceholder('Ej: 12.345.678-9')).toHaveCount(0);
   if (esDesktop(testInfo)) await expect(menuLateral(page)).toBeVisible();
@@ -372,16 +386,185 @@ test('HU-ASG-02 · criterio 5: asignar en un cupo de otro servicio se rechaza co
 
 test('HU-ASG-02 · criterio 5: un turno de otro servicio responde 403', async ({ request }, testInfo) => {
   soloPorApi(testInfo);
+  // C-20 (17 oct): TurnoController.alterarTurno deja pasar la AccessDeniedException de SeguridadServicio
+  // (antes la capturaba con toda RuntimeException y respondía 400).
   const cupo = await cupoDeEnfermeria(request);
-  fallaConocida('§5.1 y §6.3: TurnoController.alterarTurno (:145) captura toda RuntimeException, también la AccessDeniedException de SeguridadServicio, y responde 400.');
   const r = await asignarEnOtroServicio(request, cupo);
-  expect(r.status).toBe(403);
+  expect([r.status, r.cuerpo?.error]).toEqual([403, OTRO_SERVICIO]);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HU-DET-04 · Ver el historial desde el detalle (permiso de GET /bitacoras/turno/{id})
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('HU-DET-04 · criterio 2: el médico lee el historial del turno que tiene; el de un cupo o el de un turno ajeno responde 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // BitacoraService.historialDelTurno (C-06, 17 oct): la gestión lo lee en los turnos de su servicio, también en un cupo;
+  // el médico, solo en el turno que tiene hoy («Solo puedes ver el historial de tus turnos»). La bitácora general sigue
+  // siendo solo de gestión. Solo GET.
+  const medico = await tokenRol(request, 'medico');
+  const hoy = hoyChile();
+  const turnos = (await apiGet(request, medico, `/turnos/servicio/${SERVICIO.urgencias}`)).filter((t) => t.diaInicioTurno > hoy);
+  const suyo = turnos.find((t) => t.idFuncionario === ID.medico);
+  const ajeno = turnos.find((t) => t.idFuncionario != null && t.idFuncionario !== ID.medico);
+  const cupo = turnos.find((t) => t.idFuncionario == null);
+  expect(suyo && ajeno && cupo, 'hay un turno del médico, uno ajeno y un cupo, de hoy en adelante').toBeTruthy();
+
+  const propio = await apiLlamar(request, medico, 'GET', `/bitacoras/turno/${suyo.id}`);
+  expect(propio.status, 'su turno').toBe(200);
+  expect(Array.isArray(propio.cuerpo), 'una lista de eventos').toBe(true);
+  for (const [t, que] of [[ajeno, 'un turno ajeno'], [cupo, 'un cupo']]) {
+    const r = await apiLlamar(request, medico, 'GET', `/bitacoras/turno/${t.id}`);
+    expect([r.status, r.cuerpo?.error], que).toEqual([403, 'Solo puedes ver el historial de tus turnos']);
+  }
+  expect((await apiLlamar(request, medico, 'GET', '/bitacoras/dto')).status, 'la bitácora general sigue siendo de gestión').toBe(403);
+
+  // Control: la jefatura lo lee en los tres.
+  const jefatura = await tokenRol(request, 'jefatura');
+  for (const [t, que] of [[suyo, 'el turno del médico'], [ajeno, 'un turno ajeno'], [cupo, 'un cupo']]) {
+    expect((await apiLlamar(request, jefatura, 'GET', `/bitacoras/turno/${t.id}`)).status, `jefatura: ${que}`).toBe(200);
+  }
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
 // HU-JER-02 · El subrogante no designa jerarquía
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('HU-JER-02 · criterio 2: el subrogante que cambia el rol de una persona de Enfermería por API recibe 403', async () => {
-  test.skip(true, 'C-03: hoy el backend lo permite (FuncionarioController.update trata al SUBROGANTE como gestión del servicio) y la prueba cambiaría el rol de esa persona: muta la base. Correr después del arreglo o en la fase 5, con restauración.');
+test('HU-JER-02 · criterio 2: el subrogante que cambia el rol de una persona de Enfermería por API recibe 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // FuncionarioController.update (C-03, 17 oct): al subrogante que manda «rol» o «servicioId» lo niega con 403 al
+  // comienzo, antes de tocar a nadie, también sobre su propio registro. Va primero con él mismo, que ya es
+  // SUBROGANTE de Enfermería: si faltara la negación, pedir su propio rol no cambiaría nada; recién después, con
+  // otra persona del servicio (un médico de Enfermería, rol 3 → pediría el 2).
+  const token = await tokenRol(request, 'subrogante');
+  const personal = await apiGet(request, token, `/funcionarios/summary?servicioId=${SERVICIO.enfermeria}`);
+  const rolEn = (f) => f?.servicios?.find((x) => x.idServicio === SERVICIO.enfermeria)?.rolServicioNombre;
+  expect(rolEn(personal.find((f) => f.idFuncionario === ID.subrogante)), 'el 101 es SUBROGANTE de Enfermería').toBe('SUBROGANTE');
+  const persona = personal.find((f) => rolEn(f) === 'MEDICO');
+  expect(persona, 'Enfermería tiene un médico').toBeTruthy();
+
+  for (const idPersona of [ID.subrogante, persona.idFuncionario]) {
+    const r = await apiLlamar(request, token, 'PUT', `/funcionarios/${idPersona}`, { data: { servicioId: SERVICIO.enfermeria, rol: 2 } });
+    expect([r.status, r.cuerpo?.error], `PUT /funcionarios/${idPersona}`)
+      .toEqual([403, 'El subrogante no puede designar jerarquía ni sumar funcionarios al servicio']);
+  }
+  const despues = await apiGet(request, token, `/funcionarios/summary?servicioId=${SERVICIO.enfermeria}`);
+  expect(rolEn(despues.find((f) => f.idFuncionario === persona.idFuncionario)), 'sin cambios: sigue siendo MEDICO').toBe('MEDICO');
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Fase 2b · Lo que niega el filtro de seguridad (SecurityConfig), después de C-20
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// Desde C-20 el filtro responde 403 {"error": "No tienes permiso para realizar esta acción"} a
+// quien tiene sesión y le falta el rol (JwtAccessDeniedHandler), y 401 solo sin sesión o con un
+// token inválido (JwtAuthenticationEntryPoint): la interfaz no cierra la sesión ante un 403.
+// Antes del arreglo estas negaciones respondían 401 (BUG-001) y la fila 2b del catálogo pedía
+// iniciar sesión de nuevo en cada caso; ya no hace falta.
+//
+// Ninguna escribe: cada escritura va a un recurso que no existe (o con el cuerpo vacío), así que,
+// si el filtro la dejara pasar, el controller la rechazaría antes de guardar (404 o 400).
+// El mensaje exacto de 403 distingue al filtro de las negaciones de los services, que dicen otra
+// cosa («No tienes acceso a datos de otro servicio»).
+const NO_EXISTE = 2_000_000_000;
+
+/** Exige que el filtro niegue `metodo ruta` a `quien` con 403 y el mensaje fijo. */
+async function negadaPorElFiltro(request, quien, metodo, ruta, data) {
+  const r = await apiLlamar(request, await tokenRol(request, quien), metodo, ruta, { data });
+  expect([r.status, r.cuerpo?.error], `${quien}: ${metodo} ${ruta}`).toEqual([403, SIN_PERMISO]);
+}
+
+/** Con el mismo token, una lectura propia sigue respondiendo 200: la negación no cerró la sesión. */
+async function sesionVigente(request, quien) {
+  const r = await apiLlamar(request, await tokenRol(request, quien), 'GET', `/notificaciones/sin-leer/${ID[quien]}`);
+  expect(r.status, `${quien}: la sesión sigue vigente después de la negación`).toBe(200);
+}
+
+test('HU-AUT-07 · criterio 4: lo que el filtro niega por rol (el médico llama a POST /servicios) responde 403 y no cierra la sesión', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SecurityConfig: POST /servicios/** es solo del ADMINISTRADOR (GLOBAL_ADMIN_PATHS). Segunda red: el
+  // cuerpo no trae nombre, así que si el filtro la dejara pasar, ServicioService.createServicio la rechazaría.
+  await sesionVigente(request, 'medico'); // control: el token del médico sirve
+  await negadaPorElFiltro(request, 'medico', 'POST', '/servicios', {});
+  await sesionVigente(request, 'medico'); // 403 y no 401: sigue sirviendo, sin volver a entrar
+
+  // El 401 queda para quien no tiene sesión: sin token o con uno inválido.
+  const sinSesion = await request.fetch('/api/v2/servicios', { method: 'POST', data: {} });
+  expect(sinSesion.status(), 'sin token').toBe(401);
+  const invalido = await apiLlamar(request, 'no.es.un.jwt', 'POST', '/servicios', { data: {} });
+  expect(invalido.status, 'con un token inválido').toBe(401);
+});
+
+test('HU-ASG-05 · criterio 2: el médico no asigna ni edita turnos por API: alterar, crear, editar y eliminar responden 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SecurityConfig: POST, PUT y DELETE sobre /turnos/** son de ADMINISTRADOR, JEFATURA y SUBROGANTE
+  // (SERVICE_ADMIN_PATHS). Segunda red: el turno no existe y el cuerpo de POST /turnos va vacío.
+  await sesionVigente(request, 'medico');
+  await negadaPorElFiltro(request, 'medico', 'POST', '/turnos/alterar', { idTurno: NO_EXISTE, accion: 'ASIGNAR', idNuevoMedico: ID.medico, motivo: MOTIVO_2B });
+  await negadaPorElFiltro(request, 'medico', 'POST', '/turnos', {});
+  await negadaPorElFiltro(request, 'medico', 'PUT', `/turnos/${NO_EXISTE}`, { horaInicio: '08:00' });
+  await negadaPorElFiltro(request, 'medico', 'DELETE', `/turnos/${NO_EXISTE}`);
+  await sesionVigente(request, 'medico');
+});
+
+test('HU-SOL-09 · criterio 8: el médico que aprueba o rechaza una solicitud por API recibe 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SecurityConfig: PUT /solicitudes/*/estado es de ADMINISTRADOR, JEFATURA y SUBROGANTE. Segunda red: la
+  // solicitud 18 ya está RECHAZADA (aprobarla se cortaría con «ya no está pendiente») y la otra no existe.
+  const s = (await solicitudesDeUrgencias(request)).get(SOL.rechazada);
+  expect(s?.estado, `la solicitud ${SOL.rechazada} está RECHAZADA`).toBe('RECHAZADA');
+  await negadaPorElFiltro(request, 'medico', 'PUT', `/solicitudes/${SOL.rechazada}/estado?nuevoEstado=APROBADA`);
+  await negadaPorElFiltro(request, 'medico', 'PUT', `/solicitudes/${NO_EXISTE}/estado?nuevoEstado=RECHAZADA`);
+  expect((await solicitudesDeUrgencias(request)).get(SOL.rechazada).estado, 'sin cambios').toBe('RECHAZADA');
+  await sesionVigente(request, 'medico');
+});
+
+test('HU-PUE-01 · criterio 5: el médico no escribe puestos por API: crear, renombrar y eliminar responden 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SecurityConfig: POST, PUT y DELETE sobre /puestos/** son de ADMINISTRADOR, JEFATURA y SUBROGANTE. Segunda
+  // red: el servicio y el puesto no existen (crear exigiría el mismo servicio de la sesión, renombrar y eliminar, un puesto del servicio).
+  await sesionVigente(request, 'medico');
+  await negadaPorElFiltro(request, 'medico', 'POST', '/puestos', { idServicio: NO_EXISTE, nombre: '' });
+  await negadaPorElFiltro(request, 'medico', 'PUT', `/puestos/${NO_EXISTE}?nombre=${encodeURIComponent(MOTIVO_2B)}`);
+  await negadaPorElFiltro(request, 'medico', 'DELETE', `/puestos/${NO_EXISTE}`);
+  await sesionVigente(request, 'medico');
+});
+
+test('HU-ADM-02 · criterio 4: con otro rol, crear, editar o desactivar un servicio responde 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SecurityConfig: POST, PUT y DELETE sobre /servicios/** son solo del ADMINISTRADOR. Segunda red: el cuerpo de
+  // POST no trae nombre y el servicio de PUT y DELETE no existe.
+  for (const quien of ['medico', 'jefatura', 'subrogante']) {
+    await sesionVigente(request, quien);
+    await negadaPorElFiltro(request, quien, 'POST', '/servicios', {});
+    await negadaPorElFiltro(request, quien, 'PUT', `/servicios/${NO_EXISTE}`, { nombre: MOTIVO_2B });
+    await negadaPorElFiltro(request, quien, 'DELETE', `/servicios/${NO_EXISTE}`);
+    await sesionVigente(request, quien);
+  }
+});
+
+test('HU-ADM-06 · criterio 4: la jefatura y el subrogante no escriben tipos de turno por API: crear, editar y eliminar responden 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SecurityConfig: POST, PUT y DELETE sobre /tipos-turno/** son solo del ADMINISTRADOR (C-01). Segunda red: el
+  // tipo de turno no existe y el de POST apunta a un servicio que tampoco.
+  for (const quien of ['jefatura', 'subrogante']) {
+    await sesionVigente(request, quien);
+    await negadaPorElFiltro(request, quien, 'POST', '/tipos-turno', { servicioId: NO_EXISTE, nombre: MOTIVO_2B, horaInicio: '08:00', horaFin: '20:00' });
+    await negadaPorElFiltro(request, quien, 'PUT', `/tipos-turno/${NO_EXISTE}`, { nombre: MOTIVO_2B });
+    await negadaPorElFiltro(request, quien, 'DELETE', `/tipos-turno/${NO_EXISTE}`);
+    await sesionVigente(request, quien);
+  }
+});
+
+test('HU-REG-02 · C-10: la jefatura y el subrogante no escriben reglas de horario por API: crear, editar y eliminar responden 403', async ({ request }, testInfo) => {
+  soloPorApi(testInfo);
+  // SecurityConfig: POST, PUT y DELETE sobre /reglas-servicio/** son solo del ADMINISTRADOR desde C-10 (decidido el
+  // 17 oct; antes eran de la gestión del servicio). Segunda red: el cuerpo de POST va vacío y la regla de PUT y DELETE no existe.
+  for (const quien of ['jefatura', 'subrogante']) {
+    await sesionVigente(request, quien);
+    await negadaPorElFiltro(request, quien, 'POST', '/reglas-servicio', {});
+    await negadaPorElFiltro(request, quien, 'PUT', `/reglas-servicio/${NO_EXISTE}`, { nombre: MOTIVO_2B });
+    await negadaPorElFiltro(request, quien, 'DELETE', `/reglas-servicio/${NO_EXISTE}`);
+    await sesionVigente(request, quien);
+  }
 });

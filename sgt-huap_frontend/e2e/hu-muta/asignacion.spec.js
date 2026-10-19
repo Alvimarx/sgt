@@ -3,7 +3,7 @@
 //  - HU-ASG-02 (asignar a un cupo libre): criterios 1 a 4 y, por API, la excepción
 //    del administrador del criterio 5 (la negación por servicio es de la fase 2a).
 //  - HU-ASG-03 (reasignar o liberar): criterios 1 a 4.
-//  - HU-SOL-14, criterio 5 (la asignación manual no aplica R13): falla conocida, C-04.
+//  - HU-SOL-14, criterio 5 (la asignación manual aplica R13 y responde 409): C-04, corregida el 17 oct.
 //
 // La jefatura 305 entra por el calendario: el día, el detalle del turno y el panel
 // «Asignar turno libre» o «Editar asignación de turno». Lo que solo abre el panel y
@@ -14,7 +14,7 @@
 // («no se deshace»). Se asigna a los médicos de apoyo 368 y 341 y al médico 369;
 // las personas se eligen en el panel por RUT, leído de la API (no se escribe).
 import {
-  test, testMuta, expect, fallaConocida, ID, APOYO, SERVICIO, esDesktop, soloPorApi, hhmm, idDe,
+  test, testMuta, expect, ID, APOYO, SERVICIO, esDesktop, soloPorApi, idDe, etiquetaTurno,
   entrar, abrirCalendario, abrirDia, abrirDetalle, puestoDetalle, apiComo, calendarioDe, personaDe,
   motivoF4, duenoDe, fotoDelDia, bitacoraDeTurno, panelAsignacion, filasAsignacion, rutsAsignacion, buscadorAsignacion,
   confirmacionAsignacion, pulsarYEsperar, RUTA_ALTERAR, comprobarMensajeR13,
@@ -88,8 +88,8 @@ async function elegirEnPanel(panel, testInfo, persona) {
   await filasAsignacion(panel, testInfo).first().click();
 }
 
-/** Texto del turno en las confirmaciones del panel (formatShiftLabel): «{tipo} · {fecha} {hh:mm}–{hh:mm}». */
-const turnoEnConfirmacion = (t) => `${t.nombreTipoTurno} · ${t.diaInicioTurno} ${hhmm(t.horaInicio)}–${hhmm(t.horaFin)}`;
+/** Texto del turno en las confirmaciones del panel: «{tipo} · {lun 19 oct 2026} · {hh:mm}–{hh:mm}» (P-01, 17 oct: antes, la fecha en ISO). */
+const turnoEnConfirmacion = (t) => etiquetaTurno(t);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // HU-ASG-02 · Asignar un funcionario a un cupo libre
@@ -156,7 +156,7 @@ testMuta('HU-ASG-02 · criterio 3: al confirmar, el cupo queda asignado, la vist
 
   expect(await duenoDe(request, cupo.id), 'el cupo queda con el 368').toBe(APOYO.segundoMedico.id);
   const [evento] = await bitacoraDeTurno(request, cupo.id);
-  expect([evento?.tipoEvento, evento?.motivo, evento?.funcionario?.idFuncionario], 'último evento del turno: asignación manual, con la observación, de la jefatura')
+  expect([evento?.tipoEvento, evento?.motivo, evento?.idFuncionario], 'último evento del turno: asignación manual, con la observación, de la jefatura')
     .toEqual(['ASIGNACION_MANUAL_TURNO', observacion, ID.jefatura]);
 
   expect(await muta.devolverTurnos(), 'deshacer: el cupo vuelve a quedar libre').toEqual([cupo.id]);
@@ -177,8 +177,8 @@ testMuta('HU-ASG-02 · criterio 4: si la persona ya tiene un turno que se cruza,
   await panel.getByRole('button', { name: 'Asignar turno', exact: true }).click();
   const { dialogo } = await confirmacionAsignacion(page, testInfo, 'Confirmar asignación');
   const r = await pulsarYEsperar(page, dialogo.getByRole('button', { name: 'Confirmar', exact: true }), RUTA_ALTERAR);
-  testInfo.annotations.push({ type: 'código de respuesta', description: `${r.status} (§5.1: el cruce de horario responde 500 en vez de 400)` });
-  expect(r.status, 'el backend lo rechaza').toBeGreaterThanOrEqual(400);
+  testInfo.annotations.push({ type: 'código de respuesta', description: `${r.status} (C-04: el cruce de horario responde 409 con su mensaje)` });
+  expect(r.status, 'el backend lo rechaza (conflicto con el calendario)').toBe(409);
   const mensaje = 'El funcionario ya tiene otro turno asignado en este rango horario.';
   expect(r.cuerpo?.error).toBe(mensaje);
   await expect(panel.getByRole('alert')).toHaveText(mensaje);
@@ -281,7 +281,7 @@ testMuta('HU-ASG-03 · criterio 4: al confirmar la reasignación, la vista se re
 
   expect(await duenoDe(request, turno.id), 'el turno pasa al 341').toBe(APOYO.tercerMedico.id);
   const [evento] = await bitacoraDeTurno(request, turno.id);
-  expect([evento?.tipoEvento, evento?.motivo, evento?.funcionario?.idFuncionario]).toEqual(['REASIGNACION_MANUAL_TURNO', observacion, ID.jefatura]);
+  expect([evento?.tipoEvento, evento?.motivo, evento?.idFuncionario]).toEqual(['REASIGNACION_MANUAL_TURNO', observacion, ID.jefatura]);
 
   expect(await muta.devolverTurnos(), 'deshacer: el turno vuelve al 368').toEqual([turno.id]);
 });
@@ -303,7 +303,7 @@ testMuta('HU-ASG-03 · criterio 4: al confirmar la liberación, el turno queda c
 
   expect(await duenoDe(request, turno.id), 'el turno queda como cupo libre').toBeNull();
   const [evento] = await bitacoraDeTurno(request, turno.id);
-  expect([evento?.tipoEvento, evento?.motivo, evento?.funcionario?.idFuncionario]).toEqual(['LIBERACION_MANUAL_TURNO', observacion, ID.jefatura]);
+  expect([evento?.tipoEvento, evento?.motivo, evento?.idFuncionario]).toEqual(['LIBERACION_MANUAL_TURNO', observacion, ID.jefatura]);
 
   expect(await muta.devolverTurnos(), 'deshacer: el turno vuelve al 368').toEqual([turno.id]);
 });
@@ -332,12 +332,12 @@ testMuta('HU-SOL-14 · criterio 5: la jefatura no puede asignar a mano un turno 
   const { dialogo } = await confirmacionAsignacion(page, testInfo, 'Confirmar asignación');
   const r = await pulsarYEsperar(page, dialogo.getByRole('button', { name: 'Confirmar', exact: true }), RUTA_ALTERAR);
   const quedo = await duenoDe(request, cupo.id);
-  // Se deshace antes de comparar, porque hoy la asignación pasa (falla conocida).
+  // Por si la asignación pasara (regresión de C-04): se deshace antes de comparar.
   await muta.devolverTurnos();
 
-  fallaConocida('C-04 y §6.3: GestionTurnoService.validarConflictoFuncionario (asignar y reasignar a mano) solo revisa el solape; '
-    + 'no usa ValidadorAsignacionTurnoService, así que acepta la noche seguida de día.');
-  expect(r.status, 'el backend rechaza la asignación').toBe(400);
+  // C-04 (17 oct): la asignación a mano aplica R13 con el mismo validador y mensaje que las
+  // solicitudes, y es un conflicto de estado: 409 (antes pasaba, y era una falla conocida).
+  expect(r.status, 'el backend rechaza la asignación').toBe(409);
   await comprobarMensajeR13(request, r.cuerpo?.error ?? '', quien, 'noche-dia', noche);
   expect(sinNombre(await panel.getByRole('alert').textContent({ timeout: 5_000 }).catch(() => '')), 'el panel muestra el mensaje').toBe(sinNombre(r.cuerpo?.error));
   expect(quedo, `el cupo no queda con el funcionario ${idDe(quien)}`).toBeNull();

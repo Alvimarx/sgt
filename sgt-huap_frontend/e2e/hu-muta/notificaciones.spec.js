@@ -1,6 +1,10 @@
 // HU-NOT-02 · Marcar como leída y eliminar, fase 4 del catálogo
 // docs/qa/HISTORIAS_DE_USUARIO.md (§6.2), en móvil y en desktop.
 //
+// OMITIDAS desde el 19 oct 2026 (C-09): la bandeja de notificaciones queda oculta para la entrega
+// (src/config/funciones.js, NOTIFICACIONES_HABILITADAS = false), así que no hay ícono, ítem ni vista que probar.
+// Los cuerpos se conservan: con el interruptor en `true`, quitar la línea test.skip de cada prueba.
+//
 // No se toca la notificación 16 del seed (la leen las fases 1 y 2a). Como el
 // backend no crea notificaciones con las solicitudes (HU-NOT-03, C-09), cada prueba
 // crea la suya: el médico 369 pide un cupo (por API) y se crea una notificación
@@ -8,7 +12,7 @@
 // del 369 está vacía en el seed, así que el contador parte de ese 1. Al final la
 // notificación queda ELIMINADO (la bandeja no la muestra) y la solicitud, cancelada.
 import {
-  testMuta, expect, ID, esDesktop, entrar, itemMenu, esperarQuieta, apiComo, vistaActual,
+  test, testMuta, expect, ID, esDesktop, entrar, itemMenu, esperarQuieta, apiComo, vistaActual,
   abrirBandeja, leerNotificaciones, notificacionEnBandeja, ICONO_BANDEJA,
   motivoF4, cuposLibresPara, pulsarYEsperar,
 } from '../helpers/hu.js';
@@ -36,6 +40,7 @@ async function contadorInicio(page, testInfo) {
 const encabezadoBandeja = (page, testInfo) => (esDesktop(testInfo) ? page.locator('.sgt-d-encabezado__subtitulo') : page.locator('.top-header__subtitle'));
 
 testMuta('HU-NOT-02 · criterio 1: «Marcar leída» la pasa a «Leída» y baja el contador', async ({ page, request, muta }, testInfo) => {
+  test.skip(true, 'C-09: bandeja oculta para la entrega (19 oct)');
   const { sol, mensaje, id } = await notificacionNueva(request, muta, 'HU-NOT-02 · criterio 1');
   const antes = await sinLeer(request);
   expect(antes, 'la notificación creada está sin leer').toBeGreaterThanOrEqual(1);
@@ -63,6 +68,7 @@ testMuta('HU-NOT-02 · criterio 1: «Marcar leída» la pasa a «Leída» y baja
 });
 
 testMuta('HU-NOT-02 · criterio 2: «Eliminar» la quita de la lista; queda ELIMINADO y no vuelve al refrescar', async ({ page, request, muta }, testInfo) => {
+  test.skip(true, 'C-09: bandeja oculta para la entrega (19 oct)');
   const { sol, mensaje, id } = await notificacionNueva(request, muta, 'HU-NOT-02 · criterio 2');
   await entrar(page, 'medico');
   await abrirBandeja(page, testInfo);

@@ -217,7 +217,8 @@ test('planificación: vigencias y eliminar turnos, cancelados', async ({ page },
   await expect(page.getByText('Vigencias del servicio', { exact: true })).toBeHidden();
 
   // Eliminar turnos generados (legado): rango y confirmación, cancelada.
-  await page.getByRole('button', { name: desktop ? 'Eliminar turnos generados' : /^Eliminar turnos generados por este molde/, exact: desktop }).click();
+  // C-22 (17 oct): el botón se llama igual en móvil y desktop.
+  await page.getByRole('button', { name: 'Eliminar turnos generados', exact: true }).click();
   await expect(page.getByText('Eliminar turnos generados', { exact: true }).last()).toBeVisible();
   await foto(page, 'eliminar-turnos');
   await page.locator('input[type="date"]').nth(0).fill('2026-12-01');

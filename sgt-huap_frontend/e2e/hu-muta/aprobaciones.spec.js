@@ -5,26 +5,30 @@
 //    tipo en la HU de cada tipo (ver su entrada). Del 8, aquí están la parte de la
 //    interfaz y el intercambio de otro servicio; la solicitud de otro servicio que no
 //    es intercambio es de la fase 2a (permisos.spec.js) y la negativa por API del
-//    médico, de la 2b.
+//    médico, de la 2b. Desde el 17 oct (§5.1) asignar, reasignar o liberar a mano un
+//    turno rechaza las solicitudes pendientes que lo tienen: el criterio 5 se prueba como
+//    ese rechazo automático, y la segunda mitad del 6 (dueña del turno) ya no se produce.
 //  - HU-SOL-10 (varios postulantes al mismo turno, R10): criterios 1 a 4.
 //  - Lo que la fase 3 dejó para esta: HU-SOL-03 (criterio 5), HU-SOL-04 y HU-SOL-05
-//    (criterio 2, «al aprobarse»), HU-SOL-11 (criterio 5, en móvil) y HU-SOL-13
-//    (criterio 3, «si rechazaron»).
+//    (criterio 2, «al aprobarse») y HU-SOL-13 (criterio 3, «si rechazaron»). HU-SOL-11
+//    (criterio 5, en móvil) volvió a la fase 3 (cancelar-modificar.spec.js): desde
+//    P-01 (17 oct) la tarjeta móvil se comporta como la desktop, sin botones.
 //
 // Datos: turnos y cupos de Urgencias desde mañana y sin trámites encima
 // (fotoDelDia), del médico 369, de los médicos de apoyo 368 y 341 y de la jefatura
 // 305, que es quien decide (en el criterio 7, también el administrador, por API).
 // El punto de partida se crea por API (fixture `muta`); lo que se prueba, por la
 // interfaz. Lo que la aprobación mueve se devuelve al final con la asignación
-// directa de la jefatura (muta.devolverTurnos) y lo pendiente se cancela. Quedan,
+// directa de la jefatura (muta.devolverTurnos, que cierra las solicitudes pendientes de
+// esos turnos: la prueba cancela antes lo que quiera cancelar) y lo pendiente se cancela. Quedan,
 // y lo dice la anotación «no se deshace» de cada prueba: las solicitudes aprobadas,
 // rechazadas o canceladas y los eventos de bitácora.
 import {
-  test, testMuta, expect, fallaConocida, ID, SERVICIO, APOYO, esDesktop, esMovil, soloPorApi, hoyChile, sumarDias, hhmm,
+  test, testMuta, expect, ID, SERVICIO, APOYO, esDesktop, soloPorApi, hoyChile, sumarDias, hhmm,
   entrar, abrirSolicitudes, elegirPestana, leerSolicitud, esperarSolicitudes, fechaCL,
   nuevaSolicitud, campoAsistente, elegirTurnoAsistente, escribirMotivo, enviarYCrear, leerOpcionesTurno, claveOpcionTurno,
-  abrirCancelacion, confirmarCancelacion, apiComo, calendarioDe, solicitudesDe, estadoSolicitud, cupoDelSelector,
-  motivoF4, duenoDe, fotoDelDia, idDe, cuposLibresPara, intercambiosLibres, decidirEnPantalla, avisoSolicitudes,
+  apiComo, calendarioDe, solicitudesDe, estadoSolicitud, cupoDelSelector,
+  motivoF4, duenoDe, fotoDelDia, cuposLibresPara, intercambiosLibres, decidirEnPantalla, avisoSolicitudes,
   leerPostulaciones, botonPostulante, pulsarYEsperar, comprobarMensajeR13,
   sinNombre,
 } from '../helpers/hu.js';
@@ -33,11 +37,19 @@ import { inicioDe, choquesR13 } from '../helpers/datos.js';
 const DECIDIR = ['Aprobar', 'Rechazar'];
 const botonesDecision = (vista) => vista.botones.filter((b) => DECIDIR.includes(b));
 const RECHAZO_AUTOMATICO = 'Rechazo automático: Otra solicitud para este turno fue aprobada.';
+// §5.1 (17 oct): asignar, reasignar o liberar a mano un turno rechaza las solicitudes pendientes que lo tienen
+// (SolicitudService.rechazarPendientesPorCambioManual); el motivo original queda detrás.
+const RECHAZO_MANUAL = {
+  asignado: 'Rechazo automático: El turno fue asignado manualmente.',
+  reasignado: 'Rechazo automático: El turno fue reasignado manualmente.',
+};
+const YA_NO_PENDIENTE = 'Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)';
 const PARTICIPAS_NOTA = 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.';
 const PARTICIPAS_ERROR = 'No puedes aprobar ni rechazar una solicitud en la que participas directamente';
 const RUTA_DECIDIR = /\/api\/v2\/solicitudes\/\d+\/estado$/;
 const franja = (t) => `${inicioDe(t)}|${hhmm(t.horaFin)}`;
-const sinSolape = (turno, calendario) => !choquesR13(turno, calendario).some((c) => c.regla === 'solape');
+// Desde C-04 (17 oct) la asignación a mano también aplica R13: para pasarle un turno a alguien, que no choque de ninguna forma.
+const sinChoque = (turno, calendario) => choquesR13(turno, calendario).length === 0;
 
 /** Entra como `quien`, abre Solicitudes (y la pestaña, si se pide) y lee la solicitud con `motivo`. */
 async function verSolicitud(page, testInfo, quien, motivo, pestana) {
@@ -182,52 +194,71 @@ testMuta('HU-SOL-09 · criterio 4: la aprobación revalida el solape: si falla, 
   expect((await muta.cancelar('medico', sol.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
-testMuta('HU-SOL-09 · criterio 5: si el cupo ya tiene otra persona, veo «Este turno ya fue asignado a otra persona»', async ({ page, request, muta }, testInfo) => {
+testMuta('HU-SOL-09 · criterio 5: si la jefatura llena a mano el cupo que pide una cobertura, la solicitud se rechaza sola y no queda nada que aprobar', async ({ page, request, muta }, testInfo) => {
+  // §5.1 (17 oct): asignar a mano un turno rechaza las solicitudes pendientes que lo tienen, así que «Este turno ya fue
+  // asignado a otra persona» y la marca «Turno ya cubierto» ya no se alcanzan con una cobertura pendiente: queda
+  // RECHAZADA, con su motivo y sin botones. La garantía del backend al aprobar sigue ahí por si la solicitud se
+  // resolviera de otra forma; aquí se prueba contra la solicitud ya cerrada.
   const calOtro = await calendarioDe(request, 'segundoMedico');
-  const cupo = (await cuposLibresPara(request, 'medico')).find((c) => sinSolape(c, calOtro));
+  const cupo = (await cuposLibresPara(request, 'medico')).find((c) => sinChoque(c, calOtro));
   expect(cupo, 'hay un cupo libre que el 369 puede pedir y que se le puede asignar al 368').toBeTruthy();
   const motivo = motivoF4('HU-SOL-09 · criterio 5 · cobertura');
   const sol = await muta.crear('medico', { idTipoSolicitud: 3, idTurno: cupo.id, motivo });
   expect((await muta.alterar('jefatura', { idTurno: cupo.id, accion: 'ASIGNAR', idNuevoMedico: APOYO.segundoMedico.id })).status, 'la jefatura llena el cupo a mano').toBe(200);
 
-  const r = await decidirComoJefatura(page, testInfo, motivo);
-  expect(r.status).toBe(400);
-  expect(r.cuerpo.error).toBe('Este turno ya fue asignado a otra persona');
-  expect(await avisoSolicitudes(page, testInfo, /^Este turno ya fue asignado/)).toBe('Este turno ya fue asignado a otra persona');
-  expect((await estadoSolicitud(request, 'medico', sol.idSolicitud)).estado, 'la solicitud sigue pendiente').toBe('PENDIENTE');
+  const cerrada = await estadoSolicitud(request, 'medico', sol.idSolicitud);
+  expect([cerrada.estado, cerrada.motivo], 'la cobertura queda rechazada, con el motivo original detrás')
+    .toEqual(['RECHAZADA', `${RECHAZO_MANUAL.asignado} · motivo original: ${motivo}`]);
+  // La jefatura la ve en el historial, sin botones.
+  const vista = await verSolicitud(page, testInfo, 'jefatura', motivo, 'Historial');
+  expect(vista.estado).toBe('RECHAZADA');
+  expect(botonesDecision(vista), 'sin Aprobar ni Rechazar').toEqual([]);
+  await expect(vista.zona).toContainText(RECHAZO_MANUAL.asignado);
+  // Quien la emitió la ve igual, y ya no puede cancelarla.
+  const propia = await verSolicitud(page, testInfo, 'medico', motivo);
+  expect(propia.estado).toBe('RECHAZADA');
+  expect(propia.botones).not.toContain('Cancelar solicitud');
+  // Por API, aprobarla responde que ya no está pendiente.
+  const r = await muta.decidir('jefatura', sol.idSolicitud, 'APROBADA');
+  expect([r.status, r.cuerpo?.error], 'el backend, por API').toEqual([400, YA_NO_PENDIENTE]);
   expect(await duenoDe(request, cupo.id), 'el cupo sigue con quien lo asignó la jefatura').toBe(APOYO.segundoMedico.id);
 
   expect(await muta.devolverTurnos(), 'deshacer la asignación directa').toEqual([cupo.id]);
-  expect((await muta.cancelar('medico', sol.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
-testMuta('HU-SOL-09 · criterio 5: si en un intercambio uno de los turnos cambió de dueño, veo «El turno solicitado (u ofrecido) ya cambió de dueño: el intercambio quedó obsoleto»', async ({ page, request, muta }, testInfo) => {
-  // Después de que el 368 acepta, la jefatura pasa a mano al 341 primero el turno
-  // pedido y después el ofrecido. Cada vez la aprobación se rechaza.
+testMuta('HU-SOL-09 · criterio 5: si en un intercambio uno de los turnos cambia de dueño a mano, la solicitud se rechaza sola y no queda obsoleta', async ({ page, request, muta }, testInfo) => {
+  // §5.1 (17 oct): reasignar a mano uno de los turnos rechaza el intercambio pendiente («… reasignado manualmente»), así
+  // que «El turno solicitado (u ofrecido) ya cambió de dueño: el intercambio quedó obsoleto» ya no se alcanza con una
+  // solicitud pendiente. Cada turno, el pedido y el ofrecido, con su propio intercambio: después de que el 368 acepta,
+  // la jefatura pasa ese turno al 341.
   const calTercero = await calendarioDe(request, 'tercerMedico');
   const par = (await intercambiosLibres(request, 'medico', 'segundoMedico', 6))
-    .find((p) => sinSolape(p.deseado, calTercero) && sinSolape(p.propio, calTercero));
+    .find((p) => sinChoque(p.deseado, calTercero) && sinChoque(p.propio, calTercero));
   expect(par, 'hay un intercambio 369-368 cuyos dos turnos se le pueden asignar al 341').toBeTruthy();
-  const motivo = motivoF4('HU-SOL-09 · criterio 5 · intercambio');
-  const sol = await muta.crear('medico', {
-    idTipoSolicitud: 4, idTurno: par.deseado.id, idTurnoIntercambio: par.propio.id, idFuncionarioReceptor: APOYO.segundoMedico.id, motivo,
-  });
-  expect((await muta.responder('segundoMedico', sol, true)).status, 'el 368 acepta').toBe(200);
 
   for (const [turno, cual] of [[par.deseado, 'solicitado'], [par.propio, 'ofrecido']]) {
+    const motivo = motivoF4(`HU-SOL-09 · criterio 5 · intercambio · turno ${cual}`);
+    const sol = await muta.crear('medico', {
+      idTipoSolicitud: 4, idTurno: par.deseado.id, idTurnoIntercambio: par.propio.id, idFuncionarioReceptor: APOYO.segundoMedico.id, motivo,
+    });
+    expect((await muta.responder('segundoMedico', sol, true)).status, 'el 368 acepta').toBe(200);
     expect((await muta.alterar('jefatura', { idTurno: turno.id, accion: 'REASIGNAR', idNuevoMedico: APOYO.tercerMedico.id })).status, `el turno ${cual} pasa al 341`).toBe(200);
-    const mensaje = `El turno ${cual} ya cambió de dueño: el intercambio quedó obsoleto`;
-    const r = await decidirComoJefatura(page, testInfo, motivo);
-    expect(r.status, `turno ${cual}`).toBe(400);
-    expect(r.cuerpo.error).toBe(mensaje);
-    expect(await avisoSolicitudes(page, testInfo, /^El turno .* ya cambió de dueño/)).toBe(mensaje);
-    expect((await estadoSolicitud(request, 'medico', sol.idSolicitud)).estado, 'la solicitud sigue pendiente').toBe('PENDIENTE');
+
+    const cerrada = await estadoSolicitud(request, 'medico', sol.idSolicitud);
+    expect([cerrada.estado, cerrada.motivo], `turno ${cual}`).toEqual(['RECHAZADA', `${RECHAZO_MANUAL.reasignado} · motivo original: ${motivo}`]);
+    const vista = await verSolicitud(page, testInfo, 'jefatura', motivo, 'Historial');
+    expect(vista.estado, `turno ${cual}`).toBe('RECHAZADA');
+    expect(botonesDecision(vista), 'sin Aprobar ni Rechazar').toEqual([]);
+    const r = await muta.decidir('jefatura', sol.idSolicitud, 'APROBADA');
+    expect([r.status, r.cuerpo?.error], `aprobarla (turno ${cual})`).toEqual([400, YA_NO_PENDIENTE]);
     expect(await muta.devolverTurnos(), `deshacer: el turno ${cual} vuelve a su dueño`).toEqual([turno.id]);
   }
-  expect((await muta.cancelar('medico', sol.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
-testMuta('HU-SOL-09 · criterio 6: si soy la solicitante, en desktop no veo los botones y leo la nota; en móvil los veo y el backend responde que participo', async ({ page, request, muta }, testInfo) => {
+testMuta('HU-SOL-09 · criterio 6: si soy la solicitante, no veo «Aprobar» ni «Rechazar» y leo la nota de segregación; el backend responde que participo', async ({ page, request, muta }, testInfo) => {
+  // P-01 (17 oct): la segregación es igual en móvil y desktop (antes, en móvil la
+  // tarjeta ofrecía los botones y solo el backend la negaba). La negativa del
+  // backend se comprueba por API.
   const turno = await turnoSinTramites(request, 'jefatura');
   expect(turno, 'la jefatura tiene un turno futuro sin trámites').toBeTruthy();
   const motivo = motivoF4('HU-SOL-09 · criterio 6 · solicitante');
@@ -235,62 +266,21 @@ testMuta('HU-SOL-09 · criterio 6: si soy la solicitante, en desktop no veo los 
   await muta.recordarTurnos(turno);
 
   const vista = await verSolicitud(page, testInfo, 'jefatura', motivo);
-  if (esDesktop(testInfo)) {
-    expect(botonesDecision(vista)).toEqual([]);
-    expect(vista.notas).toContain(PARTICIPAS_NOTA);
-  } else {
-    expect(botonesDecision(vista), 'en móvil la tarjeta sí los ofrece').toEqual(['Rechazar', 'Aprobar']);
-    for (const accion of ['Aprobar', 'Rechazar']) {
-      const r = await decidirEnPantalla(page, vista, accion);
-      expect([r.status, r.cuerpo?.error], accion).toEqual([403, PARTICIPAS_ERROR]);
-      expect(await avisoSolicitudes(page, testInfo, /^No puedes aprobar ni rechazar/)).toBe(PARTICIPAS_ERROR);
-    }
+  expect(botonesDecision(vista), 'sin Aprobar ni Rechazar').toEqual([]);
+  await expect(vista.zona, 'la nota de segregación').toContainText(PARTICIPAS_NOTA);
+  for (const estado of ['APROBADA', 'RECHAZADA']) {
+    const r = await muta.decidir('jefatura', sol.idSolicitud, estado);
+    expect([r.status, r.cuerpo?.error], `${estado} por API`).toEqual([403, PARTICIPAS_ERROR]);
   }
   expect((await estadoSolicitud(request, 'jefatura', sol.idSolicitud)).estado, 'sigue pendiente').toBe('PENDIENTE');
   expect(await duenoDe(request, turno.id), 'el turno sigue siendo de la jefatura').toBe(ID.jefatura);
   expect((await muta.cancelar('jefatura', sol.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
-testMuta('HU-SOL-09 · criterio 6: si soy dueña de uno de los turnos (sin ser solicitante ni receptora), en desktop no veo los botones; en móvil el backend responde que participo', async ({ page, request, muta }, testInfo) => {
-  // Oferta particular entre dos médicos, aceptada; después la jefatura 305 queda a
-  // mano como dueña del turno ofrecido. El backend la cuenta como participante
-  // (SolicitudService.participantesDirectos, :509-520).
-  if (esDesktop(testInfo)) {
-    fallaConocida('§5.1 (fase 4) y HU-SOL-09, criterio 6: en desktop, ocultar «Aprobar» y «Rechazar» y mostrar la nota «Participas…» solo mira si la jefatura es '
-      + 'solicitante o receptora (SolicitudesView.jsx:1257, participa = canDecide && (esMiSolicitud || esMiReceptor)), no si es dueña de alguno de los turnos; '
-      + 'la vista ofrece los botones y el backend responde 403 «No puedes aprobar ni rechazar una solicitud en la que participas directamente».');
-  }
-  // La jefatura 305 tiene los mismos horarios que el 369: el turno se busca entre los
-  // de los médicos de apoyo, para que se le pueda asignar a ella sin solape.
-  const medicos = ['medico', 'segundoMedico', 'tercerMedico'];
-  const foto = await fotoDelDia(request, ['jefatura', ...medicos]);
-  let caso = null;
-  for (const emisor of ['tercerMedico', 'segundoMedico']) {
-    for (const receptor of medicos.filter((q) => q !== emisor)) {
-      const turno = foto.turnosDe(emisor).find((t) => sinSolape(t, foto.calendario.jefatura) && choquesR13(t, foto.calendario[receptor]).length === 0);
-      if (turno && !caso) caso = { emisor, receptor, turno };
-    }
-  }
-  expect(caso, 'hay un turno de un médico de apoyo que otro médico puede recibir y que se le puede asignar a la jefatura').toBeTruthy();
-  const { emisor, receptor, turno } = caso;
-  const motivo = motivoF4('HU-SOL-09 · criterio 6 · dueña');
-  const sol = await muta.crear(emisor, { idTipoSolicitud: 5, idTurno: turno.id, idFuncionarioReceptor: idDe(receptor), motivo });
-  expect((await muta.responder(receptor, sol, true)).status, `el ${idDe(receptor)} acepta`).toBe(200);
-  expect((await muta.alterar('jefatura', { idTurno: turno.id, accion: 'REASIGNAR', idNuevoMedico: ID.jefatura })).status, 'la jefatura queda como dueña').toBe(200);
-
-  const vista = await verSolicitud(page, testInfo, 'jefatura', motivo);
-  if (esDesktop(testInfo)) {
-    expect(vista.notas, 'la nota de segregación').toContain(PARTICIPAS_NOTA);
-    expect(botonesDecision(vista), 'sin botones').toEqual([]);
-  } else {
-    expect(botonesDecision(vista), 'en móvil la tarjeta sí los ofrece').toEqual(['Rechazar', 'Aprobar']);
-    const r = await decidirEnPantalla(page, vista, 'Aprobar');
-    expect([r.status, r.cuerpo?.error]).toEqual([403, PARTICIPAS_ERROR]);
-    expect(await avisoSolicitudes(page, testInfo, /^No puedes aprobar ni rechazar/)).toBe(PARTICIPAS_ERROR);
-    expect((await estadoSolicitud(request, emisor, sol.idSolicitud)).estado, 'sigue pendiente').toBe('PENDIENTE');
-  }
-  expect(await muta.devolverTurnos(), 'deshacer: el turno vuelve a su dueño').toEqual([turno.id]);
-  expect((await muta.cancelar(emisor, sol.idSolicitud)).status, 'deshacer').toBe(200);
+test('HU-SOL-09 · criterio 6: si soy dueña de uno de los turnos (sin ser solicitante ni receptora), no veo «Aprobar» ni «Rechazar» y leo la nota', async () => {
+  test.skip(true, 'No automatizable: el estado ya no se produce. Era una solicitud pendiente cuyo turno había pasado a mano a la jefatura; desde el 17 oct asignar, '
+    + 'reasignar o liberar a mano un turno rechaza las solicitudes pendientes que lo tienen (§5.1), y el backend exige que el turno pedido en un intercambio sea del receptor. '
+    + 'La regla de la vista (participaEnSolicitud) y la del backend (SolicitudService.participantesDirectos) siguen, sin un camino para probarlas de punta a punta.');
 });
 
 testMuta('HU-SOL-09 · criterio 7: si otra jefatura ya la aprobó, veo «Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)»', async ({ page, muta }, testInfo) => {
@@ -458,7 +448,7 @@ testMuta('HU-SOL-10 · criterio 4: en desktop la decisión se toma en el detalle
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Lo que la fase 3 dejó para esta: SOL-03, SOL-04, SOL-05, SOL-11 y SOL-13
+// Lo que la fase 3 dejó para esta: SOL-03, SOL-04, SOL-05 y SOL-13
 // ═════════════════════════════════════════════════════════════════════════════
 
 testMuta('HU-SOL-03 · criterio 5: al aprobar el permiso no cambia ningún turno', async ({ page, request, muta }, testInfo) => {
@@ -522,24 +512,6 @@ testMuta('HU-SOL-05 · criterio 2: al aprobarse la cobertura, el turno queda a m
   expect((await verSolicitud(page, testInfo, 'medico', motivo)).estado, 'el médico la ve aprobada').toBe('APROBADA');
 
   expect(await muta.devolverTurnos(), 'deshacer: el cupo vuelve a quedar libre').toEqual([cupo.id]);
-});
-
-testMuta('HU-SOL-11 · criterio 5: en móvil, la jefatura no puede decidir su propia solicitud pero sí cancelarla', async ({ page, request, muta }, testInfo) => {
-  test.skip(!esMovil(testInfo), 'En desktop lo prueba la fase 3 (cancelar-modificar.spec.js): la tarjeta no ofrece Aprobar ni Rechazar.');
-  const turno = await turnoSinTramites(request, 'jefatura', () => true);
-  expect(turno, 'la jefatura tiene un turno futuro sin trámites').toBeTruthy();
-  const motivo = motivoF4('HU-SOL-11 · criterio 5');
-  const sol = await muta.crear('jefatura', { idTipoSolicitud: 2, idTurno: turno.id, motivo });
-
-  const vista = await verSolicitud(page, testInfo, 'jefatura', motivo);
-  const r = await decidirEnPantalla(page, vista, 'Aprobar');
-  expect([r.status, r.cuerpo?.error], 'no puede decidirla').toEqual([403, PARTICIPAS_ERROR]);
-  const { dialogo } = await abrirCancelacion(page, testInfo, await leerSolicitud(page, testInfo, motivo));
-  expect((await confirmarCancelacion(page, dialogo)).status(), 'pero sí cancelarla').toBe(200);
-  await esperarSolicitudes(page);
-  await elegirPestana(page, testInfo, 'Historial');
-  expect((await leerSolicitud(page, testInfo, motivo)).estado).toBe('CANCELADA');
-  expect((await estadoSolicitud(request, 'jefatura', sol.idSolicitud)).estado).toBe('RECHAZADA');
 });
 
 testMuta('HU-SOL-13 · criterio 3: si rechazaron mi solicitud, puedo volver a pedir el turno', async ({ page, request, muta }, testInfo) => {

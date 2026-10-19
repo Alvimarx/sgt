@@ -31,10 +31,6 @@ const DECIDIR = ['Aprobar', 'Rechazar'];
 const RESPONDER = ['Aceptar', 'Rechazar'];
 const ESPERANDO = '⏳ Esperando respuesta del receptor';
 const RECEPTOR_RECHAZO = '✕ Receptor rechazó el intercambio';
-// El backend corre en UTC (§2.3): ve la hora de Chile adelantada hasta 4 horas.
-// Un turno que empieza en ese margen puede faltar en sus listas sin ser un error.
-const MARGEN_UTC = 4;
-const sumarHoras = (instante, horas) => new Date(Date.parse(`${instante}:00Z`) + horas * 3_600_000).toISOString().slice(0, 16);
 // Pares [dueño del turno, receptor] con que se buscan los casos de R13, en orden.
 const PARES_R13 = [
   ['medico', 'segundoMedico'], ['medico', 'tercerMedico'], ['segundoMedico', 'medico'],
@@ -93,15 +89,13 @@ testMuta('HU-SOL-06 · criterio 1: el tercer selector aparece después de elegir
   ]);
   const deUrgencias = new Set(urgencias.map((t) => t.id));
   const ahora = ahoraChile();
-  const limite = sumarHoras(ahora, MARGEN_UTC);
   const canjeable = (c) => choquesR13(c, calEmisor.filter((t) => t.id !== propio.id)).length === 0
     && choquesR13(propio, calReceptor.filter((t) => t.id !== c.id)).length === 0;
-  const candidatos = calReceptor.filter((c) => deUrgencias.has(c.id) && inicioDe(c) > limite);
+  const candidatos = calReceptor.filter((c) => deUrgencias.has(c.id) && inicioDe(c) > ahora);
   const esperados = candidatos.filter((c) => c.id !== previo.deseado.id && canjeable(c));
   expect(esperados.length, 'el receptor tiene turnos canjeables que mostrar').toBeGreaterThan(0);
   expect(canjeable(previo.deseado), 'control: el turno ya pedido sería canjeable si no estuviera comprometido').toBe(true);
   const claves = (lista) => Promise.all(lista.map((t) => claveOpcionTurno(page, t)));
-  const enMargen = await claves(calReceptor.filter((c) => inicioDe(c) > ahora && inicioDe(c) <= limite));
   const yaEmpezados = await claves(calReceptor.filter((c) => inicioDe(c) <= ahora));
 
   await entrar(page, 'medico');
@@ -114,7 +108,7 @@ testMuta('HU-SOL-06 · criterio 1: el tercer selector aparece después de elegir
   await expect(tercero, 'después de elegir receptor').toBeVisible();
   await tercero.click();
   const vistos = await leerOpcionesTurno(page, testInfo);
-  expect(vistos.filter((v) => !enMargen.includes(v)).sort(), 'turnos del receptor que se pueden canjear').toEqual((await claves(esperados)).sort());
+  expect([...vistos].sort(), 'turnos del receptor que se pueden canjear').toEqual((await claves(esperados)).sort());
   expect(vistos, 'el turno del receptor que ya pedí en otra solicitud').not.toContain(await claveOpcionTurno(page, previo.deseado));
   for (const pasado of yaEmpezados) expect(vistos, 'un turno que ya empezó').not.toContain(pasado);
   testInfo.annotations.push({ type: 'datos', description: `turnos futuros del receptor: ${candidatos.length}; canjeables: ${esperados.length}; `

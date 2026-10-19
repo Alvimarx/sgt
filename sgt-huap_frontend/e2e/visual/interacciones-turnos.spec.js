@@ -10,8 +10,9 @@
 // SOLO LECTURA: todo panel o diálogo que se abre se cancela, y además una
 // guarda de red aborta cualquier escritura a la API (todo lo que no sea GET,
 // salvo el login). Los estados que la base de desarrollo no tiene (postulaciones
-// agrupadas R10, una solicitud propia pendiente, una propuesta recibida) se
-// simulan respondiendo esas consultas GET con datos ficticios fijos.
+// agrupadas R10, una solicitud propia pendiente, una propuesta recibida, ofertas
+// generales de turnos que no han terminado) se simulan respondiendo esas
+// consultas GET con datos ficticios fijos.
 //
 // También falla si el navegador registra errores en la consola o excepciones
 // no capturadas durante el recorrido.
@@ -172,6 +173,25 @@ const simularPostulacionesAgrupadas = async (page) => {
   });
 };
 
+// C-16 (17 oct): «Ofertas generales» deja fuera las ofertas de turnos que ya
+// terminaron, y las de la base de desarrollo son del lunes 5 oct. Para seguir
+// viendo una oferta abierta con postulantes (y la cerrada con su elegido), sus
+// turnos se corren al miércoles 28 oct, solo en la respuesta del GET.
+const correrTurnoAl28 = (turno) => {
+  if (!turno?.diaInicioTurno) return turno;
+  const nocturno = Boolean(turno.diaFinalTurno) && turno.diaFinalTurno !== turno.diaInicioTurno;
+  const diaFinalTurno = turno.diaFinalTurno ? (nocturno ? '2026-10-29' : '2026-10-28') : turno.diaFinalTurno;
+  return { ...turno, diaInicioTurno: '2026-10-28', diaFinalTurno };
+};
+const simularOfertasVigentes = async (page) => {
+  await page.route(new RegExp(`/api/v2/ofertas-generales/servicio/${SERVICIO_URG.idServicio}$`), async (route) => {
+    const respuesta = await route.fetch();
+    const ofertas = await respuesta.json();
+    if (!Array.isArray(ofertas)) return route.fulfill({ response: respuesta });
+    return route.fulfill({ response: respuesta, json: ofertas.map((o) => ({ ...o, turno: correrTurnoAl28(o.turno) })) });
+  });
+};
+
 // ═════════════════════════════════════════════════════════════════════════════
 // CALENDARIO
 // ═════════════════════════════════════════════════════════════════════════════
@@ -288,6 +308,8 @@ test('calendario · admin en asignación (Urgencias): noviembre', async ({ page 
 
 test('solicitudes · médico: pestañas, orden y asistente de nueva solicitud', async ({ page }, testInfo) => {
   const desktop = esDesktop(testInfo);
+  // Con ofertas vigentes (simuladas), el médico ve solo la abierta (C-16).
+  await simularOfertasVigentes(page);
   await iniciarSesion(page, 'medico');
   await irAVista(page, 'solicitudes', { tab: 'requests' });
 
@@ -360,6 +382,9 @@ test('solicitudes · médico con solicitudes (simuladas): propia pendiente, moti
 
 test('solicitudes · jefatura: historial, ofertas, selección de postulante y orden', async ({ page }, testInfo) => {
   const desktop = esDesktop(testInfo);
+  // Con ofertas vigentes (simuladas), la jefatura ve la abierta y la cerrada con
+  // su elegido, no la rechazada (C-16).
+  await simularOfertasVigentes(page);
   await iniciarSesion(page, 'jefatura');
   await irAVista(page, 'solicitudes', { tab: 'requests' });
 

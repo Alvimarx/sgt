@@ -38,18 +38,19 @@ export const esNoche = (t) => (t.diaFinalTurno || t.diaInicioTurno) !== t.diaIni
  * visibles de la agenda:
  *  - no cuentan los cupos de un bloque (misma fecha y mismo tipo de turno) en
  *    el que ya tiene turno (HU-CAL-02, criterio 1);
- *  - no cuentan los cupos de día de la mañana en que sale de su noche
- *    (HU-CAL-02, criterio 2).
+ *  - no cuentan los que chocan con su calendario por solape o por R13 en los dos
+ *    sentidos: el cupo de día de la mañana en que sale de su noche (HU-CAL-02,
+ *    criterio 2) y, desde P-01 (17 oct), también la noche que termina la mañana
+ *    de un turno de día suyo, que el backend rechazaría (choquesR13).
  */
 export function cuposDisponiblesR9(turnos, idFuncionario, hoy) {
   const visibles = new Set(diasVisiblesAgenda(turnos, hoy));
   const mios = turnos.filter((t) => t.idFuncionario === idFuncionario);
   const misBloques = new Set(mios.map((t) => `${t.diaInicioTurno}|${t.idTipoTurno}`));
-  const salidasDeNoche = new Set(mios.filter(esNoche).map((t) => t.diaFinalTurno));
   const libres = turnos.filter((t) => t.idFuncionario == null && visibles.has(t.diaInicioTurno));
   const enMiBloque = libres.filter((t) => misBloques.has(`${t.diaInicioTurno}|${t.idTipoTurno}`));
   const disponibles = libres.filter((t) => !misBloques.has(`${t.diaInicioTurno}|${t.idTipoTurno}`)
-    && !(!esNoche(t) && salidasDeNoche.has(t.diaInicioTurno)));
+    && choquesR13(t, mios).length === 0);
   return { libres, enMiBloque, disponibles, misBloques };
 }
 
@@ -197,13 +198,26 @@ export const nombreMensajeR13 = (f) => [f?.nombre, f?.apellidoPaterno].filter(Bo
 
 const escapar = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Fechas como las escribe el backend en sus mensajes al usuario (FormatoFecha, P-01, 17 oct): «lun 8 jun, 20:00»,
+// con los nombres cortos fijos de la interfaz y sin el año. Se arman aparte del código del backend.
+const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const diaCorto = (iso) => {
+  const [anio, mes, dia] = iso.split('-').map(Number);
+  return `${DIAS_CORTOS[new Date(Date.UTC(anio, mes - 1, dia)).getUTCDay()]} ${dia} ${MESES_CORTOS[mes - 1]}`;
+};
+
+/** El turno que choca como lo cita el backend en R13 y en el cruce: «lun 8 jun, 20:00 a mar 9 jun, 08:00». */
+export const intervaloLegible = (t) => `${diaCorto(t.diaInicioTurno)}, ${String(t.horaInicio).slice(0, 5)} a ${diaCorto(t.diaFinalTurno || t.diaInicioTurno)}, ${String(t.horaFin).slice(0, 5)}`;
+
 /**
  * Mensaje de R13 que cita el catálogo (HU-SOL-14, criterios 1 y 2), con el nombre
  * oculto como «{nombre}» (ver sinNombre en hu.js). Lo que va entre paréntesis el
- * catálogo lo deja abierto («(…)»): se exige solo que cite el turno que choca.
+ * catálogo lo deja abierto («(…)»): se exige que cite el turno que choca, con la fecha
+ * legible de P-01 (17 oct): «(lun 8 jun, 20:00 a mar 9 jun, 08:00)», no en ISO.
  */
 export function patronMensajeR13(regla, turno) {
-  const turnoCitado = `\\([^)]*${escapar(turno.diaInicioTurno)}[^)]*\\)`;
+  const turnoCitado = `\\(${escapar(intervaloLegible(turno))}\\)`;
   const motivo = regla === 'noche-dia'
     ? `sale de su turno de noche ${turnoCitado} la mañana de ese mismo día`
     : `saldría de ese turno de noche la misma mañana en que empieza su turno de día ${turnoCitado}`;
@@ -213,8 +227,9 @@ export function patronMensajeR13(regla, turno) {
 /**
  * Mensaje del validador cuando el turno se cruza con otro de la persona (fase 4:
  * la aprobación revalida el solape, HU-SOL-09 criterio 4), con el nombre oculto
- * como «{nombre}». Se exige que cite el turno con que choca.
+ * como «{nombre}». Se exige que cite el turno con que choca, con la fecha legible
+ * de P-01 (17 oct), como en R13.
  */
 export function patronMensajeSolape(turno) {
-  return new RegExp(`^No es posible asignar el turno a \\{nombre\\} porque ya tiene otro turno asignado que se superpone \\([^)]*${escapar(turno.diaInicioTurno)}[^)]*\\)\\.$`);
+  return new RegExp(`^No es posible asignar el turno a \\{nombre\\} porque ya tiene otro turno asignado que se superpone \\(${escapar(intervaloLegible(turno))}\\)\\.$`);
 }

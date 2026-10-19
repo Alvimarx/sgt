@@ -4,8 +4,7 @@
 //   Toda petición a /api/v2 que no sea GET se corta en el navegador (salvo el
 //   login, la elección y el cambio de servicio, que no escriben en la base) y
 //   la prueba falla al terminar si intentó escribir o si la página lanzó una
-//   excepción no capturada. Además omite las pruebas en desktop-fhd y no deja
-//   correr entre las 21:00 y las 24:00 de Chile (el backend usa UTC, R18).
+//   excepción no capturada. Además omite las pruebas en desktop-fhd.
 // - `entrar`: sesión por la interfaz (iniciarSesion de sesion.js). La primera
 //   vez que un rol entra en una corrida, entra por la pantalla de login; las
 //   siguientes reusa su JWT y user_data, como quien refresca la pestaña (R5).
@@ -60,7 +59,6 @@ const partesChile = (d = new Date()) => Object.fromEntries(
 export const hoyChile = () => { const p = partesChile(); return `${p.year}-${p.month}-${p.day}`; };
 /** Instante actual en Chile como 'YYYY-MM-DDTHH:mm' (comparable con fecha+hora de un turno). */
 export const ahoraChile = () => { const p = partesChile(); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`; };
-export const horaChile = () => Number(partesChile().hour);
 /** Suma días a una fecha 'YYYY-MM-DD' (sin zona horaria). */
 export const sumarDias = (iso, n) => {
   const [y, m, d] = iso.split('-').map(Number);
@@ -110,9 +108,6 @@ export const test = base.extend({
   soloLectura: [async ({ page }, usar, testInfo) => {
     testInfo.skip(testInfo.project.name === 'desktop-fhd',
       'Las pruebas de HU corren en movil (390 px) y desktop (1366 px); desktop-fhd queda para las fotos de e2e/visual.');
-    if (horaChile() >= 21 && !process.env.SGT_IGNORAR_HORA) {
-      throw new Error('Son más de las 21:00 en Chile: el backend (UTC) ya cree que es mañana. Correr de día (catálogo §2.3).');
-    }
     const escrituras = [];
     const erroresPagina = [];
     page.on('pageerror', (err) => erroresPagina.push(err.message));
@@ -154,8 +149,8 @@ export const sinNombre = (texto) => String(texto ?? '').replace(/(asignar el tur
 
 /**
  * `testMuta`: el `test` de arriba para las pruebas que escriben. Conserva lo demás
- * (omite desktop-fhd, se niega después de las 21:00 de Chile y falla ante
- * excepciones no capturadas de la página, también en pestañas nuevas) y, en vez
+ * (omite desktop-fhd y falla ante excepciones no capturadas de la
+ * página, también en pestañas nuevas) y, en vez
  * de cortar las escrituras del navegador, las deja pasar y las registra con su
  * respuesta en la anotación «escrituras» de la prueba.
  *
@@ -165,14 +160,19 @@ export const sinNombre = (texto) => String(texto ?? '').replace(/(asignar el tur
  * PENDIENTES (la red por si la prueba se cae a medio camino) y, si la prueba pasó
  * igual, la hace fallar: cada prueba deshace lo suyo. Lo que no se puede
  * deshacer queda en la anotación «no se deshace»: las solicitudes canceladas
- * siguen en la base como RECHAZADAS, y las ofertas generales quedan pendientes
- * de apertura porque su ofertor no tiene cómo retirarlas.
+ * siguen en la base como RECHAZADAS, y las ofertas generales retiradas por su
+ * ofertor, como RETIRADAS (C-16, 17 oct; antes quedaban pendientes de apertura
+ * porque no había cómo retirarlas). La red de seguridad también retira las
+ * ofertas de la prueba que sigan pendientes de apertura.
  *
  * Fase 4 (flujos con aprobación): `muta` también decide, responde, abre y
  * rechaza ofertas, postula, selecciona, asigna a mano y crea notificaciones. Lo
  * que mueve turnos se anota antes (recordarTurnos) y se devuelve a su dueño con
- * la asignación directa de la jefatura (devolverTurnos). La red de seguridad
- * además rechaza las ofertas de muta.ofertar que sigan pendientes de apertura,
+ * la asignación directa de la jefatura (devolverTurnos). Ojo: asignar, reasignar o
+ * liberar a mano un turno rechaza las solicitudes pendientes que lo tengan (desde
+ * el 17 oct, «Rechazo automático: El turno fue … manualmente»), así que devolverTurnos
+ * las cierra: si una prueba quiere cancelarlas, tiene que hacerlo antes. La red de
+ * seguridad además retira las ofertas que sigan pendientes de apertura,
  * devuelve los turnos anotados que no volvieron y elimina las notificaciones de
  * muta.notificar que queden; si tuvo que hacerlo y la prueba pasó, la hace fallar.
  * Quedan los eventos de bitácora y las notificaciones del sistema que crea cada
@@ -208,19 +208,20 @@ export const testMuta = test.extend({
   muta: [async ({ page, request }, usar, testInfo) => {
     testInfo.skip(testInfo.project.name === 'desktop-fhd',
       'Las pruebas de HU corren en movil (390 px) y desktop (1366 px); desktop-fhd queda para las fotos de e2e/visual.');
-    if (horaChile() >= 21 && !process.env.SGT_IGNORAR_HORA) {
-      throw new Error('Son más de las 21:00 en Chile: el backend (UTC) ya cree que es mañana. Correr de día (catálogo §2.3).');
-    }
     const escrituras = [];
     const erroresPagina = [];
     const solicitudes = new Map(); // idSolicitud → { token, emisor }
-    const ofertas = [];
+    const ofertas = []; // ids de las ofertas generales que la prueba creó, por la interfaz o por API
+    const tokensOferta = new Map(); // idOferta → JWT de su ofertor, que es quien la retira (C-16)
     const lecturas = [];
     const registrar = (ruta, cuerpo, token) => {
       if (ruta.endsWith('/solicitudes') && cuerpo?.idSolicitud) {
         solicitudes.set(cuerpo.idSolicitud, { token, emisor: cuerpo.funcionario?.idFuncionario });
       }
-      if (ruta.endsWith('/ofertas-generales') && cuerpo?.idOfertaGeneral) ofertas.push(cuerpo.idOfertaGeneral);
+      if (ruta.endsWith('/ofertas-generales') && cuerpo?.idOfertaGeneral) {
+        ofertas.push(cuerpo.idOfertaGeneral);
+        tokensOferta.set(cuerpo.idOfertaGeneral, token);
+      }
     };
 
     const contexto = page.context();
@@ -265,7 +266,6 @@ export const testMuta = test.extend({
     // (recordarTurnos); al terminar, devolverTurnos los deja con su dueño de antes.
     const turnosOriginales = new Map(); // idTurno → dueño antes de la prueba (null: cupo libre)
     const turnosMovidos = new Set();
-    const ofertasADeshacer = new Set(); // creadas con muta.ofertar: la limpieza rechaza las que sigan pendientes de apertura
     const notificaciones = new Map(); // idNotificación → quien la creó (muta.notificar)
     const duenoActual = async (idTurno) => {
       const r = await apiLlamar(request, await tokenRol(request, 'jefatura'), 'GET', `/turnos/${idTurno}`);
@@ -329,17 +329,18 @@ export const testMuta = test.extend({
       /** Respuesta del receptor a una propuesta (intercambio u oferta particular, según el tipo de `sol`). */
       responder: (quien, sol, acepta) => muta.api(quien, 'PUT',
         `/solicitudes/${sol.idSolicitud}/${sol.tipoSolicitud?.tipo === 4 ? 'intercambio' : 'oferta-particular'}?respuesta=${acepta}`),
-      /** POST /ofertas-generales: exige que se cree. La limpieza rechaza la oferta si sigue pendiente de apertura. */
+      /** POST /ofertas-generales: exige que se cree. La limpieza la retira (la ofertora) si sigue pendiente de apertura. */
       async ofertar(quien, idTurno, motivo) {
         const r = await llamar(quien, 'POST', '/ofertas-generales', { data: { idTurno, motivo } });
         expect(r.status, `${quien} publica la oferta general del turno ${idTurno}`).toBe(200);
         registrar('/ofertas-generales', r.cuerpo, r.token);
-        ofertasADeshacer.add(r.cuerpo.idOfertaGeneral);
         return r.cuerpo;
       },
       /** PUT /ofertas-generales/{id}/aprobar|rechazar con el JWT de `quien` (gestión). */
       abrirOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/aprobar`),
       rechazarOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/rechazar`),
+      /** PUT /ofertas-generales/{id}/retirar con el JWT del ofertor: la oferta pendiente de apertura queda RETIRADA (C-16, 17 oct). */
+      retirarOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/retirar`),
       /** POST /ofertas-generales/{id}/postular con el JWT de `quien`. El cuerpo es la postulación. */
       postular: (quien, idOferta) => muta.api(quien, 'POST', `/ofertas-generales/${idOferta}/postular`),
       retirarPostulacion: (quien, idOferta, idPostulacion) => muta.api(quien, 'DELETE', `/ofertas-generales/${idOferta}/postular/${idPostulacion}`),
@@ -390,7 +391,7 @@ export const testMuta = test.extend({
         estadoFinal.set(s.idSolicitud, 'RECHAZADA');
       }
     }
-    // Fase 4: ofertas abiertas con muta.ofertar que sigan pendientes de apertura (las rechaza la jefatura).
+    // Ofertas generales de la prueba que sigan pendientes de apertura: su ofertor las retira (C-16, 17 oct).
     const estadoOfertas = new Map();
     if (ofertas.length) {
       const jefatura = await tokenRol(request, 'jefatura');
@@ -399,11 +400,11 @@ export const testMuta = test.extend({
         (Array.isArray(r.cuerpo) ? r.cuerpo : []).filter((o) => ofertas.includes(o.idOfertaGeneral)).forEach((o) => estadoOfertas.set(o.idOfertaGeneral, o.estado));
       };
       await leer();
-      for (const id of ofertasADeshacer) {
+      for (const id of ofertas) {
         if (estadoOfertas.get(id) === 'PENDIENTE_APROBACION') {
-          const r = await apiLlamar(request, jefatura, 'PUT', `/ofertas-generales/${id}/rechazar`);
-          escrituras.push(`limpieza PUT /api/v2/ofertas-generales/${id}/rechazar → ${r.status}`);
-          sinDeshacer.push(`oferta ${id} pendiente de apertura (la rechazó la jefatura)`);
+          const r = await apiLlamar(request, tokensOferta.get(id), 'PUT', `/ofertas-generales/${id}/retirar`);
+          escrituras.push(`limpieza PUT /api/v2/ofertas-generales/${id}/retirar → ${r.status}`);
+          sinDeshacer.push(`oferta ${id} pendiente de apertura (la retiró su ofertor)`);
         } else if (estadoOfertas.get(id) === 'ABIERTA') {
           sinDeshacer.push(`oferta ${id} ABIERTA (sigue abierta: hay que elegir a un postulante para cerrarla)`);
         }
@@ -436,10 +437,7 @@ export const testMuta = test.extend({
       return [...grupos].map(([estado, ids]) => `${ids.join(', ')}: ${estado}`).join('; ');
     };
     if (solicitudes.size) quedan.push(`solicitudes ${porEstado(estadoFinal)} (una cancelada queda RECHAZADA)`);
-    if (ofertas.length) {
-      const propias = [...ofertasADeshacer];
-      quedan.push(`ofertas generales ${porEstado(estadoOfertas)}${propias.length < ofertas.length ? ' (el ofertor no puede retirar las pendientes de apertura)' : ''}`);
-    }
+    if (ofertas.length) quedan.push(`ofertas generales ${porEstado(estadoOfertas)}`);
     if (turnosMovidos.size) quedan.push(`turnos ${[...turnosMovidos].join(', ')}: movidos y devueltos con la asignación directa (quedan sus eventos de bitácora y las notificaciones del sistema)`);
     if (notificaciones.size) quedan.push(`notificaciones ${[...notificaciones.keys()].join(', ')}: quedan ELIMINADO`);
     if (quedan.length) testInfo.annotations.push({ type: 'no se deshace', description: quedan.join(' · ') });
@@ -653,7 +651,9 @@ const extraerTarjetasMovil = (tarjetas) => tarjetas.map((el) => {
     estado: cabecera.children[2]?.textContent.trim(),
     filas,
     motivo: caja?.children[1]?.textContent.trim(),
-    notas: resto.filter((c) => /^(⏳|✕)/.test(c.textContent.trim())).map((c) => c.textContent.trim()),
+    // Avisos de la tarjeta: la espera del receptor (⏳), el rechazo del receptor (✕) y,
+    // desde P-01 (17 oct), la nota de segregación de funciones, igual que en desktop.
+    notas: resto.filter((c) => /^(⏳|✕|Participas en esta solicitud)/.test(c.textContent.trim())).map((c) => c.textContent.trim()),
     botones: [...el.querySelectorAll('button')].map((b) => b.textContent.trim()),
   };
 });
@@ -935,6 +935,14 @@ export async function leerOpcionesTurno(page, testInfo) {
   }));
 }
 
+// Fecha de un turno como la escriben las etiquetas de la interfaz desde P-01 (17 oct),
+// «lun 19 oct 2026» (antes, en ISO). Se arma aparte del código de la app.
+const DIAS_ETIQUETA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const MESES_ETIQUETA = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+export const fechaLegible = (iso) => `${DIAS_ETIQUETA[diaSemana(iso)]} ${Number(iso.slice(8, 10))} ${MESES_ETIQUETA[mesDe(iso) - 1]} ${anioDe(iso)}`;
+/** Etiqueta de un turno de la API: «Día · lun 19 oct 2026 · 08:00–20:00» (avisos del receptor, confirmaciones de asignación). */
+export const etiquetaTurno = (t) => `${t.nombreTipoTurno} · ${fechaLegible(t.diaInicioTurno)} · ${hhmm(t.horaInicio)}–${hhmm(t.horaFin)}`;
+
 /** Clave `fecha|horario` de un turno de la API, como la arma leerOpcionesTurno. */
 export const claveOpcionTurno = async (page, t) => `${await fechaCL(page, t.diaInicioTurno)}|${hhmm(t.horaInicio)}–${hhmm(t.horaFin)}`;
 
@@ -1021,6 +1029,25 @@ export async function confirmarCancelacion(page, dialogo) {
   return respuesta;
 }
 
+/**
+ * Abre la confirmación de «Retirar oferta» (C-16, 17 oct) de una oferta general propia, leída con leerSolicitud en
+ * «Ofertas generales» y pendiente de apertura. Devuelve el diálogo y su texto.
+ */
+export async function abrirRetiroOferta(page, testInfo, oferta) {
+  await oferta.zona.getByRole('button', { name: 'Retirar oferta' }).click();
+  const dialogo = esDesktop(testInfo) ? page.getByRole('alertdialog', { name: 'Retirar oferta' }) : hojaMovil(page);
+  const texto = esDesktop(testInfo) ? dialogo.locator('.sgt-dt-confirmacion__texto') : dialogo.locator('p');
+  await expect(texto).toBeVisible();
+  return { dialogo, texto: (await texto.textContent()).replace(/\s+/g, ' ').trim() };
+}
+
+/** Confirma el retiro abierto y espera la respuesta del backend (PUT /ofertas-generales/{id}/retirar). */
+export async function confirmarRetiroOferta(page, dialogo) {
+  const respuesta = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/api\/v2\/ofertas-generales\/\d+\/retirar$/.test(new URL(r.url()).pathname));
+  await dialogo.getByRole('button', { name: 'Retirar oferta' }).click();
+  return respuesta;
+}
+
 /** Abre «Modificar motivo» de una solicitud leída con leerSolicitud. Devuelve la hoja (móvil) o el panel (desktop). */
 export async function abrirModificarMotivo(page, testInfo, sol) {
   await sol.zona.getByRole('button', { name: 'Modificar motivo' }).click();
@@ -1063,8 +1090,8 @@ export async function personaDe(request, quien) {
 /**
  * Cupos libres de Urgencias, desde mañana, que `quien` puede pedir hoy sin que el
  * backend lo rechace: sin solape ni regla de R13 con su calendario (choquesR13) y
- * sin una solicitud pendiente suya encima. Desde mañana y no desde hoy: el
- * backend corre en UTC y adelanta la hora (§2.3). Quedan fuera las franjas (día
+ * sin una solicitud pendiente suya encima. Desde mañana y no desde hoy: un turno
+ * de hoy puede haber empezado ya, o empezar mientras corre la prueba. Quedan fuera las franjas (día
  * y horario) con algún cupo que no cumpla: en los selectores, los cupos de una
  * misma franja se ven iguales. En orden de inicio.
  */
@@ -1153,26 +1180,38 @@ export async function turnosEnTramite(request) {
 
 const porInicio = (a, b) => inicioDe(a).localeCompare(inicioDe(b));
 
+// Personas cuyo calendario completo lee siempre la foto del día, para saber qué turnos se pueden devolver a su dueño.
+const PERSONAS_DE_LA_FOTO = ['medico', 'segundoMedico', 'tercerMedico', 'jefatura'];
+
 /**
  * Foto del día: los turnos de Urgencias, los cupos libres y los turnos de cada
- * persona desde mañana (el backend corre en UTC, §2.3) y sin trámites encima, y
+ * persona desde mañana (los de hoy pueden haber empezado ya) y sin trámites encima, y
  * el calendario completo de las personas de `quienes` (todos sus turnos, de
  * cualquier servicio: con ellos valida el backend el solape y R13).
+ *
+ * `turnosDe` deja fuera los turnos que ya chocan (solape o R13) con el calendario de su
+ * dueño: el seed los genera sin aplicar R13, y desde C-04 (17 oct) la asignación directa
+ * sí la aplica, así que devolver uno de esos turnos a su dueño al terminar la prueba
+ * (devolverTurnos) respondería 409. `devolvible(turno, quien)` es esa misma comprobación.
  */
 export async function fotoDelDia(request, quienes = []) {
+  const todos = [...new Set([...PERSONAS_DE_LA_FOTO, ...quienes])];
   const [turnos, enTramite, ...calendarios] = await Promise.all([
     apiComo(request, 'jefatura', `/turnos/servicio/${SERVICIO.urgencias}`),
     turnosEnTramite(request),
-    ...quienes.map((q) => calendarioDe(request, q)),
+    ...todos.map((q) => calendarioDe(request, q)),
   ]);
+  const calendarioDePersona = Object.fromEntries(todos.map((q, i) => [q, calendarios[i]]));
+  const devolvible = (turno, quien) => choquesR13(turno, calendarioDePersona[quien] ?? []).length === 0;
   const hoy = hoyChile();
   const futuros = turnos.filter((t) => t.diaInicioTurno > hoy && !enTramite.has(t.id)).sort(porInicio);
   return {
     turnos,
     enTramite,
     cupos: futuros.filter((t) => t.idFuncionario == null),
-    calendario: Object.fromEntries(quienes.map((q, i) => [q, calendarios[i]])),
-    turnosDe: (quien) => futuros.filter((t) => t.idFuncionario === idDe(quien)),
+    calendario: Object.fromEntries(quienes.map((q) => [q, calendarioDePersona[q]])),
+    devolvible,
+    turnosDe: (quien) => futuros.filter((t) => t.idFuncionario === idDe(quien) && devolvible(t, quien)),
   };
 }
 
@@ -1195,7 +1234,7 @@ export async function intercambiosLibres(request, quien, receptor, n = 1) {
   for (const propio of foto.turnosDe(quien)) {
     if (usados.has(propio.id)) continue;
     const ofrecidos = (await apiComo(request, quien, `/turnos/intercambiables?idTurnoPropio=${propio.id}&idFuncionarioReceptor=${idDe(receptor)}`))
-      .filter((t) => !foto.enTramite.has(t.id) && !usados.has(t.id));
+      .filter((t) => !foto.enTramite.has(t.id) && !usados.has(t.id) && foto.devolvible(t, receptor));
     if (!ofrecidos.length) continue;
     pares.push({ propio, deseado: ofrecidos[0] });
     [propio.id, ofrecidos[0].id].forEach((id) => usados.add(id));
@@ -1206,10 +1245,11 @@ export async function intercambiosLibres(request, quien, receptor, n = 1) {
 
 /**
  * Caso para la revalidación de R13 (HU-SOL-14, criterio 4): un turno `turno` de
- * `dueno` que `receptor` puede recibir hoy, y un cupo libre `cupo` que, asignado a
- * mano a `receptor` (la asignación directa solo mira el solape, C-04), deja a
- * `turno` en choque de R13 con su calendario: una noche que sale la mañana de ese
- * día ('noche-dia') o un día que empieza la mañana en que sale de esa noche
+ * `dueno` que `receptor` puede recibir hoy, y un cupo libre `cupo` que se le puede
+ * asignar a mano a `receptor` (desde C-04, 17 oct, la asignación directa también aplica
+ * R13: el cupo no debe chocar de ninguna forma con su calendario) y que, ya asignado,
+ * deja a `turno` en choque de R13 con su calendario: una noche que sale la mañana de
+ * ese día ('noche-dia') o un día que empieza la mañana en que sale de esa noche
  * ('dia-noche'). Prueba los pares [dueno, receptor] en orden. null si no hay.
  */
 export async function casoR13PorAsignacion(request, pares) {
@@ -1219,7 +1259,7 @@ export async function casoR13PorAsignacion(request, pares) {
     for (const turno of foto.turnosDe(dueno)) {
       if (choquesR13(turno, calendario).length) continue;
       for (const cupo of foto.cupos) {
-        if (choquesR13(cupo, calendario).some((c) => c.regla === 'solape')) continue;
+        if (choquesR13(cupo, calendario).length) continue;
         const choques = choquesR13(turno, [...calendario, cupo]);
         if (choques.length === 1 && choques[0].regla !== 'solape') return { dueno, receptor, turno, cupo, regla: choques[0].regla };
       }
@@ -1239,8 +1279,8 @@ export const ofertasDeUrgencias = async (request) => new Map((await apiComo(requ
 // ── Fase 4: decidir y responder en Solicitudes ───────────────────────────────
 const RUTA_DECIDIR = /\/api\/v2\/solicitudes\/\d+\/estado$/;
 const RUTA_RESPONDER = /\/api\/v2\/solicitudes\/\d+\/(intercambio|oferta-particular)$/;
-/** Rutas de las acciones sobre una oferta general (abrir, rechazar, postular, retirar, seleccionar). */
-export const RUTA_OFERTA = /\/api\/v2\/ofertas-generales\/\d+\/(aprobar|rechazar|postular|seleccionar)(\/\d+)?$/;
+/** Rutas de las acciones sobre una oferta general (abrir, rechazar, retirar la oferta, postular, retirar la postulación, seleccionar). */
+export const RUTA_OFERTA = /\/api\/v2\/ofertas-generales\/\d+\/(aprobar|rechazar|retirar|postular|seleccionar)(\/\d+)?$/;
 
 /** Pulsa `boton` y espera la respuesta del backend a la escritura cuya ruta calza con `ruta`. Devuelve { status, cuerpo }. */
 export async function pulsarYEsperar(page, boton, ruta) {
@@ -1320,10 +1360,14 @@ export async function leerPostulaciones(page, testInfo, motivo) {
   return { ...datos, zona, fila: (m) => zona.getByText(`“${m}”`, { exact: true }).locator('xpath=..') };
 }
 
-/** «Elegir» o «Rechazar» de un postulante (zona de leerPostulaciones().fila): en desktop llevan el nombre en su etiqueta; en móvil, «Rechazar» es solo un ícono. */
+/**
+ * «Elegir» o «Rechazar» de un postulante (zona de leerPostulaciones().fila). En
+ * desktop los dos llevan el nombre en su etiqueta («Elegir a …»); en móvil, «Elegir»
+ * es texto y «Rechazar», un ícono con la etiqueta «Rechazar a …» (P-01, 17 oct).
+ */
 export const botonPostulante = (fila, testInfo, accion) => {
-  if (esDesktop(testInfo)) return fila.getByRole('button', { name: new RegExp(`^${accion} a `) });
-  return accion === 'Elegir' ? fila.getByRole('button', { name: 'Elegir', exact: true }) : fila.getByRole('button').first();
+  if (accion === 'Elegir' && !esDesktop(testInfo)) return fila.getByRole('button', { name: 'Elegir', exact: true });
+  return fila.getByRole('button', { name: new RegExp(`^${accion} a `) });
 };
 
 // ── Fase 4: ofertas generales en pantalla ────────────────────────────────────

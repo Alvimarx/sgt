@@ -8,7 +8,7 @@
 //    del seed (solicitudes 13 a 18); los casos que el seed no tiene se simulan;
 //  - HU-OFE-05: ofertas vigentes en el Centro y en «Ofertas generales».
 import {
-  test, expect, fallaConocida, ID, SERVICIO, esDesktop, hoyChile, sumarDias,
+  test, expect, fallaConocida, ID, SERVICIO, esDesktop, hoyChile, sumarDias, tokenRol, apiGet,
   entrar, esperarQuieta, abrirSolicitudes, pestana, elegirPestana, leerLista, fechaCL,
 } from '../helpers/hu.js';
 import { solicitudSimulada, ofertaSimulada, nombreSolicitud } from '../helpers/datos.js';
@@ -243,11 +243,13 @@ test('HU-SOL-02 · criterio 1: «Pendientes» con contador, «Historial» y «Of
   await expect(pestana(page, testInfo, 'Ofertas generales')).toHaveAccessibleName(`Ofertas generales ${porAbrir + 1}`);
 });
 
-test('HU-SOL-02 · criterio 2: solo aparecen las solicitudes cuyo turno es del servicio', async ({ page, api }, testInfo) => {
+test('HU-SOL-02 · criterio 2: solo aparecen las solicitudes cuyo turno es del servicio', async ({ page, request }, testInfo) => {
   await entrar(page, 'jefatura');
-  const todas = await api.get('/solicitudes');
+  // C-17 (17 oct): GET /solicitudes ya entrega a la jefatura solo las de su servicio, así que las de otros servicios
+  // se toman con el administrador, que las recibe todas. La bandeja de la jefatura no debe mostrar ninguna.
+  const todas = await apiGet(request, await tokenRol(request, 'admin', SERVICIO.urgencias), '/solicitudes');
   const deOtro = todas.filter((s) => s.turno && s.turno.servicio?.idServicio !== SERVICIO.urgencias);
-  expect(deOtro.length, 'hay solicitudes de otros servicios en la respuesta').toBeGreaterThan(0);
+  expect(deOtro.length, 'hay solicitudes de otros servicios en el sistema').toBeGreaterThan(0);
   const delServicio = todas.filter((s) => s.turno?.servicio?.idServicio === SERVICIO.urgencias);
   const clave = (titulo, solicitante) => `${titulo}|${solicitante}`;
   await abrirSolicitudes(page, testInfo);
@@ -262,7 +264,8 @@ test('HU-SOL-02 · criterio 2: solo aparecen las solicitudes cuyo turno es del s
 });
 
 test('HU-SOL-02 · criterio 3: un permiso sin turno de otro servicio no aparece', async ({ page }, testInfo) => {
-  fallaConocida('C-17 y §6.3: el filtro `!s.turno || turno.servicio = servicio activo` deja pasar los permisos sin turno de todos los servicios (SolicitudesView.load).');
+  fallaConocida('C-17: el backend ya filtra GET /solicitudes por servicio (17 oct), pero el filtro de la vista `!s.turno || turno.servicio = servicio activo` '
+    + 'sigue dejando pasar los permisos sin turno que la respuesta traiga (SolicitudesView.load). Hoy el backend no los entrega: solo se ve con la respuesta simulada.');
   await entrar(page, 'jefatura');
   const hoy = hoyChile();
   // Un permiso sin turno del funcionario multiservicio (Cirugía y Medicina Interna, no Urgencias).
@@ -295,14 +298,9 @@ test('HU-SOL-02 · criterio 4: mis propias solicitudes aparecen; puedo cancelarl
   expect(mia, 'la solicitud propia aparece junto a las del servicio').toBeTruthy();
   expect(vistas.length, 'junto a las del servicio').toBeGreaterThan(1);
   expect(mia.botones, 'puede cancelarla').toContain('Cancelar solicitud');
-  if (esDesktop(testInfo)) {
-    expect(mia.botones.filter((b) => /^(Aprobar|Rechazar)$/.test(b)), 'no puede decidirla').toEqual([]);
-    expect(mia.notas).toContain('Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.');
-  } else {
-    // En móvil la tarjeta sí ofrece Aprobar y Rechazar, y la negativa la da el
-    // backend al decidir (HU-SOL-09, criterio 6): eso escribe y queda para la fase 4.
-    testInfo.annotations.push({ type: 'fase 4', description: 'En móvil, «no decidirlas» lo garantiza el backend al aprobar o rechazar (HU-SOL-09, criterio 6).' });
-  }
+  // P-01 (17 oct): igual en móvil y desktop (antes, la tarjeta móvil ofrecía Aprobar y Rechazar).
+  expect(mia.botones.filter((b) => /^(Aprobar|Rechazar)$/.test(b)), 'no puede decidirla').toEqual([]);
+  expect(mia.notas).toContain('Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.');
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -347,7 +345,7 @@ test('HU-OFE-05 · criterio 2: en el Centro las ofertas rechazadas no aparecen c
 });
 
 test('HU-OFE-05 · criterio 1: en «Ofertas generales» no aparecen las ofertas de turnos ya terminados', async ({ page, api }, testInfo) => {
-  fallaConocida('C-16: la pestaña «Ofertas generales» de Solicitudes muestra todas las ofertas, también las de turnos pasados (la oferta 1 del seed).');
+  // C-16 (17 oct): la pestaña usa el filtro de vigencia del Centro (antes, falla conocida).
   await entrar(page, 'medico');
   const hoy = hoyChile();
   const ofertas = await api.get(`/ofertas-generales/servicio/${SERVICIO.urgencias}`);
@@ -361,11 +359,20 @@ test('HU-OFE-05 · criterio 1: en «Ofertas generales» no aparecen las ofertas 
   expect(conTurnoPasado, 'ofertas de turnos ya terminados en la lista').toEqual([]);
 });
 
-test('HU-OFE-05 · criterio 2: en «Ofertas generales» las ofertas rechazadas no aparecen como disponibles', async ({ page, api }, testInfo) => {
-  fallaConocida('C-16: la pestaña «Ofertas generales» de Solicitudes también lista las ofertas rechazadas (la oferta 3 del seed).');
+test('HU-OFE-05 · criterio 2: en «Ofertas generales» las ofertas rechazadas no aparecen como disponibles', async ({ page, api, request }, testInfo) => {
+  // C-16 (17 oct): el backend ya no entrega al médico las ofertas rechazadas ni las retiradas de otros, y la pestaña
+  // tampoco las lista (antes, falla conocida). La oferta rechazada del seed se toma de la jefatura, que sí la recibe; al
+  // médico no le llega, y para probar también el filtro de la vista se la devuelve en su respuesta (simulada).
+  const deLaJefatura = await apiGet(request, await tokenRol(request, 'jefatura'), `/ofertas-generales/servicio/${SERVICIO.urgencias}`);
+  const rechazadas = deLaJefatura.filter((o) => o.estado === 'RECHAZADA');
+  expect(rechazadas.length, 'el seed tiene una oferta rechazada').toBeGreaterThan(0);
   await entrar(page, 'medico');
   const ofertas = await api.get(`/ofertas-generales/servicio/${SERVICIO.urgencias}`);
-  expect(ofertas.some((o) => o.estado === 'RECHAZADA'), 'el seed tiene una oferta rechazada').toBe(true);
+  expect(ofertas.filter((o) => o.estado === 'RECHAZADA'), 'el backend no entrega al médico las rechazadas').toEqual([]);
+  await page.route(new RegExp(`/api/v2/ofertas-generales/servicio/${SERVICIO.urgencias}$`), async (route) => {
+    const r = await route.fetch();
+    return route.fulfill({ response: r, json: [...await r.json(), ...rechazadas] });
+  });
   await abrirSolicitudes(page, testInfo);
   await elegirPestana(page, testInfo, 'Ofertas generales');
   const vistas = await leerLista(page, testInfo);

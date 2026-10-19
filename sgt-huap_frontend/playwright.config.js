@@ -1,7 +1,8 @@
 // Pruebas end-to-end y visuales del frontend (Playwright).
 //
 // Requisitos: el ambiente local arriba (docker-compose.local.yml: db + backend
-// con el seed de desarrollo y fechas relativas) y el frontend sirviéndose en
+// con el seed de desarrollo y fechas relativas, y con la hora de Chile:
+// TZ=America/Santiago) y el frontend sirviéndose en
 // SGT_BASE_URL (por defecto `npm run dev` en localhost:5173, que proxyea /api al
 // backend). Ojo: localhost y no 127.0.0.1, que es el origen que permite el
 // CORS del backend local (CORS_ALLOWED_ORIGINS en .env.local).

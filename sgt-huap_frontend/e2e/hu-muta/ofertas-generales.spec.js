@@ -17,7 +17,7 @@
 // directa. Así el turno sirve otra vez en la corrida siguiente. Las ofertas no se
 // borran: quedan CERRADAS o RECHAZADAS («no se deshace»).
 import {
-  test, testMuta, expect, fallaConocida, ID, APOYO, esDesktop, soloPorApi, hhmm,
+  test, testMuta, expect, ID, APOYO, esDesktop, soloPorApi, hhmm,
   entrar, abrirSolicitudes, elegirPestana, leerSolicitud, esperarSolicitudes, fechaCL, idDe,
   motivoF4, duenoDe, fotoDelDia, ofertasDeUrgencias, casoR13PorAsignacion, pulsarYEsperar, RUTA_OFERTA,
   abrirSeleccion, avisoSolicitudes, comprobarMensajeR13, itemMenu, esperarQuieta,
@@ -97,27 +97,36 @@ testMuta('HU-OFE-01 · criterio 2: abierta por la jefatura, en mi oferta no veo 
 // HU-OFE-02 · Abrir o rechazar una oferta (gestión)
 // ═════════════════════════════════════════════════════════════════════════════
 
-testMuta('HU-OFE-02 · criterio 1: en una oferta «Pend. apertura», «Aprobar» la deja «Abierta» y «Rechazar» la deja «Rechazada»', async ({ page, request, muta }, testInfo) => {
+testMuta('HU-OFE-02 · criterio 1: en una oferta «Pend. apertura», «Aprobar» la deja «Abierta» y «Rechazar» la deja RECHAZADA (y fuera de la lista, C-16)', async ({ page, request, muta }, testInfo) => {
   const t1 = await turnoParaOfertar(request);
   const t2 = await turnoParaOfertar(request, { excepto: [t1?.id] });
   expect(t1 && t2, 'el 341 tiene dos turnos sin trámites').toBeTruthy();
   const [abrir, rechazar] = [motivoF4('HU-OFE-02 · criterio 1 · se abre'), motivoF4('HU-OFE-02 · criterio 1 · se rechaza')];
   const ofertaAbrir = await muta.ofertar('tercerMedico', t1.id, abrir);
-  await muta.ofertar('tercerMedico', t2.id, rechazar);
+  const ofertaRechazar = await muta.ofertar('tercerMedico', t2.id, rechazar);
 
-  for (const [motivo, accion, queda] of [[abrir, 'Aprobar', 'Abierta'], [rechazar, 'Rechazar', 'Rechazada']]) {
-    let vista = await verOferta(page, testInfo, 'jefatura', motivo);
+  for (const [motivo, accion] of [[abrir, 'Aprobar'], [rechazar, 'Rechazar']]) {
+    const vista = await verOferta(page, testInfo, 'jefatura', motivo);
     expect(vista.estado).toBe('Pend. apertura');
     expect(vista.botones.filter((b) => DECIDIR.includes(b))).toEqual(['Rechazar', 'Aprobar']);
     const r = await pulsarYEsperar(page, vista.zona.getByRole('button', { name: accion, exact: true }), RUTA_OFERTA);
     expect(r.status, accion).toBe(200);
     await esperarSolicitudes(page);
-    vista = await leerSolicitud(page, testInfo, motivo);
-    expect(vista.estado, `después de ${accion}`).toBe(queda);
-    expect(vista.botones.filter((b) => DECIDIR.includes(b)), 'solo en ofertas pendientes de apertura').toEqual([]);
   }
+  // Aprobada: queda «Abierta» y sin los botones de apertura.
+  const abierta = await leerSolicitud(page, testInfo, abrir);
+  expect(abierta.estado, 'después de Aprobar').toBe('Abierta');
+  expect(abierta.botones.filter((b) => DECIDIR.includes(b)), 'solo en ofertas pendientes de apertura').toEqual([]);
+  // Rechazada: queda RECHAZADA y, desde C-16 (17 oct), la pestaña ya no la muestra
+  // (las rechazadas no son ofertas vigentes; antes se veía como «Rechazada»).
   const estados = await ofertasDeUrgencias(request);
-  expect(estados.get(ofertaAbrir.idOfertaGeneral).estado).toBe('ABIERTA');
+  expect([estados.get(ofertaAbrir.idOfertaGeneral).estado, estados.get(ofertaRechazar.idOfertaGeneral).estado]).toEqual(['ABIERTA', 'RECHAZADA']);
+  if (esDesktop(testInfo)) {
+    await page.getByRole('searchbox').fill(rechazar);
+    await expect(page.getByRole('listbox').getByRole('option'), 'la rechazada no se lista').toHaveCount(0);
+  } else {
+    await expect(page.locator('.sgt-list-row').filter({ hasText: rechazar }), 'la rechazada no se lista').toHaveCount(0);
+  }
 
   await cerrarOferta(request, muta, { oferta: ofertaAbrir, turno: t1 });
 });
@@ -313,12 +322,9 @@ testMuta('HU-OFE-04 · criterio 3: si el postulante quedaría con una noche segu
   vista = await leerSolicitud(page, testInfo, caso.motivo);
   expect(vista.estado, 'la oferta sigue abierta').toBe('Abierta');
   expect((await ofertasDeUrgencias(request)).get(caso.oferta.idOfertaGeneral).estado).toBe('ABIERTA');
-  // Se deshace antes de comparar el aviso, que hoy falla (falla conocida): así la
-  // oferta no queda abierta ni el cupo asignado.
+  // Se deshace antes de comparar el aviso: si fallara, la oferta no queda abierta ni el cupo asignado.
   await deshacerChoqueR13(request, muta, caso);
-
-  fallaConocida('§5.1 y HU-OFE-01 (Estado): los errores de ofertas se muestran genéricos, sin el mensaje del backend. Al seleccionar, '
-    + 'SolicitudesView.handleSeleccionar (:1170-1173) muestra «Error al seleccionar postulante.». (§5.1 nombra handlePostular y handleOfertaAprobar; handleSeleccionar es el mismo caso.)');
+  // P-01 (17 oct): el aviso muestra el mensaje del backend (antes, «Error al seleccionar postulante.»).
   expect(sinNombre(aviso), 'el aviso muestra el mensaje de la regla').toBe(sinNombre(r.cuerpo.error));
 });
 

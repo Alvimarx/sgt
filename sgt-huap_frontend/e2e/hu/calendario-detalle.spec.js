@@ -8,7 +8,7 @@
 // cualquier escritura). Las descargas del CSV son GET.
 import fs from 'node:fs';
 import {
-  test, expect, fallaConocida, ID, SERVICIO, MESES, esMovil, esDesktop,
+  test, expect, ID, SERVICIO, MESES, esMovil, esDesktop, etiquetaTurno,
   hoyChile, sumarDias, diaSemana, mesDe, anioDe, mesRelativo,
   entrar, usuarioSesion, itemMenu, barraInferior, esperarQuieta,
   esperarCalendario, abrirCalendario, textoMes, tituloCalendario, botonMesCal, celdaDia, panelDiaDesktop,
@@ -436,7 +436,7 @@ test('HU-DET-01 · criterio 2: estados «Tu turno», «Asignado» y «Cupo libre
 });
 
 test('HU-DET-01 · criterio 2: la Duración, desde el calendario', async ({ page, api }, testInfo) => {
-  fallaConocida('§5.1: el calendario arma sus turnos sin las horas (turnosService.mapTurnoCalendario no copia «horas»), así que su detalle no muestra «Duración» (ShiftDetail la muestra solo si shift.horas != null).');
+  // P-01 (17 oct): mapTurnoCalendario copia las horas (antes, falla conocida).
   await entrar(page, 'medico');
   const { mio, ajeno } = await turnosParaDetalle(api);
   await abrirCalendario(page, testInfo);
@@ -450,7 +450,7 @@ test('HU-DET-01 · criterio 2: la Duración, desde el calendario', async ({ page
 });
 
 test('HU-DET-01 · criterio 2: «Solicitud pendiente», desde el calendario (marca del backend simulada)', async ({ page, api }, testInfo) => {
-  fallaConocida('§5.1: el backend marca solicitudPendiente en GET /turnos/servicio/{id}/calendario (TurnoService.getTurnosCalendario), pero turnosService.mapTurnoCalendario no la copia: desde el calendario nunca se ve «Solicitud pendiente».');
+  // P-01 (17 oct): mapTurnoCalendario copia solicitudPendiente (antes, falla conocida).
   await entrar(page, 'medico');
   const { mio } = await turnosParaDetalle(api);
   await page.route(/\/api\/v2\/turnos\/servicio\/4\/calendario\/\d+\/\d+$/, async (route) => {
@@ -502,14 +502,32 @@ test('HU-DET-01 · criterio 3: «Falta cubrir ×n» con varias vacantes en el mi
   expect(fila.vacantes).toBeGreaterThanOrEqual(2);
 });
 
-test('HU-DET-01 · criterio 4: siempre está «Ver historial»', async ({ page, api }, testInfo) => {
+// C-06 (17 oct): «Ver historial» abre el historial de ESE turno (GET /bitacoras/turno/{id}), no la bitácora general.
+// La gestión lo ve en todos los turnos de su servicio, también en los cupos; el médico solo en el turno que tiene
+// hoy: en un cupo o en un turno ajeno el backend le responde 403 y el detalle no se lo ofrece (antes estaba siempre).
+const VER_HISTORIAL = { name: 'Ver historial' };
+
+test('HU-DET-01 · criterio 4: el médico ve «Ver historial» solo en su turno, no en un turno ajeno ni en un cupo', async ({ page, api }, testInfo) => {
   await entrar(page, 'medico');
   const { mio, ajeno, libre } = await turnosParaDetalle(api);
   await abrirCalendario(page, testInfo);
-  for (const t of [mio, ajeno, libre]) {
+  for (const [t, ofrece, que] of [[mio, true, 'su turno'], [ajeno, false, 'un turno ajeno'], [libre, false, 'un cupo']]) {
     await abrirDia(page, testInfo, t.diaInicioTurno);
     const det = await abrirDetalle(page, testInfo, t);
-    await expect(det.getByRole('button', { name: 'Ver historial' }), `${t.diaInicioTurno} · ${t.nombrePuesto}`).toBeVisible();
+    await expect(det.getByRole('button', VER_HISTORIAL), `${t.diaInicioTurno} · ${que}`).toHaveCount(ofrece ? 1 : 0);
+    await cerrarDetalle(page, testInfo);
+    if (esMovil(testInfo)) await page.mouse.click(195, 24);
+  }
+});
+
+test('HU-DET-01 · criterio 4: la jefatura ve «Ver historial» en cualquier turno de su servicio, también en un cupo', async ({ page, api }, testInfo) => {
+  await entrar(page, 'jefatura');
+  const { mio, ajeno, libre } = await turnosParaDetalle(api);
+  await abrirCalendario(page, testInfo);
+  for (const [t, que] of [[mio, 'el turno de un médico'], [ajeno, 'otro turno'], [libre, 'un cupo']]) {
+    await abrirDia(page, testInfo, t.diaInicioTurno);
+    const det = await abrirDetalle(page, testInfo, t);
+    await expect(det.getByRole('button', VER_HISTORIAL), `${t.diaInicioTurno} · ${que}`).toBeVisible();
     await cerrarDetalle(page, testInfo);
     if (esMovil(testInfo)) await page.mouse.click(195, 24);
   }
@@ -520,7 +538,9 @@ test('HU-DET-01 · criterio 4: siempre está «Ver historial»', async ({ page, 
 // ═════════════════════════════════════════════════════════════════════════════
 
 const RECEPTOR = 368; // segundo médico de Urgencias (catálogo §2.1)
-const formatoTurno = (t) => `${t.nombreTipoTurno} · ${t.diaInicioTurno} ${hhmm(t.horaInicio)}–${hhmm(t.horaFin)}`;
+// Etiqueta del turno en el aviso del receptor: desde P-01 (17 oct), con la fecha
+// legible («Noche · mié 21 oct 2026 · 20:00–08:00»); antes, en ISO.
+const formatoTurno = (t) => etiquetaTurno(t);
 
 // Un turno propio y, del receptor, uno intercambiable y otro no (según la API),
 // en días y bloques donde el médico no tiene turno.

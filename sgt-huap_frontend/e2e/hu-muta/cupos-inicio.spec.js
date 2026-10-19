@@ -3,8 +3,8 @@
 // un solo usuario que se deshacen en la misma prueba.
 //  - HU-DET-02 (pedir un cupo libre tocándolo, R4): en móvil desde la agenda del
 //    inicio; en desktop, donde el inicio es el Centro de operaciones, desde el
-//    calendario. El criterio 2 desde el calendario es una falla conocida (§5.1:
-//    mapTurnoCalendario no copia la marca solicitudPendiente). El criterio 3 no
+//    calendario. El criterio 2 desde el calendario era una falla conocida hasta
+//    P-01 (17 oct: mapTurnoCalendario ya copia solicitudPendiente). El criterio 3 no
 //    se automatiza (ver su prueba). El 4 (jefatura) no escribe.
 //  - HU-CAL-03 («Solicitudes» del inicio, R11): solo móvil, porque la agenda es
 //    el inicio móvil (en desktop el inicio es el Centro, HU-CAL-05).
@@ -13,7 +13,7 @@
 // 369 puede pedir; lo creado se cancela al final. El intercambio de HU-CAL-03 se
 // crea por API con el médico 368 como receptor, que no hace nada.
 import {
-  test, testMuta, expect, fallaConocida, SERVICIO, APOYO, esMovil, esDesktop, hoyChile,
+  test, testMuta, expect, SERVICIO, APOYO, esMovil, esDesktop, hoyChile,
   entrar, barraInferior, abrirCalendario, abrirDia, abrirDetalle, detalle, puestoDetalle, accionesDetalle,
   esperarAgenda, filtro, filaDia, leerAgenda, etiquetaDia, asistente, campoAsistente, valorCampo, escribirMotivo,
   nuevaSolicitud, elegirTurnoAsistente, enviarYCrear, leerSolicitud, motivoPrueba, fechaCL, hhmm,
@@ -98,8 +98,8 @@ testMuta('HU-DET-02 · criterio 2: en la agenda, el cupo que ya pedí dice «Ya 
   expect((await muta.cancelar('medico', sol.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
-testMuta('HU-DET-02 · criterio 2: desde el calendario, el cupo que ya pedí dice «Ya solicitaste este turno» y solo queda «Ver historial»', async ({ page, request, muta }, testInfo) => {
-  fallaConocida('§5.1 y §6.3: turnosService.mapTurnoCalendario no copia solicitudPendiente, así que desde el calendario el cupo ya pedido se sigue ofreciendo y queda «Solicitar turno».');
+testMuta('HU-DET-02 · criterio 2: desde el calendario, el cupo que ya pedí dice «Ya solicitaste este turno» y no queda ninguna acción', async ({ page, request, muta }, testInfo) => {
+  // P-01 (17 oct): mapTurnoCalendario copia solicitudPendiente (antes, falla conocida).
   const caso = await cupoParaTocar(request);
   const sol = await muta.crear('medico', { idTipoSolicitud: 3, idTurno: caso.cupo.id, motivo: motivoPrueba('HU-DET-02 · criterio 2 · calendario') });
   await entrar(page, 'medico');
@@ -109,14 +109,15 @@ testMuta('HU-DET-02 · criterio 2: desde el calendario, el cupo que ya pedí dic
   const puesto = puestoDetalle(det, testInfo, caso.cupo.nombrePuesto);
   await expect(puesto, 'la fila del puesto del cupo').toHaveCount(1);
   await expect(puesto.getByText('Ya solicitaste este turno', { exact: true })).toBeVisible({ timeout: 5_000 });
-  await expect(accionesDetalle(det, testInfo)).toHaveText(['Ver historial']);
+  // C-06 (17 oct): «Ver historial» ya no se ofrece al médico en un cupo, así que sin «Solicitar turno» no queda
+  // ninguna acción, y el detalle ya no dibuja la sección «Acciones» vacía.
+  await expect(accionesDetalle(det, testInfo)).toHaveCount(0);
   expect((await muta.cancelar('medico', sol.idSolicitud)).status, 'deshacer').toBe(200);
 });
 
 test('HU-DET-02 · criterio 3: un cupo conocido solo por conteo («Cupo libre — falta cubrir») no se puede tocar', async () => {
-  test.skip(true, 'No automatizable: el estado no se produce. La agenda (funcionarioService.buildAgendaData) y el calendario (turnosService.buildTurnoTeams) '
-    + 'cuentan las vacantes de cada puesto con los mismos turnos que listan, así que en ShiftDetail.equipoPorPuesto vacantesSinTurno siempre vale 0 '
-    + 'y «Cupo libre — falta cubrir» (ShiftDetail.jsx:1012, DetalleTurnoDesktop.jsx:143) no aparece con datos reales.');
+  test.skip(true, 'No automatizable: el estado no existe. La rama «Cupo libre — falta cubrir» (vacantes conocidas solo por conteo) se retiró del detalle '
+    + 'móvil y desktop (P-01, 17 oct): la agenda y el calendario cuentan las vacantes con los mismos turnos que listan, así que nunca se dibujaba.');
 });
 
 test('HU-DET-02 · criterio 4: para la jefatura, la vacante dice «Asignar funcionario a este cupo» y abre la asignación directa', async ({ page, request }, testInfo) => {

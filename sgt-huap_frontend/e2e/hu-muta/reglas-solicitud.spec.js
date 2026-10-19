@@ -17,11 +17,11 @@
 // aserciones los comparan con el nombre oculto (sinNombre) y comprueban aparte,
 // sin escribirlo, que sea el de quien pide.
 import {
-  testMuta, expect, fallaConocida, SERVICIO, APOYO, soloPorApi, hoyChile,
+  testMuta, expect, SERVICIO, APOYO, soloPorApi, hoyChile,
   entrar, vistaActual, esperarQuieta, nuevaSolicitud, asistente, campoAsistente, elegirTurnoAsistente, elegirPersonaAsistente,
   escribirMotivo, enviarSolicitud, enviarYCrear, enviarYRechazar, errorAsistente, leerSolicitud, abrirCancelacion, confirmarCancelacion,
   esperarSolicitudes, motivoPrueba, idDe, apiComo, solicitudesDe, calendarioDe, comprometidosDe, personaDe,
-  cuposParaPedir, cupoDelSelector, intercambioPosible, hhmm, comprobarMensajeR13,
+  cuposParaPedir, cupoDelSelector, intercambioPosible, hhmm, comprobarMensajeR13, leerOpcionesTurno, claveOpcionTurno,
 } from '../helpers/hu.js';
 import { inicioDe, esNoche, choquesR13, encadenamientoR13 } from '../helpers/datos.js';
 
@@ -93,10 +93,8 @@ testMuta('HU-SOL-13 · criterio 2: con mi turno ofrecido en un intercambio, bota
 });
 
 testMuta('HU-SOL-13 · criterio 2: con mi turno ofrecido en un intercambio, proponer otro intercambio con él muestra el mensaje de turno comprometido que menciona cancelar', async ({ page, request, muta }, testInfo) => {
-  fallaConocida('HU-SOL-13 (Estado), HU-SOL-06 (criterio 5) y §5.1: con el turno propio comprometido, /turnos/intercambiables devuelve una lista vacía '
-    + '(TurnoService.java:474-477) y el asistente solo muestra «No hay turnos intercambiables con el que elegiste: …» (SolicitudesView.jsx:717 y :824), '
-    + 'que no menciona cancelar; sin turno del receptor, «Enviar solicitud» dice «Rellena todos los campos requeridos.». El mensaje de R15 del backend '
-    + '(SolicitudService.java:134-138) no llega a verse por la interfaz.');
+  // P-01 (17 oct): el asistente reconoce el turno propio comprometido, lo dice bajo «Turno del
+  // receptor que quieres» y al enviar muestra el mensaje de R15 (antes, falla conocida).
   const { propio, sol } = await intercambioPendiente(request, muta, 'HU-SOL-13 · criterio 2 · interfaz');
   await entrar(page, 'medico');
   const a = await nuevaSolicitud(page, testInfo, 'Intercambio');
@@ -237,20 +235,24 @@ for (const [criterio, regla, descripcion] of [
   [1, 'noche-dia', 'pedir el cupo de día de la mañana en que salgo de mi noche'],
   [2, 'dia-noche', 'pedir una noche que termina la mañana en que empieza mi turno de día'],
 ]) {
-  testMuta(`HU-SOL-14 · criterio ${criterio}: ${descripcion} (cobertura) se rechaza con el mensaje de R13`, async ({ page, request }, testInfo) => {
+  testMuta(`HU-SOL-14 · criterio ${criterio}: ${descripcion} (cobertura): el selector no lo ofrece y el backend lo rechaza con el mensaje de R13`, async ({ page, request, muta }, testInfo) => {
+    // P-01 (17 oct): el selector de Cobertura aplica R13 en los dos sentidos, como
+    // «Disponibles» (HU-SOL-05, criterio 1), así que el cupo ya no se ofrece y el
+    // mensaje no se alcanza por la interfaz. La garantía es la del backend, por API.
     const caso = await casoCobertura(request, soloLaRegla(regla));
     expect(caso, `hay un cupo libre desde mañana con el caso «${regla}» para alguno de los médicos 369, 368 o 341`).toBeTruthy();
     const antes = (await solicitudesDe(request, caso.quien)).length;
 
     await entrar(page, caso.quien);
     const a = await nuevaSolicitud(page, testInfo, 'Cobertura');
-    await elegirTurnoAsistente(page, testInfo, 'Turno a cubrir', caso.cupo);
-    await escribirMotivo(a, motivoPrueba(`HU-SOL-14 · criterio ${criterio}`));
-    const r = await enviarSolicitud(page, testInfo);
+    await campoAsistente(a, testInfo, 'Turno a cubrir').click();
+    const opciones = await leerOpcionesTurno(page, testInfo);
+    expect(opciones.length, 'el selector lista otros cupos').toBeGreaterThan(0);
+    expect(opciones, 'el selector no ofrece el cupo').not.toContain(await claveOpcionTurno(page, caso.cupo));
+
+    const r = await muta.solicitar(caso.quien, { idTipoSolicitud: 3, idTurno: caso.cupo.id, motivo: motivoPrueba(`HU-SOL-14 · criterio ${criterio}`) });
     expect(r.status, 'el backend rechaza la cobertura').toBe(400);
-    const texto = await errorAsistente(page, testInfo, /^No es posible asignar el turno a /);
-    expect(texto, 'el asistente muestra el mensaje del backend').toBe(r.cuerpo.error);
-    await comprobarMensajeR13(request, texto, caso.quien, regla, caso.choque.turno);
+    await comprobarMensajeR13(request, r.cuerpo.error, caso.quien, regla, caso.choque.turno);
     expect((await solicitudesDe(request, caso.quien)).length, 'no se creó nada').toBe(antes);
   });
 }

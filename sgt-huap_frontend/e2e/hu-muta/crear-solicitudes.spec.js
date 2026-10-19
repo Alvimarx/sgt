@@ -6,22 +6,23 @@
 //  - Lo que no escribe (los tipos del paso 1, los límites de fechas, los
 //    selectores) usa el `test` de solo lectura: su guarda corta cualquier envío.
 //  - Lo que crea usa `testMuta` y lo deshace al final cancelando por API. La
-//    oferta general no se puede retirar (no hay endpoint para el ofertor): queda
-//    pendiente de apertura y la prueba elige cada vez un turno sin oferta suya.
+//    oferta general la retira su ofertor por la interfaz (C-16, 17 oct); antes no
+//    había cómo y quedaba pendiente de apertura.
 //  - Fuera, en la fase 4 (necesitan que la jefatura apruebe): HU-SOL-03
 //    (criterio 5), la segunda mitad de HU-SOL-04 y HU-SOL-05 (criterio 2, «al
 //    aprobarse…»), en aprobaciones.spec.js, y la apertura real de HU-OFE-01
 //    (criterio 2, aquí simulada), en ofertas-generales.spec.js.
 //
-// Los turnos y cupos se eligen con la API del día (desde mañana: el backend corre
-// en UTC, §2.3); nada de ids fijos. Las personas van por id.
+// Los turnos y cupos se eligen con la API del día (desde mañana, porque uno de hoy
+// puede haber empezado ya); nada de ids fijos. Las personas van por id.
 import {
-  test, testMuta, expect, fallaConocida, ID, SERVICIO, APOYO, esDesktop, MESES,
+  test, testMuta, expect, ID, SERVICIO, APOYO, esDesktop, MESES,
   hoyChile, ahoraChile, sumarDias, anioDe, mesDe, diasDelMes,
   entrar, abrirSolicitudes, elegirPestana, leerSolicitud, fechaCL, hhmm,
   asistente, abrirNuevaSolicitud, nuevaSolicitud, campoAsistente, elegirTurnoAsistente, escribirMotivo,
   enviarYCrear, enviarYRechazar, errorAsistente, leerOpcionesTurno, claveOpcionTurno, motivoPrueba,
   TIPOS_SOLICITUD, apiComo, calendarioDe, comprometidosDe, cuposParaPedir, intercambioPosible, solicitudesDe,
+  abrirRetiroOferta, confirmarRetiroOferta, ofertasDeUrgencias, esperarSolicitudes, duenoDe,
 } from '../helpers/hu.js';
 import { inicioDe, choquesR13, ofertaSimulada } from '../helpers/datos.js';
 
@@ -30,12 +31,6 @@ const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'S
 const FALTAN_CAMPOS = 'Rellena todos los campos requeridos.';
 const YA_SOLICITO = 'Ud. ya solicitó este turno. Cancele la solicitud pendiente desde Solicitudes si desea cambiarla.';
 const COMPROMETIDO = 'Ese turno ya está comprometido en otra solicitud pendiente suya. Cancélela desde Solicitudes para pedir otra cosa sobre él.';
-
-// 'YYYY-MM-DDTHH:mm' más `horas` (sin zona: se usa para comparar con inicioDe).
-const sumarHoras = (instante, horas) => new Date(Date.parse(`${instante}:00Z`) + horas * 3_600_000).toISOString().slice(0, 16);
-// El backend corre en UTC (§2.3): ve la hora de Chile adelantada hasta 4 horas.
-// Un turno que empieza en ese margen puede faltar en sus listas sin ser un error.
-const MARGEN_UTC = 4;
 
 // Fechas del permiso: en desktop, los campos de fecha; en móvil, año → mes → día.
 async function elegirFechaMovil(a, iso) {
@@ -193,8 +188,7 @@ test('HU-SOL-04 · criterio 1: «Turno a liberar» lista solo mis turnos que no 
   const tope = `${anioDe(ahora) + 1}${ahora.slice(4, 10)}`;
   const mios = await calendarioDe(request, 'medico');
   const claves = async (lista) => Promise.all(lista.map((t) => claveOpcionTurno(page, t)));
-  const esperados = await claves(mios.filter((t) => inicioDe(t) > sumarHoras(ahora, MARGEN_UTC) && t.diaInicioTurno <= tope));
-  const enMargen = await claves(mios.filter((t) => inicioDe(t) > ahora && inicioDe(t) <= sumarHoras(ahora, MARGEN_UTC)));
+  const esperados = await claves(mios.filter((t) => inicioDe(t) > ahora && t.diaInicioTurno <= tope));
   const yaEmpezados = await claves(mios.filter((t) => inicioDe(t) <= ahora));
   expect(esperados.length, 'el médico tiene turnos futuros').toBeGreaterThan(0);
   expect(yaEmpezados.length, 'y turnos que ya empezaron').toBeGreaterThan(0);
@@ -202,7 +196,7 @@ test('HU-SOL-04 · criterio 1: «Turno a liberar» lista solo mis turnos que no 
   const a = await nuevaSolicitud(page, testInfo, 'Botar turno');
   await campoAsistente(a, testInfo, 'Turno a liberar').click();
   const vistos = await leerOpcionesTurno(page, testInfo);
-  expect(vistos.filter((v) => !enMargen.includes(v)).sort()).toEqual(esperados.sort());
+  expect([...vistos].sort()).toEqual(esperados.sort());
   for (const pasado of yaEmpezados) expect(vistos, 'un turno que ya empezó').not.toContain(pasado);
 });
 
@@ -288,7 +282,7 @@ async function cuposDelSelector(page, request) {
   const [turnos, mios] = await Promise.all([apiComo(request, 'medico', `/turnos/servicio/${SERVICIO.urgencias}`), calendarioDe(request, 'medico')]);
   const libres = turnos.filter((t) => t.idFuncionario == null);
   const claves = async (lista) => Promise.all(lista.map((t) => claveOpcionTurno(page, t)));
-  const futuros = libres.filter((t) => inicioDe(t) > sumarHoras(ahora, MARGEN_UTC));
+  const futuros = libres.filter((t) => inicioDe(t) > ahora);
   return {
     tomables: await claves(futuros.filter((t) => choquesR13(t, mios).length === 0)),
     noTomables: await claves(futuros.filter((t) => choquesR13(t, mios).length > 0)),
@@ -313,7 +307,7 @@ test('HU-SOL-05 · criterio 1: el selector lista todos los cupos libres que toda
 });
 
 test('HU-SOL-05 · criterio 1: el selector no lista cupos que ya empezaron', async ({ page, request }, testInfo) => {
-  fallaConocida('HU-SOL-05, §5.1 y §6.3: el selector trae todos los cupos sin funcionario, también los ya pasados (TurnoRepository.findUnassignedTurnosByServicio no filtra por fecha).');
+  // C-16 (17 oct): el selector deja fuera los cupos que ya empezaron (antes, falla conocida).
   await entrar(page, 'medico');
   const { pasados } = await cuposDelSelector(page, request);
   expect(pasados.length, 'hay cupos libres que ya pasaron (seed y vigencia desde el lunes)').toBeGreaterThan(0);
@@ -322,7 +316,7 @@ test('HU-SOL-05 · criterio 1: el selector no lista cupos que ya empezaron', asy
 });
 
 test('HU-SOL-05 · criterio 1: el selector no lista cupos que no puedo tomar (mi bloque, R9 y R13)', async ({ page, request }, testInfo) => {
-  fallaConocida('HU-SOL-05, Estado: el selector no aplica la elegibilidad de «Disponibles» (R9): lista también los cupos de los bloques donde ya tengo turno.');
+  // P-01 (17 oct): el selector aplica la regla de «Disponibles» (R9) y R13 (antes, falla conocida).
   await entrar(page, 'medico');
   const { noTomables } = await cuposDelSelector(page, request);
   expect(noTomables.length, 'hay cupos futuros que el médico no puede tomar').toBeGreaterThan(0);
@@ -363,16 +357,17 @@ test('HU-SOL-05 · criterio 3: al crear se aplican R12 y R13', async () => {
 // HU-OFE-01 · Publicar una oferta general de mi turno
 // ═════════════════════════════════════════════════════════════════════════════
 
-testMuta('HU-OFE-01 · criterio 1: al enviar, la oferta aparece en «Ofertas generales» con la marca «Pend. apertura»', async ({ page, request }, testInfo) => {
-  // No se puede deshacer: el ofertor no tiene cómo retirar la oferta (OfertaGeneralController
-  // solo deja aprobarla o rechazarla a la gestión). Por eso se elige un turno sin oferta suya.
+testMuta('HU-OFE-01 · criterio 1: al enviar, la oferta aparece en «Ofertas generales» con la marca «Pend. apertura»; quien la publicó puede retirarla', async ({ page, request }, testInfo) => {
+  // C-16 (17 oct): el ofertor retira su oferta mientras nadie la haya abierto (PUT /ofertas-generales/{id}/retirar): queda
+  // RETIRADA y el turno sigue siendo suyo. Es también cómo se deshace: antes, la oferta quedaba pendiente de apertura. Se
+  // elige un turno sin una oferta suya viva (pendiente de apertura o abierta).
   await entrar(page, 'medico');
   const ofertas = await apiComo(request, 'medico', `/ofertas-generales/servicio/${SERVICIO.urgencias}`);
-  const ofrecidos = new Set(ofertas.filter((o) => o.ofertor?.idFuncionario === ID.medico).map((o) => o.turno?.idTurno));
+  const ofrecidos = new Set(ofertas.filter((o) => o.ofertor?.idFuncionario === ID.medico && ['PENDIENTE_APROBACION', 'ABIERTA'].includes(o.estado)).map((o) => o.turno?.idTurno));
   const turno = (await calendarioDe(request, 'medico'))
     .filter((t) => t.diaInicioTurno > hoyChile() && !ofrecidos.has(t.id))
     .sort((x, y) => inicioDe(x).localeCompare(inicioDe(y))).at(-1);
-  expect(turno, 'el médico tiene un turno futuro sin oferta suya (si no, restaurar la base)').toBeTruthy();
+  expect(turno, 'el médico tiene un turno futuro sin oferta viva suya').toBeTruthy();
   const motivo = motivoPrueba('HU-OFE-01');
 
   const a = await nuevaSolicitud(page, testInfo, 'Oferta general');
@@ -388,6 +383,23 @@ testMuta('HU-OFE-01 · criterio 1: al enviar, la oferta aparece en «Ofertas gen
   expect(vista.estado).toBe('Pend. apertura');
   expect(vista.filas['Turno ofertado']).toContain(await fechaCL(page, turno.diaInicioTurno));
   expect(vista.botones, 'nadie postula a una oferta sin abrir').not.toContain('Postular');
+
+  // Quien la publicó la retira: confirmación con su texto y el turno, y el backend la deja RETIRADA.
+  expect(vista.botones, 'el ofertor puede retirarla').toContain('Retirar oferta');
+  const { dialogo, texto } = await abrirRetiroOferta(page, testInfo, vista);
+  expect(texto).toContain('Se retirará tu oferta general: ya no esperará apertura, nadie podrá postular y el turno sigue siendo tuyo.');
+  const r = await confirmarRetiroOferta(page, dialogo);
+  expect(r.status(), 'PUT /retirar').toBe(200);
+  await esperarSolicitudes(page);
+  expect((await ofertasDeUrgencias(request)).get(creada.idOfertaGeneral)?.estado, 'la oferta queda RETIRADA').toBe('RETIRADA');
+  expect(await duenoDe(request, turno.id), 'el turno sigue siendo suyo').toBe(ID.medico);
+  // Una oferta retirada ya no se lista (no es una oferta vigente).
+  if (esDesktop(testInfo)) {
+    await page.getByRole('searchbox').fill(motivo);
+    await expect(page.getByRole('listbox').getByRole('option'), 'la retirada no se lista').toHaveCount(0);
+  } else {
+    await expect(page.locator('.sgt-list-row').filter({ hasText: motivo }), 'la retirada no se lista').toHaveCount(0);
+  }
 });
 
 test('HU-OFE-01 · criterio 2: en mi oferta no veo «Postular» y, abierta, veo «Tu oferta está abierta · N postulantes» (apertura simulada)', async ({ page, api }, testInfo) => {
@@ -405,11 +417,14 @@ test('HU-OFE-01 · criterio 2: en mi oferta no veo «Postular» y, abierta, veo 
     id: 9931, estado: 'ABIERTA', ofertor: persona(ID.medico), turno: miTurno, servicio: URGENCIAS, motivo,
     postulantes: [persona(APOYO.segundoMedico.id), persona(APOYO.tercerMedico.id)],
   });
-  let reales = [];
+  // Control: una oferta abierta y vigente de otra persona. Desde C-16 (17 oct) la
+  // pestaña oculta las de turnos ya terminados, como la oferta 1 del seed (la de la
+  // semana pasada), así que el control también se simula.
+  const suTurno = turnos.find((t) => t.idFuncionario === APOYO.tercerMedico.id && t.diaInicioTurno > hoy);
+  const ajena = ofertaSimulada({ id: 9932, estado: 'ABIERTA', ofertor: persona(APOYO.tercerMedico.id), turno: suTurno, servicio: URGENCIAS, motivo: 'Simulada: abierta de otra persona' });
   await page.route(new RegExp(`/api/v2/ofertas-generales/servicio/${SERVICIO.urgencias}$`), async (route) => {
     const r = await route.fetch();
-    reales = await r.json();
-    return route.fulfill({ response: r, json: [...reales, mia] });
+    return route.fulfill({ response: r, json: [...await r.json(), mia, ajena] });
   });
   await abrirSolicitudes(page, testInfo);
   await elegirPestana(page, testInfo, 'Ofertas generales');
@@ -420,7 +435,5 @@ test('HU-OFE-01 · criterio 2: en mi oferta no veo «Postular» y, abierta, veo 
   await expect(vista.zona).toContainText('Tu oferta está abierta · 2 postulantes');
 
   // Control: en una oferta abierta de otra persona sí aparece «Postular».
-  const ajena = reales.find((o) => o.estado === 'ABIERTA' && o.ofertor?.idFuncionario !== ID.medico);
-  expect(ajena, 'el seed tiene una oferta abierta de otra persona').toBeTruthy();
   expect((await leerSolicitud(page, testInfo, ajena.motivo)).botones).toContain('Postular');
 });

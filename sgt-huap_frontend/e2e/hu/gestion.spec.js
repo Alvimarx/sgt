@@ -3,14 +3,15 @@
 //  - HU-PER-01 (criterios 1 a 3; el 4 es un negativo por API de la fase 2a);
 //  - HU-EST-01, HU-BIT-01 y HU-AUD-01 con la jefatura de Urgencias;
 //  - HU-ADM-03 con el administrador;
-//  - HU-REG-02 (abrir y cancelar) con jefatura y subrogante.
+//  - HU-REG-02: desde C-10 (17 oct) las reglas de horario son del administrador; se guarda que
+//    la jefatura y el subrogante no llegan a la vista.
 // Lo esperado sale de la API del día. Las ventanas de la bitácora no abren
 // ningún evento del seed ligado al funcionario 4 (eventos 3 y 8): solo se abre
 // la generación de turnos más reciente o un evento simulado.
 import {
   test, expect, fallaConocida, ID, SERVICIO, MESES, esDesktop,
-  hoyChile, ahoraChile, mesDe, anioDe, diasDelMes, mesRelativo,
-  entrar, irA, itemMenu, barraInferior, usuarioSesion,
+  hoyChile, ahoraChile, mesDe, anioDe, diasDelMes, mesRelativo, tokenRol, apiGet, vistaActual,
+  entrar, irA, itemMenu, barraInferior,
   abrirDesdePanel, abrirBitacora, filtrarBitacoraPorEstado,
 } from '../helpers/hu.js';
 import { nombreResumen, inicioDe } from '../helpers/datos.js';
@@ -342,7 +343,7 @@ test('HU-BIT-01 · criterio 1: elegir mes y semana filtra los eventos del perío
 });
 
 test('HU-BIT-01 · criterio 1: los eventos se ordenan del más reciente al más antiguo', async ({ page }, testInfo) => {
-  fallaConocida('HU-BIT-01, Estado, y R18: la vista invierte el orden de llegada de GET /bitacoras/dto, no ordena por fecha.');
+  // P-01 (17 oct): la vista ordena por fecha (antes invertía el orden de llegada; falla conocida).
   await entrar(page, 'jefatura');
   await abrirBitacora(page, testInfo);
   // Solo los eventos de solicitudes: caben en la primera página de desktop (la
@@ -369,7 +370,8 @@ test('HU-BIT-01 · criterio 2: filtros por categoría, tipo de solicitud, estado
   const esOferta = (e) => String(e.tipoEvento).startsWith('OFERTA_GENERAL');
   const ESTADO = {
     SOLICITUD_CREADA: 'PENDIENTE', OFERTA_ACEPTADA_POR_RECEPTOR: 'PENDIENTE', OFERTA_PARTICULAR_ACEPTADA_POR_RECEPTOR: 'PENDIENTE',
-    CAMBIO_ESTADO_APROBADA: 'APROBADA', CAMBIO_ESTADO_RECHAZADA: 'RECHAZADA', RECHAZO_AUTOMATICO: 'RECHAZADA', SOLICITUD_CANCELADA: 'RECHAZADA',
+    // P-01 (17 oct): la cancelación del solicitante se muestra como CANCELADA, con su propio filtro.
+    CAMBIO_ESTADO_APROBADA: 'APROBADA', CAMBIO_ESTADO_RECHAZADA: 'RECHAZADA', RECHAZO_AUTOMATICO: 'RECHAZADA', SOLICITUD_CANCELADA: 'CANCELADA',
     OFERTA_RECHAZADA_POR_RECEPTOR: 'RECHAZADA', OFERTA_PARTICULAR_RECHAZADA_POR_RECEPTOR: 'RECHAZADA',
     OFERTA_GENERAL_CREADA: 'PENDIENTE', OFERTA_GENERAL_APROBADA: 'PENDIENTE', OFERTA_GENERAL_RECHAZADA: 'RECHAZADA', OFERTA_GENERAL_CERRADA: 'APROBADA',
   };
@@ -415,22 +417,28 @@ test('HU-BIT-01 · criterio 2: filtros por categoría, tipo de solicitud, estado
   }
 });
 
-test('HU-BIT-01 · criterio 3: solo se ven los eventos de mi servicio', async ({ page, api }, testInfo) => {
-  fallaConocida('C-17 y §6.3: ni el backend (BitacoraController.getAllDTO) ni la vista filtran la bitácora por servicio.');
-  await entrar(page, 'jefatura');
-  const eventos = await api.get('/bitacoras/dto');
-  const solicitudes = await api.get('/solicitudes');
+test('HU-BIT-01 · criterio 3: solo se ven los eventos de mi servicio', async ({ page, api, request }, testInfo) => {
+  // C-17 (17 oct): el backend acota la bitácora al servicio de la sesión (antes, falla conocida). Los eventos de otros
+  // servicios se toman con el administrador, que los recibe todos; la jefatura no debe recibirlos ni verlos en pantalla.
+  // Solo ids y conteos: son datos de otros servicios.
+  const admin = await tokenRol(request, 'admin', SERVICIO.urgencias);
+  const todos = await apiGet(request, admin, '/bitacoras/dto');
+  const solicitudes = await apiGet(request, admin, '/solicitudes');
   const deOtroServicio = new Set(solicitudes.filter((s) => s.turno && s.turno.servicio?.idServicio !== SERVICIO.urgencias).map((s) => s.idSolicitud));
+  const ajenos = new Set(todos.filter((e) => deOtroServicio.has(e.idSolicitud)).map((e) => e.idEvento));
+  expect(ajenos.size, 'hay eventos de otros servicios en el sistema').toBeGreaterThan(0);
+
+  await entrar(page, 'jefatura');
+  const suyos = await api.get('/bitacoras/dto');
+  expect(suyos.filter((e) => ajenos.has(e.idEvento)).length, 'eventos de otros servicios en la respuesta de la jefatura').toBe(0);
   const hoy = hoyChile();
   const [anio, mes] = [anioDe(hoy), mesDe(hoy)];
-  const delMes = enPeriodo(eventos, iso(anio, mes, 1), iso(anio, mes, diasDelMes(anio, mes)));
-  const propios = delMes.filter((e) => !deOtroServicio.has(e.idSolicitud));
-  expect(delMes.length - propios.length, 'hay eventos de otro servicio en el mes').toBeGreaterThan(0);
+  const delMes = enPeriodo(suyos, iso(anio, mes, 1), iso(anio, mes, diasDelMes(anio, mes)));
   await abrirBitacora(page, testInfo);
-  await expect.poll(() => conteoBitacora(page, testInfo), { timeout: 5_000 }).toBe(propios.length);
+  await expect.poll(() => conteoBitacora(page, testInfo), { timeout: 5_000 }).toBe(delMes.length);
 });
 
-test('HU-BIT-01 · criterio 4: las cancelaciones aparecen como «Cancelada por el solicitante» (evento simulado)', async ({ page, api }, testInfo) => {
+test('HU-BIT-01 · criterio 4: las cancelaciones aparecen como CANCELADA, con «Cancelada por el solicitante» y su propio filtro (evento simulado)', async ({ page, api }, testInfo) => {
   await entrar(page, 'jefatura');
   const eventos = await api.get('/bitacoras/dto');
   const solicitudes = await api.get('/solicitudes');
@@ -446,20 +454,27 @@ test('HU-BIT-01 · criterio 4: las cancelaciones aparecen como «Cancelada por e
   await page.route(/\/api\/v2\/bitacoras\/dto$/, (route) => route.fulfill({ json: [...eventos, cancelado] }));
   await abrirBitacora(page, testInfo);
 
-  // Filtro por estado «Rechazada»: la cancelación queda incluida.
-  await filtrarBitacoraPorEstado(page, testInfo, { valor: 'RECHAZADA', texto: 'Rechazada' });
-  // Es el último en llegar: la vista lo muestra primero.
+  // P-01 (17 oct): la cancelación se muestra como CANCELADA y tiene su propio filtro
+  // («Rechazada» ya no la incluye). En la base, la solicitud sigue RECHAZADA.
+  await filtrarBitacoraPorEstado(page, testInfo, { valor: 'CANCELADA', texto: 'Cancelada' });
+  // Es el evento más reciente: la vista lo muestra primero.
+  const filas = esDesktop(testInfo) ? page.locator('table[aria-label="Registros de la bitácora"] tbody tr') : page.locator('.sgt-list-row');
+  await expect(filas.first()).toContainText('CANCELADA');
   if (esDesktop(testInfo)) {
-    const fila = page.locator('table[aria-label="Registros de la bitácora"] tbody tr').first();
-    await expect(fila).toContainText('RECHAZADA');
-    await fila.click();
+    await filas.first().click();
     await expect(page.getByRole('dialog', { name: 'Detalle del evento' })).toContainText('Cancelada por el solicitante');
+    await page.keyboard.press('Escape');
+    // Con «Rechazada» ya no aparece.
+    await page.locator('#bitacora-estado').selectOption('RECHAZADA');
   } else {
-    const item = page.locator('.sgt-list-row').first();
-    await expect(item).toContainText('RECHAZADA');
-    await item.locator('> div').first().click();
-    await expect(item).toContainText('Cancelada por el solicitante');
+    await filas.first().locator('> div').first().click();
+    await expect(filas.first()).toContainText('Cancelada por el solicitante');
+    // Con «Rechazada» ya no aparece (el panel de filtros sigue abierto).
+    if (!(await page.getByRole('button', { name: /^Estado/ }).count())) await page.getByRole('button', { name: /^Filtrar/ }).click();
+    await page.getByRole('button', { name: /^Estado/ }).click();
+    await page.locator('button.sgt-filter-chip', { hasText: /^Rechazada$/ }).click();
   }
+  await expect(filas.filter({ hasText: 'CANCELADA' }), 'la cancelación no está entre las rechazadas').toHaveCount(0);
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -585,7 +600,7 @@ test('HU-AUD-01 · criterio 3: totales de asignados, vacantes y total; en deskto
 });
 
 test('HU-AUD-01 · criterio 4: cada turno asignado muestra quién hizo la asignación', async ({ page, api }, testInfo) => {
-  fallaConocida('C-14: la auditoría no muestra al encargado de cada asignación (AuditoriaView, TurnoAuditoriaItem).');
+  fallaConocida('C-14 (decidida el 17 oct: se corrige el manual, no la pantalla): la auditoría no muestra al encargado de cada asignación (AuditoriaView, TurnoAuditoriaItem). El criterio queda por retirar del catálogo.');
   await entrar(page, 'jefatura');
   const { indice } = await turnosAuditables(api);
   await abrirAuditoria(page, testInfo);
@@ -670,49 +685,30 @@ test('HU-ADM-03 · criterio 3: cada persona muestra sus servicios y su rol en ca
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// HU-REG-02 · Reglas de horario para jefatura y subrogante (abrir y cancelar)
+// HU-REG-02 · Reglas de horario para jefatura y subrogante: retiradas por C-10
 // ═════════════════════════════════════════════════════════════════════════════
+// C-10 (decidido el 17 oct): las reglas de horario son solo del administrador. El backend cierra sus escrituras
+// (GLOBAL_ADMIN_PATHS; la 2b de permisos.spec.js las prueba por API) y la vista `reglas` pasó a las vistas del
+// administrador (Prop4). El criterio 1 del catálogo, «la jefatura llega a Reglas de Horario del Servicio desde su
+// panel o desde el menú y las edita», queda por retirar: estas pruebas guardan la decisión. El recorrido de
+// abrir y cancelar nueva regla, edición y eliminación es ahora del administrador (HU-REG-01), en
+// e2e/visual/interacciones-admin-mantenedores.spec.js.
 
 for (const rol of ['jefatura', 'subrogante']) {
-  test(`HU-REG-02 · criterio 1: llega a «Reglas de Horario del Servicio» desde su panel o desde el menú (${rol})`, async ({ page }, testInfo) => {
-    fallaConocida('C-10: ningún panel ni menú lleva a la jefatura o al subrogante a «Reglas de Horario del Servicio» (navegacion.js con permiso admin; los paneles no tienen la tarjeta).');
+  test(`HU-REG-02 · C-10: ni el panel ni el menú llevan a «Reglas de Horario del Servicio» (${rol})`, async ({ page }, testInfo) => {
     await entrar(page, rol);
     const enMenu = esDesktop(testInfo) ? await itemMenu(page, 'Reglas de horario').count() : 0;
     await barraInferior(page, 'Perfil').or(itemMenu(page, 'Perfil')).first().click();
     await page.getByRole('button', { name: new RegExp(`^Panel de ${rol === 'jefatura' ? 'Jefatura' : 'Subrogante'}`) }).click();
     const enPanel = await page.getByRole('button', { name: /^Reglas de Horario del Servicio\b/ }).count();
-    expect(enMenu + enPanel, 'un acceso visible a las reglas de horario').toBeGreaterThan(0);
+    expect(enMenu + enPanel, 'ningún acceso a las reglas de horario').toBe(0);
   });
 
-  test(`HU-REG-02 · criterio 1: forzando la vista, abre y cancela nueva regla, edición y eliminación (${rol})`, async ({ page, api }, testInfo) => {
+  test(`HU-REG-02 · C-10: forzar la vista «reglas» lleva al inicio (${rol})`, async ({ page }) => {
     await entrar(page, rol);
-    const { servicioId } = await usuarioSesion(page);
-    const reglas = await api.get(`/reglas-servicio/servicio/${servicioId}`);
     await irA(page, 'reglas');
-    await expect(page.getByText('Reglas de Horario del Servicio', { exact: true }).or(page.getByRole('heading', { name: 'Reglas de Horario del Servicio' })).first()).toBeVisible();
-
-    await page.getByRole('button', { name: 'Nueva regla' }).click();
-    const nombre = page.getByPlaceholder('Ej.: Ajuste mañana finde/feriado');
-    await nombre.fill('Regla de prueba');
-    await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-    await expect.poll(() => nombre.evaluateAll((cs) => cs.map((c) => c.value))).not.toContain('Regla de prueba');
-
-    if (reglas.length) {
-      const [r] = reglas;
-      if (esDesktop(testInfo)) await page.getByRole('button', { name: `Editar ${r.nombre}` }).click();
-      else await page.getByRole('button', { name: /Editar/ }).first().click();
-      await expect(page.getByText('Editar regla', { exact: true })).toBeVisible();
-      await expect(page.getByPlaceholder('Ej.: Ajuste mañana finde/feriado')).toHaveValue(r.nombre);
-      await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-      await expect(page.getByText('Editar regla', { exact: true })).toHaveCount(0);
-
-      if (esDesktop(testInfo)) await page.getByRole('button', { name: `Eliminar ${r.nombre}` }).click();
-      else await page.getByRole('button', { name: /Eliminar/ }).first().click();
-      await expect(page.getByText('Eliminar regla', { exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-      await expect(page.getByText('Eliminar regla', { exact: true })).toHaveCount(0);
-    } else {
-      testInfo.annotations.push({ type: 'datos', description: `El servicio ${servicioId} no tiene reglas: solo se abre y cancela «Nueva regla».` });
-    }
+    await expect.poll(() => vistaActual(page), { timeout: 15_000 }).toBe('agenda');
+    await expect(page.getByText('Reglas de Horario del Servicio', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Nueva regla' })).toHaveCount(0);
   });
 }

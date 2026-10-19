@@ -10,7 +10,7 @@
 // propuesta recibida, postulaciones agrupadas, ofertas vigentes) se simulan
 // respondiendo esas consultas GET en el navegador: nada se guarda.
 import {
-  test, expect, fallaConocida, ID, SERVICIO, APOYO, MESES, esMovil, esDesktop,
+  test, expect, fallaNueva, ID, SERVICIO, APOYO, MESES, esMovil, esDesktop,
   hoyChile, sumarDias, lunesDe, diaSemana, mesDe, anioDe,
   entrar, usuarioSesion, esperarQuieta, etiquetaDia, filtros, filtro, filaDia, esperarAgenda, leerAgenda,
 } from '../helpers/hu.js';
@@ -155,6 +155,11 @@ test('HU-CAL-01 · criterio 5: al expandir un día, una tarjeta por bloque con r
   await esperarAgenda(page);
   await filtro(page, 'Todos').click();
   // Con «Todos», hoy aparece expandido y el resto no.
+  if (misDias.includes(hoy)) {
+    fallaNueva('HU-CAL-01, criterio 5: si hoy es un día con turno propio, la fila de hoy ya existe en «Mis turnos» (el filtro inicial, C-05) '
+      + 'y AgendaView decide «expandido» al montarla (DayRow, useState(defaultExpanded), AgendaView.jsx:541; defaultExpanded en :452), '
+      + 'así que al pasar a «Todos» queda plegada. Solo pasa en esos días: si hoy no es uno de sus días, la fila se monta con «Todos» y sí queda expandida.');
+  }
   const lista = await leerAgenda(page);
   expect(lista.filter((x) => x.expandido).map((x) => x.clave)).toEqual([`D:${etiquetaDia(hoy)}`]);
 
@@ -227,7 +232,7 @@ test('HU-CAL-01 · criterio 6: el médico no ve el aviso de turnos libres', asyn
 
 test('HU-CAL-01 · criterio 6: «N turnos libres en agenda» cuenta solo los cupos de la agenda (de hoy en adelante)', async ({ page, api }, testInfo) => {
   test.skip(!esMovil(testInfo), SOLO_MOVIL);
-  fallaConocida('§5.1: el aviso «N turnos libres en agenda» cuenta también los cupos que ya pasaron (AgendaView, freeTurnsCount).');
+  // P-01 (17 oct): el aviso cuenta solo los cupos de la agenda (antes, falla conocida).
   await entrar(page, 'jefatura');
   const { turnos, visibles } = await datosAgenda(api, ID.jefatura);
   const libresVisibles = turnos.filter((t) => t.idFuncionario == null && visibles.has(t.diaInicioTurno)).length;
@@ -235,22 +240,14 @@ test('HU-CAL-01 · criterio 6: «N turnos libres en agenda» cuenta solo los cup
   await expect(page.getByText(`${libresVisibles} turno${libresVisibles > 1 ? 's' : ''} libre${libresVisibles > 1 ? 's' : ''} en agenda`, { exact: true })).toBeVisible({ timeout: 5_000 });
 });
 
-test('HU-CAL-01 · criterio 6: «N notificaciones sin leer» con el número de la bandeja', async ({ page, api }, testInfo) => {
+test('HU-CAL-01 · criterio 6 (C-09): el aviso ya no cuenta notificaciones sin leer', async ({ page, api }, testInfo) => {
   test.skip(!esMovil(testInfo), SOLO_MOVIL);
+  // C-09 (19 oct): la bandeja está oculta para la entrega (src/config/funciones.js, NOTIFICACIONES_HABILITADAS),
+  // así que el aviso del inicio no dice «N notificaciones sin leer»; el backend sigue contando la del seed.
   await entrar(page, 'notificaciones');
-  const sinLeer = await api.get(`/notificaciones/sin-leer/${APOYO.notificaciones.id}`);
-  expect(sinLeer).toBeGreaterThan(0);
+  expect(await api.get(`/notificaciones/sin-leer/${APOYO.notificaciones.id}`), 'el backend sigue contando la notificación sin leer').toBe(1);
   await esperarAgenda(page);
-  await expect(page.getByText(new RegExp(`^${sinLeer} notificaci(o|ó)n(es)? sin leer$`))).toBeVisible();
-});
-
-test('HU-CAL-01 · criterio 6: con una sola, el aviso dice «1 notificación sin leer»', async ({ page, api }, testInfo) => {
-  test.skip(!esMovil(testInfo), SOLO_MOVIL);
-  fallaConocida('§5.1: el aviso dice «1 notificacion sin leer», sin tilde en singular (AgendaView, aviso superior).');
-  await entrar(page, 'notificaciones');
-  expect(await api.get(`/notificaciones/sin-leer/${APOYO.notificaciones.id}`)).toBe(1);
-  await esperarAgenda(page);
-  await expect(page.getByText('1 notificación sin leer', { exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/notificaci(o|ó)n(es)? sin leer/)).toHaveCount(0);
 });
 
 test('HU-CAL-01 · criterio 7: un filtro sin resultados dice «Sin turnos en esta categoría.»', async ({ page, api }, testInfo) => {
@@ -595,9 +592,12 @@ for (const rol of ['jefatura', 'medico']) {
 
     const panel = page.getByRole('region', { name: 'Disponibles' });
     const tarjetas = tarjetasDe(panel);
-    await expect(tarjetas).toHaveCount(2);
+    // C-16 (17 oct): al médico, solo las ofertas abiertas (y las suyas); la gestión ve
+    // además las que esperan apertura. Antes, el médico veía también la pendiente.
+    await expect(tarjetas).toHaveCount(rol === 'jefatura' ? 2 : 1);
     await expect(tarjetas.nth(0)).toContainText('Abierta');
-    await expect(tarjetas.nth(1)).toContainText('Pend. apertura');
+    if (rol === 'jefatura') await expect(tarjetas.nth(1)).toContainText('Pend. apertura');
+    else await expect(panel.getByText('Pend. apertura', { exact: true })).toHaveCount(0);
     await expect(panel.getByText('Rechazada', { exact: true })).toHaveCount(0);
     await expect(panel.getByRole('button', { name: /Postular/ })).toHaveCount(0);
 
