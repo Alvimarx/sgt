@@ -10,7 +10,7 @@
 // propuesta recibida, postulaciones agrupadas, ofertas vigentes) se simulan
 // respondiendo esas consultas GET en el navegador: nada se guarda.
 import {
-  test, expect, fallaNueva, ID, SERVICIO, APOYO, MESES, esMovil, esDesktop,
+  test, expect, ID, SERVICIO, APOYO, MESES, esMovil, esDesktop,
   hoyChile, sumarDias, lunesDe, diaSemana, mesDe, anioDe,
   entrar, usuarioSesion, esperarQuieta, etiquetaDia, filtros, filtro, filaDia, esperarAgenda, leerAgenda,
 } from '../helpers/hu.js';
@@ -155,11 +155,6 @@ test('HU-CAL-01 · criterio 5: al expandir un día, una tarjeta por bloque con r
   await esperarAgenda(page);
   await filtro(page, 'Todos').click();
   // Con «Todos», hoy aparece expandido y el resto no.
-  if (misDias.includes(hoy)) {
-    fallaNueva('HU-CAL-01, criterio 5: si hoy es un día con turno propio, la fila de hoy ya existe en «Mis turnos» (el filtro inicial, C-05) '
-      + 'y AgendaView decide «expandido» al montarla (DayRow, useState(defaultExpanded), AgendaView.jsx:541; defaultExpanded en :452), '
-      + 'así que al pasar a «Todos» queda plegada. Solo pasa en esos días: si hoy no es uno de sus días, la fila se monta con «Todos» y sí queda expandida.');
-  }
   const lista = await leerAgenda(page);
   expect(lista.filter((x) => x.expandido).map((x) => x.clave)).toEqual([`D:${etiquetaDia(hoy)}`]);
 

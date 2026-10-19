@@ -445,6 +445,7 @@ const AgendaView = ({ tweaks = {}, user, onSwitchService, onLogout, onOpenNotifi
                     </div>
                   )}
                   <DayRow
+                    key={`${day.key}-${filter}`}
                     day={day}
                     shifts={getShifts(day.key)}
                     todayKey={todayKey}
