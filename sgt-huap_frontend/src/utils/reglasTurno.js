@@ -40,6 +40,13 @@ export const esNocturno = (t) => fechaInicioDe(t) < fechaFinDe(t);
 /** ¿Ya empezó? `ahora` en el mismo formato, en la zona horaria del hospital. */
 export const yaEmpezo = (t, ahora = ahoraISOEnZonaHospital()) => inicioDe(t) <= ahora;
 
+/**
+ * ¿Ya terminó? Un turno en curso no: termina a su hora de término, que en un nocturno es la mañana
+ * del día siguiente. `ahora` en el mismo formato, en la zona horaria del hospital. Es el «pasado» de
+ * la Auditoría de Asistencia (O-2).
+ */
+export const yaTermino = (t, ahora = ahoraISOEnZonaHospital()) => finDe(t) <= ahora;
+
 /** Dos turnos se cruzan en el tiempo ([inicio, fin)); tocarse en el borde no es cruzarse. */
 export const seSolapan = (a, b) => inicioDe(a) < finDe(b) && inicioDe(b) < finDe(a);
 

@@ -14,7 +14,7 @@ import {
   entrar, irA, itemMenu, barraInferior,
   abrirDesdePanel, abrirBitacora, filtrarBitacoraPorEstado,
 } from '../helpers/hu.js';
-import { nombreResumen, inicioDe } from '../helpers/datos.js';
+import { nombreResumen, finDe } from '../helpers/datos.js';
 
 const MESES_MIN = MESES.map((m) => m.toLowerCase());
 const norm = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -523,27 +523,28 @@ test('HU-AUD-01 · criterio 1: el mes actual o uno de los dos anteriores', async
   }
 });
 
-// Turnos del mes que se audita: el actual o, si todavía no empieza ninguno
+// Turnos del mes que se audita: el actual o, si todavía no termina ninguno
 // (el día 1 de madrugada), el anterior. `indice`: su posición en el selector.
+// «Pasado» es «ya terminó» (O-2, 22 oct): un turno en curso o por empezar no se cuenta.
 async function turnosAuditables(api) {
   const hoy = hoyChile();
   const turnos = await api.get(`/turnos/servicio/${SERVICIO.urgencias}`);
   for (const [indice, delta] of [[0, 0], [1, -1]]) {
     const ym = mesRelativo(hoy, delta);
     const delMes = turnos.filter((t) => t.diaInicioTurno.slice(0, 7) === ym);
-    const empezados = delMes.filter((t) => inicioDe(t) <= ahoraChile());
-    if (empezados.length) return { hoy, indice, delMes, empezados };
+    const terminados = delMes.filter((t) => finDe(t) <= ahoraChile());
+    if (terminados.length) return { hoy, indice, delMes, terminados };
   }
-  throw new Error('No hay turnos ya empezados en este mes ni en el anterior');
+  throw new Error('No hay turnos ya terminados en este mes ni en el anterior');
 }
 async function elegirMesAuditoria(page, testInfo, indice) {
   if (indice > 0) await opcionesMes(page, testInfo).nth(indice).click();
 }
 const claveAud = (t) => `${Number(t.diaInicioTurno.slice(8, 10))}|${String(t.horaInicio).slice(0, 5)} – ${String(t.horaFin).slice(0, 5)}|${t.nombrePuesto}`;
 
-test('HU-AUD-01 · criterio 2: los turnos del mes que ya empezaron, del más reciente al más antiguo, con funcionario o «Vacante»', async ({ page, api }, testInfo) => {
+test('HU-AUD-01 · criterio 2: los turnos del mes que ya terminaron, del más reciente al más antiguo, con funcionario o «Vacante»', async ({ page, api }, testInfo) => {
   await entrar(page, 'jefatura');
-  const { delMes, empezados, indice } = await turnosAuditables(api);
+  const { delMes, terminados, indice } = await turnosAuditables(api);
   await abrirAuditoria(page, testInfo);
   await elegirMesAuditoria(page, testInfo, indice);
   const vistos = await leerAuditoria(page, testInfo);
@@ -556,22 +557,23 @@ test('HU-AUD-01 · criterio 2: los turnos del mes que ya empezaron, del más rec
   }
   // Del más reciente al más antiguo.
   expect(vistos.map((v) => v.dia)).toEqual([...vistos.map((v) => v.dia)].sort((a, b) => b - a));
-  // Están todos los que ya empezaron.
+  // Están todos los que ya terminaron.
   const listados = new Set(vistos.map((v) => `${v.dia}|${v.horario}|${v.puesto}`));
-  expect(empezados.filter((t) => !listados.has(claveAud(t))).map(claveAud), 'turnos ya empezados que faltan').toEqual([]);
+  expect(terminados.filter((t) => !listados.has(claveAud(t))).map(claveAud), 'turnos ya terminados que faltan').toEqual([]);
 });
 
-test('HU-AUD-01 · criterio 2: no aparecen los turnos que todavía no empiezan', async ({ page, api }, testInfo) => {
-  fallaConocida('HU-AUD-01, Estado (observación del criterio 2): la vista compara solo la fecha de inicio con el momento actual (AuditoriaView, turnosDelMes) e incluye los turnos de hoy que todavía no empiezan.');
+test('HU-AUD-01 · criterio 2: no aparecen los turnos que todavía no terminan (los de hoy por empezar ni el que está en curso)', async ({ page, api }, testInfo) => {
+  // O-2 (22 oct, corregida): la vista comparaba solo el día de inicio con el momento actual y contaba, por ejemplo, la
+  // Noche de hoy (20:00) desde las 00:00. Ahora «pasado» es «ya terminó», según fecha y hora de Chile.
   await entrar(page, 'jefatura');
-  const { hoy, delMes } = await turnosAuditables(api);
-  const sinEmpezar = new Set(delMes.filter((t) => inicioDe(t) > ahoraChile()).map(claveAud));
-  // La falla se ve solo mientras hoy queda algún turno por empezar (hasta las 20:00).
-  test.skip(!delMes.some((t) => t.diaInicioTurno === hoy && inicioDe(t) > ahoraChile()),
-    'Ya empezaron todos los turnos de hoy: la falla anotada no se puede observar a esta hora.');
+  const { delMes, indice } = await turnosAuditables(api);
+  const sinTerminar = new Set(delMes.filter((t) => finDe(t) > ahoraChile()).map(claveAud));
+  // Se observa solo si el mes que se audita tiene algún turno por terminar (el actual casi siempre; no el anterior).
+  test.skip(sinTerminar.size === 0, 'El mes que se audita no tiene turnos por terminar: no hay nada que no deba aparecer.');
   await abrirAuditoria(page, testInfo);
+  await elegirMesAuditoria(page, testInfo, indice);
   const vistos = await leerAuditoria(page, testInfo);
-  expect(vistos.filter((v) => sinEmpezar.has(`${v.dia}|${v.horario}|${v.puesto}`)).map((v) => `${v.dia} ${v.horario} ${v.puesto}`), 'turnos listados que no han empezado').toEqual([]);
+  expect(vistos.filter((v) => sinTerminar.has(`${v.dia}|${v.horario}|${v.puesto}`)).map((v) => `${v.dia} ${v.horario} ${v.puesto}`), 'turnos listados que no han terminado').toEqual([]);
 });
 
 test('HU-AUD-01 · criterio 3: totales de asignados, vacantes y total; en desktop, filtro por estado', async ({ page, api }, testInfo) => {

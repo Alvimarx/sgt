@@ -6,6 +6,8 @@ import { SGT_DATA } from './data';
 import { SGTBadge, SGTIcon, TopHeader, IconBadge3D } from '../Style/UIPrimitives';
 import { ListEmptyState, LoadingState } from '../Style/ListControls';
 import { useLayout } from '../../layout/layout';
+import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { yaTermino } from '../../utils/reglasTurno';
 import { EncabezadoDesktop, PaginaDesktop, SegmentosDesktop, KpiDesktop, AvisoDesktop } from '../Desktop/ui';
 import { TablaAuditoriaDesktop } from '../Desktop/gestion/AuditoriaDesktop';
 
@@ -14,18 +16,22 @@ import { TablaAuditoriaDesktop } from '../Desktop/gestion/AuditoriaDesktop';
 // ──────────────────────────────────────────────
 
 function meses() {
-  const hoy = dayjs();
+  // El mes en curso es el de la fecha de hoy en el hospital, no el del navegador.
+  const hoy = dayjs(hoyISOEnZonaHospital());
   return [0, 1, 2].map(offset => {
     const m = hoy.subtract(offset, 'month');
     return { label: m.format('MMMM YYYY'), value: m.format('YYYY-MM'), year: m.year(), month: m.month() + 1 };
   });
 }
 
-function turnosDelMes(turnos, año, mes) {
+// Un turno es «pasado» cuando ya terminó, según su fecha y hora de término en la hora del hospital (O-2).
+// Comparar solo el día de inicio con el instante actual contaba la Noche de hoy (20:00) desde las 00:00,
+// y un turno en curso tampoco ha pasado. El mes del turno es el de su día de inicio.
+function turnosDelMes(turnos, año, mes, ahora) {
   return turnos.filter(t => {
     if (!t.diaInicioTurno) return false;
     const d = dayjs(t.diaInicioTurno);
-    return d.year() === año && d.month() + 1 === mes && d.isBefore(dayjs());
+    return d.year() === año && d.month() + 1 === mes && yaTermino(t, ahora);
   });
 }
 
@@ -102,7 +108,7 @@ const AuditoriaView = ({ onBack }) => {
   }, [servicioId]);
 
   const turnosFiltrados = useMemo(
-    () => turnosDelMes(todosTurnos, mesSeleccionado.year, mesSeleccionado.month)
+    () => turnosDelMes(todosTurnos, mesSeleccionado.year, mesSeleccionado.month, ahoraISOEnZonaHospital())
           .sort((a, b) => dayjs(b.diaInicioTurno).diff(dayjs(a.diaInicioTurno))),
     [todosTurnos, mesSeleccionado],
   );

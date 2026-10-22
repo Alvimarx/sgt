@@ -1013,11 +1013,11 @@ Total de ítems: médico 6, subrogante 11, jefatura 14, administrador 22. Los pa
 - **Endpoints:** `GET /turnos/servicio/{id}`.
 - **Criterios de aceptación:**
   1. Puedo elegir el mes actual o uno de los dos anteriores.
-  2. Solo aparecen los turnos del mes que ya empezaron, del más reciente al más antiguo, con el funcionario o «Vacante».
+  2. Solo aparecen los turnos del mes que ya terminaron (por su fecha y hora de término, en hora de Chile), del más reciente al más antiguo, con el funcionario o «Vacante». Un turno en curso, o que todavía no empieza, no aparece: la Noche de hoy no cuenta hasta que termina.
   3. Veo los totales de asignados, vacantes y total; en desktop, filtro por estado.
   4. Cada turno asignado muestra quién hizo la asignación (MF-032).
 - **Trazabilidad:** MF-032; Archivo §6.14; BUG-004.
-- **Estado:** **Parcial.** El criterio 4 no está: la vista no muestra al encargado de la asignación (`AuditoriaView`, `TurnoAuditoriaItem`). Ver §5, C-14. Observación sobre el criterio 2: la vista compara solo la fecha de inicio con el momento actual (`turnosDelMes`), así que incluye los turnos de hoy aunque todavía no empiecen.
+- **Estado:** **Parcial.** El criterio 4 no está: la vista no muestra al encargado de la asignación (`AuditoriaView`, `TurnoAuditoriaItem`). Ver §5, C-14. El criterio 2 se corrigió el 22 oct (O-2): `turnosDelMes` comparaba solo la fecha de inicio con el momento actual y contaba los turnos de hoy aunque todavía no empezaran; ahora usa `yaTermino` (`utils/reglasTurno.js`), con fecha y hora de Chile. La regla escrita no distinguía entre «ya empezó» y «ya terminó» (el catálogo decía «ya empezaron»); se tomó «ya terminó», que es el sentido de «pasado» en R17.
 - **Prueba E2E:** `jefatura`; no muta; ambos. Ya existe: `interacciones-gestion.spec.js`.
 
 ### 3.15 Reglas del servicio (HU-REG)
