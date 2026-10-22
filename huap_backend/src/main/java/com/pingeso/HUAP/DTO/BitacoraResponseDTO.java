@@ -30,9 +30,16 @@ public class BitacoraResponseDTO {
     private String horaInicioTurno;
     private String horaFinTurno;
     private String nombrePuesto;
-    // Funcionario asignado al turno directo (null = turno libre/vacante)
+    // Funcionario asignado AHORA al turno directo (null = turno libre/vacante). Cambia con cada
+    // reasignación: no es quien lo tenía cuando ocurrió el evento (ver nombreTitularAlCrearse).
     private Long idFuncionarioTurno;
     private String nombreFuncionarioTurno;
+    // Solo en el evento de creación del turno (GENERACION_TURNO), null en los demás: quién lo tenía AL
+    // CREARSE, tal como quedó guardado en el propio evento (O-1). titularAlCrearseRegistrado = false si
+    // el evento no lo guardó (turnos importados): ahí no se sabe, y no se muestra al titular de hoy.
+    // nombreTitularAlCrearse = null con registrado = true: el turno nació vacante.
+    private Boolean titularAlCrearseRegistrado;
+    private String nombreTitularAlCrearse;
 
     // Solicitud — datos base
     private Long idSolicitud;

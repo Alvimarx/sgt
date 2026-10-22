@@ -302,6 +302,11 @@ public class BitacoraService {
             } catch (NumberFormatException ignored) {}
         }
 
+        // O-1: en la creación del turno se muestra quién lo tenía AL CREARSE, lo que guardó el evento, y no el
+        // titular de hoy (turno.funcionario), que cambia con cada reasignación.
+        TitularAlCrearse alCrearse = TIPO_GENERACION.equals(e.getTipoEvento())
+                ? titularAlCrearse(e.getObservaciones()) : null;
+
         return BitacoraResponseDTO.builder()
                 .idEvento(e.getIdEvento())
                 .tipoEvento(e.getTipoEvento())
@@ -324,6 +329,8 @@ public class BitacoraService {
                 .nombrePuesto(turno != null && turno.getPuesto() != null ? turno.getPuesto().getNombre() : null)
                 .idFuncionarioTurno(turno != null && turno.getFuncionario() != null ? turno.getFuncionario().getIdFuncionario() : null)
                 .nombreFuncionarioTurno(turno != null ? nombreCompleto(turno.getFuncionario()) : null)
+                .titularAlCrearseRegistrado(alCrearse != null ? alCrearse.registrado() : null)
+                .nombreTitularAlCrearse(alCrearse != null ? alCrearse.nombre() : null)
                 // solicitud base
                 .idSolicitud(s != null ? s.getIdSolicitud() : null)
                 .tipoSolicitud(s != null && s.getTipoSolicitud() != null ? tipoSolicitudLabel(s.getTipoSolicitud().getTipo()) : null)
@@ -366,20 +373,53 @@ public class BitacoraService {
         return (f.getNombre() + (f.getApelPat() != null ? " " + f.getApelPat() : "")).trim();
     }
 
+    // ── Creación de turno: quién lo tenía al crearse (O-1) ───────────────────
+
+    private static final String TIPO_GENERACION = "GENERACION_TURNO";
+
+    /**
+     * Cómo queda guardado en el evento de creación quién tenía el turno al crearse, en sus
+     * observaciones: «Turno generado — {nombre}», o «Turno generado — Vacante». Es lo único que el
+     * evento guarda de ese momento, así que {@link #titularAlCrearse} lo lee de vuelta: los dos
+     * comparten estas constantes. Los eventos de turnos importados por script traen otro texto («Turno
+     * generado (importación…)») y no dicen quién lo tenía.
+     */
+    static final String PREFIJO_GENERACION = "Turno generado — ";
+    static final String TURNO_VACANTE = "Vacante";
+
+    /** Quién tenía el turno al crearse, según el evento: {@code nombre} es null si nació vacante. */
+    record TitularAlCrearse(boolean registrado, String nombre) {}
+
+    /** Las observaciones de un evento de creación para un turno cuyo titular es {@code nombre} (null = vacante). */
+    static String observacionDeGeneracion(String nombre) {
+        return PREFIJO_GENERACION + (nombre != null && !nombre.isBlank() ? nombre : TURNO_VACANTE);
+    }
+
+    /**
+     * Lee de las observaciones de un evento de creación quién tenía el turno al crearse. Si no traen el
+     * titular (turnos importados, texto distinto o vacío), {@code registrado} es false: no se sabe, y no
+     * hay que suplirlo con el titular de hoy.
+     */
+    static TitularAlCrearse titularAlCrearse(String observaciones) {
+        if (observaciones == null || !observaciones.startsWith(PREFIJO_GENERACION)) {
+            return new TitularAlCrearse(false, null);
+        }
+        String dicho = observaciones.substring(PREFIJO_GENERACION.length()).trim();
+        if (dicho.isEmpty()) return new TitularAlCrearse(false, null);
+        return new TitularAlCrearse(true, TURNO_VACANTE.equals(dicho) ? null : dicho);
+    }
+
     /**
      * Registra en la bitácora un turno recién generado desde una planificación.
      */
     @Transactional
     public void registrarTurnoGenerado(TurnoEntity turno, FuncionarioEntity actor, String planificacionNombre) {
-        String asignado = (turno.getFuncionario() != null)
-                ? nombreCompleto(turno.getFuncionario()) : "Vacante";
-
         BitacoraEntity log = BitacoraEntity.builder()
-                .tipoEvento("GENERACION_TURNO")
+                .tipoEvento(TIPO_GENERACION)
                 .turno(turno)
                 .funcionario(actor) // quién generó (jefatura/admin)
                 .motivo(planificacionNombre != null ? "Planificación: " + planificacionNombre : null)
-                .observaciones("Turno generado — " + asignado)
+                .observaciones(observacionDeGeneracion(nombreCompleto(turno.getFuncionario())))
                 .fechaInicioAfectada(turno.getDiaInicioTurno() != null && turno.getHoraInicio() != null
                         ? turno.getDiaInicioTurno().atTime(turno.getHoraInicio()) : null)
                 .fechaFinAfectada(turno.getDiaFinalTurno() != null && turno.getHoraFin() != null

@@ -182,6 +182,104 @@ class BitacoraServiceTest {
         assertEquals("Andrés Tigre", dto.getNombreAsignado());
     }
 
+    // ============================ O-1: la creación del turno muestra a quien lo tenía al crearse ============================
+
+    /** Evento de creación de un turno que hoy tiene a {@code titularHoy}, con las observaciones que guardó al crearse. */
+    private static BitacoraEntity creacion(FuncionarioEntity titularHoy, String observaciones) {
+        TurnoEntity turno = TurnoEntity.builder().idTurno(10L).funcionario(titularHoy).build();
+        return BitacoraEntity.builder().idEvento(1L).tipoEvento("GENERACION_TURNO").turno(turno)
+                .observaciones(observaciones).build();
+    }
+
+    @Test
+    void convertToDTO_creacionDeTurno_muestraAQuienLoTeniaAlCrearse_noAQuienLoTieneAhora() {
+        FuncionarioEntity original = funcionario(1L, "Titular", "Original");
+        FuncionarioEntity actual = funcionario(2L, "Titular", "Actual");
+        BitacoraEntity evento = creacion(original, "Turno generado — Titular Original");
+        evento.getTurno().setFuncionario(actual); // después de crearse, lo reasignaron
+
+        BitacoraResponseDTO dto = service.convertToDTO(evento);
+
+        assertEquals(Boolean.TRUE, dto.getTitularAlCrearseRegistrado());
+        assertEquals("Titular Original", dto.getNombreTitularAlCrearse());
+        // Quién lo tiene hoy sigue siendo un dato aparte, con su propio nombre.
+        assertEquals("Titular Actual", dto.getNombreFuncionarioTurno());
+    }
+
+    @Test
+    void convertToDTO_creacionDeTurno_noCambiaConCadaReasignacion() {
+        BitacoraEntity evento = creacion(funcionario(2L, "Titular", "Dos"), "Turno generado — Titular Original");
+
+        String antes = service.convertToDTO(evento).getNombreTitularAlCrearse();
+        evento.getTurno().setFuncionario(funcionario(3L, "Titular", "Tres"));
+        String despues = service.convertToDTO(evento).getNombreTitularAlCrearse();
+        evento.getTurno().setFuncionario(null); // y después se liberó
+        String liberado = service.convertToDTO(evento).getNombreTitularAlCrearse();
+
+        assertEquals("Titular Original", antes);
+        assertEquals("Titular Original", despues);
+        assertEquals("Titular Original", liberado);
+    }
+
+    @Test
+    void convertToDTO_creacionDeTurnoQueNacioVacante_diceVacanteAunqueHoyTengaTitular() {
+        BitacoraEntity evento = creacion(funcionario(2L, "Titular", "Actual"), "Turno generado — Vacante");
+
+        BitacoraResponseDTO dto = service.convertToDTO(evento);
+
+        assertEquals(Boolean.TRUE, dto.getTitularAlCrearseRegistrado());
+        assertNull(dto.getNombreTitularAlCrearse(), "nació vacante");
+    }
+
+    @Test
+    void convertToDTO_creacionSinElTitularGuardado_noSuplePorElDeHoy() {
+        // Turnos importados por script: sus observaciones no dicen quién lo tenía. Texto neutro, no un dato equivocado.
+        FuncionarioEntity actual = funcionario(2L, "Titular", "Actual");
+        for (String observaciones : new String[] {
+                "Turno generado (importación de la vigencia de agosto 2026)", "Turno generado — ", "", null}) {
+            BitacoraResponseDTO dto = service.convertToDTO(creacion(actual, observaciones));
+
+            assertEquals(Boolean.FALSE, dto.getTitularAlCrearseRegistrado(), String.valueOf(observaciones));
+            assertNull(dto.getNombreTitularAlCrearse(), String.valueOf(observaciones));
+        }
+    }
+
+    @Test
+    void convertToDTO_otrosEventos_noTraenTitularAlCrearse() {
+        BitacoraEntity evento = BitacoraEntity.builder().idEvento(2L).tipoEvento("ASIGNACION_MANUAL_TURNO")
+                .turno(TurnoEntity.builder().idTurno(10L).funcionario(funcionario(2L, "Titular", "Actual")).build())
+                .observaciones("Turno generado — Titular Original").build();
+
+        BitacoraResponseDTO dto = service.convertToDTO(evento);
+
+        assertNull(dto.getTitularAlCrearseRegistrado());
+        assertNull(dto.getNombreTitularAlCrearse());
+    }
+
+    @Test
+    void registrarTurnoGenerado_guardaQuienLoTieneAlCrearse_yElEventoLoLeeDeVuelta() {
+        FuncionarioEntity titular = funcionario(1L, "Titular", "Original");
+        TurnoEntity conTitular = TurnoEntity.builder().idTurno(10L).funcionario(titular).build();
+        TurnoEntity vacante = TurnoEntity.builder().idTurno(11L).build();
+
+        service.registrarTurnoGenerado(conTitular, funcionario(9L, "Jefe", "Uno"), "Rotativa");
+        service.registrarTurnoGenerado(vacante, funcionario(9L, "Jefe", "Uno"), "Rotativa");
+
+        var guardados = org.mockito.ArgumentCaptor.forClass(BitacoraEntity.class);
+        verify(bitacoraRepository, times(2)).save(guardados.capture());
+        BitacoraEntity deTitular = guardados.getAllValues().get(0);
+        BitacoraEntity deVacante = guardados.getAllValues().get(1);
+        assertEquals("GENERACION_TURNO", deTitular.getTipoEvento());
+        assertEquals("Turno generado — Titular Original", deTitular.getObservaciones());
+        assertEquals("Turno generado — Vacante", deVacante.getObservaciones());
+
+        // Quien escribe y quien lee comparten el formato: lo guardado se lee de vuelta.
+        assertEquals(new BitacoraService.TitularAlCrearse(true, "Titular Original"),
+                BitacoraService.titularAlCrearse(deTitular.getObservaciones()));
+        assertEquals(new BitacoraService.TitularAlCrearse(true, null),
+                BitacoraService.titularAlCrearse(deVacante.getObservaciones()));
+    }
+
     // ============================ registrarEvento / registrarEventoOferta ============================
 
     @Test

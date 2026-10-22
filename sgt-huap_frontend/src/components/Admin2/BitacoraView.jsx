@@ -128,6 +128,16 @@ const TIPO_SOLICITUD_BADGE = {
 
 const esGeneracionTurno = (ev) => ev.tipoEvento === 'GENERACION_TURNO';
 
+// Quién tenía el turno al crearse (O-1), tal como lo guardó el evento de creación: su nombre, «Libre» si
+// nació vacante, o «Sin registro» si el evento no lo guardó (turnos importados). Nunca el titular de hoy
+// (nombreFuncionarioTurno), que cambia con cada reasignación y no es lo que ese evento registró.
+function titularAlCrearse(ev) {
+  if (ev.titularAlCrearseRegistrado !== true) return { texto: 'Sin registro', tono: 'neutral' };
+  return ev.nombreTitularAlCrearse
+    ? { texto: ev.nombreTitularAlCrearse, tono: 'success' }
+    : { texto: 'Libre', tono: 'neutral' };
+}
+
 // Estado actual de la solicitud del evento: una cancelada por quien la emitió
 // queda RECHAZADA en la base con ese motivo; se muestra como CANCELADA (mismo
 // criterio que evaluarSolicitud en Solicitudes).
@@ -314,7 +324,7 @@ const BloqueGenerico = ({ ev }) => {
 
 const BloqueGeneracionTurno = ({ ev }) => (
   <>
-    <Row label="Asignado a"     value={ev.nombreFuncionarioTurno || 'Libre'} />
+    <Row label="Asignado al crearse" value={titularAlCrearse(ev).texto} />
     <Row label="Turno"          value={fmtTurno(ev.diaInicioTurno, ev.horaInicioTurno, ev.horaFinTurno, ev.nombrePuesto)} />
     <Row label="Rango afectado" value={fmtRango(ev.fechaInicioAfectada, ev.fechaFinAfectada)} />
     <Row label="Planificación"  value={ev.motivo} />
@@ -422,8 +432,8 @@ const EventoItem = ({ evento, etiqueta }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <SGTBadge tone={tone} size="xs">{label}</SGTBadge>
           {esGeneracionTurno(evento) && (
-            <SGTBadge tone={evento.nombreFuncionarioTurno ? 'success' : 'neutral'} size="xs">
-              {evento.nombreFuncionarioTurno || 'Libre'}
+            <SGTBadge tone={titularAlCrearse(evento).tono} size="xs">
+              {titularAlCrearse(evento).texto}
             </SGTBadge>
           )}
           <span style={{ fontSize: 12, color: p.ink3, fontWeight: 600, marginLeft: 'auto' }}>{fecha}</span>
@@ -706,7 +716,7 @@ const BitacoraView = ({ onBack }) => {
         etiqueta: labelEvento(ev),
         tono: TONO_DESKTOP[toneParaTipo(ev.tipoEvento || 'Evento')] || 'neutral',
         extra: generacion
-          ? { texto: ev.nombreFuncionarioTurno || 'Libre', tono: ev.nombreFuncionarioTurno ? 'exito' : 'neutral' }
+          ? { texto: titularAlCrearse(ev).texto, tono: titularAlCrearse(ev).tono === 'success' ? 'exito' : 'neutral' }
           : null,
         estado: estado ? { texto: estado, tono: TONO_DESKTOP[STATUS_TONE_MAP[estado]] || 'neutral' } : null,
         solicitante: ev.nombreFuncionarioEmisor || ev.nombreOferente || null,
