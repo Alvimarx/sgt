@@ -5,12 +5,14 @@ import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
 import com.pingeso.HUAP.Entity.SolicitudEntity;
 import com.pingeso.HUAP.Entity.TipoSolicitudEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.SolicitudRepository;
 import com.pingeso.HUAP.Repository.TipoSolicitudRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Security.SeguridadServicio;
+import com.pingeso.HUAP.Utils.FormatoFecha;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -938,6 +940,68 @@ class SolicitudServiceTest {
 
         assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class, () -> service.crearSolicitud(dto));
         verify(solicitudRepository, never()).save(any());
+    }
+
+    // ============================ RG-27 (A1-07): el cruce nombra el turno que choca ============================
+
+    /** Le pone tipo y servicio a un turno, para que el aviso de cruce los nombre. */
+    private static TurnoEntity conTipoYServicio(TurnoEntity turno, String nombreTipo, ServicioEntity servicio) {
+        TipoTurnoEntity tipo = new TipoTurnoEntity();
+        tipo.setNombre(nombreTipo);
+        turno.setTipoTurno(tipo);
+        turno.setServicio(servicio);
+        return turno;
+    }
+
+    @Test
+    void crear_tipoCobertura_conCruce_elAvisoNombraElTurnoQueChoca() {
+        mockFuncionarioYTipo(3);
+        TurnoEntity turnoACubrir = turnoConHorario(60L, LUNES, LocalTime.of(8, 0), 12);
+        turnoACubrir.setServicio(servicio(100L));
+        // El emisor ya tiene una Noche de otro servicio que se cruza con el turno a cubrir.
+        TurnoEntity queChoca = conTipoYServicio(turnoConHorario(61L, LUNES.minusDays(1), LocalTime.of(20, 0), 13),
+                "Noche", servicio(200L));
+        when(turnoRepository.findById(60L)).thenReturn(Optional.of(turnoACubrir));
+        when(turnoRepository.findByFuncionario_IdFuncionario(ID_FUNCIONARIO)).thenReturn(List.of(queChoca));
+        CrearSolicitudDTO dto = dtoBase();
+        dto.setIdTurno(60L);
+
+        var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> service.crearSolicitud(dto));
+
+        String citado = FormatoFecha.intervalo(LUNES.minusDays(1).atTime(20, 0), LUNES.atTime(9, 0));
+        assertTrue(ex.getMessage().endsWith("que se superpone (Noche de Servicio200, " + citado + ")."), ex.getMessage());
+        verify(solicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void cambiarEstado_tipoIntercambio_conCruceParaElReceptor_elAvisoNombraElTurnoQueChoca() {
+        TurnoEntity turnoDeseado = turnoConHorario(1L, LUNES, LocalTime.of(8, 0), 12);        // pasará al emisor
+        TurnoEntity turnoPropio = turnoConHorario(2L, LUNES.plusDays(5), LocalTime.of(8, 0), 12); // pasará al receptor
+        turnoDeseado.setServicio(servicio(100L));
+        turnoPropio.setServicio(servicio(100L));
+        FuncionarioEntity emisor = funcionario(5L);
+        FuncionarioEntity receptor = funcionario(6L);
+        SolicitudEntity solicitud = SolicitudEntity.builder()
+                .idSolicitud(1L).tipoSolicitud(tipoSolicitud(10L, 4))
+                .funcionario(emisor).funcionarioReceptor(receptor).aceptadoReceptor(true)
+                .turno(turnoDeseado).turnoReceptor(turnoPropio).estado(PENDIENTE).build();
+        when(solicitudRepository.findById(1L)).thenReturn(Optional.of(solicitud));
+        when(solicitudRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(solicitud));
+        when(funcionarioRepository.findById(9L)).thenReturn(Optional.of(funcionario(9L)));
+        when(turnoRepository.findByFuncionario_IdFuncionario(5L)).thenReturn(List.of(turnoPropio));
+        // El receptor ya tiene un Día, del mismo servicio, que se cruza con el turno que recibiría.
+        TurnoEntity chocaConReceptor = conTipoYServicio(
+                turnoConHorario(70L, LUNES.plusDays(5), LocalTime.of(14, 0), 8), "Día", servicio(100L));
+        when(turnoRepository.findByFuncionario_IdFuncionario(6L)).thenReturn(List.of(turnoDeseado, chocaConReceptor));
+
+        actorAutenticado(9L);
+        var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> service.cambiarEstado(1L, APROBADA));
+
+        String citado = FormatoFecha.intervalo(LUNES.plusDays(5).atTime(14, 0), LUNES.plusDays(5).atTime(22, 0));
+        assertTrue(ex.getMessage().endsWith("que se superpone (Día, " + citado + ")."), ex.getMessage());
+        verify(turnoRepository, never()).save(any());
     }
 
     @Test

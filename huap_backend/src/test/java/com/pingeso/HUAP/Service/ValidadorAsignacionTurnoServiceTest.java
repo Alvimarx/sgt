@@ -1,5 +1,7 @@
 package com.pingeso.HUAP.Service;
 
+import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import org.junit.jupiter.api.Test;
 
@@ -208,5 +210,117 @@ class ValidadorAsignacionTurnoServiceTest {
                 () -> validador.validarAsignacion("Juan Pérez", LUNES.atTime(22, 0), LUNES.plusDays(1).atTime(6, 0), 2L, List.of(noche)));
         assertTrue(solape.getMessage().endsWith("(lun 8 jun, 20:00 a mar 9 jun, 08:00)."), solape.getMessage());
         assertFalse(solape.getMessage().contains("T20:00"));
+    }
+
+    // ============================ RG-27 (A1-07): el cruce nombra el turno que choca ============================
+
+    private static final long URGENCIAS = 4L;
+    private static final long MEDICINA = 1L;
+
+    private static TurnoEntity conTipo(TurnoEntity turno, String nombreTipo) {
+        TipoTurnoEntity tipo = new TipoTurnoEntity();
+        tipo.setNombre(nombreTipo);
+        turno.setTipoTurno(tipo);
+        return turno;
+    }
+
+    private static TurnoEntity deServicio(TurnoEntity turno, long idServicio, String nombre) {
+        turno.setServicio(ServicioEntity.builder().idServicio(idServicio).nombre(nombre).build());
+        return turno;
+    }
+
+    /** Un Día de Urgencias del lunes 8 de junio, de 08:00 a 20:00. */
+    private static TurnoEntity diaDelLunes() {
+        return deServicio(conTipo(turno(1L, LUNES, LocalTime.of(8, 0), LUNES, LocalTime.of(20, 0)), "Día"),
+                URGENCIAS, "Urgencias");
+    }
+
+    private ValidadorAsignacionTurnoService.ConflictoAsignacionException cruce(TurnoEntity existente, Long idServicioCandidato) {
+        return assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> validador.validarAsignacion("Persona de prueba", LUNES.atTime(8, 0), LUNES.atTime(20, 0), 2L,
+                        List.of(existente), idServicioCandidato));
+    }
+
+    @Test
+    void cruce_citaElTipoLaFechaYLasHorasDelTurnoQueChoca() {
+        // El mismo servicio: no se repite el servicio, solo el tipo (Día) y la fecha y horas legibles de R13.
+        var ex = cruce(diaDelLunes(), URGENCIAS);
+
+        assertEquals("No es posible asignar el turno a Persona de prueba porque ya tiene otro turno asignado que "
+                + "se superpone (Día, lun 8 jun, 08:00 a lun 8 jun, 20:00).", ex.getMessage());
+    }
+
+    @Test
+    void cruce_conUnTurnoDeOtroServicio_nombraElServicio() {
+        TurnoEntity noche = deServicio(conTipo(turno(1L, LUNES.minusDays(1), LocalTime.of(20, 0), LUNES, LocalTime.of(9, 0)),
+                "Noche"), MEDICINA, "Medicina Interna");
+
+        var ex = cruce(noche, URGENCIAS);
+
+        assertTrue(ex.getMessage().endsWith("se superpone (Noche de Medicina Interna, dom 7 jun, 20:00 a lun 8 jun, 09:00)."),
+                ex.getMessage());
+    }
+
+    @Test
+    void cruce_sinTipoYDeOtroServicio_diceTurnoDeEseServicio() {
+        TurnoEntity sinTipo = deServicio(turno(1L, LUNES, LocalTime.of(8, 0), LUNES, LocalTime.of(20, 0)), MEDICINA, "Medicina Interna");
+
+        var ex = cruce(sinTipo, URGENCIAS);
+
+        assertTrue(ex.getMessage().endsWith("se superpone (turno de Medicina Interna, lun 8 jun, 08:00 a lun 8 jun, 20:00)."),
+                ex.getMessage());
+    }
+
+    @Test
+    void cruce_sinConocerElServicioDelCandidato_noNombraServicio() {
+        // La firma de siempre, sin servicio del candidato: el tipo y la fecha salen; el servicio, no.
+        TurnoEntity deOtroServicio = deServicio(conTipo(turno(1L, LUNES, LocalTime.of(8, 0), LUNES, LocalTime.of(20, 0)),
+                "Día"), MEDICINA, "Medicina Interna");
+
+        var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> validador.validarAsignacion("Persona de prueba", LUNES.atTime(8, 0), LUNES.atTime(20, 0), 2L,
+                        List.of(deOtroServicio)));
+
+        assertTrue(ex.getMessage().endsWith("se superpone (Día, lun 8 jun, 08:00 a lun 8 jun, 20:00)."), ex.getMessage());
+    }
+
+    @Test
+    void cruce_elTipoOElServicioNoSePuedenLeer_elAvisoSaleIgualConLaFecha() {
+        // Los dos se cargan perezosamente: si fallan, el aviso no debe fallar con ellos y dejar sin 409 el rechazo.
+        TipoTurnoEntity ilegible = new TipoTurnoEntity() {
+            @Override public String getNombre() { throw new IllegalStateException("sin sesión"); }
+        };
+        TurnoEntity existente = turno(1L, LUNES, LocalTime.of(8, 0), LUNES, LocalTime.of(20, 0));
+        existente.setTipoTurno(ilegible);
+        existente.setServicio(new ServicioEntity() {
+            @Override public String getNombre() { throw new IllegalStateException("sin sesión"); }
+            @Override public Long getIdServicio() { return MEDICINA; }
+        });
+
+        var ex = cruce(existente, URGENCIAS);
+
+        assertTrue(ex.getMessage().endsWith("se superpone (lun 8 jun, 08:00 a lun 8 jun, 20:00)."), ex.getMessage());
+    }
+
+    @Test
+    void validarSolape_avisaElCruceCitandoElTurno_ynoMiraElDescansoPostNocturno() {
+        // R13 no es lo suyo: una noche seguida de día pasa; el cruce, no.
+        TurnoEntity noche = turnoDe12h(1L, LUNES.minusDays(1), LocalTime.of(20, 0)); // termina lun 08:00
+        assertDoesNotThrow(() -> validador.validarSolape("Persona de prueba", LUNES.atTime(8, 0), LUNES.atTime(20, 0),
+                2L, List.of(noche), URGENCIAS));
+
+        var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> validador.validarSolape("Persona de prueba", LUNES.atTime(8, 0), LUNES.atTime(20, 0), 2L,
+                        List.of(diaDelLunes()), URGENCIAS));
+        assertTrue(ex.getMessage().endsWith("(Día, lun 8 jun, 08:00 a lun 8 jun, 20:00)."), ex.getMessage());
+        // El propio candidato, si viene en la lista, no se compara consigo mismo.
+        assertDoesNotThrow(() -> validador.validarSolape("Persona de prueba", LUNES.atTime(8, 0), LUNES.atTime(20, 0),
+                1L, List.of(diaDelLunes()), URGENCIAS));
+    }
+
+    @Test
+    void citarTurno_sinFechaOHoraCompletas_esNull() {
+        assertNull(ValidadorAsignacionTurnoService.citarTurno(TurnoEntity.builder().idTurno(1L).build(), URGENCIAS));
+        assertNull(ValidadorAsignacionTurnoService.citarTurno(null, URGENCIAS));
     }
 }

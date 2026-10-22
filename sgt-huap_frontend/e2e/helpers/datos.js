@@ -225,11 +225,23 @@ export function patronMensajeR13(regla, turno) {
 }
 
 /**
- * Mensaje del validador cuando el turno se cruza con otro de la persona (fase 4:
- * la aprobación revalida el solape, HU-SOL-09 criterio 4), con el nombre oculto
- * como «{nombre}». Se exige que cite el turno con que choca, con la fecha legible
- * de P-01 (17 oct), como en R13.
+ * El turno con que choca el candidato, como lo cita el backend en el aviso de cruce (RG-27, A1-07, 22 oct): su
+ * tipo (Día, Noche…), el servicio solo si es otro, y la fecha legible de R13. Sin tipo ('Sin Tipo' en
+ * /turnos/...), solo la fecha. «Día, lun 8 jun, 08:00 a lun 8 jun, 20:00»; de otro servicio: «Día de {servicio}, …».
+ * `servicioDeOtro`: el nombre de ese servicio si el turno es de uno distinto al del candidato; null si es el mismo.
  */
-export function patronMensajeSolape(turno) {
-  return new RegExp(`^No es posible asignar el turno a \\{nombre\\} porque ya tiene otro turno asignado que se superpone \\(${escapar(intervaloLegible(turno))}\\)\\.$`);
+export function citaDelTurno(turno, servicioDeOtro = null) {
+  const tipo = turno.nombreTipoTurno && turno.nombreTipoTurno !== 'Sin Tipo' ? turno.nombreTipoTurno : null;
+  const cual = tipo ? (servicioDeOtro ? `${tipo} de ${servicioDeOtro}` : tipo) : (servicioDeOtro ? `turno de ${servicioDeOtro}` : null);
+  return cual ? `${cual}, ${intervaloLegible(turno)}` : intervaloLegible(turno);
+}
+
+/**
+ * Mensaje del validador cuando el turno se cruza con otro de la persona (fase 4:
+ * la aprobación revalida el solape, HU-SOL-09 criterio 4; y la asignación a mano, HU-ASG-02
+ * criterio 4), con el nombre oculto como «{nombre}». Se exige que cite el turno con que
+ * choca, con su tipo y la fecha legible de P-01 (17 oct), como en R13 (ver citaDelTurno).
+ */
+export function patronMensajeSolape(turno, servicioDeOtro = null) {
+  return new RegExp(`^No es posible asignar el turno a \\{nombre\\} porque ya tiene otro turno asignado que se superpone \\(${escapar(citaDelTurno(turno, servicioDeOtro))}\\)\\.$`);
 }

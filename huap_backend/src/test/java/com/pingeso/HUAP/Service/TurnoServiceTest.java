@@ -2,6 +2,7 @@ package com.pingeso.HUAP.Service;
 
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.PuestoRepository;
@@ -66,6 +67,31 @@ class TurnoServiceTest {
         when(turnoRepository.findConflictosByFuncionario(eq(1L), any(), any())).thenReturn(List.of(existente));
 
         assertThrows(Exception.class, () -> turnoService.saveTurno(nuevo));
+        verify(turnoRepository, never()).save(any());
+    }
+
+    @Test
+    void save_funcionarioConTurnoSolapado_elAvisoNombraElTurnoQueChoca() {
+        // RG-27: el aviso dice con qué turno choca: su tipo, fecha y horas; y el servicio solo si es otro.
+        FuncionarioEntity funcionario = func(1L);
+        TurnoEntity nuevo = turno(funcionario, LUNES, LocalTime.of(8, 0), LUNES, LocalTime.of(20, 0));
+        nuevo.setServicio(servicio(100L));
+        TipoTurnoEntity tipo = new TipoTurnoEntity();
+        tipo.setNombre("Día");
+        TurnoEntity existente = turno(funcionario, LUNES, LocalTime.of(14, 0), LUNES, LocalTime.of(22, 0));
+        existente.setIdTurno(99L);
+        existente.setTipoTurno(tipo);
+        existente.setServicio(servicio(100L));
+        when(turnoRepository.findConflictosByFuncionario(eq(1L), any(), any())).thenReturn(List.of(existente));
+
+        Exception ex = assertThrows(Exception.class, () -> turnoService.saveTurno(nuevo));
+        assertEquals("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas "
+                + "(Día, lun 8 jun, 14:00 a lun 8 jun, 22:00).", ex.getMessage());
+
+        existente.setServicio(servicio(200L));
+        Exception deOtroServicio = assertThrows(Exception.class, () -> turnoService.saveTurno(nuevo));
+        assertEquals("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas "
+                + "(Día de Servicio200, lun 8 jun, 14:00 a lun 8 jun, 22:00).", deOtroServicio.getMessage());
         verify(turnoRepository, never()).save(any());
     }
 

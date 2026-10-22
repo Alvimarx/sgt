@@ -6,6 +6,7 @@ import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
+import com.pingeso.HUAP.Security.AlcanceServicio;
 import com.pingeso.HUAP.Security.SeguridadServicio;
 import com.pingeso.HUAP.Utils.FormatoFecha;
 import jakarta.transaction.Transactional;
@@ -236,7 +237,8 @@ public class GestionTurnoService {
 
     /**
      * Revisa el calendario de quien recibe el turno a mano (asignar o reasignar): ni cruce de
-     * horario ni noche seguida de día (R13). Los dos son conflictos de estado: 409 con el mensaje.
+     * horario ni noche seguida de día (R13). Los dos son conflictos de estado: 409 con el mensaje,
+     * que cita el turno con que choca (RG-27): su tipo, el servicio si es otro, y su fecha y horas.
      */
     private void validarConflictoFuncionario(FuncionarioEntity funcionario, TurnoEntity turno) {
         Long idFuncionario = funcionario.getIdFuncionario();
@@ -262,37 +264,20 @@ public class GestionTurnoService {
                 .filter(t -> !t.getIdTurno().equals(turno.getIdTurno()))
                 .toList();
 
-        boolean hayConflicto = cercanos.stream().anyMatch(t -> {
-                LocalDateTime inicioExistente = t.getDiaInicioTurno().atTime(t.getHoraInicio());
-                LocalDateTime finExistente = t.getDiaFinalTurno().atTime(t.getHoraFin());
-
-                return solapan(inicioObjetivo, finObjetivo, inicioExistente, finExistente);
-        });
-
-        // §5.1 (P-01): antes se lanzaba como Exception y /turnos/alterar respondía 500.
-        if (hayConflicto) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "El funcionario ya tiene otro turno asignado en este rango horario.");
-        }
-
-        // C-04 (HU-SOL-14, criterio 5): R13 también al asignar y reasignar a mano, con el mismo
-        // validador y el mismo mensaje de las solicitudes y las ofertas. No hay excepción de
-        // emergencia. La generación de la planificación no lo aplica (limitación conocida).
+        // El cruce se revisa contra todos los turnos antes que R13, como siempre. §5.1 (P-01): antes se
+        // lanzaba como Exception y /turnos/alterar respondía 500; RG-27 (A1-07): antes el mensaje no
+        // decía qué turno chocaba. C-04 (HU-SOL-14, criterio 5): R13 también al asignar y reasignar a
+        // mano, con el mismo validador y el mismo mensaje de las solicitudes y las ofertas. No hay
+        // excepción de emergencia. La generación de la planificación no lo aplica (limitación conocida).
+        String nombre = nombreParaMensaje(funcionario);
         try {
+            validadorAsignacion.validarSolape(nombre, inicioObjetivo, finObjetivo, turno.getIdTurno(),
+                    cercanos, AlcanceServicio.servicioDe(turno));
             validadorAsignacion.validarDescansoPostNocturno(
-                    nombreParaMensaje(funcionario), inicioObjetivo, finObjetivo, turno.getIdTurno(), cercanos);
+                    nombre, inicioObjetivo, finObjetivo, turno.getIdTurno(), cercanos);
         } catch (ValidadorAsignacionTurnoService.ConflictoAsignacionException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
-        }
-
-        private boolean solapan(
-                LocalDateTime aInicio,
-                LocalDateTime aFin,
-                LocalDateTime bInicio,
-                LocalDateTime bFin
-        ) {
-        return aInicio.isBefore(bFin) && bInicio.isBefore(aFin);
     }
 
     private void registrarEnBitacora(FuncionarioEntity admin, TurnoEntity turno,

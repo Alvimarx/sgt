@@ -309,7 +309,9 @@ public class OfertaGeneralService {
         LocalDateTime nuevoInicio = turno.getDiaInicioTurno().atTime(turno.getHoraInicio());
         LocalDateTime nuevoFin = turno.getDiaFinalTurno().atTime(turno.getHoraFin());
         String nombre = (postulante.getNombre() + (postulante.getApelPat() != null ? " " + postulante.getApelPat() : "")).trim();
-        validadorAsignacion.validarAsignacion(nombre, nuevoInicio, nuevoFin, turno.getIdTurno(), vigentes);
+        // RG-27: el aviso cita el turno que choca; con el servicio del turno nombra el del que choca si es otro.
+        validadorAsignacion.validarAsignacion(nombre, nuevoInicio, nuevoFin, turno.getIdTurno(), vigentes,
+                AlcanceServicio.servicioDe(turno));
     }
 
     /**

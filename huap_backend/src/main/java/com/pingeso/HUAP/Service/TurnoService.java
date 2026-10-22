@@ -140,11 +140,15 @@ public class TurnoService {
                     turno.getDiaInicioTurno(),
                     turno.getDiaFinalTurno());
             
-            boolean hayConflicto = conflictosFuncionario.stream()
-                    .anyMatch(t -> turno.getIdTurno() == null || !t.getIdTurno().equals(turno.getIdTurno()));
-            
-            if (hayConflicto) {
-                throw new Exception("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas.");
+            Optional<TurnoEntity> choque = conflictosFuncionario.stream()
+                    .filter(t -> turno.getIdTurno() == null || !t.getIdTurno().equals(turno.getIdTurno()))
+                    .findFirst();
+
+            if (choque.isPresent()) {
+                // RG-27: el aviso cita el turno con que choca (tipo, servicio si es otro, fecha y horas).
+                String cita = ValidadorAsignacionTurnoService.citarTurno(choque.get(), AlcanceServicio.servicioDe(turno));
+                throw new Exception("Conflicto: El funcionario seleccionado ya tiene otro turno asignado en este rango de fechas"
+                        + (cita != null ? " (" + cita + ")" : "") + ".");
             }
         }
 

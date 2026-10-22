@@ -162,15 +162,17 @@ testMuta('HU-ASG-02 · criterio 3: al confirmar, el cupo queda asignado, la vist
   expect(await muta.devolverTurnos(), 'deshacer: el cupo vuelve a quedar libre').toEqual([cupo.id]);
 });
 
-testMuta('HU-ASG-02 · criterio 4: si la persona ya tiene un turno que se cruza, veo «El funcionario ya tiene otro turno asignado en este rango horario.»', async ({ page, request, muta }, testInfo) => {
-  // Un cupo libre que se cruza con un turno del 368, del 341 o del 369.
+testMuta('HU-ASG-02 · criterio 4: si la persona ya tiene un turno que se cruza, el aviso nombra el turno que choca (tipo, fecha y horas)', async ({ page, request, muta }, testInfo) => {
+  // Un cupo libre que se cruza con un único turno del 368, del 341 o del 369 (así el aviso cita siempre el mismo).
+  const soloSolape = (c, calendario) => choquesR13(c, calendario).filter((x) => x.regla === 'solape').length === 1;
   let caso = null;
   for (const quien of ['segundoMedico', 'tercerMedico', 'medico']) {
-    const cupo = await cupoParaAsignar(request, (c, foto) => choquesR13(c, foto.calendario[quien]).some((x) => x.regla === 'solape'), [quien]);
+    const cupo = await cupoParaAsignar(request, (c, foto) => soloSolape(c, foto.calendario[quien]), [quien]);
     if (cupo) { caso = { quien, cupo }; break; }
   }
   expect(caso, 'hay un cupo libre que se cruza con un turno del 368, del 341 o del 369').toBeTruthy();
   const { quien, cupo } = caso;
+  const turnoQueChoca = choquesR13(cupo, await calendarioDe(request, quien)).find((x) => x.regla === 'solape').turno;
   await muta.recordarTurnos(cupo);
   const panel = await abrirAsignar(page, testInfo, cupo);
   await elegirEnPanel(panel, testInfo, await personaDe(request, quien));
@@ -179,9 +181,10 @@ testMuta('HU-ASG-02 · criterio 4: si la persona ya tiene un turno que se cruza,
   const r = await pulsarYEsperar(page, dialogo.getByRole('button', { name: 'Confirmar', exact: true }), RUTA_ALTERAR);
   testInfo.annotations.push({ type: 'código de respuesta', description: `${r.status} (C-04: el cruce de horario responde 409 con su mensaje)` });
   expect(r.status, 'el backend lo rechaza (conflicto con el calendario)').toBe(409);
-  const mensaje = 'El funcionario ya tiene otro turno asignado en este rango horario.';
-  expect(r.cuerpo?.error).toBe(mensaje);
-  await expect(panel.getByRole('alert')).toHaveText(mensaje);
+  // RG-27 (A1-07, 22 oct): antes era «El funcionario ya tiene otro turno asignado en este rango horario.», sin decir cuál;
+  // ahora es el mensaje del validador que usan las solicitudes: nombra a la persona y cita el turno que choca.
+  await comprobarMensajeR13(request, r.cuerpo?.error ?? '', quien, 'solape', turnoQueChoca);
+  expect(sinNombre(await panel.getByRole('alert').textContent({ timeout: 5_000 }).catch(() => '')), 'el panel muestra el mensaje').toBe(sinNombre(r.cuerpo?.error));
   expect(await duenoDe(request, cupo.id), 'el cupo sigue libre').toBeNull();
 });
 

@@ -4,12 +4,15 @@ import com.pingeso.HUAP.DTO.CrearOfertaGeneralDTO;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.OfertaGeneralEntity;
 import com.pingeso.HUAP.Entity.PostulacionEntity;
+import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.OfertaGeneralRepository;
 import com.pingeso.HUAP.Repository.PostulacionRepository;
 import com.pingeso.HUAP.Repository.TurnoRepository;
 import com.pingeso.HUAP.Security.SeguridadServicio;
+import com.pingeso.HUAP.Utils.FormatoFecha;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -415,6 +418,36 @@ class OfertaGeneralServiceTest {
         assertFalse(postulacion.getSeleccionado());
         verify(turnoRepository, never()).save(any());
         verify(ofertaGeneralRepository, never()).save(any());
+    }
+
+    @Test
+    void seleccionarPostulante_conCruceParaElPostulante_elAvisoNombraElTurnoQueChoca() {
+        // RG-27: el aviso dice con qué turno choca el postulante: tipo, servicio si es otro, fecha y horas.
+        TurnoEntity turnoOfrecido = turnoConHorario(1L, LUNES.plusDays(1), LocalTime.of(8, 0), 12);
+        turnoOfrecido.setServicio(ServicioEntity.builder().idServicio(4L).nombre("Servicio4").build());
+        FuncionarioEntity ofertor = funcionario(1L);
+        turnoOfrecido.setFuncionario(ofertor);
+        OfertaGeneralEntity o = oferta(1L, ofertor, turnoOfrecido, ABIERTA);
+        FuncionarioEntity postulante = funcionario(2L);
+        PostulacionEntity postulacion = PostulacionEntity.builder()
+                .idPostulacion(5L).ofertaGeneral(o).postulante(postulante).seleccionado(false).build();
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        when(postulacionRepository.findById(5L)).thenReturn(Optional.of(postulacion));
+        // El postulante ya tiene una Noche, de otro servicio, que se cruza con el turno ofrecido.
+        TurnoEntity chocaConPostulante = turnoConHorario(61L, LUNES, LocalTime.of(20, 0), 13);
+        TipoTurnoEntity noche = new TipoTurnoEntity();
+        noche.setNombre("Noche");
+        chocaConPostulante.setTipoTurno(noche);
+        chocaConPostulante.setServicio(ServicioEntity.builder().idServicio(1L).nombre("Servicio1").build());
+        when(turnoRepository.findByFuncionario_IdFuncionario(2L)).thenReturn(List.of(chocaConPostulante));
+
+        actorAutenticado(9L);
+        var ex = assertThrows(ValidadorAsignacionTurnoService.ConflictoAsignacionException.class,
+                () -> service.seleccionarPostulante(1L, 5L));
+
+        String citado = FormatoFecha.intervalo(LUNES.atTime(20, 0), LUNES.plusDays(1).atTime(9, 0));
+        assertTrue(ex.getMessage().endsWith("que se superpone (Noche de Servicio1, " + citado + ")."), ex.getMessage());
+        assertSame(ofertor, turnoOfrecido.getFuncionario(), "no debe asignarse el turno si hay cruce");
     }
 
     // ============================ lecturas ============================

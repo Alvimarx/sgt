@@ -333,8 +333,10 @@ public class SolicitudService {
         LocalDateTime nuevoInicio = turnoCandidato.getDiaInicioTurno().atTime(turnoCandidato.getHoraInicio());
         LocalDateTime nuevoFin = turnoCandidato.getDiaFinalTurno().atTime(turnoCandidato.getHoraFin());
 
+        // RG-27: el aviso cita el turno que choca; con el servicio del candidato nombra el del que choca si es otro.
         validadorAsignacion.validarAsignacion(
-                nombreCompleto(funcionario), nuevoInicio, nuevoFin, turnoCandidato.getIdTurno(), calendarioResultante);
+                nombreCompleto(funcionario), nuevoInicio, nuevoFin, turnoCandidato.getIdTurno(), calendarioResultante,
+                AlcanceServicio.servicioDe(turnoCandidato));
     }
 
     private String nombreCompleto(FuncionarioEntity f) {

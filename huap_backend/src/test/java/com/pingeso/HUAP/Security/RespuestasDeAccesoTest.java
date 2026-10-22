@@ -92,7 +92,8 @@ class RespuestasDeAccesoTest {
         // §5.1 y C-04: el cruce de horario y R13 son 409 y llegan al GlobalExceptionHandler con su código.
         reset(gestion);
         when(gestion.alterarTurno(any())).thenThrow(new ResponseStatusException(HttpStatus.CONFLICT,
-                "El funcionario ya tiene otro turno asignado en este rango horario."));
+                "No es posible asignar el turno a Persona de prueba porque ya tiene otro turno asignado que se "
+                + "superpone (Día, lun 8 jun, 08:00 a lun 8 jun, 20:00)."));
         ResponseStatusException conflicto = assertThrows(ResponseStatusException.class, () -> controller.alterarTurno(request));
         assertEquals(HttpStatus.CONFLICT, conflicto.getStatusCode());
     }

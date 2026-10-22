@@ -3,6 +3,7 @@ package com.pingeso.HUAP.Service;
 import com.pingeso.HUAP.DTO.AlterarTurnoRequest;
 import com.pingeso.HUAP.Entity.FuncionarioEntity;
 import com.pingeso.HUAP.Entity.ServicioEntity;
+import com.pingeso.HUAP.Entity.TipoTurnoEntity;
 import com.pingeso.HUAP.Entity.TurnoEntity;
 import com.pingeso.HUAP.Repository.FuncionarioRepository;
 import com.pingeso.HUAP.Repository.ServiciosFuncionarioRepository;
@@ -33,6 +34,8 @@ import static org.mockito.Mockito.*;
  *   validador y el mismo mensaje de las solicitudes, sin excepción de emergencia.</li>
  *   <li>§5.1 (P-01): el cruce de horario responde 409 con su mensaje; antes se lanzaba como
  *   {@code Exception} y {@code /turnos/alterar} respondía 500.</li>
+ *   <li>RG-27 (A1-07): el aviso del cruce nombra el turno que choca (tipo, servicio si es otro, fecha y
+ *   horas), igual que el de R13; antes era un texto genérico.</li>
  * </ul>
  *
  * <p>Mockito puro, sin contexto Spring; el lock pesimista queda apagado (el campo {@code @Value}
@@ -71,6 +74,11 @@ class GestionTurnoServiceTest {
 
     private static FuncionarioEntity persona(long id, String nombre, String apellido) {
         return FuncionarioEntity.builder().idFuncionario(id).nombre(nombre).apelPat(apellido).build();
+    }
+
+    /** Una persona sin nombre propio, para los casos nuevos. */
+    private static FuncionarioEntity anonima(long id) {
+        return persona(id, "Funcionario", "Prueba");
     }
 
     /** Turno de Urgencias de 12 horas que parte el día y la hora indicados. */
@@ -174,20 +182,79 @@ class GestionTurnoServiceTest {
 
     // ============================ §5.1: cruce de horario, 409 y no 500 ============================
 
-    @Test
-    void asignar_conUnTurnoQueSeCruza_409ConElMensaje() {
-        existe(turno(10L, LUNES, 8, null));
-        TurnoEntity cruzado = TurnoEntity.builder().idTurno(15L)
+    private static TipoTurnoEntity tipo(String nombre) {
+        TipoTurnoEntity tipo = new TipoTurnoEntity();
+        tipo.setNombre(nombre);
+        return tipo;
+    }
+
+    /** Un turno del MEDICO que se cruza con un cupo de 08:00 a 20:00 del lunes: de 14:00 a 22:00. */
+    private static TurnoEntity turnoQueSeCruza(long id, String nombreTipo) {
+        return TurnoEntity.builder().idTurno(id)
                 .diaInicioTurno(LUNES).horaInicio(LocalTime.of(14, 0))
-                .diaFinalTurno(LUNES).horaFin(LocalTime.of(22, 0)).build();
-        calendario(MEDICO, cruzado);
+                .diaFinalTurno(LUNES).horaFin(LocalTime.of(22, 0))
+                .tipoTurno(nombreTipo != null ? tipo(nombreTipo) : null)
+                .build();
+    }
+
+    @Test
+    void asignar_conUnTurnoQueSeCruza_409QueNombraElTurnoQueChoca() {
+        existe(turno(10L, LUNES, 8, null));
+        calendario(MEDICO, turnoQueSeCruza(15L, "Día"));
 
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> service.alterarTurno(pedido(10L, "ASIGNAR", MEDICO)));
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
-        assertEquals("El funcionario ya tiene otro turno asignado en este rango horario.", ex.getReason());
+        // RG-27: tipo, fecha y horas del turno que ya tiene; el servicio no, porque es el mismo (o no consta).
+        assertTrue(ex.getReason().startsWith("No es posible asignar el turno a "), ex.getReason());
+        assertTrue(ex.getReason().endsWith(" porque ya tiene otro turno asignado que se superpone "
+                + "(Día, lun 8 jun, 14:00 a lun 8 jun, 22:00)."), ex.getReason());
+        assertFalse(ex.getReason().contains("rango horario"), "ya no es el texto genérico");
         verify(turnoRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService, notificacionService, solicitudService);
+    }
+
+    @Test
+    void reasignar_conUnTurnoQueSeCruza_409QueNombraElTurnoQueChoca() {
+        existe(turno(10L, LUNES, 8, anonima(OTRO_MEDICO)));
+        calendario(MEDICO, turnoQueSeCruza(15L, "Noche"));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.alterarTurno(pedido(10L, "REASIGNAR", MEDICO)));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().endsWith("se superpone (Noche, lun 8 jun, 14:00 a lun 8 jun, 22:00)."), ex.getReason());
+        verify(turnoRepository, never()).save(any());
+    }
+
+    @Test
+    void asignar_conUnTurnoDeOtroServicioQueSeCruza_409NombraElServicio() {
+        // RG-18: el cruce vale contra todos los turnos de la persona, de cualquier servicio. El aviso dice cuál.
+        existe(turno(10L, LUNES, 8, null)); // cupo de Urgencias
+        TurnoEntity deMedicina = turnoQueSeCruza(15L, "Día");
+        deMedicina.setServicio(ServicioEntity.builder().idServicio(1L).nombre("Medicina Interna").build());
+        calendario(MEDICO, deMedicina);
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.alterarTurno(pedido(10L, "ASIGNAR", MEDICO)));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().endsWith("se superpone (Día de Medicina Interna, lun 8 jun, 14:00 a lun 8 jun, 22:00)."),
+                ex.getReason());
+    }
+
+    @Test
+    void asignar_conUnCruceYUnDescansoViolado_avisaPrimeroElCruce() {
+        // La noche del domingo termina el lunes a las 08:00 (R13 contra el cupo de día del lunes) y, además,
+        // otro turno del lunes se cruza con él: se avisa el cruce, como siempre antes que R13.
+        existe(turno(10L, LUNES, 8, null));
+        calendario(MEDICO, turno(11L, LUNES.minusDays(1), 20, anonima(MEDICO)), turnoQueSeCruza(15L, "Día"));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.alterarTurno(pedido(10L, "ASIGNAR", MEDICO)));
+
+        assertTrue(ex.getReason().contains("que se superpone (Día, lun 8 jun, 14:00 a lun 8 jun, 22:00)"), ex.getReason());
     }
 
     @Test
