@@ -8,6 +8,7 @@
 // vista actual, para que el número se actualice al navegar).
 import { useEffect, useState } from 'react';
 import { solicitudesService } from '../services/adminService';
+import { solicitudPendienteVigente } from '../utils/reglasSolicitud';
 
 export function useSolicitudesPendientes(user, refrescarCon) {
   const [cantidad, setCantidad] = useState(0);
@@ -34,7 +35,7 @@ export function useSolicitudesPendientes(user, refrescarCon) {
           .filter((s) => (vistas.has(s.idSolicitud) ? false : (vistas.add(s.idSolicitud), true)));
       });
     carga
-      .then((lista) => { if (vivo) setCantidad(lista.filter((s) => s.estado === 'PENDIENTE').length); })
+      .then((lista) => { if (vivo) setCantidad(lista.filter((s) => solicitudPendienteVigente(s)).length); })
       .catch(() => { if (vivo) setCantidad(0); });
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

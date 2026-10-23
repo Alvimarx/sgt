@@ -72,6 +72,7 @@ export const STATUS_TONE_MAP = {
   RECHAZADO: 'accent',
   RECHAZADA: 'accent',
   CANCELADA: 'neutral',
+  VENCIDA: 'neutral',
   PROGRAMADO: 'primary',
   COMPLETADO: 'success',
   AUSENTE: 'accent',

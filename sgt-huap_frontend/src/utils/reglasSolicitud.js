@@ -5,7 +5,46 @@
 // entidades tal como las entrega el backend (GET /solicitudes y
 // /ofertas-generales): el turno trae su funcionario como { idFuncionario }.
 
+import { yaEmpezo } from './reglasTurno';
+
 const mismoId = (a, b) => a != null && b != null && String(a) === String(b);
+
+/**
+ * Prefijo del motivo con que el backend cierra solo una solicitud u oferta pendiente cuyo turno ya
+ * empezó (decisión del 23 oct 2026: «Venció: el turno ya comenzó»). Quedan RECHAZADAS; así se
+ * reconocen como vencidas y no como un rechazo de la jefatura.
+ */
+export const PREFIJO_MOTIVO_VENCIDA = 'Venció:';
+
+const turnoEmpezado = (turno, ahora) => Boolean(turno?.diaInicioTurno && turno?.horaInicio) && yaEmpezo(turno, ahora);
+
+/**
+ * ¿La solicitud venció? Ya la cerró el backend (RECHAZADA con el motivo de vencimiento) o sigue
+ * PENDIENTE pero su turno, o el que entrega en un intercambio, ya empezó: la pantalla estuvo abierta
+ * mientras el turno empezaba y el backend la cerrará en cuanto se recargue. Una vencida se muestra
+ * como cerrada y sin acciones. `ahora` en la hora del hospital (por defecto, la de ahora).
+ */
+export function esSolicitudVencida(solicitud, ahora) {
+  if (!solicitud) return false;
+  if (solicitud.estado === 'RECHAZADA') return String(solicitud.motivo || '').startsWith(PREFIJO_MOTIVO_VENCIDA);
+  return solicitud.estado === 'PENDIENTE'
+    && (turnoEmpezado(solicitud.turno, ahora) || turnoEmpezado(solicitud.turnoReceptor, ahora));
+}
+
+/** Pendiente y todavía vigente: lo que cuenta como «pendiente» en las listas y los contadores. */
+export const solicitudPendienteVigente = (solicitud, ahora) =>
+  solicitud?.estado === 'PENDIENTE' && !esSolicitudVencida(solicitud, ahora);
+
+/**
+ * ¿La oferta general venció? Ya la cerró el backend (RECHAZADA con el motivo de vencimiento) o sigue
+ * pendiente de apertura o abierta pero su turno ya empezó.
+ */
+export function esOfertaVencida(oferta, ahora) {
+  if (!oferta) return false;
+  if (oferta.estado === 'RECHAZADA') return String(oferta.motivo || '').startsWith(PREFIJO_MOTIVO_VENCIDA);
+  return (oferta.estado === 'PENDIENTE_APROBACION' || oferta.estado === 'ABIERTA')
+    && turnoEmpezado(oferta.turno, ahora);
+}
 
 /**
  * Ids (como texto) de los turnos que `userId` tiene comprometidos en sus propias
@@ -96,14 +135,14 @@ export const puedeRetirarOferta = (oferta, userId) =>
 /**
  * ¿Se muestra la oferta? (R17 y C-16, el mismo filtro en el Centro y en
  * Solicitudes):
- *  - nunca las de turnos que ya terminaron, las rechazadas ni las retiradas
- *    por quien las publicó;
+ *  - nunca las de turnos que ya terminaron, las rechazadas (también las vencidas:
+ *    el turno ya empezó, 23 oct) ni las retiradas por quien las publicó;
  *  - la gestión (y quien la publicó) ve las abiertas, las que esperan apertura
  *    y las cerradas con un postulante elegido;
  *  - el resto ve solo las abiertas, que son a las que puede postular.
  */
 export function ofertaVisible(oferta, { hoy, puedeDecidir = false, userId = null } = {}) {
-  if (!oferta || !ofertaVigente(oferta, hoy)) return false;
+  if (!oferta || !ofertaVigente(oferta, hoy) || esOfertaVencida(oferta)) return false;
   const estado = oferta.estado;
   if (estado === 'RECHAZADA' || estado === 'RETIRADA') return false;
   if (estado === 'ABIERTA') return true;

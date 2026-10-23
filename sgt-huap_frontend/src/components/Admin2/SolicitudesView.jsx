@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { solicitudesService, turnosService, usuariosService, ofertasGeneralesService, serviciosService } from '../../services/adminService';
-import { ESTADO_OFERTA, esCoberturaDeTurnoCubierto, ofertaVisible, participaEnOferta, participaEnSolicitud, puedeRetirarOferta, turnosComprometidos } from '../../utils/reglasSolicitud';
+import { ESTADO_OFERTA, esCoberturaDeTurnoCubierto, esOfertaVencida, esSolicitudVencida, ofertaVisible, participaEnOferta, participaEnSolicitud, puedeRetirarOferta, solicitudPendienteVigente, turnosComprometidos } from '../../utils/reglasSolicitud';
 import { puedeTomarCupo, yaEmpezo } from '../../utils/reglasTurno';
 import { ahoraISOEnZonaHospital, hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { mensajeDeError } from '../../utils/errores';
@@ -124,7 +124,11 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
   // backend rechazaría aprobarla): «Turno ya cubierto», sin Aprobar ni Rechazar,
   // como en el Centro de operaciones. Quien la emitió puede cancelarla.
   const turnoCubierto = esCoberturaDeTurnoCubierto(solicitud);
-  const decisionPosible = canDecide && estado === 'PENDIENTE' && !esperandoReceptor && !receptorRechazo && !turnoCubierto;
+  // 23 oct: una solicitud cuyo turno ya empezó venció. Se muestra cerrada («Vencida») y sin
+  // acciones, para todos; el backend la cierra solo (tarea programada o al leerla).
+  const vencida = esSolicitudVencida(solicitud);
+  const vigente = estado === 'PENDIENTE' && !vencida;
+  const decisionPosible = canDecide && vigente && !esperandoReceptor && !receptorRechazo && !turnoCubierto;
   // Segregación de funciones: quien participa en la solicitud (emisor, receptor o
   // dueño de alguno de sus turnos) no la decide; el backend lo rechazaría
   // (SolicitudService.participantesDirectos). En vez de ofrecer Aprobar y
@@ -132,14 +136,14 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
   const participa = canDecide && participaEnSolicitud(solicitud, userId);
   const canDecideThis = decisionPosible && !participa;
   const bloqueadaPorParticipar = decisionPosible && participa;
-  const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && estado === 'PENDIENTE';
-  const canEditMotivo = !canDecide && !esMiReceptor && estado === 'PENDIENTE' && puedeEditarMotivo;
+  const canRespond    = esMiReceptor && esBifasico && esperandoReceptor && vigente;
+  const canEditMotivo = !canDecide && !esMiReceptor && vigente && puedeEditarMotivo;
   // Cancelar la propia solicitud pendiente: es lo que libera el turno comprometido para
   // poder pedir otra cosa sobre él (el backend bloquea mientras siga pendiente). El gate
   // es por IDENTIDAD (soy el emisor), no por rol: una jefatura que emitió una solicitud
   // no puede resolverla (segregación de funciones) pero SÍ debe poder cancelarla, o su
   // turno quedaría comprometido hasta que otra jefatura la toque.
-  const canCancelar = Boolean(esMiSolicitud) && estado === 'PENDIENTE' && puedeCancelar;
+  const canCancelar = Boolean(esMiSolicitud) && vigente && puedeCancelar;
   // Cancelada por el propio solicitante: mismo estado RECHAZADA en la base, pero el badge
   // no debe confundirse con un rechazo de jefatura.
   const esCancelada = estado === 'RECHAZADA' && String(solicitud.motivo || '').startsWith('Cancelada por el solicitante');
@@ -147,11 +151,14 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
   // Badge contextual para tipos bifásicos (4 y 5)
   let badgeLabel = esCancelada ? 'CANCELADA' : estado;
   let badgeTone  = esCancelada ? 'neutral' : (ESTADO_TONE[estado] || 'neutral');
-  if (turnoCubierto) {
+  if (vencida) {
+    badgeLabel = 'Vencida';
+    badgeTone  = 'neutral';
+  } else if (turnoCubierto) {
     badgeLabel = 'Turno ya cubierto';
     badgeTone  = 'neutral';
   }
-  if (esBifasico && estado === 'PENDIENTE') {
+  if (esBifasico && vigente) {
     if (esMiReceptor && esperandoReceptor) {
       badgeLabel = 'Requiere tu respuesta';
       badgeTone  = 'warn';
@@ -165,8 +172,8 @@ function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, p
   }
 
   return {
-    tipo, estado, esBifasico, esperandoReceptor, receptorAcepto, receptorRechazo,
-    canDecideThis, bloqueadaPorParticipar, turnoCubierto, canRespond, canEditMotivo, canCancelar, esCancelada, badgeLabel, badgeTone,
+    tipo, estado, esBifasico, esperandoReceptor: esperandoReceptor && !vencida, receptorAcepto, receptorRechazo,
+    vencida, canDecideThis, bloqueadaPorParticipar, turnoCubierto, canRespond, canEditMotivo, canCancelar, esCancelada, badgeLabel, badgeTone,
   };
 }
 
@@ -214,9 +221,14 @@ function evaluarOferta(oferta, userId, canDecide) {
   // H-07 también en las ofertas (§5.1): quien la publicó o postuló no la abre,
   // no la rechaza ni elige al postulante; ve la nota en vez de los botones.
   const participa = canDecide && participaEnOferta(oferta, userId);
-  const rotulo = ESTADO_OFERTA[estado] || { etiqueta: estado || 'Oferta', tono: 'neutral' };
+  // 23 oct: una oferta cuyo turno ya empezó venció: «Vencida», sin acciones (el backend la cierra sola).
+  const vencida = esOfertaVencida(oferta);
+  const rotulo = vencida
+    ? { etiqueta: 'Vencida', tono: 'neutral' }
+    : (ESTADO_OFERTA[estado] || { etiqueta: estado || 'Oferta', tono: 'neutral' });
   return {
     estado,
+    vencida,
     esOfertor,
     miPostulacion,
     yaPostulado: !!miPostulacion,
@@ -224,14 +236,14 @@ function evaluarOferta(oferta, userId, canDecide) {
     seleccionado: postulaciones.find(p => p.seleccionado),
     badgeTone: rotulo.tono,
     badgeLabel: rotulo.etiqueta,
-    puedeDecidirApertura: canDecide && !participa && estado === 'PENDIENTE_APROBACION',
-    puedeSeleccionar: canDecide && !participa && estado === 'ABIERTA',
-    bloqueadaPorParticipar: participa && (estado === 'PENDIENTE_APROBACION' || estado === 'ABIERTA'),
-    puedePostularORetirar: !canDecide && !esOfertor && estado === 'ABIERTA',
-    esMiOfertaAbierta: !canDecide && esOfertor && estado === 'ABIERTA',
+    puedeDecidirApertura: !vencida && canDecide && !participa && estado === 'PENDIENTE_APROBACION',
+    puedeSeleccionar: !vencida && canDecide && !participa && estado === 'ABIERTA',
+    bloqueadaPorParticipar: !vencida && participa && (estado === 'PENDIENTE_APROBACION' || estado === 'ABIERTA'),
+    puedePostularORetirar: !vencida && !canDecide && !esOfertor && estado === 'ABIERTA',
+    esMiOfertaAbierta: !vencida && !canDecide && esOfertor && estado === 'ABIERTA',
     // C-16: quien la publicó la retira hasta que alguien postule (pendiente o abierta, sin
     // postulaciones), sea cual sea su rol.
-    puedeRetirar: puedeRetirarOferta(oferta, userId),
+    puedeRetirar: !vencida && puedeRetirarOferta(oferta, userId),
   };
 }
 
@@ -312,7 +324,7 @@ const PostulacionesGrupoCard = ({ grupo, onAprobar, onRechazar, userId }) => {
 
 const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMotivo, onResponderIntercambio, onResponderOfertaParticular, onCancelar, esMiReceptor, esMiSolicitud, userId }) => {
   const {
-    tipo, estado, esperandoReceptor, receptorRechazo,
+    tipo, estado, esperandoReceptor, receptorRechazo, vencida,
     canDecideThis, bloqueadaPorParticipar, canRespond, canEditMotivo, canCancelar, badgeLabel, badgeTone,
   } = evaluarSolicitud(solicitud, {
     canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo: !!onEditMotivo, puedeCancelar: !!onCancelar, userId,
@@ -349,9 +361,14 @@ const SolicitudCard = ({ solicitud, canDecide, onAprobar, onRechazar, onEditMoti
           ⏳ Esperando respuesta del receptor
         </div>
       )}
-      {receptorRechazo && (
+      {receptorRechazo && !vencida && (
         <div style={{ marginTop: 8, padding: '6px 10px', background: PA.accentSoft, borderRadius: 8, fontSize: 12, color: '#B85A60', fontWeight: 700 }}>
           ✕ Receptor rechazó el intercambio
+        </div>
+      )}
+      {vencida && (
+        <div style={{ marginTop: 8, padding: '6px 10px', background: PA.surface2, borderRadius: 8, fontSize: 12, color: PA.ink2, fontWeight: 700 }}>
+          Venció: el turno ya comenzó. Ya no se puede resolver.
         </div>
       )}
 
@@ -1284,15 +1301,15 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const currentList = applySort((() => {
     if (tab === 'recibidas')  return recibidas;
     if (tab === 'mis')        return solicitudes;
-    if (tab === 'pendientes') return solicitudes.filter(s => s.estado === 'PENDIENTE');
-    if (tab === 'historial')  return solicitudes.filter(s => s.estado !== 'PENDIENTE');
+    if (tab === 'pendientes') return solicitudes.filter(s => solicitudPendienteVigente(s));
+    if (tab === 'historial')  return solicitudes.filter(s => !solicitudPendienteVigente(s));
     return solicitudes;
   })());
 
   // R10 — En el tab "pendientes" de jefatura, las coberturas que compiten por el
   // mismo turno (2+) salen agrupadas; el resto sigue como tarjetas individuales.
   const esPostulacionCobertura = (s) =>
-    s.tipoSolicitud?.tipo === 3 && s.estado === 'PENDIENTE' && s.turno?.idTurno != null;
+    s.tipoSolicitud?.tipo === 3 && solicitudPendienteVigente(s) && s.turno?.idTurno != null;
 
   let gruposPostulacion = [];
   let listaSinAgrupar = currentList;
@@ -1314,8 +1331,8 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   // asistente de intercambio los reconoce y dice que hay que cancelar la otra.
   const misTurnosComprometidos = useMemo(() => turnosComprometidos(solicitudes, user?.id), [solicitudes, user?.id]);
 
-  const pendienteCount = solicitudes.filter(s => s.estado === 'PENDIENTE').length;
-  const recibidasCount = recibidas.filter(s => s.estado === 'PENDIENTE').length;
+  const pendienteCount = solicitudes.filter(s => solicitudPendienteVigente(s)).length;
+  const recibidasCount = recibidas.filter(s => solicitudPendienteVigente(s)).length;
 
   // C-16 (17 oct 2026): el mismo filtro de vigencia que el Centro de
   // operaciones (utils/reglasSolicitud.js, ofertaVisible). Nunca las ofertas de
@@ -1374,10 +1391,11 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
       if (ev.canEditMotivo) acciones.push({ clave: 'motivo', etiqueta: 'Modificar motivo', variante: 'secundario', icono: 'sliders', onClick: () => setEditSolicitud(sol) });
 
       const notas = [];
+      if (ev.vencida) notas.push({ clave: 'vencida', texto: 'Venció: el turno ya comenzó. Ya no se puede resolver.' });
       if (ev.esperandoReceptor && ev.estado === 'PENDIENTE' && !esMiReceptor) {
         notas.push({ clave: 'espera', tono: 'aviso', texto: `⏳ Esperando respuesta del receptor${sol.funcionarioReceptor ? ` (${nombreFuncionario(sol.funcionarioReceptor)})` : ''}` });
       }
-      if (ev.receptorRechazo) notas.push({ clave: 'rechazo', tono: 'alerta', texto: '✕ Receptor rechazó el intercambio' });
+      if (ev.receptorRechazo && !ev.vencida) notas.push({ clave: 'rechazo', tono: 'alerta', texto: '✕ Receptor rechazó el intercambio' });
       if (ev.bloqueadaPorParticipar) notas.push({ clave: 'segregacion', texto: NOTA_PARTICIPAS });
 
       const turnoPrincipal = sol.turno ? turnoTexto(sol.turno) : sol.fechaInicioPermiso ? `${fmtFecha(sol.fechaInicioPermiso)} → ${fmtFecha(sol.fechaTerminoPermiso)}` : '';

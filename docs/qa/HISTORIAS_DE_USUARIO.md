@@ -459,10 +459,11 @@ Total de ítems con la bandeja oculta (la entrega): médico 5, subrogante 10, je
 - **Endpoints:** `GET /solicitudes/funcionario/{id}`, `GET /solicitudes/receptor/{id}`, `GET /ofertas-generales/servicio/{id}`, `GET /servicios/{id}`.
 - **Criterios de aceptación:**
   1. Veo las pestañas «Mis solicitudes», «Recibidas» (con contador de pendientes) y «Ofertas generales».
-  2. Cada solicitud muestra el tipo, la fecha, el estado (PENDIENTE, APROBADA, RECHAZADA o CANCELADA), el Solicitante, el Receptor, el turno principal («Turno a liberar», «Turno a cubrir», «Turno a recibir» o «Turno ofrecido», según el tipo), «Turno a entregar» en los intercambios, el Período y el Motivo.
+  2. Cada solicitud muestra el tipo, la fecha, el estado (PENDIENTE, APROBADA, RECHAZADA, CANCELADA o «Vencida»), el Solicitante, el Receptor, el turno principal («Turno a liberar», «Turno a cubrir», «Turno a recibir» o «Turno ofrecido», según el tipo), «Turno a entregar» en los intercambios, el Período y el Motivo.
   3. En intercambios y ofertas particulares veo, según el caso, «Requiere tu respuesta», «Aceptada · Pend. jefatura», «Pend. jefatura», «Esperando respuesta del receptor» o «Receptor rechazó el intercambio».
   4. Puedo ordenar por «Más reciente», «Más antigua» o «Por tipo» (MF-017). En desktop además busco por nombre o motivo y filtro por tipo, con la lista a la izquierda y el detalle a la derecha.
   5. Sin datos veo «Sin solicitudes» y «No hay solicitudes aquí por el momento.».
+  6. Una solicitud pendiente cuyo turno ya empezó (el pedido o, en un intercambio, el que se entrega) no está vigente: se ve «Vencida», con la nota «Venció: el turno ya comenzó. Ya no se puede resolver.», sin botones, fuera de «Pendientes» y de los contadores (decisión del 23 oct, C-24). En la base queda RECHAZADA con el motivo «Venció: el turno ya comenzó · motivo original: …». Aplica a los cinco tipos, también al permiso si tiene turno.
 - **Trazabilidad:** FUN-SGT-030; MF-017; R15, R18; BUG-002.
 - **Estado:** **Implementada.** Evidencia: `SolicitudesView.jsx` (`load`, `TABS`, `evaluarSolicitud`, `filasSolicitud`, `applySort`); `SolicitudesDesktop.jsx`; `useSolicitudesPendientes.js`.
 - **Prueba E2E:** `medico`. El médico 369 no tiene solicitudes en el seed: hay que crearlas antes (muta) o simular los GET, como hace `interacciones-turnos.spec.js`. Ambos.
@@ -579,7 +580,7 @@ Total de ítems con la bandeja oculta (la entrega): médico 5, subrogante 10, je
 - **Pantallas:** `solicitudes` → «Pendientes» → «Aprobar» o «Rechazar»; también el panel de solicitudes del Centro (desktop).
 - **Endpoints:** `PUT /solicitudes/{id}/estado?nuevoEstado=APROBADA|RECHAZADA`.
 - **Criterios de aceptación:**
-  1. Los botones aparecen solo en solicitudes PENDIENTES y, en intercambios y ofertas particulares, solo después de que el receptor aceptó.
+  1. Los botones aparecen solo en solicitudes PENDIENTES y vigentes (su turno no ha empezado, criterio 9) y, en intercambios y ofertas particulares, solo después de que el receptor aceptó.
   2. Al aprobar, «Botar turno» libera el turno, Cobertura lo asigna al solicitante, Intercambio cruza los turnos, Oferta particular lo asigna al receptor y Permiso no toca turnos.
   3. Al aprobar, las demás solicitudes pendientes que piden u ofrecen el mismo turno quedan RECHAZADAS con «Rechazo automático: Otra solicitud para este turno fue aprobada.» (R10, R15).
   4. La aprobación revalida el solape y R13. Si falla, veo el mensaje y la solicitud sigue PENDIENTE.
@@ -587,6 +588,7 @@ Total de ítems con la bandeja oculta (la entrega): médico 5, subrogante 10, je
   6. Si participo en la solicitud (como solicitante o receptor), no veo los botones y leo «Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.», igual en móvil y en desktop. El backend lo respalda: «No puedes aprobar ni rechazar una solicitud en la que participas directamente». La regla (`participaEnSolicitud`) cuenta también a los dueños de los turnos, pero ese caso no se produce: el cambio de dueño rechaza antes las solicitudes pendientes (criterio 5).
   7. Si dos jefaturas aprueban a la vez, la segunda ve «Esta solicitud ya no está pendiente (probablemente otra jefatura ya la resolvió)».
   8. Negativos: el médico no ve los botones, y por API `PUT /estado` con su token lo niega el filtro de seguridad con 403 «No tienes permiso para realizar esta acción», sin cerrar la sesión (BUG-005 y BUG-001, corregidos). Una solicitud de otro servicio responde 403 «No tienes acceso a solicitudes de otro servicio»; si es un intercambio con un turno de otro servicio, 403 «El intercambio involucra un turno de otro servicio» (`SolicitudService`).
+  9. Si el turno de la solicitud ya empezó, aprobarla o rechazarla responde 409 «Esta solicitud venció: el turno ya comenzó, así que ya no se puede resolver». La solicitud queda cerrada (RECHAZADA, «Venció: el turno ya comenzó»), ningún turno se mueve y la bitácora registra el evento de sistema `SOLICITUD_VENCIDA`, sin actor humano (decisión del 23 oct, C-24). El control de servicio y de segregación de funciones va antes: quien no puede resolverla recibe su 403.
 - **Trazabilidad:** FUN-SGT-028; MF-027; R10, R12, R13, R15; RN-SGT-017, 018, 019 y 040; TC-028, TC-029; BUG-005.
 - **Estado:** **Implementada.** Evidencia: `SolicitudesView` (`handleAprobar`, `handleRechazar`, `evaluarSolicitud`); `utils/reglasSolicitud.js` (`participaEnSolicitud`); `SolicitudService.cambiarEstado` (`participantesDirectos`, `lockTurnosInvolucrados`, `rechazarSolicitudesCompetitivas`); `SecurityConfig` (comentario «SEC (H-07)»). El cierre del 17 oct corrigió lo que la dejaba parcial: la segregación de funciones es una sola regla en móvil y desktop (P-01); el backend revisa que el receptor haya aceptado antes de aprobar un intercambio o una oferta particular (C-11, 409); revisa que el turno siga siendo de quien lo comprometió al aprobar un permiso con turno, un «Botar turno» o una «Oferta particular» (S-01 a, 409); y no deja pasar a RECHAZADA ni devolver a PENDIENTE una solicitud ya resuelta (S-01 c, 409).
 - **Prueba E2E:** `jefatura`, con solicitudes creadas por `medico`; muta; ambos. Ya existe: fotos en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/aprobaciones.spec.js`; el criterio 8, `e2e/hu/permisos.spec.js`.
@@ -618,7 +620,7 @@ Total de ítems con la bandeja oculta (la entrega): médico 5, subrogante 10, je
   3. Al confirmar, la solicitud queda con la marca CANCELADA (neutra), con el motivo «Cancelada por el solicitante · motivo original: …», y el turno se puede volver a pedir.
   4. La bitácora registra el evento «Cancelada por el solicitante»; la solicitud se ve como CANCELADA (tono neutro, igual que en Solicitudes) y el filtro por estado suma «Cancelada»: «Rechazada» ya no la incluye.
   5. Una jefatura puede cancelar una solicitud propia aunque no pueda decidirla.
-  6. Negativos (API): cancelar una solicitud ajena responde 403 «Solo puedes cancelar tus propias solicitudes»; una propia ya resuelta, 400 «Esta solicitud ya fue resuelta: no se puede cancelar». El backend revisa primero quién la emitió (`SolicitudService.java:241-248`): una ajena ya resuelta responde 403.
+  6. Negativos (API): cancelar una solicitud ajena responde 403 «Solo puedes cancelar tus propias solicitudes»; una propia ya resuelta, 400 «Esta solicitud ya fue resuelta: no se puede cancelar». Una propia cuyo turno ya empezó, 409 «Esta solicitud venció…» y queda como vencida, no como cancelada (23 oct). El backend revisa primero quién la emitió (`SolicitudService.java:241-248`): una ajena ya resuelta responde 403.
 - **Trazabilidad:** R15.
 - **Estado:** **Implementada.** Evidencia: `SolicitudesView` (`handleCancelar`, `confirmarCancelacion`; `canCancelar` y `esCancelada` en `evaluarSolicitud`); `SolicitudService.cancelarSolicitud`; `BitacoraView` (evento `SOLICITUD_CANCELADA`). Desde el 17 oct la cancelación se ve como CANCELADA, no como RECHAZADA (P-01).
 - **Prueba E2E:** `medico` y `jefatura`; muta; ambos. Ya existe: foto con datos simulados en `interacciones-turnos.spec.js`. Automatizada: `e2e/hu-muta/cancelar-modificar.spec.js` y, el criterio 5 en móvil, `aprobaciones.spec.js`; el criterio 6 con una solicitud ajena, `e2e/hu/permisos.spec.js`.
@@ -739,9 +741,10 @@ Total de ítems con la bandeja oculta (la entrega): médico 5, subrogante 10, je
   1. Las ofertas de turnos ya terminados no aparecen, ni en el Centro ni en «Ofertas generales».
   2. Las ofertas rechazadas o retiradas no aparecen como disponibles.
   3. Al médico, el backend no le entrega las ofertas rechazadas ni retiradas de otras personas (las propias, sí); la gestión y el administrador ven todas. El médico ve en «Ofertas generales» solo las abiertas, más las que él publicó.
+  4. Una oferta pendiente de apertura o abierta cuyo turno ya empezó vence: el backend la cierra (RECHAZADA, «Venció: el turno ya comenzó · motivo original: …», aunque tenga postulaciones), la tarea programada o al leer la lista, y deja el evento de sistema `OFERTA_GENERAL_VENCIDA`. Abrirla, rechazarla, retirarla, postular o elegir al postulante responde 409 «Esta oferta venció: el turno ya comenzó…». La pantalla la trata como las rechazadas: no aparece como disponible; si llegara a verse, dice «Vencida» y no ofrece acciones (decisión del 23 oct, C-24).
 - **Trazabilidad:** R16, R17.
 - **Estado:** **Implementada** (C-16, 17 oct). El Centro y la pestaña «Ofertas generales» de Solicitudes usan el mismo filtro, `ofertaVisible` (`utils/reglasSolicitud.js`): fuera las ofertas de turnos terminados, las rechazadas y las retiradas; la gestión ve las abiertas, las que esperan apertura y las cerradas con un elegido; el médico, solo las abiertas y las suyas. Sin ofertas visibles, el aviso dice «No hay ofertas vigentes en este servicio.». Además `GET /ofertas-generales/servicio/{id}` no entrega al médico las rechazadas ni las retiradas de otros (`EstadoOferta.soloLaVeSuOfertor`).
-- **Prueba E2E:** `medico`. La oferta 1 del seed, abierta y de la semana pasada, aparece hoy en «Ofertas generales». No muta; ambos.
+- **Prueba E2E:** `medico`. La oferta 1 del seed, abierta y de la semana pasada, vence en la primera lectura (23 oct): llega RECHAZADA con «Venció: …» y no aparece en «Ofertas generales». No muta; ambos.
 
 ### 3.6 Notificaciones (HU-NOT)
 
@@ -1650,6 +1653,11 @@ Cada punto trae lo que dicen los documentos (con cita), lo que hacía el código
 - **Pregunta:** ¿La jefatura puede sumar a su servicio a alguien que todavía no está en él, o eso queda solo para el administrador?
 - **Recomendación:** si la jefatura debe poder, permitir en el backend que cree la relación con el servicio de su sesión y rol MEDICO cuando la persona no tiene relación con él, sin tocar otras relaciones ni roles (y resolver C-19 en el mismo cambio). Si no, quitarle el módulo y el ítem del menú y corregir el Archivo. En los dos casos, no registrar a la persona si la asignación no se va a completar.
 - **Decisión (17 oct):** sí: la jefatura suma a su servicio, como Médico, a quien no está en él, sin tocar otros roles. Si ya pertenece, se avisa y no se cambia su rol (C-19).
+
+### C-24 · Solicitudes y ofertas sobre turnos que ya empezaron; corregir quién hizo un turno pasado
+
+- **Código antes:** el backend ya impedía pedir algo sobre un turno empezado (§5.1, RG-25) pero no cerraba lo que quedaba pendiente cuando el turno empezaba: una solicitud o una oferta del seed de mayo seguía «pendiente» y se podía aprobar. Y la asignación manual en un turno terminado quedaba sujeta a R13, que bloqueaba el registro de lo que ya ocurrió.
+- **Decisión (23 oct), regla 1:** «no deberían estar vigentes las solicitudes ocurridas en el pasado». Toda solicitud PENDIENTE (permiso, botar, cobertura, intercambio, oferta particular) cuyo turno ya empezó, y toda oferta general pendiente de apertura o abierta, se cierra sola: queda RECHAZADA con el motivo «Venció: el turno ya comenzó», sin estado nuevo ni migración (como «El turno fue asignado manualmente»). Se cierra con una tarea programada (`VencimientoProgramado`, cada 3 minutos, en la hora de Chile), al leer las listas y antes de resolverlas (409). Deja un evento de sistema sin actor humano (`SOLICITUD_VENCIDA`, `OFERTA_GENERAL_VENCIDA`). La pantalla las muestra como «Vencida», sin acciones, y no cuentan como pendientes.
 
 ### 5.1 Otras brechas del código que ningún documento contradice
 

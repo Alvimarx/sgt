@@ -26,6 +26,8 @@ const TIPO_LABEL = {
   CAMBIO_ESTADO_RECHAZADA:      'Rechazada',
   RECHAZO_AUTOMATICO:           'Rechazo automático',
   SOLICITUD_CANCELADA:          'Cancelada por el solicitante',
+  SOLICITUD_VENCIDA:            'Solicitud vencida',
+  OFERTA_GENERAL_VENCIDA:       'Oferta vencida',
   OFERTA_ACEPTADA_POR_RECEPTOR: 'Oferta aceptada',
   OFERTA_RECHAZADA_POR_RECEPTOR:'Oferta rechazada',
   ASIGNACION:                   'Asignación',
@@ -41,6 +43,8 @@ const TIPO_TONE = {
   CAMBIO_ESTADO_RECHAZADA:                   'accent',
   RECHAZO_AUTOMATICO:                        'accent',
   SOLICITUD_CANCELADA:                       'neutral',
+  SOLICITUD_VENCIDA:                         'neutral',
+  OFERTA_GENERAL_VENCIDA:                    'neutral',
   OFERTA_ACEPTADA_POR_RECEPTOR:              'warn',
   OFERTA_RECHAZADA_POR_RECEPTOR:             'accent',
   OFERTA_PARTICULAR_ACEPTADA_POR_RECEPTOR:   'warn',
@@ -82,6 +86,8 @@ function accionDesdeEvento(ev) {
     case 'CAMBIO_ESTADO_RECHAZADA':                   return 'Rechazo';
     case 'RECHAZO_AUTOMATICO':                        return 'Rechazo automático';
     case 'SOLICITUD_CANCELADA':                       return 'Cancelación por el solicitante';
+    case 'SOLICITUD_VENCIDA':
+    case 'OFERTA_GENERAL_VENCIDA':                    return 'Vencimiento automático (el turno ya comenzó)';
     case 'ASIGNACION':
     case 'ASIGNACION_MANUAL_TURNO':                   return 'Asignación de turno';
     case 'DESASIGNACION':                             return 'Desasignación de turno';
@@ -106,6 +112,9 @@ function estadoDesdeEvento(ev) {
     case 'OFERTA_ACEPTADA_POR_RECEPTOR':              return 'PENDIENTE';
     case 'CAMBIO_ESTADO_APROBADA':                    return 'APROBADA';
     case 'SOLICITUD_CANCELADA':                       return 'CANCELADA';
+    // 23 oct: las solicitudes y ofertas cuyo turno ya empezó se cierran solas (evento de sistema, sin actor).
+    case 'SOLICITUD_VENCIDA':
+    case 'OFERTA_GENERAL_VENCIDA':                    return 'VENCIDA';
     case 'CAMBIO_ESTADO_RECHAZADA':
     case 'RECHAZO_AUTOMATICO':
     case 'OFERTA_PARTICULAR_RECHAZADA_POR_RECEPTOR':
@@ -144,8 +153,13 @@ function titularAlCrearse(ev) {
 function estadoSolicitudVisible(ev) {
   const estado = ev.estadoSolicitud;
   if (estado === 'RECHAZADA' && String(ev.motivoSolicitud || '').startsWith('Cancelada por el solicitante')) return 'CANCELADA';
+  if (estado === 'RECHAZADA' && String(ev.motivoSolicitud || '').startsWith('Venció:')) return 'VENCIDA';
   return estado;
 }
+
+// Quién hizo lo que registra el evento. El vencimiento lo hace el sistema (sin actor humano).
+const esVencimiento = (ev) => ev.tipoEvento === 'SOLICITUD_VENCIDA' || ev.tipoEvento === 'OFERTA_GENERAL_VENCIDA';
+const actorDelEvento = (ev) => ev.nombreFuncionario || (esVencimiento(ev) ? 'Sistema' : null);
 
 // Fecha con que se ordena y se filtra un evento.
 const fechaDeEvento = (ev) => ev.fechaModificacion || ev.fechaInicioAfectada || null;
@@ -411,7 +425,7 @@ const EventoItem = ({ evento, etiqueta }) => {
   const fecha      = fmtFechaHora(evento.fechaModificacion) || fmtFechaHora(evento.fechaInicioAfectada) || '—';
   const estado     = estadoDesdeEvento(evento);
   const solicitante = evento.nombreFuncionarioEmisor || evento.nombreOferente || null;
-  const accionPor  = evento.nombreFuncionario;
+  const accionPor  = actorDelEvento(evento);
 
   useEffect(() => {
     if (expandido && expandedRef.current) {
@@ -662,6 +676,7 @@ const BitacoraView = ({ onBack }) => {
     { value: 'APROBADA',   label: 'Aprobada' },
     { value: 'RECHAZADA',  label: 'Rechazada' },
     { value: 'CANCELADA',  label: 'Cancelada' },
+    { value: 'VENCIDA',    label: 'Vencida' },
   ];
 
   const opcionesEncargado = useMemo(() => {
@@ -720,7 +735,7 @@ const BitacoraView = ({ onBack }) => {
           : null,
         estado: estado ? { texto: estado, tono: TONO_DESKTOP[STATUS_TONE_MAP[estado]] || 'neutral' } : null,
         solicitante: ev.nombreFuncionarioEmisor || ev.nombreOferente || null,
-        accionPor: ev.nombreFuncionario || null,
+        accionPor: actorDelEvento(ev),
         evento: ev,
       };
     });

@@ -224,7 +224,9 @@ test('HU-SOL-11 · criterio 6: cancelar una solicitud ajena responde 403 «Solo 
   soloPorApi(testInfo);
   // SolicitudService.cancelarSolicitud (:241-245): compara el emisor con el token antes de
   // mirar el estado y de guardar.
-  comprobarAjena(await solicitudesDeUrgencias(request), SOL.pendiente, { estado: 'PENDIENTE' });
+  // 23 oct: la solicitud 15 del seed es sobre un turno de mayo, así que llega vencida (RECHAZADA, «Venció: el turno ya
+  // comenzó»). El dueño se compara antes que el estado y el vencimiento, así que el 403 es el mismo.
+  comprobarAjena(await solicitudesDeUrgencias(request), SOL.pendiente);
   const r = await apiLlamar(request, await tokenRol(request, 'medico'), 'PUT', `/solicitudes/${SOL.pendiente}/cancelar`);
   expect(r.status).toBe(403);
   expect(r.cuerpo.error).toBe('Solo puedes cancelar tus propias solicitudes');
@@ -238,14 +240,11 @@ test('HU-SOL-11 · criterio 6: cancelar una solicitud propia ya resuelta', async
 // HU-SOL-12 · Modificar el motivo de mi solicitud
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('HU-SOL-12 · criterio 4: el motivo de una solicitud ajena responde 403 «Solo quien emitió la solicitud puede modificar su motivo»', async ({ request }, testInfo) => {
-  soloPorApi(testInfo);
-  // SolicitudService.modificarMotivo (:574-577): compara el emisor con el token antes de guardar.
-  comprobarAjena(await solicitudesDeUrgencias(request), SOL.pendiente, { estado: 'PENDIENTE' });
-  const r = await apiLlamar(request, await tokenRol(request, 'medico'), 'PATCH',
-    `/solicitudes/${SOL.pendiente}/motivo?motivo=${encodeURIComponent(MOTIVO_PRUEBA)}`);
-  expect(r.status).toBe(403);
-  expect(r.cuerpo.error).toBe('Solo quien emitió la solicitud puede modificar su motivo');
+test('HU-SOL-12 · criterio 4: el motivo de una solicitud ajena responde 403 «Solo quien emitió la solicitud puede modificar su motivo»', async () => {
+  // SolicitudService.modificarMotivo: revisa el estado antes que el dueño. 23 oct: la solicitud pendiente del seed (la 15)
+  // es sobre un turno de mayo y llega vencida (RECHAZADA), así que hoy respondería el 400 del caso siguiente. Para ver el
+  // 403 hace falta una solicitud ajena y vigente, y crearla muta la base (fase 3).
+  test.skip(true, 'Fuera de la fase 2a: ninguna solicitud pendiente y vigente del seed es ajena al médico (las del seed vencieron el 23 oct) y crearla muta la base (fase 3).');
 });
 
 test('HU-SOL-12 · criterio 4: el motivo de una solicitud que ya no está pendiente responde 400', async ({ request }, testInfo) => {

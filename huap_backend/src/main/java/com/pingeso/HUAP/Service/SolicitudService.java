@@ -47,34 +47,49 @@ public class SolicitudService {
     private final ValidadorAsignacionTurnoService validadorAsignacion;
     private final SeguridadServicio seguridadServicio;
 
+    /**
+     * Motivo con que se cierra sola una solicitud pendiente cuyo turno ya empezó (decisión del 23 oct).
+     * Reutiliza el estado {@code RECHAZADA}, como la asignación manual: no hay estado nuevo ni migración.
+     * La pantalla reconoce las vencidas por este prefijo.
+     */
+    public static final String MOTIVO_VENCIDA = "Venció: el turno ya comenzó";
+
+    /** Evento de sistema, sin actor humano, que deja el vencimiento en la bitácora. */
+    static final String EVENTO_VENCIDA = "SOLICITUD_VENCIDA";
+
+    /** Ahora, en la hora del servidor (el backend corre con {@code TZ=America/Santiago}). Las pruebas lo fijan. */
+    LocalDateTime ahora() {
+        return LocalDateTime.now();
+    }
+
     /** Solicitudes visibles para la sesión (ver {@link #acotarLectura}). */
     @Transactional
     public List<SolicitudEntity> findAllSolicitudes() {
-        return acotarLectura(solicitudRepository.findAll());
+        return vencerAlLeer(acotarLectura(solicitudRepository.findAll()));
     }
 
     /** Solicitudes emitidas por el funcionario (el que las crea, no el receptor). */
     @Transactional
     public List<SolicitudEntity> findByFuncionario(Long idFuncionario) {
-        return acotarLecturaDe(idFuncionario, solicitudRepository.findByFuncionario_IdFuncionario(idFuncionario));
+        return vencerAlLeer(acotarLecturaDe(idFuncionario, solicitudRepository.findByFuncionario_IdFuncionario(idFuncionario)));
     }
 
     /** Solicitudes donde el funcionario es el receptor (intercambio u oferta particular). */
     @Transactional
     public List<SolicitudEntity> findByFuncionarioReceptor(Long idFuncionario) {
-        return acotarLecturaDe(idFuncionario, solicitudRepository.findByFuncionarioReceptor_IdFuncionario(idFuncionario));
+        return vencerAlLeer(acotarLecturaDe(idFuncionario, solicitudRepository.findByFuncionarioReceptor_IdFuncionario(idFuncionario)));
     }
 
     /** Solicitudes de un tipo (Tipo_Solicitud.tipo: 1=Permiso, 2=Botar turno, 3=Cobertura, 4=Intercambio, 5=Oferta particular). */
     @Transactional
     public List<SolicitudEntity> findByTipoSolicitud(Long idTipoSolicitud) {
-        return acotarLectura(solicitudRepository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud));
+        return vencerAlLeer(acotarLectura(solicitudRepository.findByTipoSolicitud_IdTipoSolicitud(idTipoSolicitud)));
     }
 
     /** Solicitudes asociadas a un turno (como turno solicitado o como turno propio en un intercambio). */
     @Transactional
     public List<SolicitudEntity> findByTurno(Long idTurno) {
-        return acotarLectura(solicitudRepository.findByTurno_IdTurno(idTurno));
+        return vencerAlLeer(acotarLectura(solicitudRepository.findByTurno_IdTurno(idTurno)));
     }
 
     /**
@@ -233,7 +248,7 @@ public class SolicitudService {
      */
     private void exigirTurnosQueNoHanEmpezado(Integer tipo, TurnoEntity turno, TurnoEntity turnoIntercambio) {
         if (tipo == null || tipo < 2 || tipo > 5) return;
-        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime ahora = ahora();
         if (yaEmpezo(turno, ahora)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Ese turno ya empezó");
         }
@@ -354,7 +369,7 @@ public class SolicitudService {
      * la columna Estado es un enum de base de datos y agregar un valor exigiría una migración
      * coordinada. El evento de bitácora SÍ distingue el caso (SOLICITUD_CANCELADA).
      */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public SolicitudEntity cancelarSolicitud(Long idSolicitud) {
         Long idUsuario = seguridadServicio.idUsuarioActual();
 
@@ -369,6 +384,7 @@ public class SolicitudService {
             throw new org.springframework.security.access.AccessDeniedException(
                     "Solo puedes cancelar tus propias solicitudes");
         }
+        exigirNoVencida(solicitud);
         if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) {
             throw new RuntimeException("Esta solicitud ya fue resuelta: no se puede cancelar");
         }
@@ -388,7 +404,7 @@ public class SolicitudService {
      * {@code aceptadoReceptor}; no reasigna el turno (eso lo hace la aprobación de jefatura
      * en {@link #cambiarEstado}). Rechazar sí resuelve la solicitud directamente (RECHAZADA).
      */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public SolicitudEntity responderOfertaParticular(Long idSolicitud, boolean acepta) {
         // SEC (C-02, Critical): el receptor SIEMPRE es quien está autenticado, nunca un
         // idReceptor de query param — de lo contrario cualquiera podía aceptar/rechazar
@@ -400,6 +416,7 @@ public class SolicitudService {
         if (solicitud.getFuncionarioReceptor() == null || !solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
+        exigirNoVencida(solicitud);
         exigirPendienteParaResponder(solicitud);
         exigirSinRespuestaPrevia(solicitud);
 
@@ -422,7 +439,7 @@ public class SolicitudService {
     }
 
     /** Igual que {@link #responderOfertaParticular} pero para solicitudes de intercambio. */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public SolicitudEntity responderOfertaIntercambio(Long idSolicitud, boolean acepta) {
         // SEC (C-02, Critical): igual que en responderOfertaParticular, el receptor se
         // deriva del token, nunca del parámetro.
@@ -433,6 +450,7 @@ public class SolicitudService {
         if (solicitud.getFuncionarioReceptor() == null || !solicitud.getFuncionarioReceptor().getIdFuncionario().equals(idReceptor)) {
             throw new RuntimeException("No eres el receptor de esta solicitud");
         }
+        exigirNoVencida(solicitud);
         exigirPendienteParaResponder(solicitud);
         exigirSinRespuestaPrevia(solicitud);
 
@@ -490,7 +508,7 @@ public class SolicitudService {
      * (por si otra aprobación ya la resolvió mientras se esperaba el lock) y rechaza automáticamente
      * cualquier otra solicitud PENDIENTE que apunte al mismo turno.
      */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public SolicitudEntity cambiarEstado(Long idSolicitud, SolicitudEntity.EstadoSolicitud nuevoEstado) {
         SolicitudEntity solicitud = solicitudRepository.findById(idSolicitud)
                 .orElseThrow(() -> new RuntimeException("Solicitud no existe"));
@@ -546,6 +564,9 @@ public class SolicitudService {
                 }
             }
         }
+
+        // 23 oct: una pendiente cuyo turno ya empezó no está vigente: se cierra (queda guardado) y se avisa.
+        exigirNoVencida(solicitud);
 
         // SEC (S-01 c): una solicitud ya resuelta no se vuelve a decidir. Antes se podía pasar a
         // RECHAZADA (o de vuelta a PENDIENTE) una solicitud APROBADA, con sus turnos ya movidos.
@@ -767,6 +788,80 @@ public class SolicitudService {
             rechazadas++;
         }
         return rechazadas;
+    }
+
+    // ============================ Vencimiento (23 oct 2026) ============================
+
+    /**
+     * ¿Alguno de los turnos que compromete la solicitud ya empezó? Cuentan el turno pedido y, en un
+     * intercambio, el que se entrega. Una solicitud sin turno (un permiso solo con fechas) no vence.
+     */
+    private static boolean tieneTurnoEmpezado(SolicitudEntity solicitud, LocalDateTime ahora) {
+        return yaEmpezo(solicitud.getTurno(), ahora) || yaEmpezo(solicitud.getTurnoReceptor(), ahora);
+    }
+
+    /**
+     * Cierra todas las solicitudes PENDIENTES (de cualquier tipo) cuyo turno ya empezó: quedan
+     * RECHAZADAS con {@link #MOTIVO_VENCIDA} y un evento de sistema en la bitácora. Es lo que corre la
+     * tarea programada ({@code VencimientoProgramado}); no depende de ninguna sesión.
+     *
+     * @return cuántas solicitudes se cerraron.
+     */
+    @Transactional
+    public int vencerPendientesDeTurnosEmpezados() {
+        LocalDateTime ahora = ahora();
+        List<Long> vencidas = solicitudRepository.findByEstado(SolicitudEntity.EstadoSolicitud.PENDIENTE).stream()
+                .filter(s -> tieneTurnoEmpezado(s, ahora))
+                .map(SolicitudEntity::getIdSolicitud)
+                .toList();
+        int cerradas = 0;
+        for (Long id : vencidas) {
+            if (vencerSiCorresponde(id, ahora)) cerradas++;
+        }
+        return cerradas;
+    }
+
+    /**
+     * Al leer una lista: las pendientes cuyo turno ya empezó se cierran antes de entregarlas, para que
+     * nunca se vea vigente algo vencido aunque la tarea programada no haya corrido todavía.
+     */
+    private List<SolicitudEntity> vencerAlLeer(List<SolicitudEntity> solicitudes) {
+        LocalDateTime ahora = ahora();
+        solicitudes.stream()
+                .filter(s -> s.getEstado() == SolicitudEntity.EstadoSolicitud.PENDIENTE && tieneTurnoEmpezado(s, ahora))
+                .map(SolicitudEntity::getIdSolicitud)
+                .toList()
+                .forEach(id -> vencerSiCorresponde(id, ahora));
+        return solicitudes;
+    }
+
+    /**
+     * Antes de resolver una solicitud (aprobar, rechazar, cancelar, responder): si venció, se cierra y
+     * el que intenta resolverla recibe un 409. El cierre queda guardado ({@link VencidoPorInicioException}).
+     */
+    private void exigirNoVencida(SolicitudEntity solicitud) {
+        if (solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE) return;
+        LocalDateTime ahora = ahora();
+        if (tieneTurnoEmpezado(solicitud, ahora) && vencerSiCorresponde(solicitud.getIdSolicitud(), ahora)) {
+            throw new VencidoPorInicioException(
+                    "Esta solicitud venció: el turno ya comenzó, así que ya no se puede resolver");
+        }
+    }
+
+    /** Relee la solicitud con lock y, si sigue pendiente y su turno empezó, la cierra. */
+    private boolean vencerSiCorresponde(Long idSolicitud, LocalDateTime ahora) {
+        SolicitudEntity solicitud = solicitudRepository.findByIdForUpdate(idSolicitud).orElse(null);
+        if (solicitud == null || solicitud.getEstado() != SolicitudEntity.EstadoSolicitud.PENDIENTE
+                || !tieneTurnoEmpezado(solicitud, ahora)) {
+            return false;
+        }
+        solicitud.setEstado(SolicitudEntity.EstadoSolicitud.RECHAZADA);
+        solicitud.setMotivo(MOTIVO_VENCIDA
+                + (solicitud.getMotivo() != null && !solicitud.getMotivo().isBlank()
+                        ? " · motivo original: " + solicitud.getMotivo() : ""));
+        solicitudRepository.save(solicitud);
+        agendarBitacora(EVENTO_VENCIDA, idSolicitud, null); // sin actor humano: lo hace el sistema
+        return true;
     }
 
     /** Solo permitido mientras la solicitud está {@code PENDIENTE}, y solo por quien la emitió. */

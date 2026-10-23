@@ -16,6 +16,9 @@ public interface OfertaGeneralRepository extends JpaRepository<OfertaGeneralEnti
 
     List<OfertaGeneralEntity> findByOfertor_IdFuncionario(Long idFuncionario);
 
+    /** Ofertas en alguno de esos estados; la tarea de vencimiento revisa las pendientes y las abiertas. */
+    List<OfertaGeneralEntity> findByEstadoIn(java.util.Collection<OfertaGeneralEntity.EstadoOferta> estados);
+
     List<OfertaGeneralEntity> findByTurno_Servicio_IdServicio(Long idServicio);
 
     @Query("""

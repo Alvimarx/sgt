@@ -4,7 +4,7 @@ import { solicitudesService, ofertasGeneralesService } from '../../services/admi
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
 import { mensajeDeError } from '../../utils/errores';
 import { esAdministrador } from '../../utils/roles';
-import { ESTADO_OFERTA, ofertaVisible, participaEnOferta, participaEnSolicitud, puedeRetirarOferta } from '../../utils/reglasSolicitud';
+import { ESTADO_OFERTA, ofertaVisible, participaEnOferta, participaEnSolicitud, puedeRetirarOferta, solicitudPendienteVigente } from '../../utils/reglasSolicitud';
 import { formatShiftLabel } from '../Comun/turnoPresentacion';
 // Mismo sheet de gestión de asignación que usa el "Detalle del turno" móvil:
 // lista completa y buscable del personal, asignar/reasignar/quitar con motivo.
@@ -261,7 +261,8 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
     return mapa;
   }, [agenda.turnos]);
 
-  const solsPendientes = useMemo(() => sols.filter((s) => s.estado === 'PENDIENTE'), [sols]);
+  // 23 oct: una pendiente cuyo turno ya empezó venció; no cuenta como pendiente.
+  const solsPendientes = useMemo(() => sols.filter((s) => solicitudPendienteVigente(s)), [sols]);
   const idsTurnoConSolicitud = useMemo(() => {
     const m = new Map();
     solsPendientes.forEach((s) => {

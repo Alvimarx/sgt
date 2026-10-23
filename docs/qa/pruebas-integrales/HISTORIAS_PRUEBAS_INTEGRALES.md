@@ -608,7 +608,7 @@ Fechas de cada equipo dentro de la ventana:
 #### B1-08 · Borde · P2 · Un turno que empieza en menos de 3 horas
 - **Pre:** un cupo libre, o en su defecto un turno propio para botar (C5), que empieza dentro de 1 a 3 horas, en hora de Chile.
 - **Pasos:** 1) El médico lo pide. 2) Lo cancela de inmediato.
-- **Esperado:** se permite, porque el turno aún no empieza en hora de Chile. Un rechazo aquí indica que el sistema calcula la hora en otro huso. · RG-25, RG-50
+- **Esperado:** se permite, porque el turno aún no empieza en hora de Chile. Un rechazo aquí indica que el sistema calcula la hora en otro huso. Desde el 23 oct, una solicitud así que no se cancela y sigue pendiente cuando el turno empieza vence sola («Vencida»; ver B2-05). · RG-25, RG-50
 - **Evidencia:** TXT; RED; hora del reloj.
 
 #### B1-09 · Negativo · P2 · Un turno terminado
@@ -664,8 +664,8 @@ Fechas de cada equipo dentro de la ventana:
 
 #### B2-05 · Negativo · P3 · La aprobación llega con el turno ya empezado
 - **Pre:** una cobertura pendiente sobre un turno que empieza durante la ejecución.
-- **Pasos:** 1) Pasada la hora de inicio, JU intenta aprobarla.
-- **Esperado:** rechazo con aviso (S-10). · RG-25, RG-26
+- **Pasos:** 1) Pasada la hora de inicio, JU intenta aprobarla. 2) Recargar «Pendientes» y «Historial».
+- **Esperado (cambió el 23 oct, S-10):** paso 1: rechazo 409 «Esta solicitud venció: el turno ya comenzó…»; el turno no cambia. Paso 2: la solicitud ya no figura en «Pendientes» y aparece en «Historial» como «Vencida» (RECHAZADA, «Venció: el turno ya comenzó»), sin botones. Si la tarea programada (cada 3 minutos) ya corrió, la vio cerrada antes de intentar. · RG-25, RG-26
 - **Evidencia:** TXT; RED.
 
 #### B2-06 · Borde · P3 · Dos gestores aprueban a la vez
@@ -864,7 +864,7 @@ Fechas de cada equipo dentro de la ventana:
 #### C1-09 · Negativo · P2 · Un turno ya empezado o terminado
 - **Pre:** MU-A tiene un turno en curso o terminado y MU-B uno futuro, o al revés.
 - **Pasos:** 1) Proponer el canje con el turno empezado como ofrecido. 2) Proponerlo con el turno empezado como pedido. Forzar (F) si no figura.
-- **Esperado:** rechazo en los dos sentidos. · RG-25, RG-50
+- **Esperado:** rechazo en los dos sentidos. Un intercambio pendiente que ya existía vence cuando cualquiera de sus dos turnos empieza (23 oct). · RG-25, RG-50
 - **Evidencia:** CAP; RED.
 
 #### C1-10 · Negativo · P2 · Un turno del receptor en otro servicio
@@ -1289,7 +1289,7 @@ Fechas de cada equipo dentro de la ventana:
 
 #### C8-10 · Negativo · P2 · Ofertas de turnos empezados o pasados
 - **Pasos:** 1) MU1 intenta ofertar un turno en curso o terminado (forzar si no se ofrece). 2) Revisar las ofertas disponibles.
-- **Esperado:** paso 1: rechazo. Paso 2: ninguna oferta de un turno ya pasado aparece. · RG-25, RG-46
+- **Esperado:** paso 1: rechazo. Paso 2: ninguna oferta de un turno ya pasado aparece. Desde el 23 oct, una oferta pendiente o abierta cuyo turno empieza vence sola (RECHAZADA, «Venció: el turno ya comenzó»; evento de sistema en la bitácora) y abrirla, rechazarla, retirarla, postular o elegir responde 409. · RG-25, RG-46
 - **Evidencia:** RED; CAP.
 
 #### C8-11 · Negativo · P2 · Postular a la propia oferta

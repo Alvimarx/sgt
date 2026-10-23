@@ -374,6 +374,8 @@ test('HU-BIT-01 · criterio 2: filtros por categoría, tipo de solicitud, estado
     CAMBIO_ESTADO_APROBADA: 'APROBADA', CAMBIO_ESTADO_RECHAZADA: 'RECHAZADA', RECHAZO_AUTOMATICO: 'RECHAZADA', SOLICITUD_CANCELADA: 'CANCELADA',
     OFERTA_RECHAZADA_POR_RECEPTOR: 'RECHAZADA', OFERTA_PARTICULAR_RECHAZADA_POR_RECEPTOR: 'RECHAZADA',
     OFERTA_GENERAL_CREADA: 'PENDIENTE', OFERTA_GENERAL_APROBADA: 'PENDIENTE', OFERTA_GENERAL_RECHAZADA: 'RECHAZADA', OFERTA_GENERAL_CERRADA: 'APROBADA',
+    // 23 oct: el vencimiento (evento de sistema, sin actor) se muestra como VENCIDA, con su propio filtro.
+    SOLICITUD_VENCIDA: 'VENCIDA', OFERTA_GENERAL_VENCIDA: 'VENCIDA',
   };
   const encargado = delMes.find((e) => e.tipoEvento === 'GENERACION_TURNO')?.nombreFuncionario;
   const tipo = delMes.find((e) => e.tipoSolicitud)?.tipoSolicitud;
@@ -444,7 +446,9 @@ test('HU-BIT-01 · criterio 4: las cancelaciones aparecen como CANCELADA, con «
   const solicitudes = await api.get('/solicitudes');
   // Lo que registraría el backend si el emisor cancela su cobertura pendiente
   // del seed (SolicitudService.cancelarSolicitud): mismo evento DTO, otro tipo.
-  const cobertura = solicitudes.find((s) => s.tipoSolicitud.tipo === 3 && s.estado === 'PENDIENTE' && s.turno?.servicio?.idServicio === SERVICIO.urgencias);
+  // 23 oct: las coberturas pendientes del seed vencieron (su turno es de mayo); sirve cualquiera con su evento de creación.
+  const cobertura = solicitudes.find((s) => s.tipoSolicitud.tipo === 3 && s.turno?.servicio?.idServicio === SERVICIO.urgencias
+    && eventos.some((e) => e.idSolicitud === s.idSolicitud && e.tipoEvento === 'SOLICITUD_CREADA'));
   const base = eventos.find((e) => e.idSolicitud === cobertura.idSolicitud && e.tipoEvento === 'SOLICITUD_CREADA');
   const motivo = `Cancelada por el solicitante · motivo original: ${cobertura.motivo}`;
   const cancelado = {

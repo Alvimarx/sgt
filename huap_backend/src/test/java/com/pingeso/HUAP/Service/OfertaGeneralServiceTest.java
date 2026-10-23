@@ -47,9 +47,17 @@ class OfertaGeneralServiceTest {
     private final ValidadorAsignacionTurnoService validadorAsignacion = new ValidadorAsignacionTurnoService();
     private final SeguridadServicio seguridadServicio = mock(SeguridadServicio.class);
 
+    /** Antes del lunes 8 jun 2026, el turno de estas pruebas: así sigue sin empezar (si no, la oferta vencería, 23 oct). */
+    private static final LocalDateTime AHORA = LocalDateTime.of(2026, 6, 1, 9, 0);
+
     private final OfertaGeneralService service = new OfertaGeneralService(
             ofertaGeneralRepository, postulacionRepository, funcionarioRepository, turnoRepository, bitacoraService,
-            validadorAsignacion, seguridadServicio);
+            validadorAsignacion, seguridadServicio) {
+        @Override
+        LocalDateTime ahora() {
+            return AHORA;
+        }
+    };
 
     {
         when(seguridadServicio.esAdministrador()).thenReturn(true);

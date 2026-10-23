@@ -76,6 +76,9 @@ Los demás médicos de Urgencias (los de la lista del servicio salvo los alias d
 11. **Retirar una oferta general** se puede hasta que alguien postule (S-11, sin cambio).
 12. **El administrador configura** el servicio nuevo: tipos de turno, rotativas y molde (S-29, sin cambio).
 
+## Cambios al plan decididos por el dueño del sistema el 23 oct
+13. **Vencimiento.** Toda solicitud pendiente (de cualquier tipo) y toda oferta general pendiente o abierta cuyo turno ya empezó se cierra sola: RECHAZADA con «Venció: el turno ya comenzó», con un evento de sistema en la bitácora y sin actor. Se cierra con una tarea cada 3 minutos y al leer las listas o antes de resolver. B2-05 espera 409 y «Vencida»; los datos pendientes del seed (turnos de mayo) ya no sirven para probar aprobaciones.
+
 ## Resultados por caso
 | Caso | Estado | Observado | Servidor | Regla |
 |---|---|---|---|---|

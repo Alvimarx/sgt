@@ -85,6 +85,7 @@ Cada supuesto llena un hueco de las reglas con la lectura más coherente con ell
 - **Afecta a:** B2-05.
 - **Pregunta:** ¿una cobertura pendiente se puede aprobar con el turno en curso? ¿Debería rechazarse sola cuando el turno empieza?
 - **Mientras no respondas:** no se aprueba.
+- **Respuesta (23 oct):** no se aprueba, y además se cierra sola al empezar el turno (ver «Respuestas del dueño del sistema (23 oct 2026)»).
 
 ### S-11 · Hasta cuándo se retira una oferta general
 - **Supuesto:** quien la publica puede retirarla mientras nadie la haya tomado, y «tomada» significa que al menos un médico postuló. Por abrir, o abierta sin postulantes, se puede retirar; con postulantes o con elegido, no.
@@ -268,3 +269,11 @@ Cada supuesto llena un hueco de las reglas con la lectura más coherente con ell
 | Quién configura un servicio nuevo (S-29) | El administrador | Se mantiene lo diseñado |
 
 Pendiente: A1-08. La regla que le pasé al diseño («no se asigna a mano un turno con solicitudes pendientes») la redacté mal. Lo implementado en el cierre es que la asignación manual se acepta y rechaza sola las solicitudes pendientes de ese cupo, con el motivo «El turno fue asignado manualmente». Hay que confirmar cuál de las dos vale.
+
+## Respuestas del dueño del sistema (23 oct 2026)
+
+Palabras de Álvaro: «no deberían estar vigentes las solicitudes ocurridas en el pasado, pero sí yo podría poder cambiar en el sistema de turnos quién hizo el turno en el pasado como jefatura y admin».
+
+| Supuesto | Respuesta | Efecto en las pruebas |
+|---|---|---|
+| Aprobar cuando el turno ya empezó (S-10) | Las solicitudes y ofertas pendientes sobre un turno que empezó dejan de estar vigentes y se cierran solas | B2-05 cambia: 409 al intentar aprobar y la solicitud aparece «Vencida». B1-08, C1-09 y C8-10 suman el vencimiento. El seed trae solicitudes y ofertas pendientes de mayo: vencen en la primera lectura, así que ya no sirven de dato de partida «pendiente» |

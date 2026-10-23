@@ -64,6 +64,8 @@ function estadoEsperado(s, idYo) {
   const bifasico = [4, 5].includes(s.tipoSolicitud.tipo);
   const soyReceptor = s.funcionarioReceptor?.idFuncionario === idYo;
   if (s.estado === 'RECHAZADA' && s.motivo.startsWith('Cancelada por el solicitante')) return 'CANCELADA';
+  // 23 oct: una solicitud cuyo turno ya empezó venció; el backend la deja RECHAZADA con «Venció: el turno ya comenzó».
+  if (s.estado === 'RECHAZADA' && s.motivo.startsWith('Venció:')) return 'Vencida';
   if (bifasico && s.estado === 'PENDIENTE') {
     if (soyReceptor && s.aceptadoReceptor == null) return 'Requiere tu respuesta';
     if (soyReceptor && s.aceptadoReceptor === true) return 'Aceptada · Pend. jefatura';
@@ -326,8 +328,12 @@ test('HU-OFE-05 · criterio 1: en el Centro no aparecen las ofertas de turnos ya
   test.skip(!esDesktop(testInfo), 'El Centro de operaciones es la vista desktop; en móvil las ofertas están solo en Solicitudes.');
   await entrar(page, 'medico');
   const { hoy, reales, simuladas } = await ofertasConVigentes(page, api, ['ABIERTA']);
-  const pasadas = reales.filter((o) => terminoDe(o) < hoy && ['ABIERTA', 'PENDIENTE_APROBACION'].includes(o.estado));
-  expect(pasadas.length, 'el seed tiene una oferta abierta de un turno pasado').toBeGreaterThan(0);
+  // 23 oct: una oferta pendiente o abierta cuyo turno ya empezó vence: el backend la cierra al leer la lista (RECHAZADA,
+  // «Venció: el turno ya comenzó»). La oferta abierta del seed, de un turno pasado, llega ya cerrada.
+  const pasadas = reales.filter((o) => terminoDe(o) < hoy);
+  expect(pasadas.length, 'el seed tiene ofertas de turnos pasados').toBeGreaterThan(0);
+  expect(pasadas.filter((o) => ['ABIERTA', 'PENDIENTE_APROBACION'].includes(o.estado)), 'ninguna oferta de un turno pasado sigue vigente').toEqual([]);
+  expect(pasadas.some((o) => o.estado === 'RECHAZADA' && o.motivo.startsWith('Venció:')), 'la abierta del seed venció').toBe(true);
   await page.reload();
   await esperarQuieta(page);
   await expect(tarjetasCentro(page)).toHaveCount(simuladas.length);

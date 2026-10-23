@@ -46,6 +46,26 @@ public class OfertaGeneralService {
     private final ValidadorAsignacionTurnoService validadorAsignacion;
     private final SeguridadServicio seguridadServicio;
 
+    /**
+     * Motivo con que se cierra sola una oferta general pendiente de apertura o abierta cuyo turno ya
+     * empezó (decisión del 23 oct). Reutiliza {@code RECHAZADA}: no hay estado nuevo ni migración. Como
+     * la oferta solo guarda el motivo de quien la publicó, el vencimiento va al principio y conserva el
+     * original, igual que en las solicitudes. La pantalla reconoce las vencidas por este prefijo.
+     */
+    public static final String MOTIVO_VENCIDA = "Venció: el turno ya comenzó";
+
+    /** Evento de sistema, sin actor humano, que deja el vencimiento en la bitácora. */
+    static final String EVENTO_VENCIDA = "OFERTA_GENERAL_VENCIDA";
+
+    /** Estados en que una oferta sigue vigente y, por lo tanto, puede vencer. */
+    private static final List<OfertaGeneralEntity.EstadoOferta> ESTADOS_VIGENTES = List.of(
+            OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION, OfertaGeneralEntity.EstadoOferta.ABIERTA);
+
+    /** Ahora, en la hora del servidor (el backend corre con {@code TZ=America/Santiago}). Las pruebas lo fijan. */
+    LocalDateTime ahora() {
+        return LocalDateTime.now();
+    }
+
     /** Crea la oferta en estado {@code PENDIENTE_APROBACION}; no queda visible para postular hasta aprobarse. */
     @Transactional
     public OfertaGeneralEntity crearOferta(CrearOfertaGeneralDTO dto) {
@@ -108,7 +128,7 @@ public class OfertaGeneralService {
      * Lee la oferta con lock, como {@link #retirarOferta}: si el ofertor la retira al mismo tiempo,
      * la segunda operación ve el estado que dejó la primera y no lo pisa.
      */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public OfertaGeneralEntity aprobarOferta(Long idOferta) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
@@ -118,6 +138,7 @@ public class OfertaGeneralService {
         exigirMismoServicioQueOferta(oferta);
         Long idJefatura = seguridadServicio.idUsuarioActual();
         exigirQueNoSeaElOfertor(oferta, idJefatura);
+        exigirNoVencida(oferta);
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION) {
             throw new RuntimeException("La oferta no está en estado PENDIENTE_APROBACION");
@@ -130,7 +151,7 @@ public class OfertaGeneralService {
     }
 
     /** Pasa la oferta de {@code PENDIENTE_APROBACION} a {@code RECHAZADA}. Lee con lock, como {@link #aprobarOferta}. */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public OfertaGeneralEntity rechazarOferta(Long idOferta) {
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
@@ -138,6 +159,7 @@ public class OfertaGeneralService {
         exigirMismoServicioQueOferta(oferta);
         Long idJefatura = seguridadServicio.idUsuarioActual();
         exigirQueNoSeaElOfertor(oferta, idJefatura);
+        exigirNoVencida(oferta);
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.PENDIENTE_APROBACION) {
             throw new RuntimeException("La oferta no está en estado PENDIENTE_APROBACION");
@@ -163,7 +185,7 @@ public class OfertaGeneralService {
      * se pisan, la segunda operación ve lo que dejó la primera (no queda una oferta retirada con
      * una postulación).
      */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public OfertaGeneralEntity retirarOferta(Long idOferta) {
         // Con lock, igual que abrir, rechazar y postular: dos operaciones simultáneas no se pisan.
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
@@ -173,6 +195,7 @@ public class OfertaGeneralService {
         if (oferta.getOfertor() == null || !Objects.equals(oferta.getOfertor().getIdFuncionario(), idUsuario)) {
             throw new AccessDeniedException("Solo quien publicó la oferta puede retirarla");
         }
+        exigirNoVencida(oferta);
         if (oferta.getEstado() == null || !oferta.getEstado().admiteRetiro()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "La oferta " + porQueNoSePuedeRetirar(oferta.getEstado()) + ": no se puede retirar");
@@ -202,13 +225,14 @@ public class OfertaGeneralService {
      * Lee la oferta con lock, como {@link #retirarOferta}: si el ofertor la retira al mismo
      * tiempo, la segunda operación ve lo que dejó la primera.
      */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public PostulacionEntity postular(Long idOferta) {
         // SEC (C-02): el postulante siempre es quien está autenticado.
         Long idFuncionario = seguridadServicio.idUsuarioActual();
         // Con lock: retirarOferta exige que no haya postulaciones, y esta lectura las serializa con él.
         OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(idOferta)
                 .orElseThrow(() -> new RuntimeException("Oferta no existe"));
+        exigirNoVencida(oferta);
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.ABIERTA) {
             throw new RuntimeException("La oferta no está abierta");
@@ -267,7 +291,7 @@ public class OfertaGeneralService {
      * para la misma oferta al mismo tiempo, la segunda espera a que la primera termine (en vez
      * de leer el estado ABIERTA en paralelo) y luego relee con datos frescos gracias al lock.
      */
-    @Transactional
+    @Transactional(dontRollbackOn = VencidoPorInicioException.class)
     public OfertaGeneralEntity seleccionarPostulante(Long idOferta, Long idPostulacion) {
         // Lock pesimista: si dos jefaturas seleccionan postulantes distintos para la misma oferta
         // al mismo tiempo, la segunda espera a que la primera termine (en vez de leer el estado
@@ -284,6 +308,7 @@ public class OfertaGeneralService {
                 || postulacionRepository.existsByOfertaGeneral_IdOfertaGeneralAndPostulante_IdFuncionario(idOferta, idJefatura)) {
             throw new AccessDeniedException("No puedes elegir al postulante de una oferta en la que participas");
         }
+        exigirNoVencida(oferta);
 
         if (oferta.getEstado() != OfertaGeneralEntity.EstadoOferta.ABIERTA) {
             throw new RuntimeException("La oferta no está abierta");
@@ -346,7 +371,7 @@ public class OfertaGeneralService {
     @Transactional
     public List<OfertaGeneralEntity> findByServicio(Long idServicio) {
         seguridadServicio.exigirMismoServicio(idServicio);
-        List<OfertaGeneralEntity> ofertas = ofertaGeneralRepository.findByTurno_Servicio_IdServicio(idServicio);
+        List<OfertaGeneralEntity> ofertas = vencerAlLeer(ofertaGeneralRepository.findByTurno_Servicio_IdServicio(idServicio));
         if (seguridadServicio.esAdministrador() || seguridadServicio.esGestionDelServicio()) {
             return ofertas;
         }
@@ -363,7 +388,7 @@ public class OfertaGeneralService {
      */
     @Transactional
     public List<OfertaGeneralEntity> findByOfertor(Long idFuncionario) {
-        List<OfertaGeneralEntity> ofertas = ofertaGeneralRepository.findByOfertor_IdFuncionario(idFuncionario);
+        List<OfertaGeneralEntity> ofertas = vencerAlLeer(ofertaGeneralRepository.findByOfertor_IdFuncionario(idFuncionario));
         if (seguridadServicio.esAdministrador()
                 || Objects.equals(idFuncionario, seguridadServicio.idUsuarioActual())) {
             return ofertas;
@@ -372,6 +397,76 @@ public class OfertaGeneralService {
         return ofertas.stream()
                 .filter(o -> servicioSesion != null && servicioSesion.equals(AlcanceServicio.servicioDe(o.getTurno())))
                 .toList();
+    }
+
+    // ============================ Vencimiento (23 oct 2026) ============================
+
+    /** ¿La oferta sigue vigente (pendiente de apertura o abierta) y su turno ya empezó? */
+    private static boolean estaVencida(OfertaGeneralEntity oferta, LocalDateTime ahora) {
+        TurnoEntity turno = oferta.getTurno();
+        return oferta.getEstado() != null && ESTADOS_VIGENTES.contains(oferta.getEstado())
+                && turno != null && turno.getDiaInicioTurno() != null && turno.getHoraInicio() != null
+                && !turno.getDiaInicioTurno().atTime(turno.getHoraInicio()).isAfter(ahora);
+    }
+
+    /**
+     * Cierra todas las ofertas generales pendientes de apertura o abiertas cuyo turno ya empezó:
+     * quedan RECHAZADAS con {@link #MOTIVO_VENCIDA} y un evento de sistema en la bitácora. Es lo que
+     * corre la tarea programada ({@code VencimientoProgramado}); no depende de ninguna sesión.
+     *
+     * @return cuántas ofertas se cerraron.
+     */
+    @Transactional
+    public int vencerOfertasDeTurnosEmpezados() {
+        LocalDateTime ahora = ahora();
+        List<Long> vencidas = ofertaGeneralRepository.findByEstadoIn(ESTADOS_VIGENTES).stream()
+                .filter(o -> estaVencida(o, ahora))
+                .map(OfertaGeneralEntity::getIdOfertaGeneral)
+                .toList();
+        int cerradas = 0;
+        for (Long id : vencidas) {
+            OfertaGeneralEntity oferta = ofertaGeneralRepository.findByIdForUpdate(id).orElse(null);
+            if (oferta != null && cerrarSiVencio(oferta, ahora)) cerradas++;
+        }
+        return cerradas;
+    }
+
+    /**
+     * Al leer una lista: las ofertas vigentes cuyo turno ya empezó se cierran antes de entregarlas,
+     * para que nunca se vea vigente algo vencido aunque la tarea programada no haya corrido todavía.
+     */
+    private List<OfertaGeneralEntity> vencerAlLeer(List<OfertaGeneralEntity> ofertas) {
+        LocalDateTime ahora = ahora();
+        ofertas.stream()
+                .filter(o -> estaVencida(o, ahora))
+                .map(OfertaGeneralEntity::getIdOfertaGeneral)
+                .toList()
+                .forEach(id -> ofertaGeneralRepository.findByIdForUpdate(id)
+                        .ifPresent(o -> cerrarSiVencio(o, ahora)));
+        return ofertas;
+    }
+
+    /**
+     * Antes de actuar sobre una oferta ya leída con lock (abrir, rechazar, retirar, postular, elegir):
+     * si venció, se cierra y quien actúa recibe un 409. El cierre queda guardado ({@link VencidoPorInicioException}).
+     */
+    private void exigirNoVencida(OfertaGeneralEntity oferta) {
+        if (cerrarSiVencio(oferta, ahora())) {
+            throw new VencidoPorInicioException(
+                    "Esta oferta venció: el turno ya comenzó, así que ya no se puede gestionar");
+        }
+    }
+
+    /** Si la oferta (ya leída con lock) venció, la deja RECHAZADA con el motivo de vencimiento. */
+    private boolean cerrarSiVencio(OfertaGeneralEntity oferta, LocalDateTime ahora) {
+        if (!estaVencida(oferta, ahora)) return false;
+        oferta.setEstado(OfertaGeneralEntity.EstadoOferta.RECHAZADA);
+        oferta.setMotivo(MOTIVO_VENCIDA
+                + (oferta.getMotivo() != null && !oferta.getMotivo().isBlank()
+                        ? " · motivo original: " + oferta.getMotivo() : ""));
+        ofertaGeneralRepository.save(oferta);
+        agendarBitacora(EVENTO_VENCIDA, oferta.getIdOfertaGeneral(), null); // sin actor humano
+        return true;
     }
 
     private void agendarBitacora(String evento, Long idOferta, Long idFuncionario) {

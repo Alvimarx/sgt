@@ -18,6 +18,9 @@ public interface SolicitudRepository extends JpaRepository<SolicitudEntity, Long
 
     List<SolicitudEntity> findByFuncionario_IdFuncionario(Long idFuncionario);
 
+    /** Solicitudes en un estado; la tarea de vencimiento revisa las PENDIENTES. */
+    List<SolicitudEntity> findByEstado(SolicitudEntity.EstadoSolicitud estado);
+
     List<SolicitudEntity> findByFuncionarioReceptor_IdFuncionario(Long idFuncionario);
 
     List<SolicitudEntity> findByTipoSolicitud_IdTipoSolicitud(Long idTipoSolicitud);

@@ -8,6 +8,7 @@ import { SGTAvatar, SGTBadge, SGTIcon } from "../Style/UIPrimitives";
 import { useLayout } from "../../layout/layout";
 import DetalleTurnoDesktop from "../Desktop/turnos/DetalleTurnoDesktop";
 import { getTipoTurnoColor, getAgendaTeam, formatShiftLabel } from "./turnoPresentacion";
+import { yaEmpezo } from "../../utils/reglasTurno";
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -105,7 +106,8 @@ const alTocarIntegrante = (fila, { onManageAssignedTurn, onSelectMember }) => {
 const alTocarVacante = ({ vacante, yaSolicitada }, canManageAssignments, { onAssignVacancy, onRequestVacancy }) => {
     if (canManageAssignments) {
         onAssignVacancy?.(vacante);
-    } else if (!yaSolicitada) {
+    } else if (!yaSolicitada && !yaEmpezo(vacante)) {
+        // 23 oct: sobre un turno que ya empezó no se pide nada.
         onRequestVacancy?.(vacante);
     }
 };
@@ -121,6 +123,9 @@ const accionesDelTurno = ({
     const turnoLibre = isTurnoLibre(shift);
 
     const canManageAssignments = Boolean(canManageTurnAssignment || canAssignFreeTurn);
+    // 23 oct: sobre un turno que ya empezó no se pide ni se cambia nada (las solicitudes
+    // vencen). La gestión sí puede asignarlo, quitarlo o cambiarlo: es el registro de quién lo hizo.
+    const empezado = yaEmpezo(shift);
 
     if (!shift?.solicitudPendiente) {
         if (canManageAssignments && turnoLibre) {
@@ -133,7 +138,7 @@ const accionesDelTurno = ({
             });
         }
 
-        if (turnoLibre) {
+        if (turnoLibre && !empezado) {
             actions.push({
                 id: "solicitar-turno",
                 label: "Solicitar turno",
@@ -143,7 +148,7 @@ const accionesDelTurno = ({
             });
         }
 
-        if (!turnoLibre && !canManageAssignments) {
+        if (!turnoLibre && !canManageAssignments && !empezado) {
             actions.push({
                 id: "cambio",
                 label: canRequestExchange ? "Solicitar cambio" : "Selecciona receptor y su turno",
@@ -154,7 +159,7 @@ const accionesDelTurno = ({
             });
         }
 
-        if (!turnoLibre && canManageAssignments && canRequestExchange) {
+        if (!turnoLibre && canManageAssignments && canRequestExchange && !empezado) {
             actions.push({
                 id: "cambio",
                 label: "Solicitar cambio",
