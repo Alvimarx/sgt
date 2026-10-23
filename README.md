@@ -9,190 +9,184 @@
 ![MySQL](https://img.shields.io/badge/MySQL-8.0-blue)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
 
-El sistema permite planificar, asignar y gestionar los turnos del personal por servicio y puesto, gestionar solicitudes de intercambio y ofertas de turnos, notificaciones, bitácora de auditoría y estadísticas, con autenticación y autorización basada en roles.
+El sistema permite planificar, asignar y gestionar los turnos del personal por servicio y puesto, gestionar solicitudes de intercambio y ofertas de turnos, bitácora de auditoría y estadísticas, con autenticación y autorización basada en roles.
+
+> **Entrega a TIC HUAP (martes 3 de noviembre de 2026).** El índice operativo (qué se entrega, en qué estado quedó, despliegue, pruebas, decisiones, deuda técnica y pendientes) es [`docs/TRASPASO.md`](docs/TRASPASO.md). Conviene empezar por ahí. Este repositorio es público: no contiene datos reales ni secretos, y las claves, el secreto JWT y los `.env` se crean nuevos en cada ambiente.
 
 ---
 
 ## Índice
 
-- [Características](#características)
+- [Qué hace](#qué-hace)
 - [Arquitectura](#arquitectura)
 - [Stack tecnológico](#stack-tecnológico)
-- [Requisitos previos](#requisitos-previos)
-- [Inicio rápido (desarrollo)](#inicio-rápido-desarrollo)
-- [Despliegue (producción)](#despliegue-producción)
-- [Desarrollo local sin Docker](#desarrollo-local-sin-docker)
+- [Arranque rápido (ambiente local)](#arranque-rápido-ambiente-local)
+- [Documentos vigentes](#documentos-vigentes)
+- [Scripts](#scripts)
 - [Configuración](#configuración)
-- [Tests](#tests)
-- [Documentación](#documentación)
+- [Pruebas](#pruebas)
 - [Estructura del repositorio](#estructura-del-repositorio)
 
 ---
 
-## Características
+## Qué hace
 
-- 🗓️ **Planificación de turnos** por servicio, puesto y tipo de turno, con rotativas.
-- 👥 **Gestión de personal** (funcionarios) y asignación a servicios con roles por servicio.
-- 🔄 **Solicitudes** de intercambio y **ofertas** de turnos (generales y particulares).
-- 🔔 **Notificaciones** internas.
-- 📋 **Bitácora** de auditoría de acciones.
-- 📊 **Estadísticas** y **exportación** a CSV.
-- 📆 **Feriados** y reglas de horarios por servicio.
-- 🔐 **Autenticación JWT** y autorización por rol de sistema y rol de servicio.
+- **Planificación de turnos** por servicio, puesto y tipo de turno, con rotativas y un molde que genera los turnos reales.
+- **Personal y roles:** funcionarios asignados a servicios con roles por servicio (médico, subrogante, jefatura) y un rol de sistema (administrador).
+- **Solicitudes** (permiso, botar turno, cobertura, intercambio, oferta particular) y **ofertas generales** con postulaciones, que la jefatura aprueba o rechaza.
+- **Bitácora** de auditoría, auditoría de asistencia, **estadísticas** y **exportación** a CSV.
+- **Feriados** y reglas de horario por servicio.
+- **Autenticación JWT** y autorización por rol de sistema y rol de servicio, con acceso acotado al servicio de la sesión.
+- Modo móvil (bajo 1200 px) y modo desktop con menú lateral (desde 1200 px).
+- Las notificaciones existen en el código, pero la bandeja está oculta en la entrega (decisión C-09).
 
 ## Arquitectura
 
-Despliegue de referencia con balanceo de carga: un **balanceador Apache httpd** enruta el tráfico a **3 instancias de frontend** (build de React servido con Apache httpd) y **3 instancias de backend** (Spring Boot). Cada backend usa **dos conexiones a base de datos**: la **BD propia del SGT** (`gestionturnos`, lectura/escritura) y la **vista de personal del hospital** (`viewPersonal`, **solo lectura**, para el login y el alta de personal).
+Cada backend usa **dos conexiones a base de datos**: la BD propia del SGT (`gestionturnos`, lectura y escritura) y la vista de personal del hospital (`innhosp.viewPersonal`, **solo lectura**, para el login y el alta de personal).
+
+| Ambiente | Archivo | Qué levanta |
+|---|---|---|
+| Local | `docker-compose.local.yml` | MySQL con las dos bases ficticias, el backend y, opcional, el frontend |
+| VM de demostración | `docker-compose.hetzner.yml` | MySQL interno, 1 backend y 1 frontend Apache que hace de proxy de `/api/v2` |
+| Producción de referencia | `docker-compose.yml` | Balanceador Apache, 3 frontends y 3 backends; bases externas |
+| DEV del equipo anterior | `docker-compose.dev.yml` | Backend y frontend contra las bases reales de la red del hospital |
 
 ```
-Cliente ──▶ Apache LB (:5173) ──┬──▶ Frontend ×3 (Apache httpd + build React)
-                                └──▶ /api/v2/* ──▶ Backend ×3 (Spring Boot :8080) ──┬──▶ MySQL gestionturnos (R/W)
-                                                                                    └──▶ MySQL hospital · viewPersonal (solo lectura)
+Cliente ──▶ Apache (balanceador o frontend) ──┬──▶ Frontend (Apache httpd + build React)
+                                              └──▶ /api/v2/* ──▶ Backend (Spring Boot :8080) ──┬──▶ MySQL gestionturnos (R/W)
+                                                                                                └──▶ MySQL innhosp · viewPersonal (solo lectura)
 ```
 
 ## Stack tecnológico
 
 | Capa | Tecnologías |
 |------|-------------|
-| **Backend** | Java 21, Spring Boot 4, Spring Data JPA, Spring Security + JWT (jjwt), Spring Mail, Maven |
+| **Backend** | Java 21, Spring Boot 4.0 (`4.0.0-SNAPSHOT`), Spring Data JPA, Spring Security + JWT (jjwt), Maven |
 | **Frontend** | React 19, Vite 7, Tailwind CSS 3, React Router 7, Axios, dayjs |
-| **Base de datos** | MySQL 8.0 — dos datasources: `gestionturnos` (app, R/W) y `viewPersonal` del hospital (solo lectura) |
-| **Infraestructura** | Docker, Docker Compose, Apache httpd (balanceador de carga y servido de estáticos del frontend) |
+| **Base de datos** | MySQL 8.0, dos datasources: `gestionturnos` (app, R/W) e `innhosp` (`viewPersonal`, solo lectura) |
+| **Infraestructura** | Docker, Docker Compose, Apache httpd (balanceador y servido de estáticos del frontend) |
+| **Pruebas** | JUnit y Mockito, Testcontainers, Playwright |
 
-## Requisitos previos
+## Arranque rápido (ambiente local)
 
-- **Docker** y **Docker Compose** (vía cualquiera de los flujos con contenedores).
-- Para desarrollo sin Docker: **JDK 21**, **Node.js 18+** y **MySQL 8.0**.
+Es un ambiente autocontenido con datos ficticios: no necesita las bases del hospital.
 
-## Inicio rápido (desarrollo)
-
-El backend se conecta a las **dos bases de datos externas reales** (no se levanta ninguna BD local). Necesitas un archivo `.env.dev` con las credenciales reales (no versionado — pide una copia a tu equipo o generá una a partir de `.env.example`):
+Requisitos: Docker con Compose; Node `^20.19.0 || >=22.12.0` (lo exige Vite 7); Java 21 solo para correr el backend o sus pruebas fuera de Docker; puertos libres 3306, 8080 y 5173.
 
 ```bash
-cp .env.example .env.dev   # y completa los valores reales
-docker compose -f docker-compose.dev.yml --env-file .env.dev up -d --build
-```
+# 1. Variables (el archivo real no se versiona). Completar MYSQL_ROOT_PASSWORD, DB_PASSWORD,
+#    HOSPITAL_DB_PASSWORD (la misma clave) y JWT_SECRET (openssl rand -base64 48)
+cp .env.local.example .env.local
 
-Esto levanta:
-- **Backend** en `http://localhost:8080` (API bajo `/api/v2`; Swagger UI habilitado en dev en `/swagger-ui.html`), conectado a la BD `gestionturnos` externa y a la vista `viewPersonal` del hospital (externa, solo lectura).
-- **Frontend** en `http://localhost:5173`.
+# 2. Base y backend (la primera vez construye la imagen del backend; MySQL ejecuta los scripts de init una sola vez)
+docker compose -f docker-compose.local.yml --env-file .env.local up -d db backend
 
-Verifica el backend:
-
-```bash
+# 3. Comprobar el backend
 curl http://localhost:8080/api/v2/health
-```
 
-Detalle completo (arquitectura, variables, troubleshooting de conectividad): [`docs/AMBIENTE_DEV.md`](docs/AMBIENTE_DEV.md).
+# 4. Turnos vigentes de Urgencias (7 semanas desde el lunes actual; una vez por volumen)
+bash scripts/generar_turnos_demo.sh
 
-## Despliegue (producción)
-
-El compose de producción (`docker-compose.yml`) levanta **solo la app** (3 backends + 3 frontends detrás del balanceador Apache); **no incluye ninguna base de datos**. Cada backend recibe por `.env` las **dos conexiones**: la BD propia del SGT (`gestionturnos`) y la vista de personal del hospital (`viewPersonal`, solo lectura).
-
-```bash
-# 1. Crea el archivo .env a partir de la plantilla y completa los valores reales
-cp .env.example .env
-#    (DB_URL/USERNAME/PASSWORD de gestionturnos, HOSPITAL_DB_* de la conexión del hospital,
-#     JWT_SECRET y DDL_AUTO — ver la sección Configuración)
-
-# 2. Asegura que la BD de la app existe con su esquema.
-#    Si aún no está creada, cárgala con el script de solo estructura:
-#    mysql -u <user> -p < BaseDatosMySQL/despliegue/schema_gestionturnos.sql
-
-# 3. Construir y levantar
-docker compose up -d --build
-
-# 4. Verificar
-docker compose ps
-curl http://localhost:5173/api/v2/health
-```
-
-La aplicación queda disponible en `http://localhost:5173` (puerto externo del balanceador; el `80` interno se mapea a `5173` porque el `80` del router suele estar bloqueado).
-
-> 📱 Para acceder desde el celular u otro equipo de la red local, entra a `http://<IP-de-tu-PC>:5173` (misma Wi‑Fi) y abre el puerto `5173` en el firewall de Windows.
-
-> ⚠️ **Seguridad:** las credenciales y el secreto JWT se externalizan en un archivo `.env` (ignorado por Git; ver `.env.example`). Antes de un despliegue real, rota el secreto JWT y usa un usuario de BD sin privilegios de `root`.
-
-## Desarrollo local sin Docker
-
-**Backend** (requiere MySQL corriendo con la BD `gestionturnos` y acceso a la vista `viewPersonal` del hospital):
-
-El backend exige **ambos** datasources configurados por variables de entorno (no traen valor por defecto). Defínelas antes de arrancar; por ejemplo, apuntando a un MySQL local con los dos esquemas:
-
-```bash
-cd huap_backend
-export DB_URL="jdbc:mysql://localhost:3306/gestionturnos"
-export DB_USERNAME="root" DB_PASSWORD="tu_clave"
-export HOSPITAL_DB_URL="jdbc:mysql://localhost:3306/innhosp"
-export HOSPITAL_DB_USERNAME="root" HOSPITAL_DB_PASSWORD="tu_clave"
-export DDL_AUTO="update" JWT_SECRET="secreto-largo-de-desarrollo-min-32-chars"
-./mvnw spring-boot:run
-```
-
-Para desarrollo lo más simple es usar el compose de dev, que ya apunta a las BD externas reales (ver [Inicio rápido](#inicio-rápido-desarrollo)). Si necesitas trabajar sin conectividad a esas BD, puedes levantar tu propio MySQL local con los scripts de `BaseDatosMySQL/desarrollo/` (ya no se orquesta automáticamente vía Docker) y apuntar `DB_URL`/`HOSPITAL_DB_URL` a él. Detalle de variables en [Configuración](#configuración).
-
-**Frontend**:
-
-```bash
+# 5. Frontend
 cd sgt-huap_frontend
-npm install
+npm ci
 npm run dev
 ```
 
+Abrir **`http://localhost:5173`**. Usar `localhost` y no la dirección numérica de loopback: el CORS del backend solo admite los orígenes de `CORS_ALLOWED_ORIGINS`. Los usuarios de prueba y su clave están en el catálogo de historias de usuario (`docs/qa/HISTORIAS_DE_USUARIO.md` §2.1). Swagger UI: `http://localhost:8080/swagger-ui.html` (en la plantilla local, `SWAGGER_ENABLED=true`). Para detener sin borrar datos: `docker compose -f docker-compose.local.yml --env-file .env.local down`; para recrear desde cero, `down -v` y volver al paso 2. Respaldo y restauración de la base local: [`docs/TRASPASO.md`](docs/TRASPASO.md) §5.
+
+Nunca cargar datos reales en el ambiente local, en la VM ni en el repositorio.
+
+## Documentos vigentes
+
+| Documento | Para qué |
+|---|---|
+| [`docs/TRASPASO.md`](docs/TRASPASO.md) | Índice operativo de la entrega a TIC HUAP: estado, despliegue, pruebas, decisiones, incidente, deuda técnica, fe de erratas del manual y transición |
+| [`docs/DESPLIEGUE_VM.md`](docs/DESPLIEGUE_VM.md) | Instalación y operación de la VM de demostración (sin construir en la VM) |
+| [`docs/qa/HISTORIAS_DE_USUARIO.md`](docs/qa/HISTORIAS_DE_USUARIO.md) | Catálogo de 77 historias de usuario con criterios, estado según el código, decisiones (§5) y orden de pruebas (§6) |
+| [`docs/qa/pruebas-integrales/`](docs/qa/pruebas-integrales/README.md) | 32 historias y 249 casos de prueba basados en reglas, su plan de ejecución, supuestos y resultados |
+| [`requerimientos/README.md`](requerimientos/README.md) | Índice de R1–R18: qué se cambió, por qué y cómo probarlo |
+| [`docs/desktop/GUIA-DESKTOP.md`](docs/desktop/GUIA-DESKTOP.md) | Reglas para adaptar o crear pantallas desktop sin tocar el móvil |
+| [`docs/security/NOTA_INCIDENTE_DATOS_PERSONAL_GIT_2026-08-10.md`](docs/security/NOTA_INCIDENTE_DATOS_PERSONAL_GIT_2026-08-10.md) | Incidente de datos de agosto y sus pendientes |
+| [`docs/security/INTERNET_DEPLOYMENT_SECURITY_CHECKLIST.md`](docs/security/INTERNET_DEPLOYMENT_SECURITY_CHECKLIST.md) y [`RESIDUAL_RISK_REGISTER.md`](docs/security/RESIDUAL_RISK_REGISTER.md) | Lista de lo que falta para exponer el sistema a internet (su estado al 22 oct está en `docs/TRASPASO.md` §6.2 y §11) |
+| [`Archivo de funcionalidades.md`](Archivo%20de%20funcionalidades.md) | Funciones (FUN-SGT) y reglas de negocio (RN-SGT). Referencia con contradicciones: donde difiere del código, manda el catálogo |
+| [`docs/api/`](docs/api/README.md) | API REST. La especificación versionada está desactualizada: se regenera con el backend arriba y `SWAGGER_ENABLED=true` |
+
+Son históricos y se conservan como trazabilidad: `docs/qa/` (auditoría QA de julio), el resto de `docs/security/`, `REVISION_POST_CORRECCIONES_SGT.md`, `docs/BRIEF-MODO-DESKTOP.md` y `requerimientos/TRASPASO.md` (solo vale para R1–R9). `IMPLEMENTAR_DEV.MD` y `docs/AMBIENTE_DEV.md` describen el DEV contra las bases reales y solo sirven dentro de la red del hospital. La tabla completa de documentos, con su estado, está en `docs/TRASPASO.md` §2.
+
+## Scripts
+
+| Script | Qué hace | Dónde se corre |
+|---|---|---|
+| `scripts/generar_turnos_demo.sh` | Genera turnos vigentes de Urgencias (7 semanas desde el lunes actual) con la propia Planificación, entrando a la API como administrador del seed | Local y VM, con el seed ficticio |
+| `scripts/generar_rotativa_urgencias.sh` | Genera la rotativa completa de Urgencias (por defecto, del 1 oct al 31 dic de 2026) con el ciclo de 42 días anclado para que «Lunes Turno (T III)» calce con el calendario real. Completa los cupos libres del molde, respalda el molde y verifica contra la API. `SIMULAR=1` solo muestra qué haría; pide RUT y clave del administrador | En la VM, desde `/opt/sgt` |
+| `scripts/desplegar_frontend_hetzner.sh` | Construye la imagen del frontend en el equipo de desarrollo desde el último commit subido a GitHub y recrea solo ese contenedor en la VM. Con `DATOS_DEMO=1` genera además turnos vigentes | Equipo de desarrollo |
+| `scripts/desplegar_backend_hetzner.sh` | Lo mismo para el backend; se detiene si hay migraciones nuevas sin aplicar (`MIGRACIONES_APLICADAS=1` después de aplicarlas) | Equipo de desarrollo |
+| `scripts/_hetzner_comun.sh` | Piezas comunes de los dos scripts de despliegue; no se ejecuta solo | |
+| `scripts/init_db.sh` | Inicializa las dos bases en el contenedor MySQL de la VM: esquema, V2, V3, bootstrap, `innhosp` y, con `SEED_DEMO=1`, el poblado de demostración. Se puede volver a correr | VM |
+| `scripts/mysql.sh` | Consola y carga de SQL con el charset correcto (no usar `mysql` a mano) | VM |
+| `scripts/backup_mysql.sh` | Respaldo comprimido de las dos bases, con rotación por días | VM |
+| `scripts/diagnostico_login.sh` | Diagnostica por qué un RUT puede o no iniciar sesión | VM |
+
+Detalle, variables y advertencias de cada uno: su encabezado, `docs/DESPLIEGUE_VM.md` y `docs/TRASPASO.md` §4 y §6.
+
 ## Configuración
 
-La configuración del backend está en [`huap_backend/src/main/resources/application.properties`](huap_backend/src/main/resources/application.properties) y toma todos sus valores de variables de entorno. En producción se cargan desde un archivo `.env` (ignorado por Git; plantilla en [`.env.example`](.env.example)).
+La configuración del backend está en [`huap_backend/src/main/resources/application.properties`](huap_backend/src/main/resources/application.properties) y toma todos sus valores de variables de entorno. Las plantillas, sin secretos, son `.env.local.example` (ambiente local), `.env.hetzner.example` (VM) y `.env.example` (producción de referencia y DEV); los archivos reales (`.env.local`, `.env.hetzner`, `.env`, `.env.dev`) no se versionan.
 
-| Variable | Descripción | Obligatoria |
-|----------|-------------|-------------|
-| `DB_URL` | URL JDBC de la BD de la app (`gestionturnos`), R/W | Sí |
-| `DB_USERNAME` / `DB_PASSWORD` | Credenciales de la BD de la app | Sí |
-| `HOSPITAL_DB_URL` | URL JDBC de la BD del hospital (vista `viewPersonal`), solo lectura | Sí |
-| `HOSPITAL_DB_USERNAME` / `HOSPITAL_DB_PASSWORD` | Credenciales del hospital (usuario con solo `SELECT`) | Sí |
-| `DDL_AUTO` | Estrategia de esquema de Hibernate — `validate` tanto en dev como en prod (ambas BD son externas/compartidas; `update` solo si se apunta a una BD local desechable) | Sí |
-| `JWT_SECRET` | Secreto de firma de los JWT (≥ 32 caracteres, aleatorio) | Sí |
-| `SWAGGER_ENABLED` | Expone Swagger UI y la spec OpenAPI (`true` en dev, `false` en prod) | No (por defecto `false`) |
-| `SERVER_ID` | Identificador de la instancia (para health/info) | No |
+| Variable | Descripción |
+|----------|-------------|
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | Base `gestionturnos`, lectura y escritura. Obligatorias |
+| `HOSPITAL_DB_URL`, `HOSPITAL_DB_USERNAME`, `HOSPITAL_DB_PASSWORD` | Vista `viewPersonal` del hospital, solo lectura (en producción, un usuario con `SELECT` solo sobre esa vista). Obligatorias |
+| `JWT_SECRET` | Secreto de firma de los JWT: 32 caracteres o más, aleatorio y distinto por ambiente. Obligatoria |
+| `DDL_AUTO` | Estrategia de Hibernate: `validate` en todos los ambientes (el esquema debe existir antes de arrancar). Obligatoria |
+| `CORS_ALLOWED_ORIGINS` | Orígenes exactos, separados por coma. Obligatoria en los compose de producción y de la VM |
+| `SWAGGER_ENABLED` | Swagger UI y la especificación OpenAPI. Por defecto `false` |
 
-> El datasource del hospital se abre en **solo lectura** (`hikari.read-only=true`) con un pool pequeño: la app nunca escribe en la BD del hospital. El token JWT expira a las 24 h (`app.jwt.expiration=86400000`).
+El token JWT dura 24 h y el datasource del hospital se abre en solo lectura. La imagen del backend fija `TZ=America/Santiago`. Todas las variables (backend, compose, scripts, frontend y pruebas) están en `docs/TRASPASO.md` §4.
 
-## Tests
+## Pruebas
 
 ```bash
+# Backend, unitarias (452 pruebas; sin Docker)
 cd huap_backend
+./mvnw test -Dtest='!*IntegrationTest,!*ConcurrencyTest,!LockBenchmark'
+
+# Backend, todo (requiere Docker: Testcontainers). Hoy fallan 26 pruebas de integración, ya documentadas
 ./mvnw test
+
+# Frontend: lint y build
+cd ../sgt-huap_frontend
+npm run lint
+npm run build
+
+# E2E (con el ambiente local arriba y el frontend en http://localhost:5173)
+npx playwright install chromium
+TMPDIR=~/.cache/sgt-pw-tmp npx playwright test e2e/hu/ --project=movil --project=desktop          # solo lectura
+SGT_MUTA=1 npx playwright test e2e/hu-muta/ --project=movil --project=desktop                       # escribe en la base local
 ```
 
-La suite incluye tests unitarios de *services* (Mockito), de integración de repositorios (`@DataJpaTest` + Testcontainers MySQL) y pruebas de concurrencia.
-
-## Documentación
-
-La documentación sigue un modelo por **capas**:
-
-| Capa | Qué responde | Dónde |
-|------|--------------|-------|
-| **API** | Cómo consumir la API REST | Swagger UI en `/swagger-ui.html` (solo en desarrollo); spec en [docs/api/](docs/api/) |
-| **Código** | Qué hace cada clase/función | Javadoc (`./mvnw javadoc:javadoc` → `target/reports/apidocs/`) y JSDoc en el frontend |
-| **Manuales de usuario** | Cómo usar el sistema | [docs/manuales-usuario/](docs/manuales-usuario/) |
-
-Documentos adicionales: [docs/AMBIENTE_DEV.md](docs/AMBIENTE_DEV.md) (guía completa del ambiente de desarrollo) e [INFORME_PROYECTO.md](docs/INFORME_PROYECTO.md) (informe técnico histórico).
+`e2e/hu-muta/` escribe: después hay que restaurar la base local y reiniciar el backend. El estado de cada suite, las reglas de las pruebas E2E y las pruebas integrales basadas en reglas están en `docs/TRASPASO.md` §7.
 
 ## Estructura del repositorio
 
 ```
 .
-├── huap_backend/          # API REST Spring Boot (Java 21)
+├── huap_backend/            # API REST Spring Boot (Java 21)
 │   └── src/main/java/com/pingeso/HUAP/
 │       ├── Controller/  Service/  Repository/  Entity/  DTO/
 │       ├── Security/    Config/   Utils/
-├── sgt-huap_frontend/     # SPA React 19 + Vite + Tailwind
-│   └── src/{components,services,context,utils}/
-├── apache/                # Configuración del balanceador Apache (en uso)
-├── nginx/                 # Configuración Nginx alternativa (histórica, no usada por el compose)
-├── BaseDatosMySQL/        # Scripts SQL: desarrollo/ (fuente) y despliegue/ (generados)
-├── docs/                  # Documentación (API/OpenAPI, manuales, informe técnico, AMBIENTE_DEV.md)
-├── .env.example           # Plantilla de variables (base de .env y .env.dev), sin secretos
-├── .env.dev               # Variables reales de DEV (NO versionado, ver .gitignore)
-├── docker-compose.yml     # Despliegue producción (3+3 + LB, solo app; BDs externas por .env)
-└── docker-compose.dev.yml # Desarrollo (solo app; BDs externas reales por .env.dev)
+├── sgt-huap_frontend/       # SPA React 19 + Vite + Tailwind
+│   ├── src/{components,services,context,utils,config}/
+│   └── e2e/                 # Pruebas Playwright (hu/, hu-muta/, visual/)
+├── BaseDatosMySQL/          # SQL: desarrollo/ (seed ficticio), despliegue/ (VM y base nueva), migraciones/ (V2, V3)
+├── scripts/                 # Generación de turnos, despliegue y operación de la VM
+├── requerimientos/          # R1–R18 y paquete de traspaso de R1–R9
+├── docs/                    # Traspaso, despliegue de la VM, QA (catálogo y pruebas integrales), seguridad, API, desktop
+├── apache/  nginx/          # Balanceador Apache (en uso) y alternativa Nginx (sin uso)
+├── docker-compose.local.yml     # Ambiente local autocontenido
+├── docker-compose.hetzner.yml   # VM de demostración
+├── docker-compose.yml           # Producción de referencia (3+3 y balanceador; bases externas)
+├── docker-compose.dev.yml       # DEV del equipo anterior (bases reales de la red del hospital)
+└── .env.example  .env.local.example  .env.hetzner.example   # Plantillas de variables, sin secretos
 ```
