@@ -568,5 +568,5 @@ Otras correcciones de documentación pendientes: el Archivo de funcionalidades s
   2. Correr las pruebas (§7.1) y confirmar el punto de partida: unitarias del backend, lint y build del frontend.
   3. Leer el catálogo (§5 y §6.3), las decisiones del cierre y su estado (§9).
   4. Tomar los pendientes del incidente (§10) y las direcciones de red del repositorio (S-02, §4).
-  5. Decidir el destino de la VM de demostración y del repositorio con la base real (§1).
+  5. Decidir cuál repositorio pasa a ser la base, este o el que corre con la base real (§1), y cuándo levantar un ambiente propio que reemplace a la VM de demostración, que mientras tanto sigue a cargo de Álvaro (§6.1).
   6. Correr las pruebas integrales con su plan (`docs/qa/pruebas-integrales/`) y repartir la lista de §11.
