@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulador del padrón del HUAP</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header class="barra">
+    <div>
+      <h1>Simulador del padrón del HUAP</h1>
+      <p>Base ficticia <code>innhosp</code>. Lo que cambies aquí lo ve el SGT por la vista <code>viewPersonal</code>.</p>
+    </div>
+    <span class="insignia">SOLO DEMOSTRACIÓN</span>
+  </header>
+
+  <main>
+    <section class="panel" aria-label="Personal del padrón">
+      <div class="herramientas">
+        <input id="buscar" type="search" placeholder="Buscar por RUT o nombre" autocomplete="off" aria-label="Buscar por RUT o nombre">
+        <div class="filtros" role="group" aria-label="Filtrar por estado">
+          <button type="button" class="filtro activo" data-estado="todos">Todos</button>
+          <button type="button" class="filtro" data-estado="activos">En el padrón</button>
+          <button type="button" class="filtro" data-estado="fuera">Fuera del padrón</button>
+        </div>
+        <button type="button" id="abrir-agregar" class="primario">Agregar persona</button>
+      </div>
+      <p id="resumen" class="resumen" aria-live="polite"></p>
+      <div class="tabla-envoltorio">
+        <table>
+          <thead>
+            <tr><th>RUT</th><th>Nombre</th><th>Cargo</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody id="filas"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="dlg-agregar">
+    <form id="form-agregar" method="dialog" autocomplete="off">
+      <h2>Agregar persona al padrón</h2>
+      <label>RUT
+        <input name="rut" required placeholder="40.000.008-5" inputmode="text">
+        <small id="rut-ayuda">Se valida el dígito verificador.</small>
+      </label>
+      <label>Nombres <input name="nombre" required maxlength="100"></label>
+      <div class="dos">
+        <label>Apellido paterno <input name="apelPat" required maxlength="100"></label>
+        <label>Apellido materno <input name="apelMat" maxlength="100"></label>
+      </div>
+      <label>Profesión o cargo
+        <select name="profesion"><option value="">Sin especificar</option></select>
+      </label>
+      <label>Clave inicial
+        <span class="clave">
+          <input name="clave" type="password" required minlength="8" maxlength="72" autocomplete="new-password">
+          <button type="button" id="ver-clave" class="secundario">Mostrar</button>
+        </span>
+        <small>La escribes tú; mínimo 8 caracteres. Con ella la persona inicia sesión en el SGT.</small>
+      </label>
+      <p id="error-agregar" class="error" role="alert" hidden></p>
+      <div class="acciones">
+        <button type="button" id="cancelar-agregar" class="secundario">Cancelar</button>
+        <button type="submit" class="primario">Agregar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-alta">
+    <form id="form-alta" method="dialog" autocomplete="off">
+      <h2>Volver a agregar</h2>
+      <p id="alta-quien"></p>
+      <label>Clave nueva (opcional)
+        <input name="clave" type="password" minlength="8" maxlength="72" autocomplete="new-password">
+        <small>Si la dejas vacía se conserva la clave que tenía.</small>
+      </label>
+      <p id="error-alta" class="error" role="alert" hidden></p>
+      <div class="acciones">
+        <button type="button" id="cancelar-alta" class="secundario">Cancelar</button>
+        <button type="submit" class="primario">Volver a agregar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="aviso" class="aviso" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
