@@ -22,8 +22,8 @@ import java.util.List;
  * receptor específico).
  *
  * <p>Ciclo de vida: {@link #crear} (PENDIENTE_APROBACION) → jefatura {@link #aprobar}/
- * {@link #rechazar}, o el ofertor la {@link #retirar retira} (RETIRADA) → si ABIERTA, otros
- * funcionarios {@link #postular} (o
+ * {@link #rechazar}, o el ofertor la {@link #retirar retira} (RETIRADA) mientras nadie haya
+ * postulado, pendiente o ya abierta → si ABIERTA, otros funcionarios {@link #postular} (o
  * {@link #retirarPostulacion} mientras siga abierta) → jefatura {@link #seleccionar} un
  * postulante, lo que asigna el turno y cierra la oferta (CERRADA).
  */
@@ -63,13 +63,15 @@ public class OfertaGeneralController {
     // C-16 (HU-OFE-01): sin @PreAuthorize porque el ofertor puede tener cualquier rol; el service
     // exige que quien la retira sea quien la publicó.
     @Operation(summary = "Retirar una oferta propia",
-            description = "Quien publicó la oferta la retira mientras nadie la haya abierto "
-                    + "(PENDIENTE_APROBACION). Queda RETIRADA y deja un evento en la bitácora.")
+            description = "Quien publicó la oferta la retira hasta que alguien postule: pendiente de "
+                    + "apertura (PENDIENTE_APROBACION) o abierta (ABIERTA) y sin ninguna postulación. "
+                    + "Queda RETIRADA y deja un evento en la bitácora.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Oferta retirada"),
             @ApiResponse(responseCode = "403", description = "Quien la pide no es quien la publicó"),
             @ApiResponse(responseCode = "404", description = "La oferta no existe"),
-            @ApiResponse(responseCode = "409", description = "La oferta ya no está pendiente de apertura")
+            @ApiResponse(responseCode = "409", description = "La oferta ya tiene postulaciones, o ya está "
+                    + "cerrada (turno asignado), rechazada o retirada")
     })
     @PutMapping("/{id}/retirar")
     public ResponseEntity<OfertaGeneralEntity> retirar(@PathVariable Long id) {

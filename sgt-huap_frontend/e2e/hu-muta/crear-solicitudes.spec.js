@@ -358,9 +358,10 @@ test('HU-SOL-05 · criterio 3: al crear se aplican R12 y R13', async () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 testMuta('HU-OFE-01 · criterio 1: al enviar, la oferta aparece en «Ofertas generales» con la marca «Pend. apertura»; quien la publicó puede retirarla', async ({ page, request }, testInfo) => {
-  // C-16 (17 oct): el ofertor retira su oferta mientras nadie la haya abierto (PUT /ofertas-generales/{id}/retirar): queda
-  // RETIRADA y el turno sigue siendo suyo. Es también cómo se deshace: antes, la oferta quedaba pendiente de apertura. Se
-  // elige un turno sin una oferta suya viva (pendiente de apertura o abierta).
+  // C-16 (17 oct, ajustada el 20 oct): el ofertor retira su oferta hasta que alguien postule (PUT /ofertas-generales/{id}/retirar):
+  // aquí está pendiente de apertura; queda RETIRADA y el turno sigue siendo suyo. Es también cómo se deshace: antes, la oferta
+  // quedaba pendiente de apertura. Se elige un turno sin una oferta suya viva (pendiente de apertura o abierta). La oferta
+  // abierta, con y sin postulantes, está en el criterio 3 de abajo (simulada) y en ofertas-generales.spec.js (real).
   await entrar(page, 'medico');
   const ofertas = await apiComo(request, 'medico', `/ofertas-generales/servicio/${SERVICIO.urgencias}`);
   const ofrecidos = new Set(ofertas.filter((o) => o.ofertor?.idFuncionario === ID.medico && ['PENDIENTE_APROBACION', 'ABIERTA'].includes(o.estado)).map((o) => o.turno?.idTurno));
@@ -436,4 +437,43 @@ test('HU-OFE-01 · criterio 2: en mi oferta no veo «Postular» y, abierta, veo 
 
   // Control: en una oferta abierta de otra persona sí aparece «Postular».
   expect((await leerSolicitud(page, testInfo, ajena.motivo)).botones).toContain('Postular');
+  // Con dos postulantes, el ofertor ya no puede retirarla (criterio 3).
+  expect(vista.botones, 'con postulantes no se retira').not.toContain('Retirar oferta');
+});
+
+test('HU-OFE-01 · criterio 3: en mi oferta abierta veo «Retirar oferta» solo mientras nadie haya postulado (ofertas simuladas)', async ({ page, api }, testInfo) => {
+  // Retirarla de verdad es de ofertas-generales.spec.js (con la apertura real). Aquí la respuesta GET trae dos ofertas
+  // abiertas del médico, una sin postulantes y otra con uno, y la confirmación se cierra con «Volver». Nada se guarda.
+  await entrar(page, 'medico');
+  const hoy = hoyChile();
+  const turnos = await api.get(`/turnos/servicio/${SERVICIO.urgencias}`);
+  const personal = await api.get(`/funcionarios/summary?servicioId=${SERVICIO.urgencias}`);
+  const persona = (id) => personal.find((f) => f.idFuncionario === id);
+  const miTurno = turnos.find((t) => t.idFuncionario === ID.medico && t.diaInicioTurno > hoy);
+  const sinPostulantes = ofertaSimulada({
+    id: 9933, estado: 'ABIERTA', ofertor: persona(ID.medico), turno: miTurno, servicio: URGENCIAS,
+    motivo: 'Simulada: mi oferta abierta sin postulantes',
+  });
+  const conPostulante = ofertaSimulada({
+    id: 9934, estado: 'ABIERTA', ofertor: persona(ID.medico), turno: miTurno, servicio: URGENCIAS,
+    motivo: 'Simulada: mi oferta abierta con un postulante', postulantes: [persona(APOYO.segundoMedico.id)],
+  });
+  await page.route(new RegExp(`/api/v2/ofertas-generales/servicio/${SERVICIO.urgencias}$`), async (route) => {
+    const r = await route.fetch();
+    return route.fulfill({ response: r, json: [...await r.json(), sinPostulantes, conPostulante] });
+  });
+  await abrirSolicitudes(page, testInfo);
+  await elegirPestana(page, testInfo, 'Ofertas generales');
+
+  const libre = await leerSolicitud(page, testInfo, sinPostulantes.motivo);
+  expect(libre.estado).toBe('Abierta');
+  expect(libre.botones, 'nadie ha postulado: puede retirarla').toContain('Retirar oferta');
+  const { dialogo, texto } = await abrirRetiroOferta(page, testInfo, libre);
+  expect(texto).toContain('Se retirará tu oferta general: dejará de estar abierta, nadie podrá postular y el turno sigue siendo tuyo.');
+  await dialogo.getByRole('button', { name: 'Volver' }).click();
+
+  const ocupada = await leerSolicitud(page, testInfo, conPostulante.motivo);
+  expect(ocupada.estado).toBe('Abierta');
+  await expect(ocupada.zona).toContainText('Tu oferta está abierta · 1 postulante');
+  expect(ocupada.botones, 'con un postulante ya no puede retirarla').not.toContain('Retirar oferta');
 });

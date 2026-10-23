@@ -85,6 +85,12 @@ class OfertaGeneralServiceTest {
                 .idOfertaGeneral(id).ofertor(ofertor).turno(turno).estado(estado).build();
     }
 
+    /** Una postulación de {@code idPostulante}, sin la referencia de vuelta a la oferta (el service solo la cuenta). */
+    private static PostulacionEntity postulacion(long id, long idPostulante, boolean seleccionado) {
+        return PostulacionEntity.builder()
+                .idPostulacion(id).postulante(funcionario(idPostulante)).seleccionado(seleccionado).build();
+    }
+
     private void ofertaSaveDevuelveArgumento() {
         when(ofertaGeneralRepository.save(any(OfertaGeneralEntity.class))).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -204,7 +210,7 @@ class OfertaGeneralServiceTest {
 
     @Test
     void postular_ofertaInexistente_lanza() {
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.empty());
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
         actorAutenticado(2L);
         assertThrows(RuntimeException.class, () -> service.postular(1L));
     }
@@ -212,7 +218,7 @@ class OfertaGeneralServiceTest {
     @Test
     void postular_ofertaNoAbierta_lanza() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), PENDIENTE_APROBACION);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
 
         actorAutenticado(2L);
         assertThrows(RuntimeException.class, () -> service.postular(1L));
@@ -220,10 +226,22 @@ class OfertaGeneralServiceTest {
     }
 
     @Test
+    void postular_aUnaOfertaRetirada_lanzaYNoGuarda() {
+        // Retirar y postular se serializan con el lock: quien llega segundo ve la oferta ya RETIRADA.
+        OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), RETIRADA);
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+
+        actorAutenticado(2L);
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> service.postular(1L));
+        assertEquals("La oferta no está abierta", ex.getMessage());
+        verify(postulacionRepository, never()).save(any());
+    }
+
+    @Test
     void postular_ofertorPostulaASuPropiaOferta_lanza() {
         FuncionarioEntity ofertor = funcionario(1L);
         OfertaGeneralEntity o = oferta(1L, ofertor, turno(1L), ABIERTA);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
 
         actorAutenticado(1L);
         assertThrows(RuntimeException.class, () -> service.postular(1L));
@@ -233,7 +251,7 @@ class OfertaGeneralServiceTest {
     @Test
     void postular_yaExistePostulacionDelMismoFuncionario_lanza() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), ABIERTA);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
         when(postulacionRepository.existsByOfertaGeneral_IdOfertaGeneralAndPostulante_IdFuncionario(1L, 2L))
                 .thenReturn(true);
 
@@ -245,7 +263,7 @@ class OfertaGeneralServiceTest {
     @Test
     void postular_funcionarioInexistente_lanza() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), ABIERTA);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
         when(postulacionRepository.existsByOfertaGeneral_IdOfertaGeneralAndPostulante_IdFuncionario(1L, 2L))
                 .thenReturn(false);
         when(funcionarioRepository.findById(2L)).thenReturn(Optional.empty());
@@ -259,7 +277,7 @@ class OfertaGeneralServiceTest {
     void postular_happyPath_creaPostulacionNoSeleccionada() {
         OfertaGeneralEntity o = oferta(1L, funcionario(1L), turno(1L), ABIERTA);
         FuncionarioEntity postulante = funcionario(2L);
-        when(ofertaGeneralRepository.findById(1L)).thenReturn(Optional.of(o));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
         when(postulacionRepository.existsByOfertaGeneral_IdOfertaGeneralAndPostulante_IdFuncionario(1L, 2L))
                 .thenReturn(false);
         when(funcionarioRepository.findById(2L)).thenReturn(Optional.of(postulante));
@@ -273,6 +291,9 @@ class OfertaGeneralServiceTest {
         assertFalse(creada.getSeleccionado());
         assertNotNull(creada.getFechaPostulacion());
         verify(bitacoraService).registrarEventoOferta("POSTULACION_CREADA", 1L, 2L);
+        // Lee la oferta con lock (como retirarOferta), no con un findById sin lock.
+        verify(ofertaGeneralRepository).findByIdForUpdate(1L);
+        verify(ofertaGeneralRepository, never()).findById(any());
     }
 
     // ============================ retirarPostulacion ============================
@@ -620,7 +641,16 @@ class OfertaGeneralServiceTest {
         }
     }
 
+    @Test
+    void admiteRetiro_soloPendienteDeAperturaYAbierta() {
+        for (OfertaGeneralEntity.EstadoOferta e : OfertaGeneralEntity.EstadoOferta.values()) {
+            assertEquals(e == PENDIENTE_APROBACION || e == ABIERTA, e.admiteRetiro(), e.name());
+        }
+    }
+
     // ============================ C-16: el ofertor retira su oferta ============================
+    // La decisión del 17 oct decía «mientras nadie la haya abierto»; la del 20 oct la reemplazó:
+    // hasta que alguien postule (pendiente de apertura o abierta, y sin ninguna postulación).
 
     @Test
     void retirar_elOfertorEnPendienteDeApertura_quedaRetiradaYDejaElEvento() {
@@ -636,33 +666,105 @@ class OfertaGeneralServiceTest {
     }
 
     @Test
-    void retirar_quienNoLaPublico_403_aunqueSeaGestionOAdministrador() {
-        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), PENDIENTE_APROBACION);
+    void retirar_laOfertaAbiertaSinPostulaciones_quedaRetiradaYDejaElEvento() {
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), ABIERTA);
         when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
-        actorAutenticado(9L); // el administrador por defecto de esta clase
+        ofertaSaveDevuelveArgumento();
+        actorAutenticado(5L);
 
-        org.springframework.security.access.AccessDeniedException ex = assertThrows(
-                org.springframework.security.access.AccessDeniedException.class, () -> service.retirarOferta(1L));
-        assertEquals("Solo quien publicó la oferta puede retirarla", ex.getMessage());
-        assertEquals(PENDIENTE_APROBACION, o.getEstado());
-        verify(ofertaGeneralRepository, never()).save(any());
-        verifyNoInteractions(bitacoraService);
+        OfertaGeneralEntity resultado = service.retirarOferta(1L);
+
+        assertEquals(RETIRADA, resultado.getEstado());
+        verify(ofertaGeneralRepository).save(o);
+        verify(bitacoraService).registrarEventoOferta("OFERTA_GENERAL_RETIRADA", 1L, 5L);
     }
 
     @Test
-    void retirar_unaOfertaQueYaNoEstaPendienteDeApertura_409() {
-        for (OfertaGeneralEntity.EstadoOferta estado : new OfertaGeneralEntity.EstadoOferta[]{ABIERTA, CERRADA, RECHAZADA, RETIRADA}) {
+    void retirar_conAlMenosUnaPostulacion_409_yLaOfertaNoSeToca() {
+        for (OfertaGeneralEntity.EstadoOferta estado : new OfertaGeneralEntity.EstadoOferta[]{ABIERTA, PENDIENTE_APROBACION}) {
             OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), estado);
+            o.getPostulaciones().add(postulacion(10L, 2L, false));
             when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
             actorAutenticado(5L);
 
             org.springframework.web.server.ResponseStatusException ex = assertThrows(
                     org.springframework.web.server.ResponseStatusException.class, () -> service.retirarOferta(1L), estado.name());
-            assertEquals(409, ex.getStatusCode().value());
-            assertEquals("La oferta ya no está pendiente de apertura: no se puede retirar", ex.getReason());
-            assertEquals(estado, o.getEstado());
+            assertEquals(409, ex.getStatusCode().value(), estado.name());
+            assertEquals("La oferta ya tiene postulaciones: no se puede retirar", ex.getReason(), estado.name());
+            assertEquals(estado, o.getEstado(), estado.name());
+            assertEquals(1, o.getPostulaciones().size(), estado.name());
         }
         verify(ofertaGeneralRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService);
+    }
+
+    @Test
+    void retirar_siLaUnicaPostulacionSeRetira_laOfertaVuelveAPoderRetirarse() {
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), ABIERTA);
+        PostulacionEntity postulacion = PostulacionEntity.builder()
+                .idPostulacion(7L).postulante(funcionario(2L)).ofertaGeneral(o).build();
+        o.getPostulaciones().add(postulacion);
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        when(postulacionRepository.findById(7L)).thenReturn(Optional.of(postulacion));
+        ofertaSaveDevuelveArgumento();
+
+        actorAutenticado(5L);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.retirarOferta(1L));
+        assertEquals(ABIERTA, o.getEstado());
+
+        actorAutenticado(2L);
+        service.retirarPostulacion(7L); // quien postuló se retira: la oferta queda sin postulaciones
+        actorAutenticado(5L);
+
+        assertEquals(RETIRADA, service.retirarOferta(1L).getEstado());
+    }
+
+    @Test
+    void retirar_quienNoLaPublico_403_aunqueSeaGestionOAdministrador() {
+        for (OfertaGeneralEntity.EstadoOferta estado : new OfertaGeneralEntity.EstadoOferta[]{PENDIENTE_APROBACION, ABIERTA}) {
+            OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), estado);
+            when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+            actorAutenticado(9L); // el administrador por defecto de esta clase
+
+            org.springframework.security.access.AccessDeniedException ex = assertThrows(
+                    org.springframework.security.access.AccessDeniedException.class, () -> service.retirarOferta(1L), estado.name());
+            assertEquals("Solo quien publicó la oferta puede retirarla", ex.getMessage(), estado.name());
+            assertEquals(estado, o.getEstado(), estado.name());
+        }
+        verify(ofertaGeneralRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService);
+    }
+
+    /** El 409 de una oferta que ya no admite retiro: no cambia de estado, no se guarda y no deja evento. */
+    private void comprobarQueNoSePuedeRetirar(OfertaGeneralEntity.EstadoOferta estado, boolean conElegido, String mensaje) {
+        OfertaGeneralEntity o = oferta(1L, funcionario(5L), turno(1L), estado);
+        if (conElegido) o.getPostulaciones().add(postulacion(10L, 2L, true));
+        when(ofertaGeneralRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(o));
+        actorAutenticado(5L);
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class, () -> service.retirarOferta(1L), estado.name());
+        assertEquals(409, ex.getStatusCode().value(), estado.name());
+        assertEquals(mensaje, ex.getReason(), estado.name());
+        assertEquals(estado, o.getEstado(), estado.name());
+        verify(ofertaGeneralRepository, never()).save(any());
+        verifyNoInteractions(bitacoraService);
+    }
+
+    @Test
+    void retirar_unaOfertaCerradaConSuElegido_409_nuncaSePuedeSiYaSeAsigno() {
+        // CERRADA: la gestión ya eligió, el turno se asignó. Gana el aviso del estado, no el de las postulaciones.
+        comprobarQueNoSePuedeRetirar(CERRADA, true, "La oferta ya está cerrada y su turno quedó asignado: no se puede retirar");
+    }
+
+    @Test
+    void retirar_unaOfertaRechazada_409() {
+        comprobarQueNoSePuedeRetirar(RECHAZADA, false, "La oferta ya está rechazada: no se puede retirar");
+    }
+
+    @Test
+    void retirar_unaOfertaYaRetirada_409() {
+        comprobarQueNoSePuedeRetirar(RETIRADA, false, "La oferta ya está retirada: no se puede retirar");
     }
 
     @Test

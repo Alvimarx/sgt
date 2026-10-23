@@ -163,7 +163,8 @@ export const sinNombre = (texto) => String(texto ?? '').replace(/(asignar el tur
  * siguen en la base como RECHAZADAS, y las ofertas generales retiradas por su
  * ofertor, como RETIRADAS (C-16, 17 oct; antes quedaban pendientes de apertura
  * porque no había cómo retirarlas). La red de seguridad también retira las
- * ofertas de la prueba que sigan pendientes de apertura.
+ * ofertas de la prueba que sigan pendientes de apertura o abiertas sin
+ * postulaciones (desde el 20 oct el ofertor las retira hasta que alguien postule).
  *
  * Fase 4 (flujos con aprobación): `muta` también decide, responde, abre y
  * rechaza ofertas, postula, selecciona, asigna a mano y crea notificaciones. Lo
@@ -172,8 +173,8 @@ export const sinNombre = (texto) => String(texto ?? '').replace(/(asignar el tur
  * liberar a mano un turno rechaza las solicitudes pendientes que lo tengan (desde
  * el 17 oct, «Rechazo automático: El turno fue … manualmente»), así que devolverTurnos
  * las cierra: si una prueba quiere cancelarlas, tiene que hacerlo antes. La red de
- * seguridad además retira las ofertas que sigan pendientes de apertura,
- * devuelve los turnos anotados que no volvieron y elimina las notificaciones de
+ * seguridad además retira las ofertas que sigan pendientes de apertura o abiertas
+ * sin postulaciones, devuelve los turnos anotados que no volvieron y elimina las notificaciones de
  * muta.notificar que queden; si tuvo que hacerlo y la prueba pasó, la hace fallar.
  * Quedan los eventos de bitácora y las notificaciones del sistema que crea cada
  * asignación directa.
@@ -329,7 +330,7 @@ export const testMuta = test.extend({
       /** Respuesta del receptor a una propuesta (intercambio u oferta particular, según el tipo de `sol`). */
       responder: (quien, sol, acepta) => muta.api(quien, 'PUT',
         `/solicitudes/${sol.idSolicitud}/${sol.tipoSolicitud?.tipo === 4 ? 'intercambio' : 'oferta-particular'}?respuesta=${acepta}`),
-      /** POST /ofertas-generales: exige que se cree. La limpieza la retira (la ofertora) si sigue pendiente de apertura. */
+      /** POST /ofertas-generales: exige que se cree. La limpieza la retira (la ofertora) si sigue pendiente de apertura o abierta sin postulaciones. */
       async ofertar(quien, idTurno, motivo) {
         const r = await llamar(quien, 'POST', '/ofertas-generales', { data: { idTurno, motivo } });
         expect(r.status, `${quien} publica la oferta general del turno ${idTurno}`).toBe(200);
@@ -339,7 +340,10 @@ export const testMuta = test.extend({
       /** PUT /ofertas-generales/{id}/aprobar|rechazar con el JWT de `quien` (gestión). */
       abrirOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/aprobar`),
       rechazarOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/rechazar`),
-      /** PUT /ofertas-generales/{id}/retirar con el JWT del ofertor: la oferta pendiente de apertura queda RETIRADA (C-16, 17 oct). */
+      /**
+       * PUT /ofertas-generales/{id}/retirar con el JWT del ofertor: la oferta pendiente de apertura, o abierta y sin
+       * postulaciones, queda RETIRADA (C-16, 17 oct; hasta que alguien postule, 20 oct). Con una postulación responde 409.
+       */
       retirarOferta: (quien, id) => muta.api(quien, 'PUT', `/ofertas-generales/${id}/retirar`),
       /** POST /ofertas-generales/{id}/postular con el JWT de `quien`. El cuerpo es la postulación. */
       postular: (quien, idOferta) => muta.api(quien, 'POST', `/ofertas-generales/${idOferta}/postular`),
@@ -391,22 +395,29 @@ export const testMuta = test.extend({
         estadoFinal.set(s.idSolicitud, 'RECHAZADA');
       }
     }
-    // Ofertas generales de la prueba que sigan pendientes de apertura: su ofertor las retira (C-16, 17 oct).
+    // Ofertas generales de la prueba que sigan pendientes de apertura, o abiertas y sin postulaciones: su ofertor las
+    // retira (C-16, 17 oct; hasta que alguien postule, 20 oct). Con postulaciones no se puede: hay que cerrarla.
     const estadoOfertas = new Map();
+    const conPostulaciones = new Set();
     if (ofertas.length) {
       const jefatura = await tokenRol(request, 'jefatura');
       const leer = async () => {
         const r = await apiLlamar(request, jefatura, 'GET', `/ofertas-generales/servicio/${SERVICIO.urgencias}`);
-        (Array.isArray(r.cuerpo) ? r.cuerpo : []).filter((o) => ofertas.includes(o.idOfertaGeneral)).forEach((o) => estadoOfertas.set(o.idOfertaGeneral, o.estado));
+        (Array.isArray(r.cuerpo) ? r.cuerpo : []).filter((o) => ofertas.includes(o.idOfertaGeneral)).forEach((o) => {
+          estadoOfertas.set(o.idOfertaGeneral, o.estado);
+          if ((o.postulaciones || []).length) conPostulaciones.add(o.idOfertaGeneral);
+          else conPostulaciones.delete(o.idOfertaGeneral);
+        });
       };
       await leer();
       for (const id of ofertas) {
-        if (estadoOfertas.get(id) === 'PENDIENTE_APROBACION') {
+        const estado = estadoOfertas.get(id);
+        if (estado === 'PENDIENTE_APROBACION' || (estado === 'ABIERTA' && !conPostulaciones.has(id))) {
           const r = await apiLlamar(request, tokensOferta.get(id), 'PUT', `/ofertas-generales/${id}/retirar`);
           escrituras.push(`limpieza PUT /api/v2/ofertas-generales/${id}/retirar → ${r.status}`);
-          sinDeshacer.push(`oferta ${id} pendiente de apertura (la retiró su ofertor)`);
-        } else if (estadoOfertas.get(id) === 'ABIERTA') {
-          sinDeshacer.push(`oferta ${id} ABIERTA (sigue abierta: hay que elegir a un postulante para cerrarla)`);
+          sinDeshacer.push(`oferta ${id} ${estado === 'ABIERTA' ? 'abierta sin postulaciones' : 'pendiente de apertura'} (la retiró su ofertor)`);
+        } else if (estado === 'ABIERTA') {
+          sinDeshacer.push(`oferta ${id} ABIERTA con postulaciones (sigue abierta: hay que elegir a un postulante para cerrarla)`);
         }
       }
       await leer();
@@ -1031,7 +1042,7 @@ export async function confirmarCancelacion(page, dialogo) {
 
 /**
  * Abre la confirmación de «Retirar oferta» (C-16, 17 oct) de una oferta general propia, leída con leerSolicitud en
- * «Ofertas generales» y pendiente de apertura. Devuelve el diálogo y su texto.
+ * «Ofertas generales», pendiente de apertura o abierta y sin postulaciones (20 oct). Devuelve el diálogo y su texto.
  */
 export async function abrirRetiroOferta(page, testInfo, oferta) {
   await oferta.zona.getByRole('button', { name: 'Retirar oferta' }).click();

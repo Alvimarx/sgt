@@ -70,7 +70,7 @@ export const ofertaVigente = (oferta, hoy) =>
 /**
  * Etiqueta y tono del badge del estado de una oferta general, los mismos en
  * Solicitudes y en el Centro de operaciones. RETIRADA: la retiró quien la
- * publicó, antes de que se abriera (C-16).
+ * publicó, antes de que alguien postulara (C-16).
  */
 export const ESTADO_OFERTA = {
   PENDIENTE_APROBACION: { etiqueta: 'Pend. apertura', tono: 'warn' },
@@ -81,11 +81,17 @@ export const ESTADO_OFERTA = {
 };
 
 /**
- * ¿`userId` puede retirar la oferta? Solo quien la publicó y solo mientras
- * espera apertura: PUT /ofertas-generales/{id}/retirar (C-16, 17 oct 2026).
+ * ¿`userId` puede retirar la oferta? Solo quien la publicó, mientras esté
+ * pendiente de apertura o abierta y no tenga ninguna postulación: PUT
+ * /ofertas-generales/{id}/retirar (C-16, 17 oct 2026; el 20 oct pasó de
+ * «mientras nadie la abra» a «hasta que alguien postule»). Con una postulación,
+ * o cerrada, rechazada o ya retirada, no se ofrece. El backend revisa lo mismo
+ * y responde 409.
  */
 export const puedeRetirarOferta = (oferta, userId) =>
-  oferta?.estado === 'PENDIENTE_APROBACION' && mismoId(oferta?.ofertor?.idFuncionario, userId);
+  (oferta?.estado === 'PENDIENTE_APROBACION' || oferta?.estado === 'ABIERTA')
+  && (oferta?.postulaciones || []).length === 0
+  && mismoId(oferta?.ofertor?.idFuncionario, userId);
 
 /**
  * ¿Se muestra la oferta? (R17 y C-16, el mismo filtro en el Centro y en

@@ -432,7 +432,7 @@ Conteo por módulo y estado (§4.1 del catálogo):
 | C-08 | El médico que exporta sus turnos | Exporta solo sus turnos (lo fuerza el backend) | Hecho (`7a6765e`) |
 | C-10 | Reglas de horario para jefatura y subrogante | Solo el administrador; se cierra el backend | Hecho (`7dedd02`, `676acd2`). Manual: §12 |
 | C-05 | Inicio en «Mis turnos» y aviso de cambio aprobado que nunca aparece | Queda «Mis turnos» y se retira el código del aviso | Hecho (`f73c691`). Manual: §12 |
-| C-16 | Ofertas y cupos pasados a la vista; el ofertor no podía retirar su oferta | Mismo filtro de vigencia; el médico ve solo las abiertas; el ofertor retira mientras nadie la abra | Hecho (`39549e5`, `e688fa1`, `3711dce`, `f33982d`, `18e8b28`) |
+| C-16 | Ofertas y cupos pasados a la vista; el ofertor no podía retirar su oferta | Mismo filtro de vigencia; el médico ve solo las abiertas; el ofertor retira mientras nadie la abra. **Ajustada el 20 oct:** el ofertor retira hasta que alguien postule | Hecho (`39549e5`, `e688fa1`, `3711dce`, `f33982d`, `18e8b28`). El ajuste del 20 oct también: la oferta se retira pendiente o abierta y sin postulaciones (409 si tiene una); sin migración, `RETIRADA` ya existía |
 | C-14 | Auditoría de asistencia sin quién asignó | Se corrige el manual | Manual: §12. La pantalla no cambió |
 | C-21 | Exportar la nómina del servicio: existía en el backend, sin pantalla | Se agrega el botón en Personal del servicio | Hecho (`c3166a6`) |
 | C-22 | «Eliminar turnos generados»: la pantalla promete algo que el backend no cumple | Se corrige el texto; limitar el borrado queda para TIC | Texto corregido (`9224f80`). Limitar el borrado: **pendiente de TIC** |

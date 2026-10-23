@@ -52,7 +52,10 @@ public class OfertaGeneralEntity {
         ABIERTA,
         CERRADA,
         RECHAZADA,
-        /** C-16: su ofertor la retiró antes de que alguien la abriera. */
+        /**
+         * C-16: su ofertor la retiró mientras nadie había postulado, pendiente de apertura o ya
+         * abierta (la decisión del 20 oct reemplazó a la del 17 oct, «mientras nadie la abra»).
+         */
         RETIRADA;
 
         /**
@@ -61,6 +64,15 @@ public class OfertaGeneralEntity {
          */
         public boolean soloLaVeSuOfertor() {
             return this == RECHAZADA || this == RETIRADA;
+        }
+
+        /**
+         * C-16 (20 oct): ¿su ofertor todavía puede retirarla en este estado? Pendiente de apertura
+         * o abierta; cerrada (el turno ya se asignó), rechazada y retirada, nunca. Además la oferta
+         * no debe tener ninguna postulación: eso lo revisa {@code OfertaGeneralService.retirarOferta}.
+         */
+        public boolean admiteRetiro() {
+            return this == PENDIENTE_APROBACION || this == ABIERTA;
         }
     }
 }

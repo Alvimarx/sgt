@@ -2,7 +2,8 @@
 // catálogo docs/qa/HISTORIAS_DE_USUARIO.md (§6.2): flujos de dos o tres usuarios,
 // en móvil y en desktop.
 //  - HU-OFE-01, criterio 2, con la apertura real (la fase 3 lo probó con una
-//    respuesta simulada).
+//    respuesta simulada). Criterios 3 y 4: el ofertor retira su oferta abierta
+//    hasta que alguien postule (decisión del 20 oct sobre C-16).
 //  - HU-OFE-02 (abrir o rechazar), criterio 1. El 2 y el 3 son de la fase 2a
 //    (permisos.spec.js).
 //  - HU-OFE-03 (postular y retirar): criterios 1 a 3.
@@ -15,12 +16,14 @@
 // salvo la que se rechaza, termina CERRADA: si quedó abierta, el 368 postula y la
 // jefatura lo elige (cerrarOferta), y el turno vuelve a su dueño con la asignación
 // directa. Así el turno sirve otra vez en la corrida siguiente. Las ofertas no se
-// borran: quedan CERRADAS o RECHAZADAS («no se deshace»).
+// borran: quedan CERRADAS, RECHAZADAS o RETIRADAS («no se deshace»); las que
+// retira su ofertor (criterios 3 y 4 de HU-OFE-01) no mueven ningún turno.
 import {
   test, testMuta, expect, ID, APOYO, esDesktop, soloPorApi, hhmm,
   entrar, abrirSolicitudes, elegirPestana, leerSolicitud, esperarSolicitudes, fechaCL, idDe,
   motivoF4, duenoDe, fotoDelDia, ofertasDeUrgencias, casoR13PorAsignacion, pulsarYEsperar, RUTA_OFERTA,
   abrirSeleccion, avisoSolicitudes, comprobarMensajeR13, itemMenu, esperarQuieta,
+  abrirRetiroOferta, confirmarRetiroOferta,
   sinNombre,
 } from '../helpers/hu.js';
 import { choquesR13, nombreSolicitud } from '../helpers/datos.js';
@@ -91,6 +94,46 @@ testMuta('HU-OFE-01 · criterio 2: abierta por la jefatura, en mi oferta no veo 
   await expect(vista.zona.getByText(OFERTA_ABIERTA_TEXTO)).toHaveText('Tu oferta está abierta · 1 postulante');
 
   await cerrarOferta(request, muta, caso);
+});
+
+testMuta('HU-OFE-01 · criterio 3: abierta y sin postulantes, el ofertor la retira: queda RETIRADA y el turno sigue siendo suyo', async ({ page, request, muta }, testInfo) => {
+  // Decisión del 20 oct (sobre C-16): se retira hasta que alguien postule, no solo mientras espera apertura.
+  const caso = await ofertaAbierta(request, muta, 'HU-OFE-01 · criterio 3');
+  const vista = await verOferta(page, testInfo, 'tercerMedico', caso.motivo);
+  expect(vista.estado).toBe('Abierta');
+  expect(vista.botones, 'nadie ha postulado: el ofertor puede retirarla').toContain('Retirar oferta');
+  const { dialogo, texto } = await abrirRetiroOferta(page, testInfo, vista);
+  expect(texto).toContain('Se retirará tu oferta general: dejará de estar abierta, nadie podrá postular y el turno sigue siendo tuyo.');
+  const r = await confirmarRetiroOferta(page, dialogo);
+  expect(r.status(), 'PUT /retirar').toBe(200);
+  await esperarSolicitudes(page);
+
+  expect((await ofertasDeUrgencias(request)).get(caso.oferta.idOfertaGeneral)?.estado, 'la oferta queda RETIRADA').toBe('RETIRADA');
+  expect(await duenoDe(request, caso.turno.id), 'el turno sigue siendo del ofertor').toBe(idDe('tercerMedico'));
+});
+
+testMuta('HU-OFE-01 · criterio 4: con una postulación el ofertor ya no puede retirarla (409); si quien postuló se retira, vuelve a poder', async ({ page, request, muta }, testInfo) => {
+  const caso = await ofertaAbierta(request, muta, 'HU-OFE-01 · criterio 4');
+  const id = caso.oferta.idOfertaGeneral;
+  const postulacion = await muta.postular('segundoMedico', id);
+  expect(postulacion.status, 'postula el 368').toBe(200);
+
+  // Con una postulación: la pantalla no ofrece «Retirar oferta» y el backend lo niega, sin tocar la oferta.
+  let vista = await verOferta(page, testInfo, 'tercerMedico', caso.motivo);
+  await expect(vista.zona.getByText(OFERTA_ABIERTA_TEXTO)).toHaveText('Tu oferta está abierta · 1 postulante');
+  expect(vista.botones, 'con una postulación no puede retirarla').not.toContain('Retirar oferta');
+  const negada = await muta.retirarOferta('tercerMedico', id);
+  expect([negada.status, negada.cuerpo?.error], 'el ofertor por API').toEqual([409, 'La oferta ya tiene postulaciones: no se puede retirar']);
+  expect((await ofertasDeUrgencias(request)).get(id).estado, 'sigue abierta').toBe('ABIERTA');
+
+  // Si la única postulación se retira, la oferta queda sin postulaciones y vuelve a poder retirarse.
+  expect((await muta.retirarPostulacion('segundoMedico', id, postulacion.cuerpo.idPostulacion)).status, 'el 368 se retira').toBe(204);
+  vista = await verOferta(page, testInfo, 'tercerMedico', caso.motivo);
+  expect(vista.botones, 'sin postulaciones puede retirarla otra vez').toContain('Retirar oferta');
+
+  // Deshacer: la retira su ofertor.
+  expect((await muta.retirarOferta('tercerMedico', id)).status, 'deshacer: la retira su ofertor').toBe(200);
+  expect((await ofertasDeUrgencias(request)).get(id).estado, 'queda RETIRADA').toBe('RETIRADA');
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

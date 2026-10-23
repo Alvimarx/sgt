@@ -106,8 +106,9 @@ function btnStyle(tone) {
 const NOTA_PARTICIPAS = 'Participas en esta solicitud: por segregación de funciones, la decisión corresponde a otra jefatura.';
 // Lo mismo en una oferta general que la gestión publicó o a la que postuló.
 const NOTA_PARTICIPAS_OFERTA = 'Participas en esta oferta: por segregación de funciones, la decisión corresponde a otra jefatura.';
-// Confirmación de «Retirar oferta» (C-16), la misma en móvil y desktop.
-const TEXTO_RETIRAR_OFERTA = 'Se retirará tu oferta general: ya no esperará apertura, nadie podrá postular y el turno sigue siendo tuyo.';
+// Confirmación de «Retirar oferta» (C-16), la misma en móvil y desktop. Dice qué deja de pasar
+// con la oferta según esté pendiente de apertura o ya abierta (se retira hasta que alguien postule).
+const textoRetirarOferta = (oferta) => `Se retirará tu oferta general: ${oferta?.estado === 'ABIERTA' ? 'dejará de estar abierta' : 'ya no esperará apertura'}, nadie podrá postular y el turno sigue siendo tuyo.`;
 
 // Estado de una solicitud para quien la mira: badge y qué puede hacer con ella.
 function evaluarSolicitud(solicitud, { canDecide, esMiReceptor, esMiSolicitud, puedeEditarMotivo, puedeCancelar, userId }) {
@@ -228,7 +229,8 @@ function evaluarOferta(oferta, userId, canDecide) {
     bloqueadaPorParticipar: participa && (estado === 'PENDIENTE_APROBACION' || estado === 'ABIERTA'),
     puedePostularORetirar: !canDecide && !esOfertor && estado === 'ABIERTA',
     esMiOfertaAbierta: !canDecide && esOfertor && estado === 'ABIERTA',
-    // C-16: quien la publicó la retira mientras espera apertura, sea cual sea su rol.
+    // C-16: quien la publicó la retira hasta que alguien postule (pendiente o abierta, sin
+    // postulaciones), sea cual sea su rol.
     puedeRetirar: puedeRetirarOferta(oferta, userId),
   };
 }
@@ -521,7 +523,7 @@ const OfertaGeneralCard = ({ oferta, userId, canDecide, onAprobar, onRechazar, o
         </div>
       )}
 
-      {/* Quien la publicó: retirarla mientras espera apertura (C-16) */}
+      {/* Quien la publicó: retirarla hasta que alguien postule (C-16) */}
       {puedeRetirar && onRetirarOferta && (
         <button onClick={() => onRetirarOferta(oferta)} style={{ ...btnStyle('danger'), marginTop: 12, width: '100%' }}>
           <SGTIcon name="close" size={13} color="#fff" /> Retirar oferta
@@ -1256,8 +1258,8 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
   const handleSeleccionar = (idOferta, idPostulacion) => ejecutar(
     () => ofertasGeneralesService.seleccionar(idOferta, idPostulacion, user.id), 'Error al seleccionar postulante.');
 
-  // C-16: retirar la oferta propia que espera apertura. Queda RETIRADA y la
-  // lista la oculta, como a las rechazadas (ofertaVisible).
+  // C-16: retirar la oferta propia, pendiente de apertura o abierta y sin postulaciones.
+  // Queda RETIRADA y la lista la oculta, como a las rechazadas (ofertaVisible).
   const confirmarRetiroOferta = () => {
     const oferta = ofertaPorRetirar;
     setOfertaPorRetirar(null);
@@ -1612,7 +1614,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
             onCancelar={() => setOfertaPorRetirar(null)}
             onConfirmar={confirmarRetiroOferta}
           >
-            {TEXTO_RETIRAR_OFERTA}
+            {textoRetirarOferta(ofertaPorRetirar)}
             {ofertaPorRetirar.turno && (
               <div className="sgt-dt-motivo" style={{ marginTop: 10 }}>
                 <div className="sgt-d-seccion-titulo" style={{ margin: '0 0 2px' }}>Turno</div>
@@ -1806,7 +1808,7 @@ const SolicitudesView = ({ onBack, initialCreatePreset = null, onInitialCreatePr
       <Sheet open={!!ofertaPorRetirar} onClose={() => setOfertaPorRetirar(null)} title="Retirar oferta">
         <div style={{ padding: '8px 16px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <p style={{ fontSize: 14, color: PA.ink, fontWeight: 600, lineHeight: 1.5, margin: 0 }}>
-            {TEXTO_RETIRAR_OFERTA}
+            {textoRetirarOferta(ofertaPorRetirar)}
           </p>
           {ofertaPorRetirar?.turno && (
             <div style={{ background: PA.surface2, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: PA.ink2, fontWeight: 600 }}>

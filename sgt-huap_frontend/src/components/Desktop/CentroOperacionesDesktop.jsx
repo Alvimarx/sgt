@@ -325,7 +325,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
       recargar();
     } catch (e) { toast(mensajeDeError(e, 'No se pudo seleccionar al postulante.')); }
   });
-  // C-16: quien publicó la oferta la retira mientras espera apertura, como en Solicitudes.
+  // C-16: quien publicó la oferta la retira hasta que alguien postule, como en Solicitudes.
   const ofRetirar = (idOferta) => mutar(async () => {
     setConfirm(null);
     try { await ofertasGeneralesService.retirar(idOferta); toast('Oferta retirada.'); recargar(); }
@@ -610,8 +610,9 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
           }),
           onAprobar: () => ofAprobar(o.idOfertaGeneral),
           onRechazar: () => ofRechazar(o.idOfertaGeneral),
-          // Retirar la oferta propia que espera apertura (C-16), con la
-          // confirmación en la misma tarjeta, como la selección.
+          // Retirar la oferta propia, pendiente de apertura o abierta y sin
+          // postulaciones (C-16), con la confirmación en la misma tarjeta,
+          // como la selección.
           canRetirar: puedeRetirarOferta(o, myUserId),
           retirando: confirm?.t === 'retirar' && confirm.id === o.idOfertaGeneral,
           onRetirar: () => setConfirm({ t: 'retirar', id: o.idOfertaGeneral }),
