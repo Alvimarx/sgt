@@ -128,6 +128,45 @@ services:
       driver: "json-file"
       options: { max-size: "10m", max-file: "3" }
 
+  # SOLO DEMO: simulador del padron del HUAP (agrega y saca personal de innhosp).
+  # No arranca solo: docker compose -f docker-compose.hetzner.yml --env-file .env.hetzner --profile demo up -d padron
+  # Antes: bash scripts/crear_usuario_padron_demo.sh vm   y las variables PADRON_* en .env.hetzner.
+  # Si falta alguna variable PADRON_* obligatoria, el servicio NO arranca (ver simulador-padron/README.md).
+  padron:
+    profiles: ["demo"]
+    build:
+      context: ./simulador-padron
+      dockerfile: Dockerfile
+    image: sgt-padron:latest
+    container_name: sgt-padron
+    restart: "no"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=48
+      - PADRON_HOST=0.0.0.0
+      - PADRON_PORT=8091
+      - PADRON_DB_HOST=mysql
+      - PADRON_DB_NAME=innhosp
+      - PADRON_DB_USER=${PADRON_DB_USER:-padron_demo}
+      - PADRON_DB_PASSWORD=${PADRON_DB_PASSWORD:-}
+      - PADRON_ADMIN_USER=${PADRON_ADMIN_USER:-}
+      - PADRON_ADMIN_PASSWORD=${PADRON_ADMIN_PASSWORD:-}
+    ports:
+      # Solo la maquina anfitriona. PADRON_BIND=0.0.0.0 lo abre a la red (no conviene: es HTTP).
+      - "${PADRON_BIND:-127.0.0.1}:${PADRON_PUBLIC_PORT:-8091}:8091"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - sgt-network
+    mem_limit: 96m
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
 networks:
   sgt-network:
     driver: bridge
