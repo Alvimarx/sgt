@@ -147,8 +147,8 @@ Publicarlo con `PADRON_BIND=0.0.0.0` no conviene: es HTTP con autenticación bá
   No abrir el 3306 a internet.
 - **Usuarios de base con privilegio mínimo:** la app usa uno con lectura y escritura solo
   en `gestionturnos` y otro con `SELECT` solo sobre `innhosp.viewPersonal`; nunca root.
-- **Claves del personal:** el backend acepta BCrypt y, para hashes sin prefijo, SHA-512
-  sin sal. Por eso los datos de demostración, sembrados con `SHA2(..., 512)`, permiten
+- **Claves del personal:** el backend solo acepta SHA-512 sin sal (hex de 128 caracteres o
+  binario de 64 bytes); un hash BCrypt se rechaza (comprobado el 23 oct). Por eso los datos de demostración, sembrados con `SHA2(..., 512)`, permiten
   iniciar sesión.
 - **Un solo backend:** el bloqueo de login por intentos fallidos vive en la memoria del
   proceso. Con varias instancias no se comparte.
