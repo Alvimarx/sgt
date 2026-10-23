@@ -496,6 +496,7 @@ Lo que se ve desde el clon del autor (22 oct). Ojo con los nombres de remotos: e
 | Calendario y cupos que el médico no puede tomar (R18-11) | Mostrar en el calendario qué cupos libres no puede tomar el médico y por qué (R9, R13), en móvil y desktop, en vez de que el backend rechace la solicitud | Decidido: queda para después de la entrega |
 | «Eliminar turnos generados» (C-22) | Borra por las rotativas del molde dentro del rango, también turnos de otros moldes y manuales, y no anula la vigencia. La pantalla ya lo dice | Limitar el borrado a los turnos sin vigencia queda para TIC |
 | Jefaturas por servicio (C-07) | El administrador puede dejar más de una jefatura por servicio sin aviso | Cuántas admite un servicio lo decide TIC |
+| Editar o inactivar funcionarios | No hay pantalla para editar los datos de un funcionario ni para inactivarlo. En las pruebas integrales, A1-12, la parte de MX de A3-07 y E1-14 quedan como no aplicables | Abierto |
 | Componentes de confirmación duplicados | `ConfirmacionDesktop` (`Desktop/turnos/ConfirmacionDesktop.jsx`) y `ConfirmacionPlan` (`Desktop/planificacion/piezas.jsx`) | Abierto: unificar |
 | Bundle del frontend | El bundle principal pesa unos 980 kB (263 kB gzip; 965 kB el 16 oct). Aviso de Vite por un chunk sobre 500 kB | Abierto: dividir el código |
 | Pruebas de integración | Fallan 26: todas las de las 8 clases que heredan de `AbstractContainerTest` (RR-010) | Abierto, sin diagnosticar (§7.1) |
