@@ -76,6 +76,7 @@ Ramas en GitHub: `main` (la entrega), `desktop-todas-las-pantallas` (donde se hi
 | `BaseDatosMySQL/despliegue/` | SQL para una base nueva (esquema, bootstrap) y los datos de demostración de la VM |
 | `BaseDatosMySQL/migraciones/` | `V2__planificacion_vigencia.sql` (no idempotente) y `V3__oferta_retirada.sql` (idempotente; estado `RETIRADA` de las ofertas, C-16) |
 | `scripts/` | `generar_turnos_demo.sh` (local y VM), `generar_rotativa_urgencias.sh` (VM), `desplegar_frontend_hetzner.sh` y `desplegar_backend_hetzner.sh` con sus piezas comunes `_hetzner_comun.sh`, y `init_db.sh`, `mysql.sh`, `backup_mysql.sh` y `diagnostico_login.sh`, que leen `.env.hetzner` y el compose de la VM |
+| `simulador-padron/` | Herramienta **solo de demostración**: página que agrega y saca personas de `innhosp.personalAux` en la copia ficticia de la VM y la pila local, para mostrar que al hospital entran y salen personas. En el hospital el padrón lo mantiene quien administra `innhosp`; no se despliega en producción. Perfil `demo` de los compose; ver su `README.md` |
 | `docker-compose.local.yml` | Ambiente local autocontenido: MySQL con las dos bases, backend y, opcional, frontend |
 | `docker-compose.hetzner.yml` | VM de demostración: MySQL interno, 1 backend y 1 frontend |
 | `docker-compose.dev.yml` | DEV del equipo anterior: backend y frontend contra las dos bases reales de la red del hospital |

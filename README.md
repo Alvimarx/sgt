@@ -125,6 +125,7 @@ Son históricos y se conservan como trazabilidad: `docs/qa/` (auditoría QA de j
 | `scripts/_hetzner_comun.sh` | Piezas comunes de los dos scripts de despliegue; no se ejecuta solo | |
 | `scripts/init_db.sh` | Inicializa las dos bases en el contenedor MySQL de la VM: esquema, V2, V3, bootstrap, `innhosp` y, con `SEED_DEMO=1`, el poblado de demostración. Se puede volver a correr | VM |
 | `scripts/mysql.sh` | Consola y carga de SQL con el charset correcto (no usar `mysql` a mano) | VM |
+| `scripts/crear_usuario_padron_demo.sh` | Crea el usuario MySQL del simulador del padrón (solo demo): `SELECT`/`INSERT` y `UPDATE` de `estado` y `clave` solo sobre `innhosp.personalAux`. Toma la clave de `PADRON_DB_PASSWORD`; `vm` o `local` como argumento. Ver `simulador-padron/README.md` | VM y local |
 | `scripts/backup_mysql.sh` | Respaldo comprimido de las dos bases, con rotación por días | VM |
 | `scripts/diagnostico_login.sh` | Diagnostica por qué un RUT puede o no iniciar sesión | VM |
 

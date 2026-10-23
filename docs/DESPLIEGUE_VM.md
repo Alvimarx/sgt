@@ -107,6 +107,27 @@ En la VM, salvo que se diga otra cosa:
 | Diagnóstico de un login | en la VM: `bash scripts/diagnostico_login.sh <rut>` |
 | Apagar | en la VM: `docker compose -f docker-compose.hetzner.yml --env-file .env.hetzner down`. Los datos quedan en el volumen `mysql_data` |
 
+## Simulador del padrón (solo demostración)
+
+`simulador-padron/` es una página aparte que agrega y saca personas de `innhosp.personalAux`
+para mostrar que «al hospital entran y salen personas» (el SGT sigue leyendo `innhosp` en solo
+lectura). Va en el perfil `demo` de `docker-compose.hetzner.yml` (servicio `padron`, límite
+de 96 MB) y no arranca solo. Escucha únicamente en el `127.0.0.1` de la VM: se entra con un
+túnel ssh. Detalle y guion: `simulador-padron/README.md`.
+
+```bash
+cd /opt/sgt
+{ echo "PADRON_DB_PASSWORD=$(openssl rand -hex 16)"; echo "PADRON_ADMIN_USER=operador"; echo "PADRON_ADMIN_PASSWORD=$(openssl rand -hex 12)"; } >> .env.hetzner
+bash scripts/crear_usuario_padron_demo.sh vm      # usuario MySQL con permisos solo sobre personalAux
+docker compose -f docker-compose.hetzner.yml --env-file .env.hetzner --profile demo up -d --build padron
+# desde el computador de la demostración:
+ssh -L 8091:127.0.0.1:8091 efeso                  # y abrir http://localhost:8091
+```
+
+Sin `PADRON_ADMIN_USER`, `PADRON_ADMIN_PASSWORD` o `PADRON_DB_PASSWORD` el servicio no arranca.
+Publicarlo con `PADRON_BIND=0.0.0.0` no conviene: es HTTP con autenticación básica. Apagarlo:
+`docker compose -f docker-compose.hetzner.yml --env-file .env.hetzner --profile demo rm -sf padron`.
+
 ## Trampas conocidas
 
 - **Charset en comandos manuales.** Dentro del contenedor, el cliente `mysql` sin flags
