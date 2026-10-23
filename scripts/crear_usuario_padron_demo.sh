@@ -30,7 +30,9 @@ case "$MODO" in
 esac
 
 # Lee una variable de un archivo de entorno SIN ejecutarlo (en .env.local hay URLs con &).
-leer_env() { [ -f "$ARCHIVO_ENV" ] && grep -m1 "^$1=" "$ARCHIVO_ENV" | cut -d= -f2- || true; }
+# Toma la ÚLTIMA aparición, igual que docker compose con --env-file: si una variable quedó repetida,
+# el usuario de MySQL y el contenedor usan la misma clave.
+leer_env() { [ -f "$ARCHIVO_ENV" ] && grep "^$1=" "$ARCHIVO_ENV" | tail -n1 | cut -d= -f2- || true; }
 
 USUARIO="${PADRON_DB_USER:-$(leer_env PADRON_DB_USER)}"
 USUARIO="${USUARIO:-padron_demo}"
