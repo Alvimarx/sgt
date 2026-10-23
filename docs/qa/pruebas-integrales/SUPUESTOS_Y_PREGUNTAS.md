@@ -276,4 +276,5 @@ Palabras de Álvaro: «no deberían estar vigentes las solicitudes ocurridas en 
 
 | Supuesto | Respuesta | Efecto en las pruebas |
 |---|---|---|
+| Asignación manual en un turno ya terminado (S-09) | Sí, la jefatura, el subrogante y el administrador corrigen quién hizo un turno pasado | A1-10 y A2-03 cambian: se permite y queda `CORRECCION_TURNO_PASADO`. El choque de horario sigue bloqueando, R13 solo avisa, el médico común no puede |
 | Aprobar cuando el turno ya empezó (S-10) | Las solicitudes y ofertas pendientes sobre un turno que empezó dejan de estar vigentes y se cierran solas | B2-05 cambia: 409 al intentar aprobar y la solicitud aparece «Vencida». B1-08, C1-09 y C8-10 suman el vencimiento. El seed trae solicitudes y ofertas pendientes de mayo: vencen en la primera lectura, así que ya no sirven de dato de partida «pendiente» |

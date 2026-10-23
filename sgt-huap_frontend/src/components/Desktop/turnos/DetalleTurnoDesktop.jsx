@@ -62,6 +62,15 @@ const Vacante = ({ v, puedeGestionar }) => {
       </div>
     );
   }
+  if (v.yaEmpezada) {
+    // 23 oct: sobre un turno que ya empezó no se pide nada.
+    return (
+      <div className="sgt-dt-equipo-fila__libre sgt-dt-equipo-fila__libre--hecho">
+        <span className="sgt-dt-libre__mas" aria-hidden="true"><SGTIcon name="plus" size={11} strokeWidth={2.6} /></span>
+        <span className="sgt-dt-equipo-fila__libre-texto">Este turno ya empezó</span>
+      </div>
+    );
+  }
   return (
     <div className="sgt-dt-equipo-fila__libre">
       <span className="sgt-dt-libre__mas" aria-hidden="true"><SGTIcon name="plus" size={11} strokeWidth={2.6} /></span>

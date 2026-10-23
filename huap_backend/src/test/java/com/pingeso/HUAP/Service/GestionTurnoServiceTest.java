@@ -59,9 +59,17 @@ class GestionTurnoServiceTest {
     private final SeguridadServicio seguridadServicio = mock(SeguridadServicio.class);
     private final SolicitudService solicitudService = mock(SolicitudService.class);
 
+    /** Antes del lunes 8 jun 2026: los turnos de estas pruebas siguen sin terminar (no son turnos pasados, 23 oct). */
+    private static final LocalDateTime AHORA = LocalDateTime.of(2026, 6, 1, 9, 0);
+
     private final GestionTurnoService service = new GestionTurnoService(
             turnoRepository, funcionarioRepository, turnoService, bitacoraService, notificacionService,
-            serviciosFuncionarioRepository, seguridadServicio, new ValidadorAsignacionTurnoService(), solicitudService);
+            serviciosFuncionarioRepository, seguridadServicio, new ValidadorAsignacionTurnoService(), solicitudService) {
+        @Override
+        LocalDateTime ahora() {
+            return AHORA;
+        }
+    };
 
     {
         when(seguridadServicio.idUsuarioActual()).thenReturn(JEFATURA);

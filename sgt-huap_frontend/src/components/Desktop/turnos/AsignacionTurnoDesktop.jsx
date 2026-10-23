@@ -32,7 +32,7 @@ const AsignacionTurnoDesktop = ({
   cargando, guardando, error,
   resultados, seleccionadoId, onSeleccionar,
   motivo, onMotivo, maxMotivo = 180,
-  puedeQuitar, onQuitar,
+  avisoPasado, puedeQuitar, onQuitar,
   textoPrincipal, puedeConfirmar, onConfirmar, onCancelar,
 }) => {
   const fecha = fechaLarga(turno?.fecha);
@@ -79,6 +79,8 @@ const AsignacionTurnoDesktop = ({
           />
         </div>
       </div>
+
+      {avisoPasado && <AvisoDesktop tono="aviso"><span role="note">{avisoPasado}</span></AvisoDesktop>}
 
       {error && <AvisoDesktop tono="alerta"><span role="alert">{error}</span></AvisoDesktop>}
 

@@ -78,6 +78,7 @@ Los demás médicos de Urgencias (los de la lista del servicio salvo los alias d
 
 ## Cambios al plan decididos por el dueño del sistema el 23 oct
 13. **Vencimiento.** Toda solicitud pendiente (de cualquier tipo) y toda oferta general pendiente o abierta cuyo turno ya empezó se cierra sola: RECHAZADA con «Venció: el turno ya comenzó», con un evento de sistema en la bitácora y sin actor. Se cierra con una tarea cada 3 minutos y al leer las listas o antes de resolver. B2-05 espera 409 y «Vencida»; los datos pendientes del seed (turnos de mayo) ya no sirven para probar aprobaciones.
+14. **Turno ya terminado.** La jefatura, el subrogante y el administrador pueden asignar, quitar o cambiar al médico de un turno pasado (corrección de quién lo hizo). Se mantienen el choque de horario y la separación por servicio; R13 avisa y no bloquea; el médico común no puede. La bitácora guarda `CORRECCION_TURNO_PASADO`. Se invierte el resultado esperado de A1-10 y A2-03 (y completa el de A1-09, de la decisión del 20 oct).
 
 ## Resultados por caso
 | Caso | Estado | Observado | Servidor | Regla |

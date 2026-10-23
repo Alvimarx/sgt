@@ -180,10 +180,10 @@ const CalendarView = ({
     const [selectionToast, setSelectionToast] = useState(null);
     const toastTimerRef = useRef(null);
 
-    const showSelectionToast = (message) => {
+    const showSelectionToast = (message, duracion = 2500) => {
         setSelectionToast(message);
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setSelectionToast(null), 2500);
+        toastTimerRef.current = setTimeout(() => setSelectionToast(null), duracion);
     };
 
     useEffect(() => () => {
@@ -314,7 +314,9 @@ const CalendarView = ({
         }
     };
 
-    const handleAssigned = () => {
+    const handleAssigned = (resultado) => {
+        // 23 oct: al corregir un turno pasado, el descanso posterior a una noche (R13) no bloquea, avisa.
+        if (resultado?.advertencia) showSelectionToast(resultado.advertencia, 9000);
         setAssignmentShift(null);
         setDetailShift(null);
         setSelectedDay(null);

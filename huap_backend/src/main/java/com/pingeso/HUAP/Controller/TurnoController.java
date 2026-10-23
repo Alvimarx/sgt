@@ -146,13 +146,15 @@ public class TurnoController {
      */
     @Operation(summary = "Alterar un turno (asignar/reasignar/liberar/cambiar horas)",
             description = "Punto único para mutar un turno asignado, validando reglas y conflictos. "
-                    + "Requiere rol ADMINISTRADOR, JEFATURA o SUBROGANTE.")
+                    + "Requiere rol ADMINISTRADOR, JEFATURA o SUBROGANTE. En un turno que ya terminó, asignar, "
+                    + "quitar o cambiar al médico es la corrección de quién lo hizo (evento CORRECCION_TURNO_PASADO): "
+                    + "el cruce de horario sigue bloqueando y R13 solo avisa (campo 'advertencia').")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Turno alterado"),
             @ApiResponse(responseCode = "400", description = "Operación o datos inválidos"),
             @ApiResponse(responseCode = "403", description = "Sin permisos o turno de otro servicio"),
             @ApiResponse(responseCode = "409", description = "La persona ya tiene un turno que se cruza, "
-                    + "o quedaría con una noche seguida de día (R13)")
+                    + "o quedaría con una noche seguida de día (R13, salvo en un turno ya terminado)")
     })
     @PostMapping("/alterar")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'JEFATURA', 'SUBROGANTE')")

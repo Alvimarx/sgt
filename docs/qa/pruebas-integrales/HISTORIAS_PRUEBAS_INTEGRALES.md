@@ -342,14 +342,14 @@ Fechas de cada equipo dentro de la ventana:
 
 #### A1-09 · Negativo · P2 · Un turno ya empezado
 - **Pre:** cupo libre de un turno que empezó y no ha terminado, en hora de Chile. Solo si ya existe: no se vacía un turno real en curso para crearlo.
-- **Pasos:** 1) JU intenta asignar a un médico que podría tomarlo.
-- **Esperado:** rechazo con aviso (S-09). · RG-25, RG-50
+- **Pasos:** 1) JU asigna a un médico que podría tomarlo.
+- **Esperado (cambió el 20 oct, S-09):** se permite: es el reemplazo de último minuto, y la bitácora registra la asignación manual (`ASIGNACION_MANUAL_TURNO`). R13 sigue bloqueando mientras el turno no termina. Luego se restaura el cupo. · RG-25, RG-50
 - **Evidencia:** TXT; RED; hora del reloj.
 
 #### A1-10 · Negativo · P2 · Un turno ya terminado
 - **Pre:** cupo libre de un turno ya terminado.
-- **Pasos:** 1) JU intenta asignar a un médico.
-- **Esperado:** rechazo con aviso (S-09). Si el sistema lo acepta, es FALLA: se revierte de inmediato y se anota en la bitácora de cambios del plan. · RG-25
+- **Pasos:** 1) JU asigna a un médico. 2) Repetir con un médico que tendría una noche seguida de día (R13). 3) Repetir con uno que ya tiene otro turno a esa hora.
+- **Esperado (cambió el 23 oct, S-09):** paso 1: se permite; es la corrección de quién hizo el turno, y la bitácora guarda `CORRECCION_TURNO_PASADO` con JU como quien lo hizo, el titular anterior («sin titular») y el nuevo. Paso 2: se permite y la pantalla avisa del descanso. Paso 3: rechazo 409 por choque de horario. Si el sistema rechaza los pasos 1 o 2, es FALLA. Se restaura el cupo al terminar. · RG-25
 - **Evidencia:** TXT; RED.
 
 #### A1-11 · Negativo · P1 · Un médico de otro servicio
@@ -414,8 +414,8 @@ Fechas de cada equipo dentro de la ventana:
 
 #### A2-03 · Negativo · P2 · Un turno ya empezado o terminado
 - **Pre:** un turno asignado que ya empezó o terminó.
-- **Pasos:** 1) JU intenta quitar al médico.
-- **Esperado:** rechazo con aviso (S-09). Si el sistema lo permite, es FALLA y se restaura al médico de inmediato. · RG-25, RG-50
+- **Pasos:** 1) JU quita al médico. 2) Con un médico común (MU2), intentar la misma acción en un turno terminado, aunque sea forzando la petición (F).
+- **Esperado (cambió el 20 y el 23 oct, S-09):** paso 1: se permite. En un turno en curso queda `LIBERACION_MANUAL_TURNO`; en uno terminado, `CORRECCION_TURNO_PASADO` con el titular anterior y «sin titular». Paso 2: 403 «Solo la jefatura, el subrogante o el administrador pueden corregir un turno pasado» (o 403 del filtro de seguridad). Se restaura al médico al terminar. · RG-25, RG-50
 - **Evidencia:** TXT; RED.
 
 #### A2-04 · Borde · P2 · Quitar solo la Noche de un 24 corrido

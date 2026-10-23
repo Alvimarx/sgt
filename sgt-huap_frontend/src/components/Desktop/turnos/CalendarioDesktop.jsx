@@ -8,6 +8,7 @@
 import React, { useRef } from 'react';
 import './turnos.css';
 import { SGTIcon } from '../../Style/UIPrimitives';
+import { yaEmpezo } from '../../../utils/reglasTurno';
 import { AvisoDesktop, BotonDesktop, ChipDesktop, EncabezadoDesktop, PaginaDesktop, PanelDesktop } from '../ui';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -228,6 +229,8 @@ const BloqueTurno = ({ grupo, puedeGestionar, onAbrirTurno, onAsignar, onSolicit
                   </BotonDesktop>
                 ) : yaSolicitada ? (
                   <ChipDesktop tono="aviso" mayus>Solicitado</ChipDesktop>
+                ) : yaEmpezo(t) ? (
+                  <ChipDesktop tono="neutral" mayus>Ya empezó</ChipDesktop>
                 ) : (
                   <BotonDesktop variante="secundario" tamano="sm" icono="hand-raised" aria-label={`Solicitar cupo libre: ${puesto}`} onClick={() => onSolicitar(t)}>
                     Solicitar

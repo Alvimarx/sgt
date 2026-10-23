@@ -26,6 +26,7 @@ const TIPO_LABEL = {
   CAMBIO_ESTADO_RECHAZADA:      'Rechazada',
   RECHAZO_AUTOMATICO:           'Rechazo automático',
   SOLICITUD_CANCELADA:          'Cancelada por el solicitante',
+  CORRECCION_TURNO_PASADO:      'Corrección de turno pasado',
   SOLICITUD_VENCIDA:            'Solicitud vencida',
   OFERTA_GENERAL_VENCIDA:       'Oferta vencida',
   OFERTA_ACEPTADA_POR_RECEPTOR: 'Oferta aceptada',
@@ -57,6 +58,8 @@ const TIPO_TONE = {
   ASIGNACION_MANUAL_TURNO:                   'primary',
   REASIGNACION_MANUAL_TURNO:                 'warn',
   LIBERACION_MANUAL_TURNO:                   'accent',
+  // 23 oct: corrección de quién hizo un turno que ya terminó (asignar, quitar o cambiar).
+  CORRECCION_TURNO_PASADO:                   'warn',
   PERMISO:                                   'warn',
   INTERCAMBIO:                               'neutral',
   COBERTURA:                                 'success',
@@ -92,6 +95,7 @@ function accionDesdeEvento(ev) {
     case 'ASIGNACION_MANUAL_TURNO':                   return 'Asignación de turno';
     case 'DESASIGNACION':                             return 'Desasignación de turno';
     case 'LIBERACION_MANUAL_TURNO':                   return 'Liberación de turno';
+    case 'CORRECCION_TURNO_PASADO':                   return 'Corrección de turno pasado';
     case 'REASIGNACION':
     case 'REASIGNACION_MANUAL_TURNO':                 return 'Reasignación de turno';
     case 'MODIFICACION_HORARIO':                      return 'Modificación de horario';
@@ -551,6 +555,7 @@ const EVENTO_DE_TURNO = {
   ASIGNACION_MANUAL_TURNO:   'Asignación manual',
   REASIGNACION_MANUAL_TURNO: 'Reasignación manual',
   LIBERACION_MANUAL_TURNO:   'Liberación manual',
+  CORRECCION_TURNO_PASADO:   'Corrección de turno pasado',
   MODIFICACION_HORARIO:      'Cambio de horario',
 };
 

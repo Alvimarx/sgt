@@ -21,7 +21,7 @@ Este documento es un índice operativo: dice dónde está cada cosa, en qué est
 - **Requerimientos:** R1–R9 aprobados; R10–R17 pendientes de visto bueno; R18 (desktop en todas las pantallas) implementado y sin revisión (`requerimientos/README.md`).
 - **Decisiones:** Álvaro respondió 33 de las 34 con ID el 17 oct; la 34.ª (S-02, las direcciones de red del repositorio) la decide TIC. Se implementaron del 17 al 19 oct, y el 22 oct salieron tres correcciones más de las pruebas integrales (§9).
 - **VM de demostración:** corre el cierre desde el 19 oct y las correcciones del 22 oct. El servidor no se entrega: sigue a cargo de Álvaro como demostración hasta que TIC tenga su propio ambiente (§6.1).
-- **Pruebas:** 480 pruebas unitarias del backend pasan (23 oct); siguen fallando 26 de integración, ya documentadas; el lint del frontend está sin problemas; las E2E de solo lectura quedaron en verde el 19 oct. De las pruebas integrales basadas en reglas (32 historias, 249 casos) se ejecutaron 20 en la VM; el resto lo corre TIC con el plan (§7).
+- **Pruebas:** 495 pruebas unitarias del backend pasan (23 oct); siguen fallando 26 de integración, ya documentadas; el lint del frontend está sin problemas; las E2E de solo lectura quedaron en verde el 19 oct. De las pruebas integrales basadas en reglas (32 historias, 249 casos) se ejecutaron 20 en la VM; el resto lo corre TIC con el plan (§7).
 - **Seguridad, pendiente ya:** la cuenta de administrador de arranque de la demostración usa la clave común de desarrollo, que está en este repositorio público, y la VM se abre desde internet por HTTP. Hay que cambiar esa clave o desactivar la cuenta (§6.1, §11).
 - **No está listo para datos reales ni para internet.** Antes hay que cerrar, al menos: TLS, rate limiting, el filtro del administrador en solicitudes, las 26 pruebas de integración y el hash heredado de claves (§6.2, §11).
 - **Incidente de datos de agosto:** todos sus pendientes pasan a TIC HUAP (§10).
@@ -64,7 +64,7 @@ Ramas en GitHub: `main` (la entrega), `desktop-todas-las-pantallas` (donde se hi
 |---|---|
 | `huap_backend/` | API REST, Java 21 y Spring Boot `4.0.0-SNAPSHOT`. Paquetes `Controller`, `Service`, `Repository`, `Entity`, `DTO`, `Security`, `Config`, `Utils`; `hospital/` lee la vista de personal (solo lectura). `Security/SeguridadServicio` y `Security/AlcanceServicio` acotan lecturas y escrituras por servicio y dueño (C-17); `JwtAccessDeniedHandler` responde 403 (C-20) |
 | `huap_backend/src/main/resources/application.properties` | Toda la configuración; los valores vienen de variables de entorno (§4) |
-| `huap_backend/src/test/` | 27 clases de pruebas unitarias (480 pruebas, Mockito y JUnit), 8 de integración y concurrencia con Testcontainers y `LockBenchmark` (§7) |
+| `huap_backend/src/test/` | 28 clases de pruebas unitarias (495 pruebas, Mockito y JUnit), 8 de integración y concurrencia con Testcontainers y `LockBenchmark` (§7) |
 | `sgt-huap_frontend/` | SPA React 19, Vite 7 y Tailwind 3 |
 | `sgt-huap_frontend/src/components/Admin2/Prop4.jsx` | Navegación: no hay rutas, la app cambia de vista con `currentView` y lista blanca por rol |
 | `sgt-huap_frontend/src/components/Desktop/`, `src/layout/` | Modo desktop (R16–R18) y el umbral de 1200 px |
@@ -327,7 +327,7 @@ Base: `docs/security/INTERNET_DEPLOYMENT_SECURITY_CHECKLIST.md` y `RESIDUAL_RISK
 
 | Suite | Qué hay | Cómo se corre | Estado |
 |---|---|---|---|
-| Backend, unitarias | 27 clases (Mockito y JUnit), sin base ni contexto de Spring: 480 pruebas | `cd huap_backend && ./mvnw test -Dtest='!*IntegrationTest,!*ConcurrencyTest,!LockBenchmark'` | **480 pasan, 0 fallan** (23 oct; Maven 3.9.6 y Java 21). Es el filtro con que se obtuvo ese resultado |
+| Backend, unitarias | 28 clases (Mockito y JUnit), sin base ni contexto de Spring: 495 pruebas | `cd huap_backend && ./mvnw test -Dtest='!*IntegrationTest,!*ConcurrencyTest,!LockBenchmark'` | **495 pasan, 0 fallan** (23 oct; Maven 3.9.6 y Java 21). Es el filtro con que se obtuvo ese resultado |
 | Backend, integración y concurrencia | 8 clases que heredan de `AbstractContainerTest` (MySQL 8.0 con Testcontainers y contexto completo de Spring), más `LockBenchmark`, que no calza con el patrón de nombres por defecto de Surefire. Requieren Docker | `./mvnw test` (corre todo, también estas) | **26 pruebas fallan, sin diagnosticar** (documentadas desde agosto). Pista, sin confirmar: `REVISION_POST_CORRECCIONES_SGT.md` §1.5 atribuye los errores a una causa común (el datasource del hospital no se configura en las pruebas) |
 | Frontend, lint | ESLint | `cd sgt-huap_frontend && npm run lint` | **0 problemas** en todo el árbol (22 oct) |
 | Frontend, build | Vite | `npm run build` | Pasa. Aviso de un chunk sobre 500 kB: el bundle principal pesa unos 980 kB (263 kB gzip, build del 19 oct; 965 kB el 16 oct) |
@@ -454,6 +454,7 @@ Decisiones del traspaso (22 y 23 oct):
 | Repositorio con la base real de `innhosp` | Lo decide TIC: si porta R10–R18 a ese repositorio o si este pasa a ser la base |
 | Transición | Álvaro responde dudas hasta el 30 nov 2026, por correo |
 | Vencimiento (23 oct) | «No deberían estar vigentes las solicitudes ocurridas en el pasado»: toda solicitud pendiente y toda oferta general pendiente o abierta cuyo turno ya empezó se cierra sola (RECHAZADA, «Venció: el turno ya comenzó»; sin migración). Tarea programada cada 3 minutos (`huap.vencimiento.intervalo-ms`) y, además, al leer las listas y antes de resolver; evento de sistema en la bitácora, sin actor. Catálogo C-24. Efecto en la VM: las solicitudes y ofertas pendientes del seed (turnos de mayo) vencen en la primera lectura |
+| Turno pasado (23 oct) | «Sí yo podría poder cambiar en el sistema de turnos quién hizo el turno en el pasado como jefatura y admin»: en un turno ya terminado, la jefatura del servicio, el subrogante y el administrador asignan, quitan o cambian al médico (en uno empezado ya se podía, decisión del 20 oct). Se mantienen el choque de horario y la separación por servicio; el descanso posterior a una noche (R13) avisa y no bloquea; el médico común no puede. Bitácora: evento `CORRECCION_TURNO_PASADO` con quién lo hizo, el titular anterior y el nuevo. La auditoría y las estadísticas leen el titular del turno y reflejan la corrección. Sin migración. Catálogo C-24 |
 
 ---
 

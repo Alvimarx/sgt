@@ -415,6 +415,7 @@ public class ExportacionService {
         return tipoEvento.contains("ASIGNACION_MANUAL")
                 || tipoEvento.contains("LIBERACION_MANUAL")
                 || tipoEvento.contains("REASIGNACION_MANUAL")
+                || tipoEvento.contains("CORRECCION_TURNO_PASADO")
                 || tipoEvento.contains("TURNO_ASIGNADO_MANUALMENTE")
                 || tipoEvento.contains("MODIFICACION_MANUAL_TURNO");
     }
@@ -466,6 +467,8 @@ public class ExportacionService {
 
         if (tipoEvento.contains("LIBERACION_MANUAL")) {
             detalle = "Funcionario eliminado manualmente del turno por administración";
+        } else if (tipoEvento.contains("CORRECCION_TURNO_PASADO")) {
+            detalle = "Corrección del registro de quién hizo el turno, por administración";
         } else if (tipoEvento.contains("REASIGNACION_MANUAL")) {
             detalle = "Funcionario reasignado manualmente por administración";
         } else if (tipoEvento.contains("ASIGNACION_MANUAL")) {

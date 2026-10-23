@@ -148,7 +148,7 @@ El token JWT dura 24 h y el datasource del hospital se abre en solo lectura. La 
 ## Pruebas
 
 ```bash
-# Backend, unitarias (480 pruebas; sin Docker)
+# Backend, unitarias (495 pruebas; sin Docker)
 cd huap_backend
 ./mvnw test -Dtest='!*IntegrationTest,!*ConcurrencyTest,!LockBenchmark'
 

@@ -4,11 +4,15 @@ import { SGTAvatar, SGTBadge, SGTIcon, Sheet } from '../Style/UIPrimitives';
 import { getFuncionariosSummary } from '../../services/funcionarioService';
 import { asignarTurnoLibre, reasignarTurno, desasignarTurno } from '../../services/turnosService';
 import { formatShiftLabel } from './turnoPresentacion';
+import { yaTermino } from '../../utils/reglasTurno';
 import { useLayout } from '../../layout/layout';
 import AsignacionTurnoDesktop from '../Desktop/turnos/AsignacionTurnoDesktop';
 import ConfirmacionDesktop from '../Desktop/turnos/ConfirmacionDesktop';
 
 const MAX_SEARCH_LENGTH = 60;
+
+// Decisión del 23 oct: en un turno que ya terminó, la gestión corrige quién lo hizo de verdad.
+const NOTA_TURNO_PASADO = 'Turno pasado: estás corrigiendo el registro de quién lo hizo. Queda en la bitácora con tu nombre, el titular anterior y el nuevo. Se mantiene el choque de horario; el descanso posterior a una noche solo avisa.';
 
 const sanitizeQuery = (raw) => String(raw || '').replace(/[<>"'`;]/g, '').slice(0, MAX_SEARCH_LENGTH);
 
@@ -218,7 +222,11 @@ const AsignarTurnoLibreSheet = ({
   const turnoAsignado = Boolean(shift?.idFuncionario);
   const turnoLibre = !turnoAsignado;
 
-  const tituloSheet = turnoAsignado ? 'Editar asignación de turno' : 'Asignar turno libre';
+  const turnoPasado = Boolean(shift) && yaTermino(shift);
+
+  const tituloSheet = turnoPasado
+    ? 'Corregir quién hizo el turno'
+    : (turnoAsignado ? 'Editar asignación de turno' : 'Asignar turno libre');
   const textoBotonPrincipal = turnoAsignado ? 'Reasignar turno' : 'Asignar turno';
 
   useEffect(() => {
@@ -396,6 +404,7 @@ const AsignarTurnoLibreSheet = ({
               onSeleccionar={(id) => setSelectedId(String(id) === String(selectedId) ? null : id)}
               motivo={motivo}
               onMotivo={(valor) => setMotivo(valor.slice(0, 180))}
+              avisoPasado={turnoPasado ? NOTA_TURNO_PASADO : null}
               puedeQuitar={turnoAsignado}
               onQuitar={abrirConfirmacionDesasignar}
               textoPrincipal={saving ? 'Guardando...' : textoBotonPrincipal}
@@ -459,6 +468,24 @@ const AsignarTurnoLibreSheet = ({
                   Gestión de asignación
                 </span>
               </div>
+
+              {turnoPasado && (
+                <div
+                  role="note"
+                  style={{
+                    margin: '4px 0 8px',
+                    padding: '7px 10px',
+                    borderRadius: 10,
+                    background: PA.warnSoft,
+                    color: PA.warn,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {NOTA_TURNO_PASADO}
+                </div>
+              )}
 
               <div style={{ fontSize: 16, fontWeight: 900, color: PA.ink }}>
                 {formatShiftLabel(shift)}

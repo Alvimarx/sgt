@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getTurnosServicio } from '../../services/funcionarioService';
 import { solicitudesService, ofertasGeneralesService } from '../../services/adminService';
 import { hoyISOEnZonaHospital } from '../../utils/dateUtils';
+import { yaEmpezo } from '../../utils/reglasTurno';
 import { mensajeDeError } from '../../utils/errores';
 import { esAdministrador } from '../../utils/roles';
 import { ESTADO_OFERTA, ofertaVisible, participaEnOferta, participaEnSolicitud, puedeRetirarOferta, solicitudPendienteVigente } from '../../utils/reglasSolicitud';
@@ -191,10 +192,10 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
   const [refreshTick, setRefreshTick] = useState(0);
   const toastTimer = useRef(null);
 
-  const toast = useCallback((msg) => {
+  const toast = useCallback((msg, duracion = 2800) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToastMsg(msg);
-    toastTimer.current = setTimeout(() => setToastMsg(null), 2800);
+    toastTimer.current = setTimeout(() => setToastMsg(null), duracion);
   }, []);
   const recargar = () => setRefreshTick((v) => v + 1);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
@@ -362,12 +363,15 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
       // El backend marca solicitudPendiente solo para solicitudes DEL usuario
       // autenticado (R11): si ya lo solicitó, el cupo queda no interactivo (R12).
       const yaSolicitada = !canAssign && Boolean(t.solicitudPendiente);
+      // 23 oct: sobre un turno que ya empezó no se pide nada (las solicitudes vencen); la gestión sí lo asigna.
+      const yaEmpezada = !canAssign && yaEmpezo(t);
       return {
         key: t.id, puesto: t.nombrePuesto || 'Sin puesto',
-        yaSolicitada,
+        yaSolicitada: yaSolicitada || yaEmpezada,
+        yaEmpezada,
         onAsignar: canAssign
           ? () => setTurnoGestion(t)
-          : yaSolicitada
+          : (yaSolicitada || yaEmpezada)
             ? undefined
             : () => onOpenSolicitudes?.({ tipoSolicitudId: 3, idTurno: t.id, turnoLabel: formatShiftLabel(t) }),
       };
@@ -670,7 +674,7 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
                     <span style={{ width: 18, height: 18, borderRadius: 99, border: '1.5px dashed #E57F84', color: '#B85A60', display: 'inline-grid', placeItems: 'center', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>+</span>
                     <span style={{ minWidth: 0, textAlign: 'left' }}>
                       <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#8C3F44' }}>
-                        {canAssign ? 'Asignar' : l.yaSolicitada ? 'Solicitado' : 'Solicitar'}
+                        {canAssign ? 'Asignar' : l.yaEmpezada ? 'Ya empezó' : l.yaSolicitada ? 'Solicitado' : 'Solicitar'}
                       </span>
                       <span style={{ display: 'block', fontSize: '8px', fontWeight: 700, color: '#B85A60', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{l.puesto} libre</span>
                     </span>
@@ -938,9 +942,11 @@ const CentroOperacionesDesktop = ({ user, onNavigate, onOpenSolicitudes }) => {
         servicioId={servicioId}
         adminUserId={myUserId}
         onClose={() => setTurnoGestion(null)}
-        onAssigned={() => {
+        onAssigned={(resultado) => {
           setTurnoGestion(null);
-          toast('Asignación actualizada.');
+          // 23 oct: en un turno pasado, R13 avisa y no bloquea; el aviso se lee con calma.
+          if (resultado?.advertencia) toast(resultado.advertencia, 9000);
+          else toast('Asignación actualizada.');
           recargar();
         }}
       />

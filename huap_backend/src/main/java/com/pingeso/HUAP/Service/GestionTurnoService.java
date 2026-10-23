@@ -13,11 +13,13 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import com.pingeso.HUAP.Repository.ServiciosFuncionarioRepository;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +50,20 @@ public class GestionTurnoService {
     static final String MOTIVO_ASIGNADO = "Rechazo automático: El turno fue asignado manualmente.";
     static final String MOTIVO_REASIGNADO = "Rechazo automático: El turno fue reasignado manualmente.";
     static final String MOTIVO_LIBERADO = "Rechazo automático: El turno fue liberado manualmente.";
+
+    /** Evento de bitácora de la corrección de quién hizo un turno que ya terminó (decisión del 23 oct). */
+    static final String EVENTO_CORRECCION_TURNO_PASADO = "CORRECCION_TURNO_PASADO";
+
+    /** Ahora, en la hora del servidor (el backend corre con {@code TZ=America/Santiago}). Las pruebas lo fijan. */
+    LocalDateTime ahora() {
+        return LocalDateTime.now();
+    }
+
+    /** ¿El turno ya terminó? Un turno en curso no: termina a su hora de término (la mañana siguiente, si es una noche). */
+    private static boolean yaTermino(TurnoEntity turno, LocalDateTime ahora) {
+        if (turno.getDiaFinalTurno() == null || turno.getHoraFin() == null) return false;
+        return !turno.getDiaFinalTurno().atTime(turno.getHoraFin()).isAfter(ahora);
+    }
 
     /**
      * Kill-switch del lock pesimista (por defecto activado). Existe para poder medir A/B el costo del
@@ -93,10 +109,21 @@ public class GestionTurnoService {
 
         FuncionarioEntity funcionarioAnterior = turno.getFuncionario();
 
-        return switch (request.getAccion().toUpperCase()) {
-                case "ASIGNAR"       -> accionAsignar(request, turno, admin, funcionarioAnterior);
-                case "DESASIGNAR"    -> accionDesasignar(request, turno, admin, funcionarioAnterior);
-                case "REASIGNAR"     -> accionReasignar(request, turno, admin, funcionarioAnterior);
+        // 23 oct: en un turno que ya terminó, asignar, quitar o cambiar al médico es la corrección del
+        // registro de quién lo hizo de verdad, y la hacen solo la jefatura del servicio, el subrogante
+        // y el administrador. Se mantienen el choque de horario y la separación por servicio; el
+        // descanso posterior a una noche (R13) avisa, pero no bloquea.
+        String accion = request.getAccion().toUpperCase();
+        boolean pasado = yaTermino(turno, ahora())
+                && ("ASIGNAR".equals(accion) || "DESASIGNAR".equals(accion) || "REASIGNAR".equals(accion));
+        if (pasado) {
+            exigirGestionParaCorregirPasado();
+        }
+
+        return switch (accion) {
+                case "ASIGNAR"       -> accionAsignar(request, turno, admin, funcionarioAnterior, pasado);
+                case "DESASIGNAR"    -> accionDesasignar(request, turno, admin, funcionarioAnterior, pasado);
+                case "REASIGNAR"     -> accionReasignar(request, turno, admin, funcionarioAnterior, pasado);
                 case "CAMBIAR_HORAS" -> accionCambiarHoras(request, turno, admin);
                 default -> throw new RuntimeException("Acción no válida: " + request.getAccion());
         };
@@ -107,7 +134,7 @@ public class GestionTurnoService {
     // ---------------------------------------------------------------
 
     private Map<String, Object> accionAsignar(AlterarTurnoRequest request, TurnoEntity turno,
-            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior) {
+            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior, boolean pasado) {
 
         if (funcionarioAnterior != null)
             throw new RuntimeException("El turno ya tiene un funcionario asignado. Use REASIGNAR.");
@@ -118,45 +145,56 @@ public class GestionTurnoService {
                 .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: " + request.getIdNuevoMedico()));
 
         validarFuncionarioAsignable(nuevo, turno);
-        validarConflictoFuncionario(nuevo, turno);
+        String advertencia = validarConflictoFuncionario(nuevo, turno, pasado);
 
         turno.setFuncionario(nuevo);
         turnoRepository.save(turno);
 
-        registrarEnBitacora(admin, turno, "ASIGNACION_MANUAL_TURNO",
-                "Turno asignado manualmente a " + nombreCompleto(nuevo), request.getMotivo());
+        if (pasado) {
+            registrarCorreccionPasada(admin, turno, null, nuevo, advertencia, request.getMotivo());
+        } else {
+            registrarEnBitacora(admin, turno, "ASIGNACION_MANUAL_TURNO",
+                    "Turno asignado manualmente a " + nombreCompleto(nuevo), request.getMotivo());
+        }
         solicitudService.rechazarPendientesPorCambioManual(turno.getIdTurno(), admin.getIdFuncionario(), MOTIVO_ASIGNADO);
 
-        notificacionService.crearNotificacionSistema(nuevo,
-                "Se te ha asignado un turno del " + diaYHorario(turno) + ".");
+        notificacionService.crearNotificacionSistema(nuevo, pasado
+                ? "Se registró que hiciste el turno del " + diaYHorario(turno) + "."
+                : "Se te ha asignado un turno del " + diaYHorario(turno) + ".");
 
-        return Map.of("accion", "asignado", "funcionario", nombreCompleto(nuevo));
+        return resultado(pasado, advertencia, "accion", "asignado", "funcionario", nombreCompleto(nuevo));
     }
 
     private Map<String, Object> accionDesasignar(AlterarTurnoRequest request, TurnoEntity turno,
-            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior) {
+            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior, boolean pasado) {
 
         String anteriorNombre = funcionarioAnterior != null ? nombreCompleto(funcionarioAnterior) : "N/A";
 
         turno.setFuncionario(null);
         turnoRepository.save(turno);
 
-        registrarEnBitacora(admin, turno, "LIBERACION_MANUAL_TURNO",
-          "Funcionario eliminado manualmente del turno: " + anteriorNombre, request.getMotivo());
+        if (pasado) {
+            registrarCorreccionPasada(admin, turno, funcionarioAnterior, null, null, request.getMotivo());
+        } else {
+            registrarEnBitacora(admin, turno, "LIBERACION_MANUAL_TURNO",
+              "Funcionario eliminado manualmente del turno: " + anteriorNombre, request.getMotivo());
+        }
 
         if (funcionarioAnterior != null) {
             // Liberar un cupo que ya estaba libre no cambia nada: sus coberturas pendientes siguen.
             solicitudService.rechazarPendientesPorCambioManual(turno.getIdTurno(), admin.getIdFuncionario(), MOTIVO_LIBERADO);
-            notificacionService.crearNotificacionSistema(funcionarioAnterior,
-                    "Tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
-                    + " ha sido desasignado. Motivo: " + request.getMotivo());
+            notificacionService.crearNotificacionSistema(funcionarioAnterior, pasado
+                    ? "Se corrigió el registro del turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
+                      + ": ya no figura a tu nombre. Motivo: " + request.getMotivo()
+                    : "Tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
+                      + " ha sido desasignado. Motivo: " + request.getMotivo());
         }
 
-        return Map.of("accion", "desasignado", "anterior", anteriorNombre);
+        return resultado(pasado, null, "accion", "desasignado", "anterior", anteriorNombre);
     }
 
     private Map<String, Object> accionReasignar(AlterarTurnoRequest request, TurnoEntity turno,
-            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior) {
+            FuncionarioEntity admin, FuncionarioEntity funcionarioAnterior, boolean pasado) {
 
         if (request.getIdNuevoMedico() == null)
             throw new RuntimeException("Debe especificar el ID del nuevo funcionario.");
@@ -165,16 +203,20 @@ public class GestionTurnoService {
                 .orElseThrow(() -> new RuntimeException("Funcionario no encontrado: " + request.getIdNuevoMedico()));
 
         validarFuncionarioAsignable(nuevo, turno);
-        validarConflictoFuncionario(nuevo, turno);
+        String advertencia = validarConflictoFuncionario(nuevo, turno, pasado);
 
         String anteriorNombre = funcionarioAnterior != null ? nombreCompleto(funcionarioAnterior) : "N/A";
 
         turno.setFuncionario(nuevo);
         turnoRepository.save(turno);
 
-        registrarEnBitacora(admin, turno, "REASIGNACION_MANUAL_TURNO",
-                "Turno reasignado manualmente de " + anteriorNombre + " a " + nombreCompleto(nuevo),
-                request.getMotivo());
+        if (pasado) {
+            registrarCorreccionPasada(admin, turno, funcionarioAnterior, nuevo, advertencia, request.getMotivo());
+        } else {
+            registrarEnBitacora(admin, turno, "REASIGNACION_MANUAL_TURNO",
+                    "Turno reasignado manualmente de " + anteriorNombre + " a " + nombreCompleto(nuevo),
+                    request.getMotivo());
+        }
         // Reasignar a quien ya lo tiene no cambia de dueño: sus solicitudes siguen en pie.
         boolean cambiaDeDueno = funcionarioAnterior == null
                 || !funcionarioAnterior.getIdFuncionario().equals(nuevo.getIdFuncionario());
@@ -183,14 +225,18 @@ public class GestionTurnoService {
         }
 
         if (funcionarioAnterior != null) {
-            notificacionService.crearNotificacionSistema(funcionarioAnterior,
-                    "Tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
-                    + " ha sido reasignado a otro funcionario. Motivo: " + request.getMotivo());
+            notificacionService.crearNotificacionSistema(funcionarioAnterior, pasado
+                    ? "Se corrigió el registro del turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
+                      + ": ya no figura a tu nombre. Motivo: " + request.getMotivo()
+                    : "Tu turno del " + FormatoFecha.dia(turno.getDiaInicioTurno())
+                      + " ha sido reasignado a otro funcionario. Motivo: " + request.getMotivo());
         }
-        notificacionService.crearNotificacionSistema(nuevo,
-                "Se te ha reasignado el turno del " + diaYHorario(turno) + ".");
+        notificacionService.crearNotificacionSistema(nuevo, pasado
+                ? "Se registró que hiciste el turno del " + diaYHorario(turno) + "."
+                : "Se te ha reasignado el turno del " + diaYHorario(turno) + ".");
 
-        return Map.of("accion", "reasignado", "anterior", anteriorNombre, "nuevo", nombreCompleto(nuevo));
+        return resultado(pasado, advertencia, "accion", "reasignado", "anterior", anteriorNombre,
+                "nuevo", nombreCompleto(nuevo));
     }
 
     private Map<String, Object> accionCambiarHoras(AlterarTurnoRequest request,
@@ -239,8 +285,12 @@ public class GestionTurnoService {
      * Revisa el calendario de quien recibe el turno a mano (asignar o reasignar): ni cruce de
      * horario ni noche seguida de día (R13). Los dos son conflictos de estado: 409 con el mensaje,
      * que cita el turno con que choca (RG-27): su tipo, el servicio si es otro, y su fecha y horas.
+     *
+     * <p>En un turno pasado ({@code pasado}, 23 oct) el cruce de horario sigue bloqueando, porque nadie
+     * puede estar en dos turnos a la vez; R13 no, porque se registra lo que ya ocurrió: en su lugar
+     * se devuelve el aviso (o {@code null} si no hay nada que avisar).
      */
-    private void validarConflictoFuncionario(FuncionarioEntity funcionario, TurnoEntity turno) {
+    private String validarConflictoFuncionario(FuncionarioEntity funcionario, TurnoEntity turno, boolean pasado) {
         Long idFuncionario = funcionario.getIdFuncionario();
         // Lock pesimista del funcionario ANTES del chequeo: serializa validación+asignación para un
         // mismo funcionario (cubre ASIGNAR y REASIGNAR), cerrando la carrera check-then-act que
@@ -273,11 +323,63 @@ public class GestionTurnoService {
         try {
             validadorAsignacion.validarSolape(nombre, inicioObjetivo, finObjetivo, turno.getIdTurno(),
                     cercanos, AlcanceServicio.servicioDe(turno));
-            validadorAsignacion.validarDescansoPostNocturno(
-                    nombre, inicioObjetivo, finObjetivo, turno.getIdTurno(), cercanos);
         } catch (ValidadorAsignacionTurnoService.ConflictoAsignacionException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         }
+        try {
+            validadorAsignacion.validarDescansoPostNocturno(
+                    nombre, inicioObjetivo, finObjetivo, turno.getIdTurno(), cercanos);
+        } catch (ValidadorAsignacionTurnoService.ConflictoAsignacionException e) {
+            if (!pasado) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+            }
+            return "Se registró igual porque el turno ya pasó, pero tenga en cuenta el descanso: " + e.getMessage();
+        }
+        return null;
+    }
+
+    /**
+     * Solo la jefatura del servicio, el subrogante que la reemplaza y el administrador corrigen quién
+     * hizo un turno pasado. El endpoint ya lo pide por rol; esto lo repite en el servicio para que no
+     * dependa de quien lo llame. El alcance por servicio lo exige {@code alterarTurno} antes.
+     */
+    private void exigirGestionParaCorregirPasado() {
+        if (!seguridadServicio.esAdministrador() && !seguridadServicio.esGestionDelServicio()) {
+            throw new AccessDeniedException(
+                    "Solo la jefatura, el subrogante o el administrador pueden corregir un turno pasado");
+        }
+    }
+
+    /**
+     * La respuesta de {@code /turnos/alterar}: los pares clave-valor de la acción, más
+     * {@code correccionTurnoPasado} y el {@code advertencia} (si lo hay) cuando el turno ya terminó.
+     */
+    private static Map<String, Object> resultado(boolean pasado, String advertencia, Object... pares) {
+        Map<String, Object> mapa = new LinkedHashMap<>();
+        for (int i = 0; i < pares.length; i += 2) {
+            mapa.put((String) pares[i], pares[i + 1]);
+        }
+        if (pasado) {
+            mapa.put("correccionTurnoPasado", true);
+        }
+        if (advertencia != null) {
+            mapa.put("advertencia", advertencia);
+        }
+        return mapa;
+    }
+
+    /**
+     * Deja en la bitácora la corrección de un turno pasado: quién la hizo (el actor del evento), el
+     * titular anterior y el nuevo. La columna de observaciones es de 255 caracteres.
+     */
+    private void registrarCorreccionPasada(FuncionarioEntity admin, TurnoEntity turno,
+            FuncionarioEntity anterior, FuncionarioEntity nuevo, String advertencia, String motivo) {
+        String observaciones = "Corrección de turno pasado: titular anterior "
+                + (anterior != null ? nombreCompleto(anterior) : "sin titular")
+                + "; titular nuevo " + (nuevo != null ? nombreCompleto(nuevo) : "sin titular")
+                + (advertencia != null ? ". Aviso: noche seguida de día (R13), registrado igual." : ".");
+        registrarEnBitacora(admin, turno, EVENTO_CORRECCION_TURNO_PASADO,
+                observaciones.length() > 255 ? observaciones.substring(0, 255) : observaciones, motivo);
     }
 
     private void registrarEnBitacora(FuncionarioEntity admin, TurnoEntity turno,

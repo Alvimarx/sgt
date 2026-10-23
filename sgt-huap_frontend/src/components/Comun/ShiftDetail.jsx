@@ -8,7 +8,7 @@ import { SGTAvatar, SGTBadge, SGTIcon } from "../Style/UIPrimitives";
 import { useLayout } from "../../layout/layout";
 import DetalleTurnoDesktop from "../Desktop/turnos/DetalleTurnoDesktop";
 import { getTipoTurnoColor, getAgendaTeam, formatShiftLabel } from "./turnoPresentacion";
-import { yaEmpezo } from "../../utils/reglasTurno";
+import { yaEmpezo, yaTermino } from "../../utils/reglasTurno";
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -44,6 +44,10 @@ const estadoDelTurno = (shift, turnoLibre) =>
             : shift.miTurno
                 ? "Tu turno"
                 : "Asignado";
+
+// Decisión del 23 oct: en un turno que ya terminó, la jefatura, el subrogante y el administrador
+// asignan, quitan o cambian al médico: es la corrección de quién lo hizo de verdad.
+const NOTA_CORREGIR_PASADO = "Turno pasado: puedes corregir quién lo hizo (asignar, quitar o cambiar). Queda en la bitácora.";
 
 // Equipo agrupado por puesto: cada integrante con el turno que se puede gestionar
 // y cada vacante con su estado (ya solicitada o no).
@@ -81,6 +85,8 @@ const equipoPorPuesto = ({ porPuesto = [], turnosGrupo = [], canManageAssignment
         const vacantes = vacantesDelPuesto.map((vacante) => ({
             vacante,
             yaSolicitada: !canManageAssignments && Boolean(vacante.solicitudPendiente),
+            // 23 oct: sobre un turno que ya empezó no se pide nada; la gestión sí lo asigna.
+            yaEmpezada: !canManageAssignments && yaEmpezo(vacante),
         }));
 
         // Las vacantes de cada puesto se cuentan con los mismos turnos del grupo
@@ -103,11 +109,10 @@ const alTocarIntegrante = (fila, { onManageAssignedTurn, onSelectMember }) => {
     onSelectMember?.(fila.p);
 };
 
-const alTocarVacante = ({ vacante, yaSolicitada }, canManageAssignments, { onAssignVacancy, onRequestVacancy }) => {
+const alTocarVacante = ({ vacante, yaSolicitada, yaEmpezada }, canManageAssignments, { onAssignVacancy, onRequestVacancy }) => {
     if (canManageAssignments) {
         onAssignVacancy?.(vacante);
-    } else if (!yaSolicitada && !yaEmpezo(vacante)) {
-        // 23 oct: sobre un turno que ya empezó no se pide nada.
+    } else if (!yaSolicitada && !yaEmpezada) {
         onRequestVacancy?.(vacante);
     }
 };
@@ -326,6 +331,7 @@ const ShiftDetail = ({
         const receptorId = selectedTargetFuncionario?.id;
 
         const info = [{ etiqueta: "Estado", valor: estadoDelTurno(shift, turnoLibre) }];
+        if (canManageAssignments && yaTermino(shift)) info.push({ etiqueta: "Registro", valor: NOTA_CORREGIR_PASADO });
         if (!turnoLibre && shift.nombreFuncionario) info.push({ etiqueta: "Funcionario", valor: shift.nombreFuncionario });
         if (shift.nombrePuesto) info.push({ etiqueta: "Puesto", valor: shift.nombrePuesto });
         if (shift.horas != null) info.push({ etiqueta: "Duración", valor: `${shift.horas} horas` });
@@ -353,6 +359,7 @@ const ShiftDetail = ({
                 vacantes: fila.vacantes.map((v, i) => ({
                     clave: `vacante-${v.vacante.id ?? i}`,
                     yaSolicitada: v.yaSolicitada,
+                    yaEmpezada: v.yaEmpezada,
                     onClick: () => alTocarVacante(v, canManageAssignments, {
                         onAssignVacancy: handleAssignVacancy,
                         onRequestVacancy: handleRequestVacancy,
@@ -520,6 +527,10 @@ const ShiftDetail = ({
                         label="Estado"
                         value={estadoDelTurno(shift, turnoLibre)}
                     />
+
+                    {canManageAssignments && yaTermino(shift) && (
+                        <DetailRow label="Registro" value={NOTA_CORREGIR_PASADO} />
+                    )}
 
                     {!turnoLibre && shift.nombreFuncionario && (
                         <DetailRow label="Funcionario" value={shift.nombreFuncionario} />
@@ -853,12 +864,14 @@ const TeamByPuesto = ({
 
                         {vacantes.map((fila, i) => {
                             // yaSolicitada: vacante que el usuario YA solicitó (ver equipoPorPuesto).
-                            const { vacante, yaSolicitada } = fila;
+                            const { vacante, yaSolicitada, yaEmpezada } = fila;
+                            // Cerrada: ya la pidió o el turno ya empezó (no se pide nada).
+                            const cerrada = yaSolicitada || yaEmpezada;
                             return (
                             <button
                                 key={`vacante-${vacante.id ?? i}`}
                                 type="button"
-                                disabled={yaSolicitada}
+                                disabled={cerrada}
                                 onClick={() => alTocarVacante(fila, canManageAssignments, { onAssignVacancy, onRequestVacancy })}
                                 style={{
                                     display: "flex",
@@ -869,17 +882,17 @@ const TeamByPuesto = ({
                                     marginTop: 4,
                                     border: canManageAssignments
                                         ? `1px dashed ${P2().primary}`
-                                        : yaSolicitada
+                                        : cerrada
                                             ? `1px dashed ${P2().line}`
                                             : `1px dashed ${P2().accent}`,
                                     background: canManageAssignments
                                         ? P2().primarySoft
-                                        : yaSolicitada
+                                        : cerrada
                                             ? P2().surface2
                                             : P2().accentSoft,
                                     width: "100%",
                                     textAlign: "left",
-                                    cursor: yaSolicitada ? "default" : "pointer",
+                                    cursor: cerrada ? "default" : "pointer",
                                 }}
                             >
                                 <div
@@ -888,7 +901,7 @@ const TeamByPuesto = ({
                                         height: 28,
                                         borderRadius: 99,
                                         border: `1.5px dashed ${
-                                            canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : P2().accent
+                                            canManageAssignments ? P2().primary : cerrada ? P2().ink3 : P2().accent
                                         }`,
                                         display: "grid",
                                         placeItems: "center",
@@ -896,9 +909,9 @@ const TeamByPuesto = ({
                                     }}
                                 >
                                     <SGTIcon
-                                        name={canManageAssignments ? "user-plus" : yaSolicitada ? "check" : "hand-raised"}
+                                        name={canManageAssignments ? "user-plus" : cerrada ? "check" : "hand-raised"}
                                         size={13}
-                                        color={canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60"}
+                                        color={canManageAssignments ? P2().primary : cerrada ? P2().ink3 : "#B85A60"}
                                     />
                                 </div>
 
@@ -906,7 +919,7 @@ const TeamByPuesto = ({
                                     style={{
                                         fontSize: 12.5,
                                         fontWeight: 800,
-                                        color: canManageAssignments ? P2().primary : yaSolicitada ? P2().ink3 : "#B85A60",
+                                        color: canManageAssignments ? P2().primary : cerrada ? P2().ink3 : "#B85A60",
                                         flex: 1,
                                     }}
                                 >
@@ -914,10 +927,12 @@ const TeamByPuesto = ({
                                         ? "Asignar funcionario a este cupo"
                                         : yaSolicitada
                                             ? "Ya solicitaste este turno"
-                                            : "Cupo libre — tocar para solicitar"}
+                                            : yaEmpezada
+                                                ? "Este turno ya empezó"
+                                                : "Cupo libre — tocar para solicitar"}
                                 </span>
 
-                                {!yaSolicitada && (
+                                {!cerrada && (
                                     <SGTIcon
                                         name="chevron-right"
                                         size={13}

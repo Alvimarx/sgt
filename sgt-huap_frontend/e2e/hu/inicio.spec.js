@@ -11,12 +11,12 @@
 // respondiendo esas consultas GET en el navegador: nada se guarda.
 import {
   test, expect, ID, SERVICIO, APOYO, MESES, esMovil, esDesktop,
-  hoyChile, sumarDias, lunesDe, diaSemana, mesDe, anioDe,
+  hoyChile, ahoraChile, sumarDias, lunesDe, diaSemana, mesDe, anioDe,
   entrar, usuarioSesion, esperarQuieta, etiquetaDia, filtros, filtro, filaDia, esperarAgenda, leerAgenda,
 } from '../helpers/hu.js';
 import {
   diasVisiblesAgenda, turnosPorDia, cuposDisponiblesR9, rotativaDelBloque, esNoche, horasDe,
-  solicitudSimulada, ofertaSimulada,
+  solicitudSimulada, ofertaSimulada, inicioDe,
 } from '../helpers/datos.js';
 
 const SOLO_MOVIL = 'HU-CAL-01 y HU-CAL-02 son solo móvil: en desktop el inicio es el Centro de operaciones (HU-CAL-05).';
@@ -429,7 +429,9 @@ async function diaConCupo(api) {
   const turnos = await api.get('/turnos/servicio/4');
   const hoy = hoyChile();
   const lunes = lunesDe(hoy);
-  const libre = turnos.filter((t) => t.idFuncionario == null && t.diaInicioTurno >= hoy && t.diaInicioTurno <= sumarDias(lunes, 13))
+  // 23 oct: sobre un turno que ya empezó no se pide ni se asigna como un cupo común (el Centro dice «Ya empezó» y el
+  // panel de la gestión es el de corregir un turno pasado), así que el cupo de hoy debe empezar después de ahora.
+  const libre = turnos.filter((t) => t.idFuncionario == null && inicioDe(t) > ahoraChile() && t.diaInicioTurno <= sumarDias(lunes, 13))
     .sort((a, b) => a.diaInicioTurno.localeCompare(b.diaInicioTurno))[0];
   expect(libre, 'hay un cupo libre en las próximas dos semanas').toBeTruthy();
   return { turnos, libre, otraSemana: libre.diaInicioTurno > sumarDias(lunes, 6) };
