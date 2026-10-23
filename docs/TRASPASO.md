@@ -21,7 +21,7 @@ Este documento es un índice operativo: dice dónde está cada cosa, en qué est
 - **Requerimientos:** R1–R9 aprobados; R10–R17 pendientes de visto bueno; R18 (desktop en todas las pantallas) implementado y sin revisión (`requerimientos/README.md`).
 - **Decisiones:** Álvaro respondió 33 de las 34 con ID el 17 oct; la 34.ª (S-02, las direcciones de red del repositorio) la decide TIC. Se implementaron del 17 al 19 oct, y el 22 oct salieron tres correcciones más de las pruebas integrales (§9).
 - **VM de demostración:** corre el cierre desde el 19 oct y las correcciones del 22 oct. El servidor no se entrega: sigue a cargo de Álvaro como demostración hasta que TIC tenga su propio ambiente (§6.1).
-- **Pruebas:** 452 pruebas unitarias del backend pasan (22 oct); siguen fallando 26 de integración, ya documentadas; el lint del frontend está sin problemas; las E2E de solo lectura quedaron en verde el 19 oct. De las pruebas integrales basadas en reglas (32 historias, 249 casos) se ejecutaron 20 en la VM; el resto lo corre TIC con el plan (§7).
+- **Pruebas:** 459 pruebas unitarias del backend pasan (23 oct); siguen fallando 26 de integración, ya documentadas; el lint del frontend está sin problemas; las E2E de solo lectura quedaron en verde el 19 oct. De las pruebas integrales basadas en reglas (32 historias, 249 casos) se ejecutaron 20 en la VM; el resto lo corre TIC con el plan (§7).
 - **Seguridad, pendiente ya:** la cuenta de administrador de arranque de la demostración usa la clave común de desarrollo, que está en este repositorio público, y la VM se abre desde internet por HTTP. Hay que cambiar esa clave o desactivar la cuenta (§6.1, §11).
 - **No está listo para datos reales ni para internet.** Antes hay que cerrar, al menos: TLS, rate limiting, el filtro del administrador en solicitudes, las 26 pruebas de integración y el hash heredado de claves (§6.2, §11).
 - **Incidente de datos de agosto:** todos sus pendientes pasan a TIC HUAP (§10).
@@ -64,7 +64,7 @@ Ramas en GitHub: `main` (la entrega), `desktop-todas-las-pantallas` (donde se hi
 |---|---|
 | `huap_backend/` | API REST, Java 21 y Spring Boot `4.0.0-SNAPSHOT`. Paquetes `Controller`, `Service`, `Repository`, `Entity`, `DTO`, `Security`, `Config`, `Utils`; `hospital/` lee la vista de personal (solo lectura). `Security/SeguridadServicio` y `Security/AlcanceServicio` acotan lecturas y escrituras por servicio y dueño (C-17); `JwtAccessDeniedHandler` responde 403 (C-20) |
 | `huap_backend/src/main/resources/application.properties` | Toda la configuración; los valores vienen de variables de entorno (§4) |
-| `huap_backend/src/test/` | 26 clases de pruebas unitarias (452 pruebas, Mockito y JUnit), 8 de integración y concurrencia con Testcontainers y `LockBenchmark` (§7) |
+| `huap_backend/src/test/` | 26 clases de pruebas unitarias (459 pruebas, Mockito y JUnit), 8 de integración y concurrencia con Testcontainers y `LockBenchmark` (§7) |
 | `sgt-huap_frontend/` | SPA React 19, Vite 7 y Tailwind 3 |
 | `sgt-huap_frontend/src/components/Admin2/Prop4.jsx` | Navegación: no hay rutas, la app cambia de vista con `currentView` y lista blanca por rol |
 | `sgt-huap_frontend/src/components/Desktop/`, `src/layout/` | Modo desktop (R16–R18) y el umbral de 1200 px |
@@ -327,7 +327,7 @@ Base: `docs/security/INTERNET_DEPLOYMENT_SECURITY_CHECKLIST.md` y `RESIDUAL_RISK
 
 | Suite | Qué hay | Cómo se corre | Estado |
 |---|---|---|---|
-| Backend, unitarias | 26 clases (Mockito y JUnit), sin base ni contexto de Spring: 452 pruebas | `cd huap_backend && ./mvnw test -Dtest='!*IntegrationTest,!*ConcurrencyTest,!LockBenchmark'` | **452 pasan, 0 fallan** (22 oct; Maven 3.9.6 y Java 21). Es el filtro con que se obtuvo ese resultado |
+| Backend, unitarias | 26 clases (Mockito y JUnit), sin base ni contexto de Spring: 459 pruebas | `cd huap_backend && ./mvnw test -Dtest='!*IntegrationTest,!*ConcurrencyTest,!LockBenchmark'` | **459 pasan, 0 fallan** (23 oct; Maven 3.9.6 y Java 21). Es el filtro con que se obtuvo ese resultado |
 | Backend, integración y concurrencia | 8 clases que heredan de `AbstractContainerTest` (MySQL 8.0 con Testcontainers y contexto completo de Spring), más `LockBenchmark`, que no calza con el patrón de nombres por defecto de Surefire. Requieren Docker | `./mvnw test` (corre todo, también estas) | **26 pruebas fallan, sin diagnosticar** (documentadas desde agosto). Pista, sin confirmar: `REVISION_POST_CORRECCIONES_SGT.md` §1.5 atribuye los errores a una causa común (el datasource del hospital no se configura en las pruebas) |
 | Frontend, lint | ESLint | `cd sgt-huap_frontend && npm run lint` | **0 problemas** en todo el árbol (22 oct) |
 | Frontend, build | Vite | `npm run build` | Pasa. Aviso de un chunk sobre 500 kB: el bundle principal pesa unos 980 kB (263 kB gzip, build del 19 oct; 965 kB el 16 oct) |
